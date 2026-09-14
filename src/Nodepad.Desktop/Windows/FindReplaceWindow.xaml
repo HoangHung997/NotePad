@@ -1,0 +1,72 @@
+<Window x:Class="Nodepad.Desktop.Windows.FindReplaceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Find &amp; Replace"
+        Icon="/Assets/Branding/h2-notes-app-icon-v1.png"
+        Width="480"
+        Height="260"
+        MinWidth="480"
+        MinHeight="260"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource PanelBrush}">
+    <Border Padding="16"
+            Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Find"
+                       FontFamily="Segoe UI Semibold"
+                       FontSize="13" />
+            <TextBox x:Name="FindTextBox"
+                     Grid.Row="1"
+                     Margin="0,8,0,12" />
+
+            <TextBlock Grid.Row="2"
+                       Text="Replace with"
+                       FontFamily="Segoe UI Semibold"
+                       FontSize="13" />
+            <TextBox x:Name="ReplaceTextBox"
+                     Grid.Row="3"
+                     Margin="0,8,0,0" />
+
+            <DockPanel Grid.Row="4"
+                       Margin="0,16,0,0"
+                       LastChildFill="False">
+                <CheckBox x:Name="MatchCaseCheckBox"
+                          Content="Match case"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0" />
+
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            DockPanel.Dock="Right">
+                    <Button Content="Find Next"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Click="FindNextButton_OnClick"
+                            Margin="0,0,8,0" />
+                    <Button Content="Replace"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Click="ReplaceButton_OnClick"
+                            Margin="0,0,8,0" />
+                    <Button Content="Replace All"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Click="ReplaceAllButton_OnClick"
+                            Margin="0,0,8,0" />
+                    <Button Content="Close"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Click="CloseButton_OnClick"
+                            IsDefault="True" />
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>
