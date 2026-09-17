@@ -7,12 +7,23 @@ work must compare actual app screenshots against them at each implementation
 stage. This approval also records per-project files, configurable data folders,
 and Ollama/multi-provider AI settings. A first functional implementation is now
 available, with 77 passing tests. It is not fully accepted against the baseline;
-see [implementation status and remaining gaps](D:/VSstudio/Nodepad/docs/RESPONSIVE_IMPLEMENTATION.md).
+see [implementation status and remaining gaps](docs/RESPONSIVE_IMPLEMENTATION.md).
 
-See [approved product requirements](D:/VSstudio/Nodepad/docs/APPROVED_PRODUCT_SPEC.md),
-[acceptance checklist](D:/VSstudio/Nodepad/docs/UI_ACCEPTANCE.md), and
-[approved image gallery](D:/VSstudio/Nodepad/docs/ui-concepts/2026-09-15-responsive-hybrid/README.md).
+See [approved product requirements](docs/APPROVED_PRODUCT_SPEC.md),
+[acceptance checklist](docs/UI_ACCEPTANCE.md), and
+[approved image gallery](docs/ui-concepts/2026-09-15-responsive-hybrid/README.md).
 The sections below describe the earlier implemented prototypes.
+
+## Repository layout
+
+- `src/H2Notes.Core/` — shared H2 Notes data, storage, AI and document logic.
+- `src/H2Notes.Avalonia/` — current Avalonia H2 Notes application.
+- `src/Nodepad.Desktop/` — original WPF desktop app kept for compatibility/reference.
+- `tests/` — H2 Notes automated tests and OCR probe.
+- `tools/ocr/` — local OCR/layout bridge tooling.
+- `docs/` — approved product requirements, UI baseline and verification evidence.
+- `experiments/H2AgentLab/` — isolated AI-agent research lab; not automatically integrated into H2 Notes.
+- `_ver2/` — older WinForms source retained as legacy reference.
 
 ## H2 Notes Project Sheet (Avalonia branch)
 
