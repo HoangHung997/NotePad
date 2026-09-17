@@ -1,6 +1,15 @@
 name: Avalonia Full Portable OCR
 
 on:
+  push:
+    branches:
+      - feature/nas-multi-device-sync
+    paths:
+      - '.github/workflows/avalonia-portable-ocr.yml'
+      - 'tools/ocr/**'
+      - 'src/H2Notes.Core/PortableOcrRuntime.cs'
+      - 'src/H2Notes.Core/AiPdf.cs'
+      - 'src/H2Notes.Avalonia/H2Notes.Avalonia.csproj'
   workflow_dispatch:
 
 jobs:
