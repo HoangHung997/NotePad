@@ -192,6 +192,22 @@ def mineru_dependencies(root, budget):
     dump(root / "runtime.json", data)
 
 
+def easyocr_catalog(root):
+    """Read EasyOCR's pinned download metadata from the isolated runtime, not host Python."""
+    python = root / "venv/Scripts/python.exe"
+    if not python.exists():
+        raise RuntimeError("OCR venv is missing before EasyOCR model download")
+    code = (
+        "import json; from easyocr.config import detection_models, recognition_models; "
+        "print(json.dumps({'detection': detection_models, 'recognition': recognition_models}))"
+    )
+    env = dict(os.environ, PYTHONNOUSERSITE="1", PYTHONUTF8="1")
+    result = subprocess.run([str(python), "-I", "-c", code], capture_output=True, text=True, env=env, timeout=30)
+    if result.returncode:
+        raise RuntimeError("EasyOCR is not importable from the isolated OCR runtime: " + result.stderr[-500:])
+    return json.loads(result.stdout)
+
+
 def download_models(root, engine, budget):
     spec = LOCK["engines"][engine]
     if spec.get("blocked"):
@@ -230,7 +246,9 @@ def download_models(root, engine, budget):
             receipt["files"].append({"path": path.relative_to(model_root).as_posix(),
                                      "size": path.stat().st_size, "sha256": sha})
     if spec.get("easyocr"):
-        from easyocr.config import detection_models, recognition_models
+        catalog = easyocr_catalog(root)
+        detection_models = catalog["detection"]
+        recognition_models = catalog["recognition"]
         for key in spec["easyocr"]:
             item = detection_models[key] if key in detection_models else recognition_models["gen2"][key]
             path = model_root / "easyocr" / item["filename"]
