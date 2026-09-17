@@ -1,0 +1,46 @@
+﻿
+# ===== H2 NOTES GITHUB CLEANUP =====
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# .NET build
+**/bin/
+**/obj/
+bin/
+obj/
+
+# Build/test artifacts
+.artifacts/
+artifacts/
+TestResults/
+coverage/
+releases/
+
+# Package/cache folders
+node_modules/
+packages/
+.cache/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pdb
+*.ilk
+*.cache
+*.bak
+
+# Local secrets
+.env
+.env.*
+secrets.json
+credentials.json
+*.pfx
+*.p12
+*.pem
+*.key
+
