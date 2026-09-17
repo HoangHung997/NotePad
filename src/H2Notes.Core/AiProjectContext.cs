@@ -126,7 +126,9 @@ public static class AiProjectContext
             + "Yêu cầu của người dùng:\n" + pending.Content + AiDocuments.Describe(pending.Attachments),
             AiDocuments.NativeImages(pending.Attachments),
             AiDocuments.NativeFiles(pending.Attachments)));
-        turns.Insert(0, new AiTurn("system", Instructions + "\n"
+        var now = DateTimeOffset.Now;
+        var clock = $"\nH2 runtime clock: currentLocalTime={now:yyyy-MM-ddTHH:mm:sszzz}; currentUtc={now.UtcDateTime:O}; timeZoneId={TimeZoneInfo.Local.Id}; morning=05:00-11:59; afternoon=12:00-17:59; evening=18:00-22:59; night=23:00-04:59.\n";
+        turns.Insert(0, new AiTurn("system", Instructions + clock
             + (conversation.PermissionMode == AiPermissionMode.ReadOnly ? "" : AiArtifacts.Instructions)
             + "\n" + AiProjectActions.Instructions(conversation.PermissionMode)));
         AiPdf.ValidateBudget(turns);
