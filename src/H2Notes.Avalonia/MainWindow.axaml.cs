@@ -101,9 +101,17 @@ public partial class MainWindow : Window
     public void FlushNotes()
     {
         if (_notesProject is not null && ProjectTitleEditor.HasChanges && !string.IsNullOrWhiteSpace(ProjectTitleEditor.Snapshot().Text))
-        { _notesProject.NameRich = ProjectTitleEditor.Snapshot(); ProjectTitleEditor.MarkSaved(); _app.MarkProjectDirty(_notesProject.Id); }
+        {
+            _notesProject.NameRich = ProjectTitleEditor.Snapshot();
+            _notesProject.UpdatedAtUtc = DateTime.UtcNow;
+            ProjectTitleEditor.MarkSaved(); _app.MarkProjectDirty(_notesProject.Id);
+        }
         if (_notesProject is not null && NotesEditor.HasChanges)
-        { _notesProject.NotesRich = NotesEditor.Snapshot(); _loadedNotesSource = _notesProject.NotesRich; NotesEditor.MarkSaved(); _app.MarkProjectDirty(_notesProject.Id); }
+        {
+            _notesProject.NotesRich = NotesEditor.Snapshot();
+            _notesProject.UpdatedAtUtc = DateTime.UtcNow;
+            _loadedNotesSource = _notesProject.NotesRich; NotesEditor.MarkSaved(); _app.MarkProjectDirty(_notesProject.Id);
+        }
     }
     public void Flush()
     {
@@ -124,7 +132,9 @@ public partial class MainWindow : Window
         Sheet.CommitEdit(); FlushNotes();
         var name = await Dialogs.Prompt(this, "Thêm dự án", "Tên dự án");
         if (string.IsNullOrWhiteSpace(name)) return;
-        var project = new ProjectRecord { Name = name.Trim() };
+        var now = DateTime.UtcNow;
+        var project = new ProjectRecord { Name = name.Trim(), CreatedAtUtc = now, UpdatedAtUtc = now };
+        _board.UpdatedAtUtc = now;
         _board.Projects.Add(project); SearchBox.Text = ""; SelectCurrent(project); _app.ScheduleSave();
     }
     private async Task AddTask()
@@ -132,15 +142,18 @@ public partial class MainWindow : Window
         Sheet.CommitEdit(); FlushNotes(); var project = _notesProject; if (project is null) return;
         var text = await Dialogs.Prompt(this, "Thêm công việc", project.DisplayName);
         if (string.IsNullOrWhiteSpace(text)) return;
-        project.ChecklistItems.Add(new TaskRecord { Text = text.Trim() }); project.IsExpanded = true;
+        var now = DateTime.UtcNow;
+        project.ChecklistItems.Add(new TaskRecord { Text = text.Trim(), CreatedAtUtc = now, UpdatedAtUtc = now });
+        project.UpdatedAtUtc = now; project.IsExpanded = true;
         Sheet.Refresh(); UpdateSummary(); _app.ScheduleSave();
     }
     private async Task DeleteRow(SheetRow row)
     {
         Flush();
         if (!await Dialogs.Confirm(this, "Xác nhận xóa", row.IsProject ? "Xóa dự án và các công việc bên trong?\n" + row.Title : "Xóa công việc này?\n" + row.Title)) return;
-        if (row.Task is null) { _board.Projects.Remove(row.Project); _notesProject = null; }
-        else row.Project.ChecklistItems.Remove(row.Task);
+        var now = DateTime.UtcNow;
+        if (row.Task is null) { _board.Projects.Remove(row.Project); _board.UpdatedAtUtc = now; _notesProject = null; }
+        else { row.Project.ChecklistItems.Remove(row.Task); row.Project.UpdatedAtUtc = now; }
         if (row.IsProject) SelectCurrent(_board.Projects.FirstOrDefault());
         else { Sheet.Refresh(); UpdateSummary(); }
         _app.SaveNow();
