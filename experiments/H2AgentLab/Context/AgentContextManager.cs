@@ -222,8 +222,16 @@ public sealed class AgentContextManager
 
     private static string BuildScalarSection(string heading, string source, int limit, out bool truncated)
     {
-        truncated = false;
-        if (limit <= 0 || source.Length == 0) return "";
+        if (source.Length == 0)
+        {
+            truncated = false;
+            return "";
+        }
+        if (limit <= 0)
+        {
+            truncated = true;
+            return "";
+        }
         var prefix = "## " + heading + "\n";
         if (limit <= prefix.Length)
         {
