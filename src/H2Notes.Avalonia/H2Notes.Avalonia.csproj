@@ -17,6 +17,7 @@
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/install.py" Link="tools/ocr/install.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/smoke.py" Link="tools/ocr/smoke.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/build-portable-runtime.ps1" Link="tools/ocr/build-portable-runtime.ps1" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/models.lock.json" Link="tools/ocr/models.lock.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/requirements.in" Link="tools/ocr/requirements.in" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/requirements-mineru.in" Link="tools/ocr/requirements-mineru.in" CopyToOutputDirectory="PreserveNewest" />
