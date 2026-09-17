@@ -37,6 +37,24 @@ jobs:
       - name: Run H2 Notes tests
         run: dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
 
+      - name: Restore H2 Agent Lab
+        run: dotnet restore .\experiments\H2AgentLab\H2AgentLab.csproj
+
+      - name: Build H2 Agent Lab
+        run: dotnet build .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-restore
+
+      - name: Run H2 Agent Lab v1 self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v1-self-test'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --self-test $out
+
+      - name: Run H2 Agent Lab v2 architecture guard
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-guard'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-guard-test $out
+
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
