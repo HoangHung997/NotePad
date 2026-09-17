@@ -31,8 +31,13 @@ public sealed class ChatMessageView : Border
     {
         Message = message;
         var user = message.Role == "user";
-        HorizontalAlignment = user ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        Padding = new Thickness(12, 9); MaxWidth = 300;
+        // Assistant content is allowed to use the whole available chat width. This is important for
+        // responsive Markdown tables: when the AI panel is resized, star-sized columns reflow with
+        // the bubble instead of remaining trapped in the old fixed 300 px width.
+        HorizontalAlignment = user ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
+        Margin = user ? new Thickness(72, 0, 0, 0) : new Thickness(0, 0, 18, 0);
+        Padding = new Thickness(12, 9);
+        if (user) MaxWidth = 520;
         CornerRadius = user ? new CornerRadius(12, 12, 3, 12) : new CornerRadius(12, 12, 12, 3);
         Background = RichEditor.Brush(user ? "#F4E7DC" : "#FFFFFF");
         BorderBrush = RichEditor.Brush(user ? "#E7CCBA" : "#E5DCD3"); BorderThickness = new Thickness(1);
@@ -54,7 +59,7 @@ public sealed class ChatMessageView : Border
             if (e.ExtentDelta.Y != 0 || e.ViewportDelta.Y != 0) FollowThinking();
         };
         ToolTip.SetTip(_thinking, "Thu gọn: xem một dòng tiến trình mới nhất. Mở rộng: xem toàn bộ tiến trình model cung cấp. Không lưu vào lịch sử.");
-        Child = new StackPanel { Spacing = 6, Children = { title, _thinking, _markdownBody, Body, _error, Actions, _time } };
+        Child = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch, Children = { title, _thinking, _markdownBody, Body, _error, Actions, _time } };
         SetThinking("");
         Refresh();
     }
@@ -80,8 +85,6 @@ public sealed class ChatMessageView : Border
         var lines = text.Replace("\r", "", StringComparison.Ordinal)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var latest = lines.LastOrDefault() ?? text.Trim();
-        // Keep the newest provider line rather than a growing transcript. TextTrimming guarantees
-        // the collapsed header occupies one visual line at narrow widths.
         return "Đang suy nghĩ · " + latest;
     }
 
@@ -99,7 +102,6 @@ public sealed class ChatMessageView : Border
     {
         if (_thinkingScrollQueued) return;
         _thinkingScrollQueued = true;
-        // Wait for wrapped text to be measured, including updates to the rolling 24k buffer.
         Dispatcher.UIThread.Post(() => { _thinkingScrollQueued = false; FollowThinking(); }, DispatcherPriority.Background);
     }
 
