@@ -102,6 +102,24 @@ public static class V2OllamaTransportTests
                 throw new InvalidOperationException("Empty tools should not inflate Ollama payload.");
         });
 
+        await Test("Ollama transport resolves named reasoning effort through H2 Core capabilities", async () =>
+        {
+            var handler = new DirectHandler("ok");
+            await using var transport = new OllamaTransport(new AiProfile
+            {
+                Model = "gpt-oss:20b",
+                BaseUrl = "http://localhost:11434",
+                ReasoningEffort = "max",
+                OllamaThinking = false
+            }, handler);
+            _ = await Collect(transport.StartAsync(new(Guid.NewGuid(), Guid.NewGuid(),
+                [new(AgentTransportMessageRole.User, "hello")], [])));
+
+            using var payload = JsonDocument.Parse(handler.RequestBodies.Single());
+            if (payload.RootElement.GetProperty("think").GetString() != "high")
+                throw new InvalidOperationException("H2 Core reasoning capability did not map max to Ollama high.");
+        });
+
         await Test("Ollama transport sends native image bytes but rejects native files before network", async () =>
         {
             var imageHandler = new DirectHandler("seen");
