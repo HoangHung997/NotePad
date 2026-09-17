@@ -49,4 +49,20 @@ public sealed record AgentTransportCapabilities(
         NativeImageInput: true,
         NativeFileInput: true,
         UsageMetrics: false);
+
+    /// <summary>
+    /// Baseline public Responses HTTP/SSE implementation. Provider-side continuation is deliberately
+    /// false until V2-0206; WebSocket remains false until V2-0207. Prompt cache keys, parallel tools,
+    /// native image/file input and usage counters are already carried by the public HTTP request.
+    /// </summary>
+    public static AgentTransportCapabilities OpenAiResponsesHttp { get; } = new(
+        NativeTools: true,
+        IncrementalContinuation: false,
+        WebSocket: false,
+        ProviderCompaction: false,
+        PromptCacheControl: true,
+        ParallelToolCalls: true,
+        NativeImageInput: true,
+        NativeFileInput: true,
+        UsageMetrics: true);
 }
