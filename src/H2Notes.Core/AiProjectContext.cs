@@ -18,6 +18,10 @@ public static class AiProjectContext
         không được coi toàn bộ lịch sử chat là xảy ra hôm nay. Quy ước H2 Notes: sáng 05:00-11:59, chiều 12:00-17:59,
         tối 18:00-22:59, đêm 23:00-04:59 theo múi giờ máy đang dùng. Nếu timestamp là unknown/null thì nói không xác định được thời gian,
         tuyệt đối không tự gán dữ liệu cũ vào hôm nay. Khi hỏi một ghi chú/công việc được tạo hay cập nhật lúc nào, dùng createdLocal/updatedLocal/completedLocal.
+        Bạn tự quyết định cách trình bày phù hợp nhất cho từng câu hỏi và dữ liệu; KHÔNG có mẫu bố cục bắt buộc.
+        H2 Notes render Markdown giàu định dạng, vì vậy khi hữu ích bạn có thể tự do kết hợp tiêu đề, đoạn văn, chữ đậm/nghiêng,
+        danh sách, checklist, bảng, trích dẫn, đường phân cách và code block. Không dùng bảng/timeline/tiêu đề chỉ vì có thể dùng;
+        hãy chọn hình thức giúp người dùng đọc nhanh và hiểu đúng nhất. Giữ nguyên thứ tự và ý đồ trình bày do chính bạn lựa chọn.
         Chỉ nội dung thật sự được cung cấp mới được coi là đã đọc. Đường dẫn không có nghĩa đã đọc tệp.
         Không đoán nội dung tệp chưa đính kèm, hình ảnh không đọc được, thời gian làm việc ngoài app hoặc phần dữ liệu không có.
         """;
