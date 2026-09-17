@@ -78,10 +78,10 @@ Rules:
 - [x] **V2-0206 — Implement OpenAI Responses continuation state.**  
   Evidence: `OpenAiResponsesTransport` now has explicit `Stateless` and `StoredContinuation` modes. Privacy-preserving stateless remains the default (`store:false` + local output replay + encrypted reasoning). Stored continuation is opt-in and restricted to the official `https://api.openai.com/v1/` endpoint; it uses `store:true`, captures the completed response ID and sends later tool results as only new `function_call_output` input with `previous_response_id`, without resending the prior system/user/function-call transcript. Tests also prove compatible endpoints cannot silently claim official stored continuation and a missing response ID never falls back by replaying data unexpectedly. GitHub Actions run `35247235754` completed successfully: H2 Notes **336/336**, Agent Lab build/v1 and every v2 transport suite passed, followed by self-contained artifact and `/bin` publish.
 
-- [~] **V2-0207 — Implement Responses WebSocket turn session.**  
-  Acceptance: one turn-scoped connection is reused across multiple model calls, with safe HTTP fallback.
+- [x] **V2-0207 — Implement Responses WebSocket turn session.**  
+  Evidence: `Transport/OpenAiResponsesWebSocketTransport.cs` adds an official-endpoint, turn-scoped `wss://api.openai.com/v1/responses` transport. One socket is reused across Start + all tool continuations; the first request sends full canonical input, while continuations send only new `function_call_output` items plus `previous_response_id` with `store:false`. It falls back to HTTP only when WebSocket connection setup fails before any request write; any disconnect/error after a successful write is treated as ambiguous and is never auto-replayed. `AgentTransportCapabilities.OpenAiResponsesWebSocket` exposes WebSocket + incremental continuation explicitly. `V2ResponsesWebSocketTransportTests.cs` verifies same-socket reuse, minimal continuation payload, safe pre-write fallback, no post-write replay, and official-endpoint restriction. GitHub Actions run `35250100777` completed successfully: H2 Notes tests, all prior Agent Lab v1/v2 transport suites, the new WebSocket suite, self-contained publish and `/bin` publish all passed.
 
-- [ ] **V2-0208 — Add WebSocket prewarm where supported.**  
+- [~] **V2-0208 — Add WebSocket prewarm where supported.**  
   Acceptance: prewarm is best-effort and never changes task result semantics; trace distinguishes prewarm time.
 
 - [ ] **V2-0209 — Add provider transport tests.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0207 — Implement Responses WebSocket turn session`.
+**Active task:** `V2-0208 — Add WebSocket prewarm where supported`.
