@@ -112,11 +112,12 @@ public sealed partial class AiSettingsWindow
         local.Children.Add(new TextBlock { Text = "Thư mục bộ OCR (chỉ lưu trên máy này)", FontWeight = FontWeight.SemiBold, FontSize = 12 });
         local.Children.Add(root); local.Children.Add(new WrapPanel { Children = { browse, check } });
         local.Children.Add(new TextBlock { Text = "Muốn copy app sang PC khác mà không cài lại OCR: trên máy đang có đủ 3 engine, bấm ‘Đóng gói đủ 3 OCR vào app’, chờ kiểm tra xong rồi chép nguyên thư mục ứng dụng. Model OCR có thể nhiều GiB nên artifact CI tiêu chuẩn không tự nhúng chúng.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
-        local.Children.Add(new WrapPanel { Children = { pack, diagnostics } });
         local.Children.Add(new TextBlock { Text = "Giới hạn số trang / thời gian chờ (giây)", FontSize = 12 });
         var limits = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") }; limits.Children.Add(pages); limits.Children.Add(seconds); Grid.SetColumn(seconds, 1); seconds.Margin = new Thickness(8, 0, 0, 0); local.Children.Add(limits);
         local.Children.Add(new TextBlock { Text = "Không tải model khi gửi chat. Bộ OCR chạy cục bộ; Markdown chỉ gửi đến kết nối AI bạn đã chọn. Dừng AI sẽ dừng cả tiến trình đọc PDF.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
-        var panel = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = "Tài liệu PDF và OCR ảnh", FontSize = 20, FontWeight = FontWeight.SemiBold }, engine, description, local, readiness, save } };
+        var portableRow = new WrapPanel { Children = { pack, diagnostics } };
+        var portableHint = new TextBlock { Text = "Công cụ portability luôn hiện kể cả khi đang dùng PDF trực tiếp, để bạn có thể chuẩn bị một bộ OCR portable trước khi đổi engine hoặc đổi máy.", TextWrapping = TextWrapping.Wrap, FontSize = 11 };
+        var panel = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = "Tài liệu PDF và OCR ảnh", FontSize = 20, FontWeight = FontWeight.SemiBold }, engine, description, portableRow, portableHint, local, readiness, save } };
         Refresh();
         return new Border { Name = "AiPdfSettings", BorderBrush = RichEditor.Brush("#D9CFC5"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 18, 0, 0), Margin = new Thickness(0, 12, 0, 0), Child = panel };
     }
