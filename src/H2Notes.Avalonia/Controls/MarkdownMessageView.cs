@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
@@ -31,7 +32,7 @@ public sealed class MarkdownMessageView : StackPanel
 
     public void SetMarkdown(string? markdown)
     {
-        markdown ??= "";
+        markdown = NormalizeDisplayText(markdown ?? "");
         if (Markdown == markdown) return;
         Markdown = markdown;
         Children.Clear();
@@ -54,7 +55,11 @@ public sealed class MarkdownMessageView : StackPanel
                     code.Append(lines[i++]);
                 }
                 if (i < lines.Length) i++;
-                Children.Add(CodeBlock(code.ToString(), language));
+                var codeText = code.ToString();
+                // Vision models sometimes correctly transcribe a table but wrap the Markdown in
+                // a text/code fence. Preserve the table semantics instead of showing pipe text.
+                if (TryFencedTable(codeText, out var rows)) Children.Add(Table(rows));
+                else Children.Add(CodeBlock(codeText, language));
                 continue;
             }
 
@@ -62,8 +67,9 @@ public sealed class MarkdownMessageView : StackPanel
             if (heading.Success)
             {
                 var level = heading.Groups[1].Value.Length;
-                Children.Add(InlineBlock(heading.Groups[2].Value.Trim(), 22 - Math.Min(5, level - 1) * 1.7,
-                    level <= 2 ? FontWeight.Bold : FontWeight.SemiBold, "MarkdownHeading", new Thickness(0, level == 1 ? 8 : 4, 0, 1)));
+                var size = Math.Max(14, 18 - (level - 1) * .8);
+                Children.Add(InlineBlock(heading.Groups[2].Value.Trim(), size,
+                    level <= 2 ? FontWeight.Bold : FontWeight.SemiBold, "MarkdownHeading", new Thickness(0, level == 1 ? 6 : 3, 0, 1)));
                 i++;
                 continue;
             }
@@ -132,6 +138,21 @@ public sealed class MarkdownMessageView : StackPanel
         if (i + 1 >= lines.Length || !lines[i].Contains('|') || !lines[i + 1].Contains('|')) return false;
         var divider = TableCells(lines[i + 1]);
         return divider.Length > 0 && divider.All(c => TableDivider.IsMatch(c.Trim()));
+    }
+
+    private static bool TryFencedTable(string text, out IReadOnlyList<string[]> rows)
+    {
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n')
+            .Split('\n').Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
+        if (lines.Length < 2 || !LooksLikeTable(lines, 0)) { rows = []; return false; }
+        var parsed = new List<string[]> { TableCells(lines[0]) };
+        for (var i = 2; i < lines.Length; i++)
+        {
+            if (!lines[i].Contains('|')) { rows = []; return false; }
+            parsed.Add(TableCells(lines[i]));
+        }
+        rows = parsed;
+        return true;
     }
 
     private static string[] TableCells(string line)
@@ -280,6 +301,36 @@ public sealed class MarkdownMessageView : StackPanel
             inlines.Add(new Run { Text = text[i..endPlain].Replace("\\*", "*", StringComparison.Ordinal).Replace("\\_", "_", StringComparison.Ordinal) });
             i = endPlain;
         }
+    }
+
+    private static string NormalizeDisplayText(string text)
+    {
+        if (!text.Contains("\\u", StringComparison.Ordinal)) return text;
+        var result = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length;)
+        {
+            if (i + 6 <= text.Length && text[i] == '\\' && text[i + 1] == 'u'
+                && ushort.TryParse(text.AsSpan(i + 2, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var first))
+            {
+                var high = (char)first;
+                if (char.IsHighSurrogate(high) && i + 12 <= text.Length && text[i + 6] == '\\' && text[i + 7] == 'u'
+                    && ushort.TryParse(text.AsSpan(i + 8, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var second)
+                    && char.IsLowSurrogate((char)second))
+                {
+                    result.Append(char.ConvertFromUtf32(char.ConvertToUtf32(high, (char)second)));
+                    i += 12;
+                    continue;
+                }
+                if (!char.IsSurrogate(high))
+                {
+                    result.Append(high);
+                    i += 6;
+                    continue;
+                }
+            }
+            result.Append(text[i++]);
+        }
+        return result.ToString();
     }
 
     private static int NextInlineMarker(string text, int start)
