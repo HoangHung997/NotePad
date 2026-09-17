@@ -1,4 +1,5 @@
 using System.Text.Json;
+using H2AgentLab.Metrics;
 using H2Notes.Core;
 
 namespace H2AgentLab.Transport;
@@ -85,6 +86,62 @@ public static class V2ResponsesWebSocketTransportTests
             }
             catch (IOException) { }
             Check(socket.Sent.Count == 1 && fallback.StartCalls == 0, "Request written to WebSocket must never be replayed automatically.");
+        });
+
+        await Test("Prewarm uses generate false then reuses warm response without resending input", async () =>
+        {
+            var socket = new FakeConnection([
+                [
+                    Event(new { type = "response.created", response = new { id = "warm_1" } }),
+                    Event(new { type = "response.completed", response = new { id = "warm_1", output = Array.Empty<object>() } })
+                ],
+                [
+                    Event(new { type = "response.created", response = new { id = "resp_real" } }),
+                    Event(new { type = "response.output_text.delta", delta = "ready" }),
+                    Event(new { type = "response.output_item.done", item = new { type = "message", role = "assistant", content = Array.Empty<object>() } }),
+                    Event(new { type = "response.completed", response = new { id = "resp_real", output = Array.Empty<object>() } })
+                ]
+            ]);
+            var trace = new AgentTrace();
+            await using var transport = new OpenAiResponsesWebSocketTransport(OfficialProfile(), "key", () => socket, null, enablePrewarm: true, trace);
+            var events = await Collect(transport.StartAsync(new(Guid.NewGuid(), Guid.NewGuid(), [new(AgentTransportMessageRole.User, "hello")], [])));
+            Check(events.Any(x => x.Kind == AgentTransportEventKind.TextDelta && x.Text == "ready"));
+            Check(socket.ConnectCount == 1 && socket.Sent.Count == 2, "Prewarm and real request must share one socket.");
+
+            using var warm = JsonDocument.Parse(socket.Sent[0]);
+            Check(warm.RootElement.GetProperty("generate").ValueKind == JsonValueKind.False);
+            Check(warm.RootElement.GetProperty("input").GetArrayLength() == 1);
+            using var real = JsonDocument.Parse(socket.Sent[1]);
+            Check(!real.RootElement.TryGetProperty("generate", out _));
+            Check(real.RootElement.GetProperty("previous_response_id").GetString() == "warm_1");
+            Check(real.RootElement.GetProperty("input").GetArrayLength() == 0, "Successful prewarm should avoid resending identical initial input.");
+
+            var start = trace.First(AgentTraceKind.PrewarmStart);
+            var finish = trace.Last(AgentTraceKind.PrewarmFinish);
+            Check(start is not null && finish is not null && finish.Sequence > start.Sequence);
+            Check(finish!.Detail == "success" && finish.ElapsedMilliseconds >= start!.ElapsedMilliseconds);
+        });
+
+        await Test("Prewarm failure is best effort and real request keeps full semantics", async () =>
+        {
+            var socket = new FakeConnection([
+                [Event(new { type = "error", error = new { message = "fixture warmup unsupported" } })],
+                [
+                    Event(new { type = "response.created", response = new { id = "resp_full" } }),
+                    Event(new { type = "response.output_text.delta", delta = "full" }),
+                    Event(new { type = "response.output_item.done", item = new { type = "message", role = "assistant", content = Array.Empty<object>() } }),
+                    Event(new { type = "response.completed", response = new { id = "resp_full", output = Array.Empty<object>() } })
+                ]
+            ]);
+            var trace = new AgentTrace();
+            await using var transport = new OpenAiResponsesWebSocketTransport(OfficialProfile(), "key", () => socket, null, enablePrewarm: true, trace);
+            var events = await Collect(transport.StartAsync(new(Guid.NewGuid(), Guid.NewGuid(), [new(AgentTransportMessageRole.User, "hello")], [])));
+            Check(events.Any(x => x.Kind == AgentTransportEventKind.TextDelta && x.Text == "full"));
+            Check(socket.Sent.Count == 2);
+            using var real = JsonDocument.Parse(socket.Sent[1]);
+            Check(!real.RootElement.TryGetProperty("previous_response_id", out _));
+            Check(real.RootElement.GetProperty("input").GetArrayLength() == 1, "Failed prewarm must preserve full real input.");
+            Check(trace.Last(AgentTraceKind.PrewarmFinish)?.Detail.StartsWith("failed:", StringComparison.Ordinal) == true);
         });
 
         await Test("WebSocket rejects compatible and unsafe endpoints before sending data", async () =>
