@@ -34,9 +34,10 @@ public sealed class NoteWindow : Window
         var footer = new TextBlock { Text = "Ghi chú riêng · Tự lưu", Margin = new Thickness(18, 4), FontSize = 11, Foreground = RichEditor.Brush("#837568") }; Grid.SetRow(footer, 4); layout.Children.Add(footer);
         Content = new Border { BorderThickness = new Thickness(1), BorderBrush = global::Avalonia.Media.Brush.Parse("#CCC6BE"), Background = RichEditor.Brush("#FCFAF7"), Child = layout };
         DesktopWindowChrome.Attach(this, titleBar);
-        _editor.Load(note.ReadContent()); _editor.Changed += app.ScheduleSave;
+        _editor.Load(note.ReadContent());
+        _editor.Changed += () => { _note.UpdatedAtUtc = DateTime.UtcNow; app.ScheduleSave(); };
         WindowPlacement.Attach(this, () => _note, app, false);
-        _title.TextChanged += (_, _) => { Title = _title.Text ?? ""; app.ScheduleSave(); };
+        _title.TextChanged += (_, _) => { Title = _title.Text ?? ""; _note.UpdatedAtUtc = DateTime.UtcNow; app.ScheduleSave(); };
         Activated += (_, _) => Opacity = 1;
         Deactivated += (_, _) => Opacity = Math.Clamp(note.NoteOpacity, .01, 1);
         Closing += (_, e) =>
@@ -47,8 +48,10 @@ public sealed class NoteWindow : Window
     }
     public void Flush()
     {
+        var changed = _note.Title != (_title.Text ?? "") || _editor.HasChanges;
         _note.Title = _title.Text ?? "";
         if (_editor.HasChanges) { _note.ContentRich = _editor.Snapshot(); _editor.MarkSaved(); }
+        if (changed) _note.UpdatedAtUtc = DateTime.UtcNow;
         if (WindowState == WindowState.Normal && IsVisible) { _note.Left = Position.X; _note.Top = Position.Y; _note.Width = Width; _note.Height = Height; }
     }
 }
