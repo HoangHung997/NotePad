@@ -120,9 +120,10 @@ internal static class AiTests
                 Check(Directory.EnumerateFiles(Path.Combine(root, "memory"), "*.h2memory.json", SearchOption.AllDirectories).Any());
 
                 var pcB = new AiMemoryStore(root, "PC-B");
-                var facts = pcB.Query("diện tích Krong", project.Id, false, 20, new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero));
+                var localNow = new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.FromHours(7));
+                var facts = pcB.Query("diện tích Krong", project.Id, false, 20, localNow);
                 Check(facts.Records.Any(r => r.Text.Contains("11,49 ha", StringComparison.Ordinal)));
-                var morning = pcB.Query("sáng nay Krong làm gì", project.Id, false, 20, new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero));
+                var morning = pcB.Query("sáng nay Krong làm gì", project.Id, false, 20, localNow);
                 Check(morning.Records.Any(r => r.Text.Contains("hồ sơ hoàn công Krong", StringComparison.Ordinal)));
             }
             finally { try { Directory.Delete(root, true); } catch { } }
