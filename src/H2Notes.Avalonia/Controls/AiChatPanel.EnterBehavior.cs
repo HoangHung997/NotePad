@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 
@@ -10,8 +9,6 @@ public sealed partial class AiChatPanel
     {
         InputElement.KeyDownEvent.AddClassHandler<AiChatPanel>((panel, e) => panel.HandleComposerEnter(e),
             RoutingStrategies.Tunnel, handledEventsToo: true);
-        InputElement.GotFocusEvent.AddClassHandler<AiChatPanel>((panel, e) => panel.RefreshComposerKeyHints(e),
-            RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     private async void HandleComposerEnter(KeyEventArgs e)
@@ -33,13 +30,5 @@ public sealed partial class AiChatPanel
 
         e.Handled = true;
         await SendOrSave();
-    }
-
-    private void RefreshComposerKeyHints(GotFocusEventArgs e)
-    {
-        if (!ReferenceEquals(e.Source, _composer)) return;
-        ToolTip.SetTip(_composer,
-            "Enter để gửi · Shift+Enter để xuống dòng. Ctrl+V để dán ảnh hoặc văn bản; thả tệp/file:// trên máy. Gõ @ để chọn ngữ cảnh hoặc gợi ý.");
-        ToolTip.SetTip(_send, "Gửi · Enter");
     }
 }
