@@ -72,10 +72,10 @@ Rules:
 - [x] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
   Evidence: `Transport/ChatCompletionsTransport.cs` isolates `/chat/completions` streaming behind `IAgentTransport`, preserves provider tool-call IDs plus fragmented function names/JSON arguments, explicit tool-result replay, H2 image/file wire shapes, bearer authentication, H2 Core endpoint safety and capability-driven reasoning effort while rejecting truncated tool proposals before execution. `Transport/V2ChatCompletionsTransportTests.cs` covers direct reasoning/text streaming, fragmented tool continuation, multimodal shapes, truncation and unsafe endpoint rejection. GitHub Actions run `35244902978` passed H2 Notes **336/336**, Agent Lab build/v1 regressions, v2 architecture/metrics/baseline/transport-contract/Ollama suites and the new Chat Completions transport suite, then publish succeeded.
 
-- [~] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
-  Acceptance: official OpenAI Responses path supports streaming text/tool calls/usage without using undocumented Codex headers.
+- [x] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
+  Evidence: `Transport/OpenAiResponsesTransport.cs` implements the public Responses HTTP/SSE path behind `IAgentTransport`, using H2 Core endpoint/reasoning checks, bearer auth, typed text/reasoning-summary/tool/usage events, `prompt_cache_key`, parallel tool declarations, native image/file inputs and `store:false` stateless function-call replay with `reasoning.encrypted_content`; it deliberately does **not** use undocumented Codex headers or `previous_response_id` yet. `Transport/V2OpenAiResponsesTransportTests.cs` covers streaming/usage, stateless tool continuation, native inputs, incomplete-response safety and endpoint safety. `Transport/AiProfileSnapshotExtensions.cs` keeps active request settings immutable until V2-0210 extracts a shared Core helper. GitHub Actions run `35246360154` completed successfully, including H2 Notes **336/336**, Agent Lab build/v1 regressions, all v2 transport suites, self-contained publish and `/bin` publish.
 
-- [ ] **V2-0206 — Implement OpenAI Responses continuation state.**  
+- [~] **V2-0206 — Implement OpenAI Responses continuation state.**  
   Acceptance: tool result continuation does not resend full prior transcript when the public API supports previous response state.
 
 - [ ] **V2-0207 — Implement Responses WebSocket turn session.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0205 — Implement OpenAI Responses HTTP transport`.
+**Active task:** `V2-0206 — Implement OpenAI Responses continuation state`.
