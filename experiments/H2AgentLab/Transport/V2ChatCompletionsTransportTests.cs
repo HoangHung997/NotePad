@@ -49,7 +49,7 @@ public static class V2ChatCompletionsTransportTests
                     """{"choices":[{"delta":{"reasoning_content":"trace ","content":"Xin "},"finish_reason":null}]}""",
                     """{"choices":[{"delta":{"content":"chào"},"finish_reason":"stop"}]}"""));
             await using var transport = new ChatCompletionsTransport(Profile(), "test-key", handler);
-            var events = await Collect(transport.StartAsync(StartRequest(new(AgentTransportMessageRole.User, "hello"))));
+            var events = await Collect(transport.StartAsync(StartRequest(new AgentTransportMessage(AgentTransportMessageRole.User, "hello"))));
 
             Check(string.Concat(events.Where(e => e.Kind == AgentTransportEventKind.ReasoningDelta).Select(e => e.Text)) == "trace ", "Reasoning alias was not surfaced separately.");
             Check(string.Concat(events.Where(e => e.Kind == AgentTransportEventKind.TextDelta).Select(e => e.Text)) == "Xin chào", "Text deltas were not preserved.");
@@ -111,7 +111,7 @@ public static class V2ChatCompletionsTransportTests
         {
             var handler = new QueueHandler(Sse("""{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"""));
             await using var transport = new ChatCompletionsTransport(Profile(), "", handler);
-            var request = StartRequest(new(AgentTransportMessageRole.User, "inspect",
+            var request = StartRequest(new AgentTransportMessage(AgentTransportMessageRole.User, "inspect",
                 [new AiImage("image/png", [1, 2, 3])],
                 [new AiFile("brief.pdf", "application/pdf", [4, 5, 6])]));
             _ = await Collect(transport.StartAsync(request));
@@ -155,7 +155,7 @@ public static class V2ChatCompletionsTransportTests
             Check(transport.Capabilities == AgentTransportCapabilities.ChatCompletionsFallback, "Capability profile changed.");
             try
             {
-                _ = await Collect(transport.StartAsync(StartRequest(new(AgentTransportMessageRole.User, "x"))));
+                _ = await Collect(transport.StartAsync(StartRequest(new AgentTransportMessage(AgentTransportMessageRole.User, "x"))));
                 throw new InvalidOperationException("Unsafe HTTP endpoint was accepted.");
             }
             catch (InvalidOperationException ex)
