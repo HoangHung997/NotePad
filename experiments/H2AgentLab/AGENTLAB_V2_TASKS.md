@@ -69,10 +69,10 @@ Rules:
 - [x] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
   Evidence: `Transport/OllamaTransport.cs` isolates native Ollama `/api/chat` streaming behind `IAgentTransport`, reuses H2 Core `AiClient.Endpoint` safety, preserves native image input, explicit thinking settings, provider thinking replay on active tool turns, completed tool-call identity/arguments and public token/cache counters while rejecting native files and incomplete tool results before execution. `Transport/V2OllamaTransportTests.cs` verifies direct answers, thinking true/false, tool continuation, usage, image/file boundaries and endpoint safety. GitHub Actions run `35241305423` completed successfully: H2 Notes **336/336**, Lab build/v1 regressions, v2 architecture/metrics/baseline/transport-contract tests and the new Ollama transport suite all passed, then self-contained publish and `/bin` publish succeeded.
 
-- [~] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
-  Acceptance: tool call IDs/arguments/streaming remain compatible with existing tests.
+- [x] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
+  Evidence: `Transport/ChatCompletionsTransport.cs` isolates `/chat/completions` streaming behind `IAgentTransport`, preserves provider tool-call IDs plus fragmented function names/JSON arguments, explicit tool-result replay, H2 image/file wire shapes, bearer authentication, H2 Core endpoint safety and capability-driven reasoning effort while rejecting truncated tool proposals before execution. `Transport/V2ChatCompletionsTransportTests.cs` covers direct reasoning/text streaming, fragmented tool continuation, multimodal shapes, truncation and unsafe endpoint rejection. GitHub Actions run `35244902978` passed H2 Notes **336/336**, Agent Lab build/v1 regressions, v2 architecture/metrics/baseline/transport-contract/Ollama suites and the new Chat Completions transport suite, then publish succeeded.
 
-- [ ] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
+- [~] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
   Acceptance: official OpenAI Responses path supports streaming text/tool calls/usage without using undocumented Codex headers.
 
 - [ ] **V2-0206 — Implement OpenAI Responses continuation state.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0204 — Wrap existing Chat Completions behavior in ChatCompletionsTransport`.
+**Active task:** `V2-0205 — Implement OpenAI Responses HTTP transport`.
