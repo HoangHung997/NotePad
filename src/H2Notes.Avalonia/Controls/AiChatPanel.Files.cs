@@ -34,7 +34,7 @@ public sealed partial class AiChatPanel
     {
         PrepareProjectContext?.Invoke();
         return _includeProject.IsChecked == true && _scope?.Project is { } p
-            ? AiProjectContext.Build(p, _conversation?.Id, _includeHistory.IsChecked == true) : "";
+            ? AiProjectContext.Build(_app.State, p, _conversation?.Id, _includeHistory.IsChecked == true) : "";
     }
 
     private Task PickAttachments() => PickAttachments(false);
