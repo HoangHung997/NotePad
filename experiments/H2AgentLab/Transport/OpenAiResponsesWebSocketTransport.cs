@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using H2AgentLab.Metrics;
 using H2Notes.Core;
 
 namespace H2AgentLab.Transport;
@@ -90,9 +91,10 @@ internal sealed class ClientResponsesWebSocketConnection : IResponsesWebSocketCo
 /// Turn-scoped Responses WebSocket transport for the official OpenAI endpoint. A single socket is
 /// reused for Start + all tool continuations in the same user turn. The first request sends full
 /// canonical input; continuations send only function_call_output items plus previous_response_id.
-/// If the socket cannot connect before any request is written, the transport may safely fall back
-/// to the HTTP/SSE transport. After a request write succeeds, disconnects are treated as ambiguous
-/// and are never auto-replayed through HTTP.
+/// Public construction enables a best-effort generate=false prewarm. Prewarm has no model/tool side
+/// effects; if it fails, the real request is still sent with full input. If the socket cannot connect
+/// before a real request is written, the transport may safely fall back to HTTP/SSE. After a real
+/// request write succeeds, disconnects are ambiguous and are never auto-replayed through HTTP.
 /// </summary>
 public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 {
@@ -102,6 +104,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
     private readonly Func<IAgentTransport>? _httpFallbackFactory;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Dictionary<string, AgentToolDefinition> _tools = new(StringComparer.Ordinal);
+    private readonly bool _enablePrewarm;
+    private readonly AgentTrace? _trace;
     private IResponsesWebSocketConnection? _connection;
     private IAgentTransport? _fallback;
     private List<AgentTransportToolCall> _pendingCalls = [];
@@ -114,8 +118,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
     private string? _previousResponseId;
     private JsonArray _initialInput = [];
 
-    public OpenAiResponsesWebSocketTransport(AiProfile profile, string apiKey)
-        : this(profile, apiKey, () => new ClientResponsesWebSocketConnection(), null)
+    public OpenAiResponsesWebSocketTransport(AiProfile profile, string apiKey, AgentTrace? trace = null)
+        : this(profile, apiKey, () => new ClientResponsesWebSocketConnection(), null, enablePrewarm: true, trace)
     {
     }
 
@@ -123,7 +127,9 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         AiProfile profile,
         string apiKey,
         Func<IResponsesWebSocketConnection> connectionFactory,
-        Func<IAgentTransport>? httpFallbackFactory)
+        Func<IAgentTransport>? httpFallbackFactory,
+        bool enablePrewarm = false,
+        AgentTrace? trace = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(connectionFactory);
@@ -138,6 +144,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         _connectionFactory = connectionFactory;
         _httpFallbackFactory = httpFallbackFactory ?? (() => new OpenAiResponsesTransport(
             _profile, _apiKey, stateMode: OpenAiResponsesStateMode.Stateless));
+        _enablePrewarm = enablePrewarm;
+        _trace = trace;
 
         _ = WebSocketEndpoint(_profile); // fail before any data can be sent
     }
@@ -165,24 +173,27 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         if (_initialInput.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
         _started = true;
 
-        Exception? connectFailure = null;
-        try { await EnsureConnected(cancellationToken); }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex) when (ex is WebSocketException or HttpRequestException or IOException)
+        if (!await TryConnect(cancellationToken))
         {
-            connectFailure = ex;
-        }
-
-        if (connectFailure is not null)
-        {
-            if (_httpFallbackFactory is null) throw connectFailure;
-            _fallback = _httpFallbackFactory();
-            await foreach (var item in _fallback.StartAsync(request, cancellationToken).WithCancellation(cancellationToken))
+            await foreach (var item in StartFallback(request, cancellationToken).WithCancellation(cancellationToken))
                 yield return item;
             yield break;
         }
 
-        var payload = BuildPayload(_initialInput, previousResponseId: null);
+        string? warmupResponseId = null;
+        if (_enablePrewarm) warmupResponseId = await TryPrewarm(cancellationToken);
+
+        // Prewarm may have observed a closed/broken socket. Because generate=false cannot execute
+        // model output or tools, reconnecting before the real request is safe.
+        if (_connection?.IsOpen != true && !await TryConnect(cancellationToken))
+        {
+            await foreach (var item in StartFallback(request, cancellationToken).WithCancellation(cancellationToken))
+                yield return item;
+            yield break;
+        }
+
+        var input = warmupResponseId is null ? _initialInput : new JsonArray();
+        var payload = BuildPayload(input, warmupResponseId);
         await foreach (var item in SendAndReceive(payload, cancellationToken).WithCancellation(cancellationToken))
             yield return item;
     }
@@ -258,13 +269,102 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         _lifetime.Dispose();
     }
 
+    private async Task<bool> TryConnect(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await EnsureConnected(cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) when (ex is WebSocketException or HttpRequestException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private async IAsyncEnumerable<AgentTransportEvent> StartFallback(
+        AgentTransportStartRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (_httpFallbackFactory is null)
+            throw new IOException("Responses WebSocket không kết nối được và không có HTTP fallback.");
+        _fallback = _httpFallbackFactory();
+        await foreach (var item in _fallback.StartAsync(request, cancellationToken).WithCancellation(cancellationToken))
+            yield return item;
+    }
+
     private async Task EnsureConnected(CancellationToken cancellationToken)
     {
         if (_connection?.IsOpen == true) return;
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync();
+            _connection = null;
+        }
         _connection = _connectionFactory();
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(_apiKey)) headers["Authorization"] = "Bearer " + _apiKey;
         await _connection.ConnectAsync(WebSocketEndpoint(_profile), headers, cancellationToken);
+    }
+
+    private async Task<string?> TryPrewarm(CancellationToken cancellationToken)
+    {
+        if (_connection?.IsOpen != true) return null;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var token = linked.Token;
+        _trace?.Mark(AgentTraceKind.PrewarmStart, "responses-websocket");
+        try
+        {
+            var payload = BuildPayload(_initialInput, previousResponseId: null);
+            payload["generate"] = false;
+            await _connection.SendTextAsync(payload.ToJsonString(), token);
+
+            string? responseId = null;
+            var completed = false;
+            var characters = 0;
+            await foreach (var raw in _connection.ReceiveTextAsync(token).WithCancellation(token))
+            {
+                characters += raw.Length;
+                if (characters > 3_000_000) throw new IOException("Responses prewarm vượt giới hạn an toàn 3 MB.");
+                using var json = JsonDocument.Parse(raw);
+                var root = json.RootElement;
+                var type = String(root, "type") ?? "";
+                if (type is "error" or "response.failed" or "response.incomplete")
+                    throw new IOException("Responses prewarm không hoàn tất; bỏ prewarm và chạy request thật.");
+                if (type == "response.output_text.delta" || type == "response.output_item.done")
+                    throw new InvalidDataException("Responses prewarm generate=false trả output; không dùng response này làm continuation.");
+                if (type is "response.created" or "response.in_progress")
+                {
+                    if (root.TryGetProperty("response", out var created) && created.ValueKind == JsonValueKind.Object)
+                        responseId ??= String(created, "id");
+                }
+                if (type == "response.completed")
+                {
+                    if (!root.TryGetProperty("response", out var response) || response.ValueKind != JsonValueKind.Object)
+                        throw new InvalidDataException("Responses prewarm completion thiếu response object.");
+                    responseId = String(response, "id") ?? responseId;
+                    completed = true;
+                    break;
+                }
+            }
+            if (!completed || string.IsNullOrWhiteSpace(responseId))
+                throw new IOException("Responses prewarm đóng trước completion hoặc thiếu response id.");
+
+            _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "success");
+            return responseId;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) when (ex is WebSocketException or IOException or JsonException or InvalidDataException)
+        {
+            _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "failed:" + ex.GetType().Name);
+            if (_connection?.IsOpen != true && _connection is not null)
+            {
+                await _connection.DisposeAsync();
+                _connection = null;
+            }
+            return null;
+        }
     }
 
     private async IAsyncEnumerable<AgentTransportEvent> SendAndReceive(
