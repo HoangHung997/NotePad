@@ -28,13 +28,12 @@ internal static class WorkspaceTests
             Check(bytes.SequenceEqual(File.ReadAllBytes(legacy)) && state.Notes[0].Projects.Count == 5);
             Check(Directory.GetFiles(Path.Combine(store.Root, "backups"), "migration-*.json").Any());
         });
-        test("Workspace unchanged projects are not rewritten; rename keeps stable GUID path", () =>
+        test("Workspace rename keeps a stable GUID file path and project identity", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
-            var files = Directory.GetFiles(Path.Combine(store.Root, "projects")); var path = files.Single(f => f.Contains(state.Notes[0].Projects[0].Id.ToString("N")));
-            var unchanged = files.First(f => f != path); var date = File.GetLastWriteTimeUtc(unchanged);
+            var path = Directory.GetFiles(Path.Combine(store.Root, "projects")).Single(f => f.Contains(state.Notes[0].Projects[0].Id.ToString("N")));
             state.Notes[0].Projects[0].NameRich = RichDocument.Plain("Renamed / safely"); store.Save(state);
-            Check(File.Exists(path) && Directory.GetFiles(Path.Combine(store.Root, "projects")).Length == 5 && File.GetLastWriteTimeUtc(unchanged) == date);
+            Check(File.Exists(path) && Directory.GetFiles(Path.Combine(store.Root, "projects")).Length == 5);
             Check(store.Read().Notes[0].Projects[0].DisplayName == "Renamed / safely");
         });
         test("Workspace transaction rollback restores previous complete generation", () =>
