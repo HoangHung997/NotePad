@@ -11,6 +11,7 @@ namespace H2Notes.Avalonia;
 public sealed partial class AiSettingsWindow
 {
     internal static string PdfBridgePath => Path.Combine(AppContext.BaseDirectory, "tools", "ocr", "convert.py");
+    private static string OcrInstallerPath => Path.Combine(AppContext.BaseDirectory, "tools", "ocr", "install.py");
     private sealed record PdfChoice(AiPdfEngine Engine, string Label) { public override string ToString() => Label; }
 
     private Control BuildPdfSettings(App app)
@@ -30,6 +31,8 @@ public sealed partial class AiSettingsWindow
         var readiness = new TextBlock { Name = "AiOcrReadiness", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = RichEditor.Brush("#796C62") };
         var browse = new Button { Content = "Chọn thư mục bộ OCR…", FontSize = 12 };
         var check = new Button { Content = "Kiểm tra bộ đã cài", FontSize = 12 };
+        var pack = new Button { Name = "PackPortableOcr", Content = "Đóng gói đủ 3 OCR vào app…", FontSize = 12 };
+        var diagnostics = new Button { Name = "PortabilityDiagnostics", Content = "Kiểm tra copy sang máy khác", FontSize = 12 };
         var save = new Button { Content = "Lưu thiết lập PDF / ảnh", Classes = { "accent" } };
         var local = new StackPanel { Spacing = 7 };
         AiPdfSettings Draft() => new() { Engine = ((PdfChoice)engine.SelectedItem!).Engine, OcrImages = images.IsChecked == true,
@@ -53,6 +56,45 @@ public sealed partial class AiSettingsWindow
             if (folders.FirstOrDefault()?.TryGetLocalPath() is { } path) { root.Text = path; Refresh(); }
         };
         engine.SelectionChanged += (_, _) => Refresh(); check.Click += (_, _) => Refresh();
+        diagnostics.Click += async (_, _) => await Dialogs.Message(this, "Khả năng copy H2 Notes sang máy khác", PortabilityDiagnostics.Build(app));
+        pack.Click += async (_, _) =>
+        {
+            var source = root.Text?.Trim() ?? "";
+            if (!Path.IsPathFullyQualified(source)) { readiness.Text = "Chọn runtime OCR hiện đang chạy trên laptop trước khi đóng gói."; return; }
+            pack.IsEnabled = browse.IsEnabled = check.IsEnabled = save.IsEnabled = false;
+            try
+            {
+                var progress = new Progress<string>(text => readiness.Text = text);
+                var scan = await Task.Run(() => PortableOcrPackager.Inspect(source));
+                if (!scan.Ready && !scan.PythonBundled && scan.Engines.Values.All(v => v))
+                {
+                    var makePortable = await Dialogs.Confirm(this, "Thêm Python portable vào bộ OCR?",
+                        "Cả 3 engine/model OCR đã sẵn sàng trên máy này nhưng runtime còn trỏ vào Python của laptop.\n\nH2 Notes sẽ CHỈ thêm một bản Python nền vào runtime hiện tại, không tải lại model và không xóa file nguồn. Sau đó app mới sao chép runtime vào thư mục ứng dụng.", "Đóng gói Python portable");
+                    if (!makePortable) { readiness.Text = "Đã hủy. Runtime OCR nguồn không bị thay đổi."; return; }
+                    scan = await Task.Run(() => PortableOcrPackager.MakePortableInPlace(source, OcrInstallerPath, progress));
+                }
+                if (!scan.Ready) throw new InvalidOperationException(scan.Message);
+
+                var destination = PortableOcrPackager.AppRuntimeRoot;
+                var same = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar)
+                    .Equals(Path.GetFullPath(destination).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+                var replace = false;
+                if (!same && Directory.Exists(destination))
+                {
+                    replace = await Dialogs.Confirm(this, "Thay bộ OCR portable cạnh ứng dụng?",
+                        "Đích đã có ocr-runtime:\n" + destination + "\n\nH2 Notes sẽ tạo bản staging, kiểm tra đủ 3 engine rồi mới thay thế. Runtime nguồn ở laptop luôn được giữ nguyên.", "Kiểm tra và thay thế");
+                    if (!replace) { readiness.Text = "Đã hủy thay thế. Không xóa runtime nào."; return; }
+                }
+                var final = await Task.Run(() => PortableOcrPackager.CopyIntoApp(source, replace, progress));
+                root.Text = final.Root;
+                app.LocalSettings.Ai.Pdf = Draft();
+                app.LocalSettings.Save();
+                readiness.Text = $"ĐÃ PORTABLE: đủ GOT-OCR 2.0 + Docling + MinerU + Python. {final.Bytes / 1024d / 1024d / 1024d:0.00} GiB. Giờ chép NGUYÊN thư mục chứa H2Notes.Avalonia.exe sang PC khác.";
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException or TimeoutException or PlatformNotSupportedException)
+            { readiness.Text = "Chưa đóng gói được OCR: " + ex.Message; }
+            finally { pack.IsEnabled = browse.IsEnabled = check.IsEnabled = save.IsEnabled = true; }
+        };
         save.Click += async (_, _) =>
         {
             try
@@ -69,6 +111,8 @@ public sealed partial class AiSettingsWindow
         local.Children.Add(new TextBlock { Text = "Bật: trích chữ/bảng trong ảnh bằng bộ OCR đã chọn, gửi Markdown cho AI; giữ ảnh gốc trong lịch sử. Tắt: ảnh mới gửi trực tiếp cho model đọc ảnh, lựa chọn PDF không tác động đến ảnh. Ảnh đã OCR giữ kết quả trong lịch sử; đính kèm lại để phân tích hình ảnh trực tiếp.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
         local.Children.Add(new TextBlock { Text = "Thư mục bộ OCR (chỉ lưu trên máy này)", FontWeight = FontWeight.SemiBold, FontSize = 12 });
         local.Children.Add(root); local.Children.Add(new WrapPanel { Children = { browse, check } });
+        local.Children.Add(new TextBlock { Text = "Muốn copy app sang PC khác mà không cài lại OCR: trên máy đang có đủ 3 engine, bấm ‘Đóng gói đủ 3 OCR vào app’, chờ kiểm tra xong rồi chép nguyên thư mục ứng dụng. Model OCR có thể nhiều GiB nên artifact CI tiêu chuẩn không tự nhúng chúng.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
+        local.Children.Add(new WrapPanel { Children = { pack, diagnostics } });
         local.Children.Add(new TextBlock { Text = "Giới hạn số trang / thời gian chờ (giây)", FontSize = 12 });
         var limits = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") }; limits.Children.Add(pages); limits.Children.Add(seconds); Grid.SetColumn(seconds, 1); seconds.Margin = new Thickness(8, 0, 0, 0); local.Children.Add(limits);
         local.Children.Add(new TextBlock { Text = "Không tải model khi gửi chat. Bộ OCR chạy cục bộ; Markdown chỉ gửi đến kết nối AI bạn đã chọn. Dừng AI sẽ dừng cả tiến trình đọc PDF.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
