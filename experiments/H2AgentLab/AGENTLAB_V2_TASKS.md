@@ -35,32 +35,32 @@ Rules:
 
 ## Phase 01 — turn trace and measurable performance
 
-- [ ] **V2-0101 — Add typed turn trace model.**  
-  Create `Metrics/AgentTrace.cs`. Record monotonic timestamped events with TaskId/TurnId and kinds: send, context-ready, request-start, connection-ready, first-model-event, tool-start, tool-finish, continuation, verifier-start, verifier-finish, final, error, cancel.
+- [x] **V2-0101 — Add typed turn trace model.**  
+  Evidence: `Metrics/AgentTrace.cs` records typed turn events with task/turn IDs, append-only sequence, UTC timestamps and monotonic `Stopwatch` elapsed time with a bounded event limit.
 
-- [ ] **V2-0102 — Add provider usage/latency metrics model.**  
-  Create `Metrics/AgentMetrics.cs` for input/cached/output tokens, bytes, model/tool calls, first-event latency, total duration, repairs and optional cost estimate.
+- [x] **V2-0102 — Add provider usage/latency metrics model.**  
+  Evidence: `Metrics/AgentMetrics.cs` aggregates public provider token/cache counters, bytes, model/tool calls, repairs, TTFT, total duration and optional configured cost without storing prompt/reasoning text.
 
-- [ ] **V2-0103 — Persist trace/metrics per Lab run.**  
-  Acceptance: each run writes bounded JSON evidence under Lab state; atomic write; no API key or hidden reasoning persisted.
+- [x] **V2-0103 — Persist trace/metrics per Lab run.**  
+  Evidence: `Metrics/AgentTraceStore.cs` writes bounded atomic JSON under Lab `traces/`; persisted events intentionally omit free-form detail/reasoning and redact Bearer/API-key-shaped labels. `LabWindow` persists a trace after each run.
 
-- [ ] **V2-0104 — Instrument existing v1 AgentRunner through a thin adapter.**  
-  Acceptance: v1 behavior unchanged, but every model/tool step emits new trace metrics.
+- [x] **V2-0104 — Instrument existing v1 AgentRunner through a thin adapter.**  
+  Evidence: the legacy `Run` signature is preserved; the telemetry overload marks request/connection/first-model/tool/continuation/final/error/cancel phases and records public Ollama usage while keeping the v1 execution/recovery semantics. V1 self-test stayed 18/18.
 
-- [ ] **V2-0105 — Add deterministic trace tests.**  
-  Acceptance: test ordering, monotonic durations, cancellation/error path and secret redaction.
+- [x] **V2-0105 — Add deterministic trace tests.**  
+  Evidence: `Metrics/V2MetricsTests.cs`; CI run `35235796417` reported **6 passed, 0 failed** for monotonic ordering, metric aggregation, bounded persistence/redaction, cancellation, provider error and event safety-limit cases.
 
-- [ ] **V2-0106 — Add raw-model baseline probe.**  
-  Acceptance: same profile/prompt can be measured without Lab tool loop, producing comparable TTFT/total/token metrics.
+- [x] **V2-0106 — Add raw-model baseline probe.**  
+  Evidence: `Metrics/RawModelBaselineProbe.cs` measures the same v1 Ollama/Chat profile and prompt with no Lab tool/session payload and emits the same trace/metrics model. It is explicitly measurement-only; Phase 02 owns the production transport.
 
-- [ ] **V2-0107 — Capture initial A/B baseline evidence.**  
-  Acceptance: docs/evidence record raw API vs current v1 on at least direct-text and one tool-call fixture; results clearly separated from correctness claims.
+- [x] **V2-0107 — Capture initial A/B baseline evidence.**  
+  Evidence: `Metrics/V2BaselineTests.cs` and `evidence/2026-09-17-v2-phase01/INITIAL_AB_BASELINE.md`. CI run `35235796417` reported **3 passed, 0 failed** and deterministically exposed request growth: synthetic raw 86 bytes, v1 direct 13,782 bytes, v1 one-tool 28,062 bytes. The evidence explicitly forbids treating fixture timings as real model-speed results. The same run had H2 Notes 336/336, Lab v1 18/18, v2 guard 3/3, v2 metrics 6/6 and 0-warning/0-error Lab build. A stale `/bin` publish race was separately fixed in `45fe1d6fc187688c47293126e3459f3dd3952987`; run `35235928163` then completed the full workflow successfully.
 
 ---
 
 ## Phase 02 — transport abstraction
 
-- [ ] **V2-0201 — Define `IAgentTransport` and typed stream events.**  
+- [~] **V2-0201 — Define `IAgentTransport` and typed stream events.**  
   Must support start/continue/cancel/dispose and capability reporting; orchestration must not know provider JSON.
 
 - [ ] **V2-0202 — Define `AgentTransportCapabilities`.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Next task:** `V2-0101 — Add typed turn trace model`.
+**Active task:** `V2-0201 — Define IAgentTransport and typed stream events`.
