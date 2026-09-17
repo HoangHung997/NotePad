@@ -53,6 +53,7 @@ public sealed partial class AiChatPanel
             // UI callback is synchronous, targets this exact project and preserves editor undo.
             ProjectActionsRequested.Invoke(project, actions);
             var now = DateTime.UtcNow;
+            var local = now.ToLocalTime();
             project.UpdatedAtUtc = now;
             foreach (var task in project.ChecklistItems.Where(t => !oldTaskIds.Contains(t.Id)))
             {
@@ -60,7 +61,10 @@ public sealed partial class AiChatPanel
                 task.UpdatedAtUtc ??= now;
             }
             message.ProjectActionsApplied = true;
-            message.ProjectActionsAudit = $"H2 Notes đã áp dụng {actions.Count} thay đổi · {now.ToLocalTime():HH:mm dd/MM/yyyy}";
+            var items = string.Join(" | ", actions.Select((a, i) => $"{i + 1}:{a.Kind}:{(a.Text.Length > 160 ? a.Text[..160] + "…" : a.Text)}"));
+            // Keep machine-readable ISO timestamps in the saved chat context so later questions
+            // such as "AI added that note when?" can answer from evidence instead of guessing.
+            message.ProjectActionsAudit = $"appliedUtc={now:O}; appliedLocal={local:yyyy-MM-ddTHH:mm:sszzz}; count={actions.Count}; items={items}";
             Touch(scope);
         }
         catch (Exception ex) when (IsProjectActionException(ex)) { _status.Text = "Chưa áp dụng: " + ex.Message; }
