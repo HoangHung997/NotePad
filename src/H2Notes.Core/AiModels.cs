@@ -6,6 +6,7 @@ namespace H2Notes.Core;
 public sealed class AiConversation
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long Revision { get; set; }
     public string Title { get; set; } = "Cuộc trao đổi mới";
     public string Draft { get; set; } = "";
     public List<AiAttachment> DraftAttachments { get; set; } = [];
@@ -21,6 +22,9 @@ public sealed class AiMessage
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? ParentId { get; set; }
+    public long Sequence { get; set; }
+    public Guid? AiRunId { get; set; }
+    public string DeviceId { get; set; } = "";
     public string Role { get; set; } = "user";
     public string Content { get; set; } = "";
     public string Model { get; set; } = "";
@@ -83,6 +87,9 @@ public static class AiHistory
             foreach (var message in conversation.Messages)
             {
                 message.Id = mapping[message.Id];
+                message.Sequence = 0;
+                message.AiRunId = null;
+                message.DeviceId = "";
                 if (message.ParentId is { } parent && mapping.TryGetValue(parent, out var mapped)) message.ParentId = mapped;
             }
         }
