@@ -50,7 +50,7 @@ public sealed partial class AiChatPanel
 
     private void ApplyProjectActions(AiChatScope scope, AiMessage message, IReadOnlyList<AiProjectAction> actions, bool approved)
     {
-        if (scope != _scope || scope.Project is not { } project || message.ProjectActionsApplied || ProjectActionsRequested is null) return;
+        if (scope != _scope || scope.Project is not { } project || message.ProjectActionsApplied) return;
         try
         {
             // First flush a human edit that may still be in the rich editor. Then validate the whole
@@ -60,9 +60,9 @@ public sealed partial class AiChatPanel
             var now = DateTime.UtcNow;
             AiProjectActions.Apply(project, actions, now);
 
-            // Existing host callback is used as a refresh signal. Passing an empty action set avoids
-            // replaying legacy add/append logic now that Core owns every edit/delete/rich-format operation.
-            ProjectActionsRequested.Invoke(project, []);
+            // A host may subscribe only to refresh its visible editors. The mutation itself does not
+            // depend on that subscription, so detached/embedded panels behave consistently.
+            ProjectActionsRequested?.Invoke(project, []);
 
             var local = now.ToLocalTime();
             message.ProjectActionsApplied = true;
