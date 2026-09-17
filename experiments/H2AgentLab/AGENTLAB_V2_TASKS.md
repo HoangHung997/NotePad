@@ -81,10 +81,10 @@ Rules:
 - [x] **V2-0207 — Implement Responses WebSocket turn session.**  
   Evidence: `Transport/OpenAiResponsesWebSocketTransport.cs` adds an official-endpoint, turn-scoped `wss://api.openai.com/v1/responses` transport. One socket is reused across Start + all tool continuations; the first request sends full canonical input, while continuations send only new `function_call_output` items plus `previous_response_id` with `store:false`. It falls back to HTTP only when WebSocket connection setup fails before any request write; any disconnect/error after a successful write is treated as ambiguous and is never auto-replayed. `AgentTransportCapabilities.OpenAiResponsesWebSocket` exposes WebSocket + incremental continuation explicitly. `V2ResponsesWebSocketTransportTests.cs` verifies same-socket reuse, minimal continuation payload, safe pre-write fallback, no post-write replay, and official-endpoint restriction. GitHub Actions run `35250100777` completed successfully: H2 Notes tests, all prior Agent Lab v1/v2 transport suites, the new WebSocket suite, self-contained publish and `/bin` publish all passed.
 
-- [~] **V2-0208 — Add WebSocket prewarm where supported.**  
-  Acceptance: prewarm is best-effort and never changes task result semantics; trace distinguishes prewarm time.
+- [x] **V2-0208 — Add WebSocket prewarm where supported.**  
+  Evidence: `OpenAiResponsesWebSocketTransport` now performs best-effort `response.create` prewarm with `generate:false` on the official Responses WebSocket path. A successful warmup remains on the same turn socket and the real generation references the warm response with empty duplicate input; a warmup error never changes task semantics—the real request keeps the original full input. A broken warmup connection may be recreated because generate=false cannot produce model/tool effects, while the existing no-replay rule still applies after a real generation write. `AgentTraceKind.PrewarmStart/PrewarmFinish` records warmup timing/status without reasoning text. `V2ResponsesWebSocketTransportTests` verifies successful reuse, failure fallback semantics and trace ordering. GitHub Actions run `35250947951` completed successfully: H2 Notes, Lab build/v1, all transport suites including WebSocket/prewarm, publish and `/bin` publish all passed.
 
-- [ ] **V2-0209 — Add provider transport tests.**  
+- [~] **V2-0209 — Add provider transport tests.**  
   Mock HTTP/SSE/WebSocket/Ollama streams; continuation, disconnect, cancel and malformed-response cases.
 
 - [ ] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0208 — Add WebSocket prewarm where supported`.
+**Active task:** `V2-0209 — Add provider transport tests`.
