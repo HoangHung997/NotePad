@@ -41,21 +41,10 @@ public sealed class OllamaTransport : IAgentTransport
         if (string.IsNullOrWhiteSpace(profile.Model))
             throw new ArgumentException("Chưa chọn model Ollama.", nameof(profile));
 
-        // Snapshot only transport-relevant settings. A UI edit after Send must not mutate an
-        // already-running turn.
-        _profile = new AiProfile
-        {
-            Id = profile.Id,
-            Name = profile.Name,
-            Protocol = AiProtocol.Ollama,
-            BaseUrl = profile.BaseUrl,
-            Model = profile.Model,
-            TimeoutSeconds = profile.TimeoutSeconds,
-            WaitForCompletion = profile.WaitForCompletion,
-            RequestReasoningSummary = profile.RequestReasoningSummary,
-            ReasoningEffort = profile.ReasoningEffort,
-            OllamaThinking = profile.OllamaThinking
-        };
+        // Shared Core owns the snapshot contract so future AiProfile fields cannot be silently
+        // omitted by this transport while a turn is running.
+        _profile = profile.Copy();
+        _profile.Protocol = AiProtocol.Ollama;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = Timeout.InfiniteTimeSpan
@@ -162,7 +151,10 @@ public sealed class OllamaTransport : IAgentTransport
             ["stream"] = true
         };
         if (_tools.Count > 0) payload["tools"] = BuildTools();
-        if (_profile.OllamaThinking is bool thinking) payload["think"] = thinking;
+        if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
+            payload["think"] = effort;
+        else if (_profile.OllamaThinking is bool thinking)
+            payload["think"] = thinking;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "api/chat"))
         {
