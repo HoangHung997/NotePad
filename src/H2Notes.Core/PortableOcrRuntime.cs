@@ -28,9 +28,11 @@ public static class PortableOcrRuntime
     {
         if (!OperatingSystem.IsWindows()) return;
         root = Path.GetFullPath(root);
-        if (!Checked.TryAdd(root, 0)) return;
         var manifestPath = Path.Combine(root, "runtime.json");
+        // Do not cache a missing bundle. The user may package the runtime beside the app later
+        // in this same process and it must then be inspected/repaired immediately.
         if (!File.Exists(manifestPath)) return;
+        if (!Checked.TryAdd(root, 0)) return;
         try
         {
             if (new FileInfo(manifestPath).Length > 64 * 1024) return;
