@@ -116,8 +116,7 @@ public sealed class AiMemoryStore
         }
 
         // Current structured records are rebuildable. Remove only stale current records; immutable
-        // episodic/message records remain as history. This is safe after ProjectWorkspaceStore has
-        // already merged the live state with the latest NAS generation.
+        // episodic/message records remain as history.
         foreach (var path in EnumerateRecordFiles())
         {
             AiMemoryRecord? record = null;
@@ -129,7 +128,13 @@ public sealed class AiMemoryStore
         if (changed)
         {
             var revision = ReadRevisionUnsafe() + 1;
-            ProjectWorkspaceStore.AtomicWrite(_revisionPath, JsonSerializer.SerializeToUtf8Bytes(new MemoryRevision { SchemaVersion = SchemaVersion, Revision = revision, UpdatedUtc = now, WriterId = _writerId }, ProjectWorkspaceStore.Json));
+            ProjectWorkspaceStore.AtomicWrite(_revisionPath, JsonSerializer.SerializeToUtf8Bytes(new MemoryRevision
+            {
+                SchemaVersion = AiMemoryStore.SchemaVersion,
+                Revision = revision,
+                UpdatedUtc = now,
+                WriterId = _writerId
+            }, ProjectWorkspaceStore.Json));
         }
     }
 
@@ -163,14 +168,12 @@ public sealed class AiMemoryStore
         foreach (var message in conversation.Messages)
         {
             if (message.Id == Guid.Empty || message.Status is not ("complete" or "interrupted") || message.IsTimelineMarker && message.Role != "user") continue;
-            // User statements are authoritative memory. AI text is retained only when the app
-            // actually applied its project actions; ordinary AI prose must not silently become fact.
+            // User statements are authoritative memory. AI prose becomes memory only when H2 Notes
+            // actually applied its project action; ordinary model speculation is not promoted to fact.
             if (message.Role != "user" && !message.ProjectActionsApplied) continue;
             var text = new StringBuilder(message.Content ?? "");
             foreach (var attachment in message.Attachments.Where(a => !string.IsNullOrWhiteSpace(a.Text)))
-            {
                 text.Append("\nTệp ").Append(attachment.Name).Append(":\n").Append(Trim(attachment.Text, 12_000));
-            }
             if (message.ProjectActionsApplied && !string.IsNullOrWhiteSpace(message.ProjectActionsAudit))
                 text.Append("\nThao tác H2 Notes đã áp dụng: ").Append(message.ProjectActionsAudit);
             if (text.Length == 0) continue;
@@ -212,7 +215,9 @@ public sealed class AiMemoryStore
             UpdatedUtc = Utc(updated),
             IsCurrent = true,
             Priority = priority,
-            WriterId = _writerId
+            // Structured truth is identical on every device after the workspace merge. Do not rewrite
+            // a record merely because another PC generated the same index entry.
+            WriterId = "structured-state"
         };
 
     private bool Upsert(AiMemoryRecord record, HashSet<Guid>? desiredCurrent)
@@ -226,14 +231,19 @@ public sealed class AiMemoryStore
             var oldStamp = Timestamp(existing) ?? DateTime.MinValue;
             var newStamp = Timestamp(record) ?? DateTime.MinValue;
             if (oldStamp > newStamp) return false;
-            var oldBytes = File.ReadAllBytes(path);
-            var newBytes = JsonSerializer.SerializeToUtf8Bytes(record, ProjectWorkspaceStore.Json);
-            if (oldBytes.SequenceEqual(newBytes)) return false;
-            ProjectWorkspaceStore.AtomicWrite(path, newBytes); return true;
+            if (Equivalent(existing, record)) return false;
+            ProjectWorkspaceStore.AtomicWrite(path, JsonSerializer.SerializeToUtf8Bytes(record, ProjectWorkspaceStore.Json));
+            return true;
         }
         ProjectWorkspaceStore.AtomicWrite(path, JsonSerializer.SerializeToUtf8Bytes(record, ProjectWorkspaceStore.Json));
         return true;
     }
+
+    private static bool Equivalent(AiMemoryRecord a, AiMemoryRecord b) => a.SchemaVersion == b.SchemaVersion && a.Id == b.Id
+        && a.Scope == b.Scope && a.ProjectId == b.ProjectId && a.ProjectName == b.ProjectName && a.Kind == b.Kind
+        && a.SourceType == b.SourceType && a.SourceId == b.SourceId && a.FactKey == b.FactKey && a.Text == b.Text
+        && Utc(a.CreatedUtc) == Utc(b.CreatedUtc) && Utc(a.UpdatedUtc) == Utc(b.UpdatedUtc)
+        && a.IsCurrent == b.IsCurrent && a.Priority == b.Priority;
 
     private IReadOnlyList<AiMemoryRecord> LoadCachedRecords()
     {
@@ -244,7 +254,7 @@ public sealed class AiMemoryStore
             if (File.Exists(_cachePath))
             {
                 var cache = JsonSerializer.Deserialize<LocalCache>(File.ReadAllBytes(_cachePath), ProjectWorkspaceStore.Json);
-                if (cache?.SchemaVersion == SchemaVersion && cache.Revision == revision && cache.Records is not null) return cache.Records;
+                if (cache?.SchemaVersion == AiMemoryStore.SchemaVersion && cache.Revision == revision && cache.Records is not null) return cache.Records;
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException) { }
@@ -253,7 +263,12 @@ public sealed class AiMemoryStore
         foreach (var path in EnumerateRecordFiles()) records.Add(ReadRecord(path));
         try
         {
-            ProjectWorkspaceStore.AtomicWrite(_cachePath, JsonSerializer.SerializeToUtf8Bytes(new LocalCache { SchemaVersion = SchemaVersion, Revision = revision, Records = records }, ProjectWorkspaceStore.Json));
+            ProjectWorkspaceStore.AtomicWrite(_cachePath, JsonSerializer.SerializeToUtf8Bytes(new LocalCache
+            {
+                SchemaVersion = AiMemoryStore.SchemaVersion,
+                Revision = revision,
+                Records = records
+            }, ProjectWorkspaceStore.Json));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         return records;
@@ -279,7 +294,7 @@ public sealed class AiMemoryStore
         if (new FileInfo(path).Length > 128 * 1024) throw new InvalidDataException("Bản ghi AI memory vượt giới hạn.");
         var record = JsonSerializer.Deserialize<AiMemoryRecord>(File.ReadAllBytes(path), ProjectWorkspaceStore.Json)
             ?? throw new InvalidDataException("Bản ghi AI memory rỗng.");
-        if (record.SchemaVersion != SchemaVersion || record.Id == Guid.Empty || record.SourceId == Guid.Empty || record.Text.Length > MaxRecordText
+        if (record.SchemaVersion != AiMemoryStore.SchemaVersion || record.Id == Guid.Empty || record.SourceId == Guid.Empty || record.Text.Length > MaxRecordText
             || record.Scope is not ("workspace" or "project")) throw new InvalidDataException("Bản ghi AI memory không hợp lệ.");
         return record;
     }
@@ -319,7 +334,7 @@ public sealed class AiMemoryStore
         try
         {
             var revision = JsonSerializer.Deserialize<MemoryRevision>(File.ReadAllBytes(_revisionPath), ProjectWorkspaceStore.Json);
-            return revision?.SchemaVersion == SchemaVersion ? revision.Revision : 0;
+            return revision?.SchemaVersion == AiMemoryStore.SchemaVersion ? revision.Revision : 0;
         }
         catch (JsonException) { return 0; }
     }
@@ -327,18 +342,21 @@ public sealed class AiMemoryStore
     private static (DateTimeOffset? From, DateTimeOffset? To) ParseTimeRange(string query, DateTimeOffset now)
     {
         var q = Normalize(query);
-        var day = now.Date;
-        if (q.Contains("hom qua")) day = now.AddDays(-1).Date;
-        var hasDay = q.Contains("hom nay") || q.Contains("hom qua") || q.Contains("sang nay") || q.Contains("chieu nay") || q.Contains("toi nay") || q.Contains("dem nay");
+        var yesterday = q.Contains("hom qua", StringComparison.Ordinal);
+        var hasDay = q.Contains("hom nay", StringComparison.Ordinal) || yesterday;
+        var morning = q.Contains("sang nay", StringComparison.Ordinal) || q.Contains("sang hom qua", StringComparison.Ordinal);
+        var afternoon = q.Contains("chieu nay", StringComparison.Ordinal) || q.Contains("chieu hom qua", StringComparison.Ordinal);
+        var evening = q.Contains("toi nay", StringComparison.Ordinal) || q.Contains("toi hom qua", StringComparison.Ordinal);
+        var night = q.Contains("dem nay", StringComparison.Ordinal) || q.Contains("dem hom qua", StringComparison.Ordinal);
+        if (morning || afternoon || evening || night) hasDay = true;
         if (!hasDay) return (null, null);
+        var day = yesterday ? now.AddDays(-1).Date : now.Date;
         TimeSpan from = TimeSpan.Zero, to = TimeSpan.FromDays(1);
-        if (q.Contains("sang nay")) { from = TimeSpan.FromHours(5); to = TimeSpan.FromHours(12); }
-        else if (q.Contains("chieu nay")) { from = TimeSpan.FromHours(12); to = TimeSpan.FromHours(18); }
-        else if (q.Contains("toi nay")) { from = TimeSpan.FromHours(18); to = TimeSpan.FromHours(23); }
-        else if (q.Contains("dem nay")) { from = TimeSpan.FromHours(23); to = TimeSpan.FromDays(1); }
-        var start = new DateTimeOffset(day + from, now.Offset);
-        var end = new DateTimeOffset(day + to, now.Offset);
-        return (start, end);
+        if (morning) { from = TimeSpan.FromHours(5); to = TimeSpan.FromHours(12); }
+        else if (afternoon) { from = TimeSpan.FromHours(12); to = TimeSpan.FromHours(18); }
+        else if (evening) { from = TimeSpan.FromHours(18); to = TimeSpan.FromHours(23); }
+        else if (night) { from = TimeSpan.FromHours(23); to = TimeSpan.FromDays(1); }
+        return (new DateTimeOffset(day + from, now.Offset), new DateTimeOffset(day + to, now.Offset));
     }
 
     private static int Score(AiMemoryRecord record, string normalizedQuery, HashSet<string> queryTokens, Guid? currentProjectId, bool timeFiltered, DateTime nowUtc)
@@ -388,7 +406,8 @@ public sealed class AiMemoryStore
                 var newline = text.LastIndexOf('\n', offset + take - 1, take);
                 if (newline > offset + size / 2) take = newline - offset + 1;
             }
-            yield return text.Substring(offset, take).Trim();
+            var chunk = text.Substring(offset, take).Trim();
+            if (chunk.Length > 0) yield return chunk;
             offset += take;
         }
     }
@@ -402,14 +421,15 @@ public sealed class AiMemoryStore
 
     private sealed class MemoryRevision
     {
-        public int SchemaVersion { get; set; } = SchemaVersion;
+        public int SchemaVersion { get; set; } = AiMemoryStore.SchemaVersion;
         public long Revision { get; set; }
         public DateTime UpdatedUtc { get; set; }
         public string WriterId { get; set; } = "";
     }
+
     private sealed class LocalCache
     {
-        public int SchemaVersion { get; set; } = SchemaVersion;
+        public int SchemaVersion { get; set; } = AiMemoryStore.SchemaVersion;
         public long Revision { get; set; }
         public List<AiMemoryRecord> Records { get; set; } = [];
     }
