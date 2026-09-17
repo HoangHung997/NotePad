@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -35,6 +34,8 @@ public static class AiProjectActions
     { "kind", "text", "match", "taskId", "completed", "comment", "format" };
     private static readonly HashSet<string> AllowedFormatProperties = new(StringComparer.Ordinal)
     { "match", "bold", "italic", "underline", "strike", "color", "highlight", "font", "size" };
+    private static readonly HashSet<string> AllowedKinds = new(StringComparer.Ordinal)
+    { "add_task", "update_task", "delete_task", "append_note", "replace_note", "delete_note" };
 
     public static string Instructions(AiPermissionMode permission)
     {
@@ -95,6 +96,7 @@ public static class AiProjectActions
                 throw new InvalidDataException("Cấu trúc thay đổi chưa hợp lệ.");
 
             var kind = kindNode.GetString()!;
+            if (!AllowedKinds.Contains(kind)) throw new InvalidDataException("Loại thay đổi không được phép.");
             var textValue = OptionalString(item, "text", trim: false);
             var matchValue = OptionalString(item, "match", trim: false);
             var comment = OptionalString(item, "comment", trim: false);
@@ -113,7 +115,9 @@ public static class AiProjectActions
                 completed = completeNode.GetBoolean();
             }
             var format = ParseFormat(item);
-            actions.Add(new(kind, textValue, matchValue, taskId, completed, comment, format));
+            var action = new AiProjectAction(kind, textValue, matchValue, taskId, completed, comment, format);
+            ValidateParsedShape(action);
+            actions.Add(action);
         }
         return actions;
     }
@@ -199,6 +203,54 @@ public static class AiProjectActions
 
     public static string WithoutBlocks(string text) => Blocks.Replace(text, "").Trim();
 
+    private static void ValidateParsedShape(AiProjectAction action)
+    {
+        switch (action.Kind)
+        {
+            case "add_task":
+                RequireText(action.Text, 4000, "Nội dung công việc");
+                if (action.TaskId is not null || action.Match is not null || action.Completed is not null || action.Comment is not null)
+                    throw new InvalidDataException("add_task có trường không phù hợp.");
+                ValidateFormats(action.Text!, action.Format);
+                break;
+            case "update_task":
+                if (action.TaskId is null || action.Match is not null || action.Text is null && action.Completed is null && action.Comment is null)
+                    throw new InvalidDataException("update_task cần taskId và ít nhất một thay đổi hợp lệ.");
+                if (action.Text is not null) RequireText(action.Text, 4000, "Tên công việc");
+                if (action.Comment is not null && (action.Comment.Length > 20_000 || action.Comment.Contains('\0')))
+                    throw new InvalidDataException("Ghi chú công việc vượt giới hạn.");
+                if (action.Text is null && action.Format is { Count: > 0 }) throw new InvalidDataException("Không thể định dạng task khi không thay text.");
+                if (action.Text is not null) ValidateFormats(action.Text, action.Format);
+                break;
+            case "delete_task":
+                if (action.TaskId is null || action.Text is not null || action.Match is not null || action.Completed is not null
+                    || action.Comment is not null || action.Format is { Count: > 0 })
+                    throw new InvalidDataException("delete_task có trường không phù hợp.");
+                break;
+            case "append_note":
+                RequireText(action.Text, 20_000, "Nội dung ghi chú");
+                if (action.TaskId is not null || action.Match is not null || action.Completed is not null || action.Comment is not null)
+                    throw new InvalidDataException("append_note có trường không phù hợp.");
+                ValidateFormats(action.Text!, action.Format);
+                break;
+            case "replace_note":
+                RequireMatch(action.Match);
+                if (action.TaskId is not null || action.Completed is not null || action.Comment is not null || action.Text is null
+                    || action.Text.Length > 20_000 || action.Text.Contains('\0'))
+                    throw new InvalidDataException("replace_note có trường không phù hợp.");
+                ValidateFormats(action.Text, action.Format);
+                break;
+            case "delete_note":
+                RequireMatch(action.Match);
+                if (action.TaskId is not null || action.Text is not null || action.Completed is not null || action.Comment is not null
+                    || action.Format is { Count: > 0 })
+                    throw new InvalidDataException("delete_note có trường không phù hợp.");
+                break;
+            default:
+                throw new InvalidDataException("Loại thay đổi không được phép.");
+        }
+    }
+
     private static void ValidateActions(ProjectRecord project, IReadOnlyList<AiProjectAction> actions)
     {
         if (actions.Count is < 1 or > 10) throw new InvalidDataException("Nhóm thay đổi không hợp lệ.");
@@ -207,13 +259,10 @@ public static class AiProjectActions
 
         foreach (var action in actions)
         {
+            ValidateParsedShape(action);
             switch (action.Kind)
             {
                 case "add_task":
-                    RequireText(action.Text, 4000, "Nội dung công việc");
-                    if (action.TaskId is not null || action.Match is not null || action.Completed is not null || action.Comment is not null)
-                        throw new InvalidDataException("add_task có trường không phù hợp.");
-                    ValidateFormats(action.Text!, action.Format);
                     if (tasks.Count >= 5000) throw new InvalidDataException("Dự án đã đạt giới hạn công việc.");
                     tasks.Add(Guid.NewGuid(), (action.Text!, "", false));
                     break;
@@ -221,51 +270,27 @@ public static class AiProjectActions
                 case "update_task":
                     if (action.TaskId is not { } updateId || !tasks.TryGetValue(updateId, out var current))
                         throw new InvalidDataException("Không tìm thấy công việc cần sửa.");
-                    if (action.Match is not null || action.Text is null && action.Completed is null && action.Comment is null)
-                        throw new InvalidDataException("update_task cần ít nhất một thay đổi hợp lệ.");
-                    if (action.Text is not null) RequireText(action.Text, 4000, "Tên công việc");
-                    if (action.Comment is not null && (action.Comment.Length > 20_000 || action.Comment.Contains('\0')))
-                        throw new InvalidDataException("Ghi chú công việc vượt giới hạn.");
-                    if (action.Text is null && action.Format is { Count: > 0 }) throw new InvalidDataException("Không thể định dạng task khi không thay text.");
-                    if (action.Text is not null) ValidateFormats(action.Text, action.Format);
                     tasks[updateId] = (action.Text ?? current.DisplayText, action.Comment ?? current.CommentText, action.Completed ?? current.IsCompleted);
                     break;
 
                 case "delete_task":
                     if (action.TaskId is not { } deleteId || !tasks.Remove(deleteId))
                         throw new InvalidDataException("Không tìm thấy công việc cần xóa.");
-                    if (action.Text is not null || action.Match is not null || action.Completed is not null || action.Comment is not null || action.Format is { Count: > 0 })
-                        throw new InvalidDataException("delete_task có trường không phù hợp.");
                     break;
 
                 case "append_note":
-                    RequireText(action.Text, 20_000, "Nội dung ghi chú");
-                    if (action.TaskId is not null || action.Match is not null || action.Completed is not null || action.Comment is not null)
-                        throw new InvalidDataException("append_note có trường không phù hợp.");
-                    ValidateFormats(action.Text!, action.Format);
                     notes.Replace(notes.Text.Length, 0, (notes.Text.Length == 0 || notes.Text.EndsWith('\n') ? "" : "\n") + action.Text);
                     break;
 
                 case "replace_note":
-                    if (action.TaskId is not null || action.Completed is not null || action.Comment is not null)
-                        throw new InvalidDataException("replace_note có trường không phù hợp.");
-                    RequireMatch(action.Match);
-                    if (action.Text is null || action.Text.Length > 20_000 || action.Text.Contains('\0')) throw new InvalidDataException("Nội dung thay thế chưa hợp lệ.");
-                    ValidateFormats(action.Text, action.Format);
                     var replaceAt = UniqueIndex(notes.Text, action.Match!);
-                    notes.Replace(replaceAt, action.Match!.Length, action.Text);
+                    notes.Replace(replaceAt, action.Match!.Length, action.Text!);
                     break;
 
                 case "delete_note":
-                    if (action.TaskId is not null || action.Text is not null || action.Completed is not null || action.Comment is not null || action.Format is { Count: > 0 })
-                        throw new InvalidDataException("delete_note có trường không phù hợp.");
-                    RequireMatch(action.Match);
                     var deleteAt = UniqueIndex(notes.Text, action.Match!);
                     notes.Replace(deleteAt, action.Match!.Length, "");
                     break;
-
-                default:
-                    throw new InvalidDataException("Loại thay đổi không được phép.");
             }
             if (notes.Text.Length > 600_000) throw new InvalidDataException("Thay đổi vượt giới hạn dung lượng ghi chú dự án.");
         }
