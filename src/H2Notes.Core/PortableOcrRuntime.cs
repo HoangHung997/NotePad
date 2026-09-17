@@ -24,6 +24,8 @@ public static class PortableOcrRuntime
         return root;
     }
 
+    public static void Invalidate(string root) => Checked.TryRemove(Path.GetFullPath(root), out _);
+
     public static void EnsureRelocated(string root)
     {
         if (!OperatingSystem.IsWindows()) return;
