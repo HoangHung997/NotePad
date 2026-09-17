@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using H2AgentLab.Metrics;
 using H2Notes.Core;
 
 namespace H2AgentLab;
@@ -112,6 +113,7 @@ public sealed class LabWindow : Window
         if (string.IsNullOrWhiteSpace(_profile.Model)) { await Configure(); if (string.IsNullOrWhiteSpace(_profile.Model)) return; }
         if (_profile.ProcessingLocation != "Ollama · chạy trên máy" && !await Confirm(new("Gửi tới model đã chọn", $"{_profile.ProcessingLocation}\n{_profile.BaseUrl}\nModel: {_profile.Model}\n\nLượt này có thể gửi nội dung tệp trong thư mục được chọn, nhật ký gần đây và nội dung cửa sổ bạn duyệt đọc. Có thể phát sinh phí API. Không dùng dữ liệu thật nếu chưa tin endpoint."), CancellationToken.None)) return;
         using var cancel = new CancellationTokenSource(); _running = cancel;
+        var telemetry = new AgentRunTelemetry();
         SetBusy(true); _input.Text = ""; Bubble("user", prompt);
         var streamed = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Text = "Đang chờ model…" };
         _messages.Children.Add(streamed); var answer = ""; var thought = "";
@@ -129,12 +131,26 @@ public sealed class LabWindow : Window
                 else if (kind == "tool") { Bubble("tool", text.Length > 1600 ? text[..1600] + "\n… Xem đầy đủ trong nhật ký." : text); streamed.Text = "Đang đối chiếu kết quả công cụ…"; }
                 else if (kind == "final") { _messages.Children.Remove(streamed); Bubble("assistant", text); }
                 Dispatcher.UIThread.Post(() => _scroll.ScrollToEnd(), DispatcherPriority.Background);
-            }, Save, cancel.Token);
+            }, Save, telemetry, cancel.Token);
             _status.Text = "Lượt đã kết thúc · Xem kết quả công cụ trước khi kết luận";
         }
         catch (OperationCanceledException) { streamed.Text = answer; _status.Text = "Đã dừng. Thao tác đã hoàn tất trước khi dừng vẫn giữ trong nhật ký."; _session.Add("cancelled", "User stopped this run."); Save(); }
         catch (Exception ex) { streamed.Text = answer; _status.Text = "Chưa hoàn tất: " + ex.Message; _session.Add("error", ex.Message); try { Save(); } catch (IOException) { } }
-        finally { thought = ""; _running = null; SetBusy(false); }
+        finally
+        {
+            thought = "";
+            try
+            {
+                var evidence = AgentTraceStore.Save(_stateRoot, telemetry.Trace, telemetry.Metrics);
+                _session.Add("telemetry", "Turn metrics: " + Path.GetFileName(evidence));
+                Save();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _status.Text += " · Không lưu được trace: " + ex.Message;
+            }
+            _running = null; SetBusy(false);
+        }
     }
     private void SetBusy(bool busy) { _send.IsEnabled = !busy; _stop.IsEnabled = busy; _actions.IsEnabled = !busy; _readOnly.IsEnabled = !busy; }
     private async Task PickWorkspace()
