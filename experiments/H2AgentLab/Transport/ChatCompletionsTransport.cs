@@ -44,19 +44,10 @@ public sealed class ChatCompletionsTransport : IAgentTransport
         if (profile.RequestReasoningSummary)
             throw new ArgumentException("Chat Completions fallback không hỗ trợ yêu cầu reasoning summary công khai; dùng Responses nếu cần.", nameof(profile));
 
-        _profile = new AiProfile
-        {
-            Id = profile.Id,
-            Name = profile.Name,
-            Protocol = AiProtocol.OpenAiChat,
-            BaseUrl = profile.BaseUrl,
-            Model = profile.Model,
-            TimeoutSeconds = profile.TimeoutSeconds,
-            WaitForCompletion = profile.WaitForCompletion,
-            RequestReasoningSummary = false,
-            ReasoningEffort = profile.ReasoningEffort,
-            OllamaThinking = null
-        };
+        _profile = profile.Copy();
+        _profile.Protocol = AiProtocol.OpenAiChat;
+        _profile.RequestReasoningSummary = false;
+        _profile.OllamaThinking = null;
         _apiKey = apiKey ?? "";
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false })
         {
