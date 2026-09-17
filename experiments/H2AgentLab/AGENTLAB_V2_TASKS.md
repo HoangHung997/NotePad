@@ -100,10 +100,10 @@ Rules:
 - [x] **V2-0302 — Add agent policy/toolset version identifiers.**  
   Evidence: `AgentVersionIdentifiers.cs` defines validated, non-secret `AgentPolicyVersion`, `SafetyPolicyVersion` and `ToolsetVersion` metadata plus the current v2 contract labels. `AgentPromptStablePrefix` requires these identifiers and `AgentPromptLayout` carries them out-of-band instead of consuming prompt tokens. `AgentTrace` schema 2 and `AgentTraceStore` persist the identifiers for v2 reproducibility while v1 traces remain compatible with `Versions=null`; `AgentRunTelemetry` accepts the same immutable metadata. `V2ArchitectureTests` rejects unsafe labels and verifies versions never enter model prompt text; `V2MetricsTests` verifies the three identifiers persist without policy text. Source commit `14cb701d8d3eaa737eca670f7c906a4e7da01ad5`; GitHub Actions push run `35257216721` and PR run `35257220506` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **6/6**, metrics **7/7**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. The workflow-generated portable commit is `ecafeb3` (`[skip ci]`).
 
-- [~] **V2-0303 — Add prompt-cache identity builder.**  
-  Acceptance: deterministic hash changes only when stable policy/model/toolset/safety inputs change.
+- [x] **V2-0303 — Add prompt-cache identity builder.**  
+  Evidence: `Prompting/AgentPromptCacheIdentity.cs` builds a versioned SHA-256 identity from only the cacheable stable-prefix messages, policy/safety/toolset versions, provider protocol/model/normalized endpoint and optional sorted stable skill hashes. Runtime task/time/session/workspace/user context and non-cache request controls are absent from the builder API. It emits a provider-safe `h2pc1_...` key bounded to 64 characters plus the full SHA-256 diagnostics without persisting prompt text. `V2ArchitectureTests` proves runtime context, profile display/runtime controls and skill enumeration order do not change the identity, while every stable policy/safety/model/tool/provider/endpoint/skill fixture invalidates it. Source commit `d56fbf033384adeaea1aa5ca2b31608f511caeb5`; GitHub Actions push run `35258076743` and PR run `35258081376` both completed successfully. Evidence: H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **8/8**, metrics **7/7**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `6abe98857b43fd313737007d86aa298305717e6f` records source `d56fbf03...` and ZIP SHA256 `9b6d82fe4f4827fe865177a4dd19b3fe12be21f72b369471f1b50038a0ecce9e`.
 
-- [ ] **V2-0304 — Add bounded `AgentContextManager`.**  
+- [~] **V2-0304 — Add bounded `AgentContextManager`.**  
   Inputs: task contract, current state, recent relevant turns, relevant tool summaries, compacted history; output has explicit budgets.
 
 - [ ] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0303 — Add prompt-cache identity builder`.
+**Active task:** `V2-0304 — Add bounded AgentContextManager`.
