@@ -71,7 +71,10 @@ public sealed partial class AiChatPanel
         catch (Exception ex) when (IsProjectActionException(ex)) { _status.Text = "Chưa áp dụng: " + ex.Message; }
     }
 
-    private async Task ApplyAutomaticProjectActions(AiChatScope scope, AiConversation conversation, AiMessage answer, AiPermissionMode sentPermission)
+    private void ApplyAutomaticProjectActions(AiChatScope scope, AiConversation conversation, AiMessage answer, AiPermissionMode sentPermission)
+        => _ = ApplyAutomaticProjectActionsAsync(scope, conversation, answer, sentPermission);
+
+    private async Task ApplyAutomaticProjectActionsAsync(AiChatScope scope, AiConversation conversation, AiMessage answer, AiPermissionMode sentPermission)
     {
         if (scope != _scope || conversation != _conversation || answer.Status != "complete" || sentPermission != CurrentPermission) return;
         try
@@ -81,23 +84,23 @@ public sealed partial class AiChatPanel
 
             if (sentPermission == AiPermissionMode.ProjectAccess)
             {
-                // Full project access means exactly that: no second confirmation for an allowlisted,
-                // validated project mutation requested by the newest user turn.
                 ApplyProjectActions(scope, answer, actions, false);
+                if (_conversation == conversation) Render();
                 return;
             }
 
             if (sentPermission == AiPermissionMode.ConfirmChanges && TopLevel.GetTopLevel(this) is Window owner)
             {
                 PrepareProjectContext?.Invoke();
-                // Validate before showing the dialog so the user never confirms an action that can
-                // no longer target the current project state.
                 AiProjectActions.Validate(scope.Project, actions, AiPermissionMode.ProjectAccess, false);
                 var description = scope.Title + "\n\n" + AiProjectActions.Preview(scope.Project, actions);
                 var approved = await Dialogs.Confirm(owner, "AI muốn thay đổi dự án", description, "Đồng ý và áp dụng");
                 if (approved && scope == _scope && conversation == _conversation && CurrentPermission == AiPermissionMode.ConfirmChanges
                     && _request is null && !_preparing)
+                {
                     ApplyProjectActions(scope, answer, actions, true);
+                    Render();
+                }
             }
         }
         catch (Exception ex) when (IsProjectActionException(ex)) { _status.Text = "AI đã trả lời nhưng thay đổi chưa hợp lệ: " + ex.Message; }
