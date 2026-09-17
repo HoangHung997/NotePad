@@ -478,21 +478,15 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
     private static void ValidateSummaryRequest(AiProfile profile)
     {
         if (!profile.RequestReasoningSummary) return;
-        if (!IsOfficialOpenAi(profile))
+        if (!AiModelCapabilities.IsOfficialOpenAi(profile))
             throw new InvalidOperationException("Reasoning summary chỉ được bật cho OpenAI Responses chính thức đã xác nhận.");
     }
 
     private static void ValidateStateMode(AiProfile profile, OpenAiResponsesStateMode stateMode)
     {
         if (!Enum.IsDefined(stateMode)) throw new ArgumentOutOfRangeException(nameof(stateMode));
-        if (stateMode == OpenAiResponsesStateMode.StoredContinuation && !IsOfficialOpenAi(profile))
+        if (stateMode == OpenAiResponsesStateMode.StoredContinuation && !AiModelCapabilities.IsOfficialOpenAi(profile))
             throw new InvalidOperationException("Provider-state continuation hiện chỉ được bật rõ ràng cho OpenAI Responses chính thức; endpoint tương thích khác giữ chế độ stateless.");
-    }
-
-    private static bool IsOfficialOpenAi(AiProfile profile)
-    {
-        var endpoint = AiClient.Endpoint(profile, "");
-        return endpoint.Scheme == "https" && endpoint.IsDefaultPort && endpoint.IdnHost == "api.openai.com" && endpoint.AbsolutePath == "/v1/";
     }
 
     private void EnsureUsable()
