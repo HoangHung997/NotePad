@@ -9,6 +9,8 @@ public enum AgentTraceKind
     ContextReady,
     RequestStart,
     ConnectionReady,
+    PrewarmStart,
+    PrewarmFinish,
     FirstModelEvent,
     ToolStart,
     ToolFinish,
