@@ -1,0 +1,377 @@
+# H2 Agent Lab 2.0 — implementation task tracker
+
+This file is the **authoritative execution checklist** for `AGENTLAB_V2_SPEC.md`.
+
+Rules:
+
+- Work in ID order unless a dependency says otherwise.
+- `[x]` means implementation **and required evidence/tests** are complete.
+- `[~]` means actively in progress; do not start a second unrelated implementation task while one is `[~]` unless it is a test/docs update needed to finish the same task.
+- `[ ]` means not started.
+- If new work is discovered, add a new unique ID. Never hide extra work inside another task.
+- Do not delete old v1 code until a replacement task explicitly says it may be retired.
+- H2 Notes production integration is forbidden until Phase 12 gate passes and the user explicitly approves it.
+
+---
+
+## Phase 00 — specification, baseline and guardrails
+
+- [x] **V2-0001 — Write approved architecture specification.**  
+  Evidence: `AGENTLAB_V2_SPEC.md` exists on `feature/nas-multi-device-sync` and defines reuse, transport, tool search, Office/Desktop hosts, verification, context, safety and acceptance gate.
+
+- [x] **V2-0002 — Create authoritative task tracker.**  
+  Evidence: this file exists with unique IDs, dependencies and acceptance notes.
+
+- [ ] **V2-0003 — Link spec/tracker from Agent Lab README.**  
+  Acceptance: README clearly states v2 is the active implementation plan and links both files without rewriting historical evaluation evidence.
+
+- [ ] **V2-0004 — Freeze v1 behavior baseline.**  
+  Acceptance: record current deterministic test counts/build result and preserve existing v1 live-evaluation docs; no old evidence deleted.
+
+- [ ] **V2-0005 — Add architecture compatibility guard test.**  
+  Acceptance: test proves H2AgentLab still references H2Notes.Core and existing v1 self/recovery/skills tests remain callable while v2 is developed incrementally.
+
+---
+
+## Phase 01 — turn trace and measurable performance
+
+- [ ] **V2-0101 — Add typed turn trace model.**  
+  Create `Metrics/AgentTrace.cs`. Record monotonic timestamped events with TaskId/TurnId and kinds: send, context-ready, request-start, connection-ready, first-model-event, tool-start, tool-finish, continuation, verifier-start, verifier-finish, final, error, cancel.
+
+- [ ] **V2-0102 — Add provider usage/latency metrics model.**  
+  Create `Metrics/AgentMetrics.cs` for input/cached/output tokens, bytes, model/tool calls, first-event latency, total duration, repairs and optional cost estimate.
+
+- [ ] **V2-0103 — Persist trace/metrics per Lab run.**  
+  Acceptance: each run writes bounded JSON evidence under Lab state; atomic write; no API key or hidden reasoning persisted.
+
+- [ ] **V2-0104 — Instrument existing v1 AgentRunner through a thin adapter.**  
+  Acceptance: v1 behavior unchanged, but every model/tool step emits new trace metrics.
+
+- [ ] **V2-0105 — Add deterministic trace tests.**  
+  Acceptance: test ordering, monotonic durations, cancellation/error path and secret redaction.
+
+- [ ] **V2-0106 — Add raw-model baseline probe.**  
+  Acceptance: same profile/prompt can be measured without Lab tool loop, producing comparable TTFT/total/token metrics.
+
+- [ ] **V2-0107 — Capture initial A/B baseline evidence.**  
+  Acceptance: docs/evidence record raw API vs current v1 on at least direct-text and one tool-call fixture; results clearly separated from correctness claims.
+
+---
+
+## Phase 02 — transport abstraction
+
+- [ ] **V2-0201 — Define `IAgentTransport` and typed stream events.**  
+  Must support start/continue/cancel/dispose and capability reporting; orchestration must not know provider JSON.
+
+- [ ] **V2-0202 — Define `AgentTransportCapabilities`.**  
+  Flags: native tools, incremental continuation, WebSocket, provider compaction, prompt cache control, parallel tool calls, native image/file input, usage metrics.
+
+- [ ] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
+  Acceptance: native tool calls + thinking replay work with existing mock tests; no regression.
+
+- [ ] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
+  Acceptance: tool call IDs/arguments/streaming remain compatible with existing tests.
+
+- [ ] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
+  Acceptance: official OpenAI Responses path supports streaming text/tool calls/usage without using undocumented Codex headers.
+
+- [ ] **V2-0206 — Implement OpenAI Responses continuation state.**  
+  Acceptance: tool result continuation does not resend full prior transcript when the public API supports previous response state.
+
+- [ ] **V2-0207 — Implement Responses WebSocket turn session.**  
+  Acceptance: one turn-scoped connection is reused across multiple model calls, with safe HTTP fallback.
+
+- [ ] **V2-0208 — Add WebSocket prewarm where supported.**  
+  Acceptance: prewarm is best-effort and never changes task result semantics; trace distinguishes prewarm time.
+
+- [ ] **V2-0209 — Add provider transport tests.**  
+  Mock HTTP/SSE/WebSocket/Ollama streams; continuation, disconnect, cancel and malformed-response cases.
+
+- [ ] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
+  Acceptance: no duplicated endpoint-security logic; reasoning settings continue to use `AiModelCapabilities` when appropriate.
+
+---
+
+## Phase 03 — stable prompt, cache and context foundation
+
+- [ ] **V2-0301 — Split static base policy from dynamic runtime context.**  
+  Acceptance: time/session journal/workspace data cannot appear before stable prefix.
+
+- [ ] **V2-0302 — Add agent policy/toolset version identifiers.**  
+  Used for cache identity and trace reproducibility.
+
+- [ ] **V2-0303 — Add prompt-cache identity builder.**  
+  Acceptance: deterministic hash changes only when stable policy/model/toolset/safety inputs change.
+
+- [ ] **V2-0304 — Add bounded `AgentContextManager`.**  
+  Inputs: task contract, current state, recent relevant turns, relevant tool summaries, compacted history; output has explicit budgets.
+
+- [ ] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
+  Raw LabSession journal remains persisted but not blindly injected.
+
+- [ ] **V2-0306 — Add artifact handles for large tool output.**  
+  Long stdout/stderr/document extracts stored out-of-context; model sees concise summary + retrievable handle.
+
+- [ ] **V2-0307 — Add compaction checkpoint model.**  
+  Raw history preserved, active context can be replaced by summary + durable source references.
+
+- [ ] **V2-0308 — Add automatic context budget trigger.**  
+  Acceptance: active context remains bounded as synthetic conversation grows to hundreds of turns.
+
+- [ ] **V2-0309 — Add context/cache tests.**  
+  Verify stable prefix equality, budget enforcement, source preservation and no linear unbounded growth.
+
+---
+
+## Phase 04 — task contract and orchestrator state machine
+
+- [ ] **V2-0401 — Add `AgentTaskContract`.**  
+  Fields: goal, scope, inputs, required changes, preserve constraints, outputs, acceptance criteria, risk class, verification policy.
+
+- [ ] **V2-0402 — Add criterion/evidence types.**  
+  Acceptance criterion cannot be silently removed after task starts; evidence references are typed.
+
+- [ ] **V2-0403 — Add `AgentTaskState` state machine.**  
+  Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.
+
+- [ ] **V2-0404 — Enforce no mutation completion without verification.**  
+  Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.
+
+- [ ] **V2-0405 — Add fast-path router.**  
+  Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.
+
+- [ ] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
+  Existing AgentRunner retained as compatibility path until migration completes.
+
+- [ ] **V2-0407 — Add orchestrator deterministic tests.**  
+  Cover direct/retrieval/action/repair/cancel/blocked transitions.
+
+---
+
+## Phase 05 — tool registry and deferred tool discovery
+
+- [ ] **V2-0501 — Define tool descriptor/namespace/registry types.**  
+  Include risk, mutating/read-only, parallel capability, schema version and runtime executor reference.
+
+- [ ] **V2-0502 — Register existing v1 tools through registry adapters.**  
+  No functional deletion yet.
+
+- [ ] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
+  No embedding dependency. Cache by registry version.
+
+- [ ] **V2-0504 — Expose `tool_search` as initial callable tool.**  
+  Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.
+
+- [ ] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
+  Acceptance: exact selected schemas are traceable; duplicates coalesced.
+
+- [ ] **V2-0506 — Add parallel read-only execution support.**  
+  Serialize overlapping mutations to same resource.
+
+- [ ] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
+  Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.
+
+- [ ] **V2-0508 — Tool-search regression/performance tests.**  
+  Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.
+
+---
+
+## Phase 06 — verification framework
+
+- [ ] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
+  Machine-readable pass/fail per criterion with evidence IDs.
+
+- [ ] **V2-0602 — Add file/hash/scope verifier.**  
+  Check exact changed files, expected hashes and unintended output.
+
+- [ ] **V2-0603 — Add generic artifact verifier contract.**  
+  Allows domain verifiers without coupling orchestrator to Excel/Word.
+
+- [ ] **V2-0604 — Add `AgentRepairController`.**  
+  Convert failed criteria into concise repair context; preserve already-passed criteria.
+
+- [ ] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
+  Runtime/protocol recovery remains distinct from semantic repair.
+
+- [ ] **V2-0606 — Add verification-gate tests.**  
+  Model saying “done” must not pass if verifier fails.
+
+---
+
+## Phase 07 — document/file tools and H2 Notes reuse
+
+- [ ] **V2-0701 — Wrap `AiDocuments` as Lab document-inspection service.**  
+  Reuse H2 Core safety/size/hash/Office extraction rather than duplicate readers.
+
+- [ ] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
+  `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.
+
+- [ ] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
+  Values/formulas/styles/merges/sheets/hidden state needed by verifier.
+
+- [ ] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
+  Paragraph/run/style/table/section/header/footer fields needed by verifier.
+
+- [ ] **V2-0705 — Add `ExcelVerifier` for closed files.**
+
+- [ ] **V2-0706 — Add `WordVerifier` for closed files.**
+
+- [ ] **V2-0707 — Make structured document tools preferred over `run_python`.**  
+  Python remains escape hatch for unsupported transforms.
+
+- [ ] **V2-0708 — Closed-file acceptance tests.**  
+  Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.
+
+---
+
+## Phase 08 — live OfficeHost
+
+- [ ] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
+  Separate process, STA, named-pipe/JSON-RPC boundary, no model/API key access.
+
+- [ ] **V2-0802 — Add OfficeHost process lifecycle/timeout/restart handling.**
+
+- [ ] **V2-0803 — Implement live Excel discovery.**  
+  List running workbooks, active workbook/sheet/selection; stable session IDs.
+
+- [ ] **V2-0804 — Implement live Excel structured read snapshot.**  
+  Must observe unsaved edits in the open workbook.
+
+- [ ] **V2-0805 — Implement live Excel structured patch.**  
+  Targeted values/formulas/styles with before snapshot and task-scope validation.
+
+- [ ] **V2-0806 — Implement Excel recalc/save-copy path.**  
+  Never silently overwrite original during acceptance testing.
+
+- [ ] **V2-0807 — Implement live Excel verifier.**  
+  Compare before/after contract, including preservation fields.
+
+- [ ] **V2-0808 — Add Excel live unsaved-state acceptance fixture.**  
+  Human/manual fixture allowed for Office installation dependency, but result must be machine-verified.
+
+- [ ] **V2-0809 — Implement live Word discovery/active document/selection.**
+
+- [ ] **V2-0810 — Implement live Word structured read snapshot.**  
+  Must observe unsaved edits.
+
+- [ ] **V2-0811 — Implement live Word text/format patch.**
+
+- [ ] **V2-0812 — Implement Word save-copy/export path.**
+
+- [ ] **V2-0813 — Implement live Word verifier.**
+
+- [ ] **V2-0814 — Add Word live unsaved-state acceptance fixture.**
+
+- [ ] **V2-0815 — OfficeHost safety/permission tests.**  
+  Wrong process/document/session, stale state, timeout, crash and user denial.
+
+---
+
+## Phase 09 — DesktopHost / computer use
+
+- [ ] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
+  Separate from UI/model/Python sandbox.
+
+- [ ] **V2-0902 — Implement safe app/window enumeration.**  
+  Block sensitive/system/password-manager/security windows according to explicit policy.
+
+- [ ] **V2-0903 — Implement `observe` screenshot + bounds + DPI + foreground metadata.**
+
+- [ ] **V2-0904 — Add compact UI Automation tree to observation.**  
+  Short-lived element tokens bound to state/window.
+
+- [ ] **V2-0905 — Implement click/double-click/key/type/scroll/drag/wait actions.**
+
+- [ ] **V2-0906 — Enforce observe-after-mutation.**  
+  A mutating action result cannot be final evidence without a newer observation.
+
+- [ ] **V2-0907 — Add stale-state protection.**  
+  Action with stale `state_id` is rejected or requires re-observation.
+
+- [ ] **V2-0908 — Add vision input adapter for screenshot observations.**  
+  Only providers/models with image input receive pixels; UIA fallback remains available.
+
+- [ ] **V2-0909 — Preserve structured-adapter priority.**  
+  Tests prove Excel/Word requests prefer OfficeHost and do not fall straight to pixel clicking.
+
+- [ ] **V2-0910 — Dedicated desktop test window acceptance suite.**  
+  Verify observe→act→observe, no coordinate guessing after resize, cancel/denial.
+
+---
+
+## Phase 10 — Python/runtime migration and fallback
+
+- [ ] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**
+
+- [ ] **V2-1002 — Preserve WindowsPythonSandbox security regression suite.**
+
+- [ ] **V2-1003 — Make `run_python` deferred/escape-hatch only.**
+
+- [ ] **V2-1004 — Add Python result verifier requirements.**  
+  Exit code 0 alone is insufficient; artifact or explicit task assertions required.
+
+- [ ] **V2-1005 — Add fallback test: unsupported Office transform → Python → deterministic verifier.**
+
+---
+
+## Phase 11 — end-to-end v2 loop and UI
+
+- [ ] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
+  Keep a temporary v1 diagnostic mode only if needed for A/B comparison.
+
+- [ ] **V2-1102 — Add UI progress based on typed trace events.**  
+  Show meaningful phase/tool/verifier progress without exposing chain-of-thought.
+
+- [ ] **V2-1103 — Add task/criterion/evidence inspection panel.**  
+  User can see what is required, what passed and what failed.
+
+- [ ] **V2-1104 — Add cancel behavior across transport/tool/helper processes.**
+
+- [ ] **V2-1105 — Add restart/resume of durable task state.**  
+  Never resume an uncertain mutation by blindly repeating it; observe current state first.
+
+- [ ] **V2-1106 — Add compaction UI/diagnostic counters.**
+
+- [ ] **V2-1107 — Run complete deterministic regression suite.**  
+  Must include existing v1 tests, new v2 tests and shared H2 Core tests.
+
+---
+
+## Phase 12 — acceptance gate before H2 Notes integration
+
+- [ ] **V2-1201 — Build final 30+ task acceptance corpus.**
+
+- [ ] **V2-1202 — Run each accepted model/provider configuration >= 3 times per task.**
+
+- [ ] **V2-1203 — Produce correctness report by task class.**
+
+- [ ] **V2-1204 — Produce performance/cost report A(raw)/B(v1)/C(v2).**
+
+- [ ] **V2-1205 — Verify permission/scope safety gate: zero violations.**
+
+- [ ] **V2-1206 — Verify >=90% supported-task correctness gate.**
+
+- [ ] **V2-1207 — Verify context does not grow unbounded with long threads.**
+
+- [ ] **V2-1208 — Verify open Excel/Word unsaved-state workflows.**
+
+- [ ] **V2-1209 — Verify DesktopHost observe-after-act workflows.**
+
+- [ ] **V2-1210 — User acceptance decision.**  
+  **Do not integrate into H2 Notes before the user explicitly approves this gate.**
+
+---
+
+## Phase 13 — future H2 Notes integration (blocked until V2-1210)
+
+- [ ] **V2-1301 — Design H2 Notes adapter boundary around accepted Agent Lab engine.**
+- [ ] **V2-1302 — Reuse H2 shared project memory/context router without coupling Agent Lab core to H2 UI.**
+- [ ] **V2-1303 — Map H2 project actions to accepted structured tools/verification.**
+- [ ] **V2-1304 — Preserve H2 multi-PC/NAS sync and permissions.**
+- [ ] **V2-1305 — Run H2 Notes full regression/CI and staged integration acceptance.**
+
+---
+
+## Current execution pointer
+
+**Next task:** `V2-0003 — Link spec/tracker from Agent Lab README`.
