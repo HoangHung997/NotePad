@@ -28,6 +28,9 @@ public static class AiProjectContext
     public static string Build(SheetState workspace, ProjectRecord project, Guid? currentConversation, bool history = true)
         => BuildCore(workspace, project, currentConversation, history, DateTimeOffset.Now);
 
+    public static string BuildWorkspace(SheetState workspace, Guid? currentConversation, bool history = true)
+        => BuildCore(workspace, new ProjectRecord { Id = Guid.Empty, Name = "Toàn bộ H2 Notes" }, currentConversation, history, DateTimeOffset.Now);
+
     internal static string BuildAt(SheetState workspace, ProjectRecord project, Guid? currentConversation, bool history, DateTimeOffset now)
         => BuildCore(workspace, project, currentConversation, history, now);
 
@@ -82,7 +85,7 @@ public static class AiProjectContext
             title = n.Title,
             createdLocal = Local(n.CreatedAtUtc),
             updatedLocal = Local(n.UpdatedAtUtc),
-            conversations = history ? Conversations(n.AiConversations) : []
+            conversations = history ? Conversations(n.AiConversations, currentConversation) : []
         }).ToArray() ?? [];
 
         var data = new
@@ -95,7 +98,7 @@ public static class AiProjectContext
                 dayParts = new { morning = "05:00-11:59", afternoon = "12:00-17:59", evening = "18:00-22:59", night = "23:00-04:59" },
                 unknownRule = "null/unknown means H2 Notes did not record the historical time; never infer that it happened today"
             },
-            projectId = project.Id,
+            projectId = project.Id == Guid.Empty ? null : project.Id,
             name = project.DisplayName,
             createdLocal = Local(project.CreatedAtUtc),
             updatedLocal = Local(project.UpdatedAtUtc),
@@ -143,7 +146,9 @@ public static class AiProjectContext
             },
             scope = workspace is null
                 ? "Dữ liệu dự án hiện tại. Không đọc thư mục liên kết. Không gửi mốc riêng tư hoặc bản nháp."
-                : "Snapshot H2 Notes hiện tại gồm dự án đang chọn và các nguồn khác trong workspace. Không đọc thư mục liên kết. Không gửi mốc riêng tư hoặc bản nháp."
+                : project.Id == Guid.Empty
+                    ? "Snapshot toàn bộ nguồn H2 Notes hiện tại: dự án, công việc, ghi chú và các chat đã lưu. Không đọc thư mục liên kết. Không gửi mốc riêng tư hoặc bản nháp."
+                    : "Snapshot H2 Notes hiện tại gồm dự án đang chọn và các nguồn khác trong workspace. Không đọc thư mục liên kết. Không gửi mốc riêng tư hoặc bản nháp."
         };
         return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
