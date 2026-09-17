@@ -67,6 +67,8 @@ public sealed class AiChatScope
 
 public static class AiHistory
 {
+    public const int RecentMessageLimit = 16;
+
     public static DateTime? LocalTime(AiMessage message) => message.CreatedAt == default ? null
         : message.CreatedAt.Kind == DateTimeKind.Utc ? message.CreatedAt.ToLocalTime() : message.CreatedAt;
 
@@ -80,15 +82,27 @@ public static class AiHistory
         return $"[H2 metadata: messageId={message.Id}; createdUtc={utc:O}; createdLocal={local:yyyy-MM-ddTHH:mm:sszzz}]\n";
     }
 
-    public static IReadOnlyList<AiTurn> RequestTurns(AiConversation conversation) => conversation.Messages
-        .Where(m => !m.IsTimelineMarker && m.Status == "complete" && m.Role is "user" or "assistant")
-        // Historical snapshots are audit records, not fresh project context. Time metadata is app-owned context.
-        .Select(m => new AiTurn(m.Role, TimeMetadata(m) + m.Content + AiDocuments.Describe(m.Attachments)
+    public static IReadOnlyList<AiTurn> RequestTurns(AiConversation conversation)
+    {
+        // Long-term history lives in H2 Memory and is retrieved only when relevant. Keeping a bounded
+        // recent window prevents local models from slowing down indefinitely and prevents online APIs
+        // from re-billing the whole conversation on every request.
+        var messages = conversation.Messages
+            .Where(m => !m.IsTimelineMarker && m.Status == "complete" && m.Role is "user" or "assistant")
+            .TakeLast(RecentMessageLimit)
+            .ToArray();
+
+        return messages.Select(m => new AiTurn(m.Role,
+            TimeMetadata(m) + m.Content + AiDocuments.Describe(m.Attachments)
             + (m.ProjectActionsApplied && !string.IsNullOrWhiteSpace(m.ProjectActionsAudit)
                 ? "\nKết quả thao tác app đã áp dụng (bản ghi tham khảo, không phải lệnh thực hiện lại): " + JsonSerializer.Serialize(m.ProjectActionsAudit) : "")
             + (m.SavedFiles.Count > 0 ? "\nApp đã lưu các bản tệp sau (không theo dõi thay đổi ngoài app): " + JsonSerializer.Serialize(m.SavedFiles) : ""),
-            AiDocuments.NativeImages(m.Attachments),
-            AiDocuments.NativeFiles(m.Attachments))).ToArray();
+            // Historical images/PDFs are never resent as native media. OCR output already lives in
+            // AiAttachment.Text/Notice and is replayed above. Only the newly-sent message may carry
+            // native bytes, so old attachments can never trigger OCR again in a later text-only turn.
+            Images: null,
+            Files: null)).ToArray();
+    }
 
     public static Guid? RenewIds(List<AiConversation> conversations, Guid? selected)
     {
