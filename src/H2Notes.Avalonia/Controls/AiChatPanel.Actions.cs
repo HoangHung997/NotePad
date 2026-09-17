@@ -49,10 +49,18 @@ public sealed partial class AiChatPanel
         {
             PrepareProjectContext?.Invoke();
             AiProjectActions.Validate(project, actions, CurrentPermission, approved);
+            var oldTaskIds = project.ChecklistItems.Select(t => t.Id).ToHashSet();
             // UI callback is synchronous, targets this exact project and preserves editor undo.
             ProjectActionsRequested.Invoke(project, actions);
+            var now = DateTime.UtcNow;
+            project.UpdatedAtUtc = now;
+            foreach (var task in project.ChecklistItems.Where(t => !oldTaskIds.Contains(t.Id)))
+            {
+                task.CreatedAtUtc ??= now;
+                task.UpdatedAtUtc ??= now;
+            }
             message.ProjectActionsApplied = true;
-            message.ProjectActionsAudit = $"H2 Notes đã áp dụng {actions.Count} thay đổi · {DateTime.Now:HH:mm dd/MM/yyyy}";
+            message.ProjectActionsAudit = $"H2 Notes đã áp dụng {actions.Count} thay đổi · {now.ToLocalTime():HH:mm dd/MM/yyyy}";
             Touch(scope);
         }
         catch (Exception ex) when (IsProjectActionException(ex)) { _status.Text = "Chưa áp dụng: " + ex.Message; }
