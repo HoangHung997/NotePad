@@ -51,9 +51,9 @@ public sealed record AgentTransportCapabilities(
         UsageMetrics: false);
 
     /// <summary>
-    /// Baseline public Responses HTTP/SSE implementation. Provider-side continuation is deliberately
-    /// false until V2-0206; WebSocket remains false until V2-0207. Prompt cache keys, parallel tools,
-    /// native image/file input and usage counters are already carried by the public HTTP request.
+    /// Public Responses HTTP/SSE implementation. Stateless mode leaves IncrementalContinuation false;
+    /// stored HTTP continuation may opt into it at runtime. Prompt cache keys, parallel tools, native
+    /// image/file input and usage counters are supported by the public Responses request shape.
     /// </summary>
     public static AgentTransportCapabilities OpenAiResponsesHttp { get; } = new(
         NativeTools: true,
@@ -65,4 +65,14 @@ public sealed record AgentTransportCapabilities(
         NativeImageInput: true,
         NativeFileInput: true,
         UsageMetrics: true);
+
+    /// <summary>
+    /// Turn-scoped official OpenAI Responses WebSocket. The same socket is reused for tool
+    /// continuations, which can send only new function_call_output items plus previous_response_id.
+    /// </summary>
+    public static AgentTransportCapabilities OpenAiResponsesWebSocket { get; } = OpenAiResponsesHttp with
+    {
+        IncrementalContinuation = true,
+        WebSocket = true
+    };
 }
