@@ -35,7 +35,18 @@ public partial class MainWindow : Window
         NotesToolbar.Content = NotesEditor.CreateToolbar();
         InitializeShell();
         Sheet.SelectionChanged += OnSelection;
-        Sheet.DataChanged += () => { if (!_switching) { UpdateSummary(); _app.ScheduleSave(); } };
+        Sheet.DataChanged += () =>
+        {
+            if (_switching) return;
+            if (Sheet.SelectedRow is { } changed)
+            {
+                var now = DateTime.UtcNow;
+                changed.Project.UpdatedAtUtc = now;
+                if (changed.Task is { } task) task.UpdatedAtUtc = now;
+                _app.MarkProjectDirty(changed.Project.Id);
+            }
+            UpdateSummary(); _app.ScheduleSave();
+        };
         Sheet.DraftChanged += _app.ScheduleSave;
         Sheet.EditStarting += FlushNotes;
         Sheet.DeleteRequested += async row => await DeleteRow(row);
