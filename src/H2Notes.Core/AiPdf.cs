@@ -7,7 +7,8 @@ public sealed class AiPdfSettings
 {
     public AiPdfEngine Engine { get; set; } = AiPdfEngine.Direct;
     public bool OcrImages { get; set; }
-    public string RuntimeRoot { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes", "ocr-runtime");
+    // Portable builds keep the complete OCR runtime beside the app. A custom absolute path may still be selected.
+    public string RuntimeRoot { get; set; } = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "ocr-runtime"));
     public int MaxPages { get; set; } = 100;
     public int TimeoutSeconds { get; set; } = 180;
 }
