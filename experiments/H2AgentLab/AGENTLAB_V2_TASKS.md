@@ -103,10 +103,10 @@ Rules:
 - [x] **V2-0303 — Add prompt-cache identity builder.**  
   Evidence: `Prompting/AgentPromptCacheIdentity.cs` builds a versioned SHA-256 identity from only the cacheable stable-prefix messages, policy/safety/toolset versions, provider protocol/model/normalized endpoint and optional sorted stable skill hashes. Runtime task/time/session/workspace/user context and non-cache request controls are absent from the builder API. It emits a provider-safe `h2pc1_...` key bounded to 64 characters plus the full SHA-256 diagnostics without persisting prompt text. `V2ArchitectureTests` proves runtime context, profile display/runtime controls and skill enumeration order do not change the identity, while every stable policy/safety/model/tool/provider/endpoint/skill fixture invalidates it. Source commit `d56fbf033384adeaea1aa5ca2b31608f511caeb5`; GitHub Actions push run `35258076743` and PR run `35258081376` both completed successfully. Evidence: H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **8/8**, metrics **7/7**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `6abe98857b43fd313737007d86aa298305717e6f` records source `d56fbf03...` and ZIP SHA256 `9b6d82fe4f4827fe865177a4dd19b3fe12be21f72b369471f1b50038a0ecce9e`.
 
-- [~] **V2-0304 — Add bounded `AgentContextManager`.**  
-  Inputs: task contract, current state, recent relevant turns, relevant tool summaries, compacted history; output has explicit budgets.
+- [x] **V2-0304 — Add bounded `AgentContextManager`.**  
+  Evidence: `Context/AgentContextManager.cs` adds explicit hard budgets for total active context, task contract, current state, recent relevant turns, relevant tool summaries, compacted history, per-item size and selected-item counts. Selection is deterministic by relevance/recency/source ID, selected turn/tool provenance is retained as source IDs, emitted list items are restored to chronological order, and truncation plus selected/dropped counts are machine-readable in `AgentContextUsage`. The manager returns a bounded `AgentPromptRuntimeContext` without modifying the frozen v1 `LabSession.Context()` path. `V2ArchitectureTests` verifies total/section caps, truncation flags, deterministic provenance, selected/dropped counts and order-independent input enumeration. Source commit `8139677c93266c55d837d69747a9396044ce48b8`; GitHub Actions push run `35259116155` and PR run `35259119900` completed successfully. Push evidence: H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `47081637da34bca7c0b66593f58706535dbee8bf` records source `8139677c...` and ZIP SHA256 `47a262251204d84e71db8a5676ea0e3af5d0af9f979d7a358adbf402ab7fcb7f`.
 
-- [ ] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
+- [~] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
   Raw LabSession journal remains persisted but not blindly injected.
 
 - [ ] **V2-0306 — Add artifact handles for large tool output.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0304 — Add bounded AgentContextManager`.
+**Active task:** `V2-0305 — Replace direct session.Context() injection in v2 path`.
