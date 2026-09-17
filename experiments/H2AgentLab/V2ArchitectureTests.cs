@@ -150,6 +150,90 @@ public static class V2ArchitectureTests
             catch (ArgumentException) { }
         });
 
+        Test("Prompt cache identity ignores runtime context and non-cache request controls", () =>
+        {
+            var stable = new AgentPromptStablePrefix(AgentVersions.Current, "base", "security", "model-policy", "tool-namespaces");
+            var firstLayout = AgentPromptLayout.Create(stable,
+                new AgentPromptRuntimeContext("task-a", "journal-a", "time-a"), "user-a");
+            var secondLayout = AgentPromptLayout.Create(stable,
+                new AgentPromptRuntimeContext("task-b", "journal-b", "time-b"), "user-b");
+            var firstProfile = new AiProfile
+            {
+                Protocol = AiProtocol.OpenAiResponses,
+                BaseUrl = "https://api.openai.com/v1",
+                Model = "gpt-5",
+                Name = "profile-a",
+                TimeoutSeconds = 10,
+                WaitForCompletion = false,
+                ReasoningEffort = "low"
+            };
+            var secondProfile = new AiProfile
+            {
+                Protocol = AiProtocol.OpenAiResponses,
+                BaseUrl = "https://api.openai.com/v1/",
+                Model = "gpt-5",
+                Name = "renamed-profile",
+                TimeoutSeconds = 999,
+                WaitForCompletion = true,
+                RequestReasoningSummary = true,
+                ReasoningEffort = "high"
+            };
+            var skillA = new AgentStableSkillHash("alpha", new string('a', 64));
+            var skillB = new AgentStableSkillHash("beta", new string('b', 64));
+            var first = AgentPromptCacheIdentityBuilder.Build(firstLayout, firstProfile, [skillB, skillA]);
+            var second = AgentPromptCacheIdentityBuilder.Build(secondLayout, secondProfile, [skillA, skillB]);
+
+            if (first.Key != second.Key || first.Sha256Hex != second.Sha256Hex)
+                throw new InvalidOperationException("Dynamic context, profile display/runtime controls or skill enumeration order changed cache identity.");
+            if (!first.Key.StartsWith(AgentPromptCacheIdentityBuilder.Scheme + "_", StringComparison.Ordinal)
+                || first.Key.Length > AgentPromptCacheIdentityBuilder.MaxProviderCacheKeyCharacters
+                || first.Sha256Hex.Length != 64)
+                throw new InvalidOperationException("Prompt cache identity is not provider-safe or not a full SHA-256 digest.");
+            if (first.StableSkillHashes.Select(x => x.SkillId).SequenceEqual(new[] { "alpha", "beta" }) is false)
+                throw new InvalidOperationException("Stable skill hashes were not canonicalized by skill ID.");
+        });
+
+        Test("Prompt cache identity changes for every stable policy model toolset safety input", () =>
+        {
+            static AgentPromptLayout Layout(
+                AgentVersionIdentifiers versions,
+                string basePolicy = "base",
+                string securityPolicy = "security",
+                string modelPolicy = "model-policy",
+                string toolMetadata = "tool-namespaces")
+                => AgentPromptLayout.Create(
+                    new AgentPromptStablePrefix(versions, basePolicy, securityPolicy, modelPolicy, toolMetadata),
+                    new AgentPromptRuntimeContext("dynamic-task", "dynamic-state", "dynamic-time"),
+                    "dynamic-user");
+
+            static AiProfile Profile(AiProtocol protocol = AiProtocol.OpenAiResponses, string baseUrl = "https://api.openai.com/v1", string model = "gpt-5")
+                => new() { Protocol = protocol, BaseUrl = baseUrl, Model = model };
+
+            static string Key(AgentPromptLayout layout, AiProfile profile, params AgentStableSkillHash[] skills)
+                => AgentPromptCacheIdentityBuilder.Build(layout, profile, skills).Key;
+
+            var versions = AgentVersions.Current;
+            var baseline = Key(Layout(versions), Profile(), new AgentStableSkillHash("alpha", new string('a', 64)));
+            var changed = new[]
+            {
+                Key(Layout(versions, basePolicy: "base-2"), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions, securityPolicy: "security-2"), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions, modelPolicy: "model-policy-2"), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions, toolMetadata: "tool-namespaces-2"), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(new AgentVersionIdentifiers("agent-policy-v2.0.1", versions.SafetyPolicyVersion, versions.ToolsetVersion)), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(new AgentVersionIdentifiers(versions.AgentPolicyVersion, "safety-policy-v2.0.1", versions.ToolsetVersion)), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(new AgentVersionIdentifiers(versions.AgentPolicyVersion, versions.SafetyPolicyVersion, "toolset-bootstrap-v1.0.1")), Profile(), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions), Profile(model: "gpt-5-mini"), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions), Profile(AiProtocol.OpenAiChat), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions), Profile(baseUrl: "https://example.test/v1"), new AgentStableSkillHash("alpha", new string('a', 64))),
+                Key(Layout(versions), Profile(), new AgentStableSkillHash("alpha", new string('c', 64)))
+            };
+            if (changed.Any(key => key == baseline))
+                throw new InvalidOperationException("A stable cache input changed without invalidating prompt cache identity.");
+            if (changed.Distinct(StringComparer.Ordinal).Count() != changed.Length)
+                throw new InvalidOperationException("Distinct stable cache inputs unexpectedly collided in deterministic fixtures.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
