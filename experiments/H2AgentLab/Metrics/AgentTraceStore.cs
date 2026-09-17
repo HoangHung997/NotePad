@@ -5,11 +5,12 @@ namespace H2AgentLab.Metrics;
 
 public sealed record AgentTurnEvidence
 {
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } = AgentTrace.SchemaVersion;
     public required Guid TaskId { get; init; }
     public required Guid TurnId { get; init; }
     public required DateTimeOffset StartedUtc { get; init; }
     public required DateTimeOffset SavedUtc { get; init; }
+    public AgentVersionIdentifiers? Versions { get; init; }
     public required IReadOnlyList<PersistedAgentTraceEvent> Events { get; init; }
     public required AgentMetricsSnapshot Metrics { get; init; }
 }
@@ -55,6 +56,7 @@ public static partial class AgentTraceStore
             TurnId = trace.TurnId,
             StartedUtc = trace.StartedUtc,
             SavedUtc = DateTimeOffset.UtcNow,
+            Versions = trace.Versions,
             Events = events,
             Metrics = metrics.Snapshot(trace)
         };
