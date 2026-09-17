@@ -76,8 +76,8 @@ public static class AiModelCapabilities
         return [];
     }
 
-    internal static bool IsOfficialOpenAi(AiProfile profile) => OfficialEndpoint(profile, "api.openai.com", "/v1/");
-    internal static bool IsOfficialGemini(AiProfile profile) => OfficialEndpoint(profile, "generativelanguage.googleapis.com", "/v1/", "/v1beta/");
+    public static bool IsOfficialOpenAi(AiProfile profile) => OfficialEndpoint(profile, "api.openai.com", "/v1/");
+    public static bool IsOfficialGemini(AiProfile profile) => OfficialEndpoint(profile, "generativelanguage.googleapis.com", "/v1/", "/v1beta/");
 
     private static bool OfficialEndpoint(AiProfile profile, string host, params string[] paths)
     {
