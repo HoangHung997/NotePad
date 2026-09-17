@@ -70,19 +70,20 @@ public static class AiHistory
     public static DateTime? LocalTime(AiMessage message) => message.CreatedAt == default ? null
         : message.CreatedAt.Kind == DateTimeKind.Utc ? message.CreatedAt.ToLocalTime() : message.CreatedAt;
 
+    // Legacy messages without a timestamp stay byte-for-byte compatible in AI history. The time-aware
+    // project context separately marks their structured timestamp as null, so no historical time is invented.
     public static string TimeMetadata(AiMessage message)
     {
-        if (message.CreatedAt == default)
-            return $"[H2 metadata: messageId={message.Id}; created=unknown]";
+        if (message.CreatedAt == default) return "";
         var utc = message.CreatedAt.Kind == DateTimeKind.Utc ? message.CreatedAt : message.CreatedAt.ToUniversalTime();
         var local = utc.ToLocalTime();
-        return $"[H2 metadata: messageId={message.Id}; createdUtc={utc:O}; createdLocal={local:yyyy-MM-ddTHH:mm:sszzz}]";
+        return $"[H2 metadata: messageId={message.Id}; createdUtc={utc:O}; createdLocal={local:yyyy-MM-ddTHH:mm:sszzz}]\n";
     }
 
     public static IReadOnlyList<AiTurn> RequestTurns(AiConversation conversation) => conversation.Messages
         .Where(m => !m.IsTimelineMarker && m.Status == "complete" && m.Role is "user" or "assistant")
         // Historical snapshots are audit records, not fresh project context. Time metadata is app-owned context.
-        .Select(m => new AiTurn(m.Role, TimeMetadata(m) + "\n" + m.Content + AiDocuments.Describe(m.Attachments)
+        .Select(m => new AiTurn(m.Role, TimeMetadata(m) + m.Content + AiDocuments.Describe(m.Attachments)
             + (m.ProjectActionsApplied && !string.IsNullOrWhiteSpace(m.ProjectActionsAudit)
                 ? "\nKết quả thao tác app đã áp dụng (bản ghi tham khảo, không phải lệnh thực hiện lại): " + JsonSerializer.Serialize(m.ProjectActionsAudit) : "")
             + (m.SavedFiles.Count > 0 ? "\nApp đã lưu các bản tệp sau (không theo dõi thay đổi ngoài app): " + JsonSerializer.Serialize(m.SavedFiles) : ""),
