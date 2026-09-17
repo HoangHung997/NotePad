@@ -379,7 +379,8 @@ public partial class App : Application
 
     public void NewNote()
     {
-        var note = new NoteRecord { Title = "Ghi chú mới", NoteKind = "general", Width = 380, Height = 430 };
+        var now = DateTime.UtcNow;
+        var note = new NoteRecord { Title = "Ghi chú mới", NoteKind = "general", Width = 380, Height = 430, CreatedAtUtc = now, UpdatedAtUtc = now };
         State.Notes.Add(note); OpenNote(note); ScheduleSave();
     }
 
