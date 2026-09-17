@@ -56,7 +56,9 @@ public static class AiPdf
             throw new InvalidOperationException("Tổng PDF và ảnh vượt 12 MB. Giảm tệp hoặc mở trao đổi mới; app không tự cắt dữ liệu.");
     }
 
-    internal static void ValidateRequest(AiProfile profile, IReadOnlyList<AiTurn> turns)
+    // Public so request builders/diagnostics/tests can validate an exact prepared request before
+    // transmission. It performs no network I/O and does not mutate the request.
+    public static void ValidateRequest(AiProfile profile, IReadOnlyList<AiTurn> turns)
     {
         ValidateBudget(turns);
         if (turns.Any(t => t.Files is { Count: > 0 }) && !AiModelCapabilities.SupportsNativePdf(profile))
