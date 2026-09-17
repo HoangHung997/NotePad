@@ -61,6 +61,13 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-metrics'
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-metrics-test $out
 
+      - name: Run H2 Agent Lab initial A B baseline
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-baseline'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-baseline-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-initial-ab-baseline.md')
+
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
