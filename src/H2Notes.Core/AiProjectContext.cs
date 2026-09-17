@@ -98,7 +98,7 @@ public static class AiProjectContext
                 dayParts = new { morning = "05:00-11:59", afternoon = "12:00-17:59", evening = "18:00-22:59", night = "23:00-04:59" },
                 unknownRule = "null/unknown means H2 Notes did not record the historical time; never infer that it happened today"
             },
-            projectId = project.Id == Guid.Empty ? null : project.Id,
+            projectId = project.Id == Guid.Empty ? (Guid?)null : project.Id,
             name = project.DisplayName,
             createdLocal = Local(project.CreatedAtUtc),
             updatedLocal = Local(project.UpdatedAtUtc),
