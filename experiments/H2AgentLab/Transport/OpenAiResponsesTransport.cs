@@ -7,10 +7,22 @@ using H2Notes.Core;
 
 namespace H2AgentLab.Transport;
 
+public enum OpenAiResponsesStateMode
+{
+    /// <summary>Privacy-preserving default. Keep store=false and replay returned output items locally.</summary>
+    Stateless,
+
+    /// <summary>
+    /// Opt-in official OpenAI server state. Uses store=true and previous_response_id so tool
+    /// continuations send only new function outputs rather than the growing prior transcript.
+    /// </summary>
+    StoredContinuation
+}
+
 /// <summary>
-/// Baseline HTTP/SSE transport for the public OpenAI Responses API. This task deliberately keeps
-/// continuation stateless and replays the active Responses input. V2-0206 upgrades continuation to
-/// provider state (`previous_response_id`) so the orchestrator contract does not need to change.
+/// Public OpenAI Responses HTTP/SSE transport. Stateless mode is the default. StoredContinuation
+/// is an explicit opt-in because OpenAI documents that store=true retains response data for later
+/// retrieval; it is never enabled silently and is restricted to the official OpenAI /v1 endpoint.
 /// </summary>
 public sealed class OpenAiResponsesTransport : IAgentTransport
 {
@@ -18,9 +30,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
     private readonly string _apiKey;
     private readonly HttpClient _http;
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly JsonArray _input = [];
+    private JsonArray _requestInput = [];
     private readonly Dictionary<string, AgentToolDefinition> _tools = new(StringComparer.Ordinal);
     private readonly List<string> _completedOutputItems = [];
+    private readonly OpenAiResponsesStateMode _stateMode;
     private List<AgentTransportToolCall> _pendingCalls = [];
     private Guid _taskId;
     private Guid _turnId;
@@ -28,17 +41,24 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
     private bool _disposed;
     private bool _allowParallelToolCalls;
     private string? _promptCacheKey;
+    private string? _previousResponseId;
 
-    public OpenAiResponsesTransport(AiProfile profile, string apiKey, HttpMessageHandler? handler = null)
+    public OpenAiResponsesTransport(
+        AiProfile profile,
+        string apiKey,
+        HttpMessageHandler? handler = null,
+        OpenAiResponsesStateMode stateMode = OpenAiResponsesStateMode.Stateless)
     {
         if (profile.Protocol != AiProtocol.OpenAiResponses)
             throw new ArgumentException("OpenAiResponsesTransport chỉ nhận hồ sơ OpenAiResponses.", nameof(profile));
         if (string.IsNullOrWhiteSpace(profile.Model))
             throw new ArgumentException("Chưa chọn model OpenAI Responses.", nameof(profile));
         ValidateSummaryRequest(profile);
+        ValidateStateMode(profile, stateMode);
 
         _profile = profile.Copy();
         _profile.Protocol = AiProtocol.OpenAiResponses;
+        _stateMode = stateMode;
         _apiKey = apiKey ?? "";
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false })
         {
@@ -46,7 +66,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         };
     }
 
-    public AgentTransportCapabilities Capabilities => AgentTransportCapabilities.OpenAiResponsesHttp;
+    public AgentTransportCapabilities Capabilities
+        => _stateMode == OpenAiResponsesStateMode.StoredContinuation
+            ? AgentTransportCapabilities.OpenAiResponsesHttp with { IncrementalContinuation = true }
+            : AgentTransportCapabilities.OpenAiResponsesHttp;
 
     public async IAsyncEnumerable<AgentTransportEvent> StartAsync(
         AgentTransportStartRequest request,
@@ -59,8 +82,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         if (request.AllowParallelToolCalls && !Capabilities.ParallelToolCalls)
             throw new InvalidOperationException("Transport không hỗ trợ parallel tool calls.");
 
-        foreach (var message in request.Messages) _input.Add(ToResponsesMessage(message));
-        if (_input.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
+        var input = new JsonArray();
+        foreach (var message in request.Messages) input.Add(ToResponsesMessage(message));
+        if (input.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
+        _requestInput = input;
         foreach (var tool in SnapshotTools(request.Tools)) _tools[tool.Name] = tool;
 
         _taskId = request.TaskId;
@@ -101,23 +126,34 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         if (request.NewlyLoadedTools is { Count: > 0 })
             foreach (var tool in SnapshotTools(request.NewlyLoadedTools)) _tools[tool.Name] = tool;
 
-        // Stateless baseline: preserve exact completed provider output items (including opaque encrypted
-        // reasoning when the API returned it), then append function results. V2-0206 replaces this replay
-        // with previous_response_id on providers that support stored continuation state.
-        foreach (var raw in _completedOutputItems)
-            _input.Add(JsonNode.Parse(raw) ?? throw new InvalidDataException("Responses output item không giải mã được."));
-        _completedOutputItems.Clear();
+        var continuationInput = new JsonArray();
+        if (_stateMode == OpenAiResponsesStateMode.Stateless)
+        {
+            foreach (var raw in _completedOutputItems)
+                _requestInput.Add(JsonNode.Parse(raw) ?? throw new InvalidDataException("Responses output item không giải mã được."));
+        }
+        else if (string.IsNullOrWhiteSpace(_previousResponseId))
+        {
+            throw new InvalidOperationException("Provider-state continuation thiếu previous response id; không tự hạ cấp hoặc gửi lại toàn bộ transcript.");
+        }
 
         foreach (var call in _pendingCalls)
         {
             var result = byId[call.Id][0];
-            _input.Add(new JsonObject
+            var output = new JsonObject
             {
                 ["type"] = "function_call_output",
                 ["call_id"] = call.Id,
                 ["output"] = result.Content
-            });
+            };
+            if (_stateMode == OpenAiResponsesStateMode.Stateless) _requestInput.Add(output);
+            else continuationInput.Add(output);
         }
+
+        if (_stateMode == OpenAiResponsesStateMode.StoredContinuation)
+            _requestInput = continuationInput;
+
+        _completedOutputItems.Clear();
         _pendingCalls = [];
 
         await foreach (var item in StreamOnce(cancellationToken).WithCancellation(cancellationToken))
@@ -249,6 +285,8 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         token.ThrowIfCancellationRequested();
         if (!completed)
             throw new IOException("Kết nối Responses đóng trước response.completed; không chạy function call từ phản hồi dở dang.");
+        if (_stateMode == OpenAiResponsesStateMode.StoredContinuation && string.IsNullOrWhiteSpace(responseId))
+            throw new IOException("Stored Responses completion không trả response id; không thể continuation an toàn.");
 
         var calls = ResolveFunctionCalls(outputItems);
         var hasMessage = outputItems.Any(IsAssistantMessage);
@@ -256,7 +294,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
             throw new IOException("Responses hoàn tất nhưng không trả assistant message hoặc function call.");
 
         _completedOutputItems.Clear();
-        _completedOutputItems.AddRange(outputItems);
+        if (_stateMode == OpenAiResponsesStateMode.Stateless)
+            _completedOutputItems.AddRange(outputItems);
+        else
+            _previousResponseId = responseId;
         _pendingCalls = calls;
 
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
@@ -266,13 +307,17 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
 
     private JsonObject BuildPayload()
     {
+        var stored = _stateMode == OpenAiResponsesStateMode.StoredContinuation;
         var payload = new JsonObject
         {
             ["model"] = _profile.Model,
-            ["input"] = _input.DeepClone(),
+            ["input"] = _requestInput.DeepClone(),
             ["stream"] = true,
-            ["store"] = false
+            ["store"] = stored
         };
+        if (stored && _previousResponseId is { Length: > 0 })
+            payload["previous_response_id"] = _previousResponseId;
+
         if (_tools.Count > 0)
         {
             payload["tools"] = BuildTools();
@@ -285,9 +330,12 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort) reasoning["effort"] = effort;
         if (reasoning.Count > 0) payload["reasoning"] = reasoning;
 
-        // Public Responses supports encrypted reasoning output for stateless store:false continuation.
-        // The ciphertext is never surfaced to the user; it is retained only inside the active turn.
-        payload["include"] = new JsonArray("reasoning.encrypted_content");
+        if (!stored)
+        {
+            // Stateless reasoning workflows must return encrypted reasoning items so the next request
+            // can replay them without server-side response storage.
+            payload["include"] = new JsonArray("reasoning.encrypted_content");
+        }
         return payload;
     }
 
@@ -430,9 +478,21 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
     private static void ValidateSummaryRequest(AiProfile profile)
     {
         if (!profile.RequestReasoningSummary) return;
-        var endpoint = AiClient.Endpoint(profile, "");
-        if (endpoint.Scheme != "https" || !endpoint.IsDefaultPort || endpoint.IdnHost != "api.openai.com" || endpoint.AbsolutePath != "/v1/")
+        if (!IsOfficialOpenAi(profile))
             throw new InvalidOperationException("Reasoning summary chỉ được bật cho OpenAI Responses chính thức đã xác nhận.");
+    }
+
+    private static void ValidateStateMode(AiProfile profile, OpenAiResponsesStateMode stateMode)
+    {
+        if (!Enum.IsDefined(stateMode)) throw new ArgumentOutOfRangeException(nameof(stateMode));
+        if (stateMode == OpenAiResponsesStateMode.StoredContinuation && !IsOfficialOpenAi(profile))
+            throw new InvalidOperationException("Provider-state continuation hiện chỉ được bật rõ ràng cho OpenAI Responses chính thức; endpoint tương thích khác giữ chế độ stateless.");
+    }
+
+    private static bool IsOfficialOpenAi(AiProfile profile)
+    {
+        var endpoint = AiClient.Endpoint(profile, "");
+        return endpoint.Scheme == "https" && endpoint.IsDefaultPort && endpoint.IdnHost == "api.openai.com" && endpoint.AbsolutePath == "/v1/";
     }
 
     private void EnsureUsable()
