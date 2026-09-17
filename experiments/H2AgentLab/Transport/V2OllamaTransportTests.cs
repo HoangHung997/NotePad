@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using H2AgentLab.Transport;
@@ -202,10 +203,12 @@ public static class V2OllamaTransportTests
             return body;
         }
         protected static HttpResponseMessage Ndjson(params object[] lines)
-            => new(HttpStatusCode.OK)
-            {
-                Content = new StringContent(string.Join("\n", lines.Select(JsonSerializer.Serialize)) + "\n", Encoding.UTF8, "application/x-ndjson")
-            };
+        {
+            var body = string.Join("\n", lines.Select(line => JsonSerializer.Serialize(line))) + "\n";
+            var content = new StringContent(body, Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/x-ndjson");
+            return new(HttpStatusCode.OK) { Content = content };
+        }
     }
 
     private sealed class ToolLoopHandler : CaptureHandler

@@ -376,7 +376,7 @@ public sealed class OllamaTransport : IAgentTransport
         var cached = Long(root, "prompt_eval_cached_count");
         var output = Long(root, "eval_count");
         if (input is null && cached is null && output is null) return null;
-        var total = input is null && output is null ? null : (input ?? 0) + (output ?? 0);
+        long? total = input is null && output is null ? null : (input ?? 0) + (output ?? 0);
         return new(input, cached, null, output, total);
     }
 
