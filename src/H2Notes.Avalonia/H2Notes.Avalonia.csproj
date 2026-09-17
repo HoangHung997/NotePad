@@ -15,6 +15,13 @@
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/install.py" Link="tools/ocr/install.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/smoke.py" Link="tools/ocr/smoke.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/models.lock.json" Link="tools/ocr/models.lock.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/requirements.in" Link="tools/ocr/requirements.in" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/requirements-mineru.in" Link="tools/ocr/requirements-mineru.in" CopyToOutputDirectory="PreserveNewest" />
+    <!-- If a verified portable runtime has been prepared under tools/ocr/runtime, publish it beside the app. -->
+    <None Include="../../tools/ocr/runtime/**/*" Link="ocr-runtime/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../tools/ocr/runtime/runtime.json')" />
     <AvaloniaResource Include="../../assets/branding/h2-notes-app-icon-v1.ico" Link="Assets/app.ico" />
     <AvaloniaResource Include="../../assets/branding/h2-notes-app-icon-v1.png" Link="Assets/app.png" />
   </ItemGroup>
