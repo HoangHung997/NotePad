@@ -42,7 +42,14 @@ public partial class MainWindow : Window
             {
                 var now = DateTime.UtcNow;
                 changed.Project.UpdatedAtUtc = now;
-                if (changed.Task is { } task) task.UpdatedAtUtc = now;
+                if (changed.Task is { } task)
+                {
+                    task.UpdatedAtUtc = now;
+                    // Only timestamp completion for records created by the new timestamp-aware app.
+                    // Legacy completed tasks intentionally remain unknown instead of being backfilled with "now".
+                    if (task.CreatedAtUtc is not null)
+                        task.CompletedAtUtc = task.IsCompleted ? task.CompletedAtUtc ?? now : null;
+                }
                 _app.MarkProjectDirty(changed.Project.Id);
             }
             UpdateSummary(); _app.ScheduleSave();
