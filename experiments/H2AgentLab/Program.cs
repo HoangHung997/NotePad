@@ -14,6 +14,7 @@ public static class Program
         if (args.Contains("--computer-worker")) return ComputerTools.Worker();
         if (args.Contains("--self-test")) return LabTests.Run(args).GetAwaiter().GetResult();
         if (args.Contains("--skills-test")) return SkillTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-guard-test")) return V2ArchitectureTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--portability-test")) return PortabilityTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--verify-install")) return LabEnvironment.Verify(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--recovery-test")) return RecoveryTests.Run(args[^1]).GetAwaiter().GetResult();
