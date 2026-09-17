@@ -1,0 +1,306 @@
+PASS Plain text round trip
+PASS Import WPF styled spans without running XAML
+PASS XML external entity is not evaluated
+PASS Format only selected text
+PASS Insertion preserves surrounding formatting
+PASS Deletion crossing spans
+PASS Draft clone does not mutate original
+PASS Invalid rich-text range rejected
+PASS Selected formatting reports shared and mixed properties independently
+PASS Project move preserves identity and child order
+PASS Task reorder updates Next only on move
+PASS Foreign task cannot be moved into another project
+PASS Search keeps parent and original ordinal
+PASS Collapse hides checklist, not the model
+PASS Column preferences and rich task comments persist and old files get defaults
+PASS Isolated import retains originals, unknown fields, IDs and rich text
+PASS Corrupt state never replaced with empty state
+PASS Future schema cannot be overwritten
+PASS Nera fractional scroll preserved
+PASS Nera wheel animates and clamps
+PASS Manual import converts legacy hub and general notes without writing during preview
+PASS Manual import appends copies, retains edits/preferences and permanent source/pre-import backups
+PASS Manual import rejects invalid structures and future schemas before changing data
+PASS Manual import supports older standalone project notes and missing general NoteKind
+PASS Manual import uses the confirmed snapshot even if selected file later changes
+PASS Failed import save leaves live state and current file unchanged
+PASS Manual import rejects active file and oversized input
+PASS Desktop session restores the selected board and note stacking order on both launch paths
+PASS Hidden board and all-hidden session are not forced open
+PASS Session restore ignores deleted, archived, duplicate and inactive board IDs
+PASS First launch and pre-session data retain visible-note defaults
+PASS Disabling session restore starts quietly with Windows, manually opens only the board
+PASS Manual import preserves the current desktop session on disk
+PASS Settings exposes manual import without changing state on open or close
+PASS Notes have no taskbar/minimize/maximize; X hides, flushes draft and permits reopening
+PASS Board X hides without closing and switched board is the saved session selection
+PASS Application exit retains visible windows and captures draft and geometry before closing
+PASS Moving and resizing a note schedule autosave even when snapping is off
+PASS Settings and dialogs stay off the taskbar without minimize/maximize
+PASS Missing monitor is recovered while valid negative monitor coordinates are kept
+PASS Toolbar and menu follow uniform/mixed selection without edits or saves
+PASS Mixed bold toggles all on from menu and toolbar follows undo
+PASS Typing format and caret formatting agree without changing other text
+PASS Four columns; STT checkbox changes only its task and keeps ordinal
+PASS Auto height uses only enabled columns; clipped cells retain full tooltip text
+PASS Cell comment formats survive commit, autosave, cancel and reopening
+PASS Auto wraps unbroken text; fixed cells fit large fonts and retain span backgrounds
+PASS Rich editor applies formatting and undoes it
+PASS Text edit undo retains existing rich spans
+PASS Grid edit commit and Escape after autosave
+PASS Grid task drag preview leaves Next and project order unchanged
+PASS Project drag preview/cancel preserves groups and ordinals
+PASS Filtered grid does not reorder underlying data on drag
+PASS Main window constructs its named controls and loads notes
+METRIC 1000 projects/10000 tasks: initial layout 1761 ms; 27 visual elements (headless, not native FPS)
+PASS Viewport visual count stays bounded for 10,000 tasks
+PASS Workspace stores each project with rich text, chat, paths and ordinary notes
+PASS Workspace migration preserves source bytes and immutable backup
+PASS Workspace unchanged projects are not rewritten; rename retains identity
+PASS Workspace transaction rollback restores previous complete generation
+PASS Workspace rejects external modification without overwriting it
+PASS Workspace prevents nested roots, foreign overwrite and duplicate IDs
+PASS Workspace lock prevents two writers
+PASS Incremental save persists only dirty projects while index order and selection update
+PASS Workspace merge requires explicit conflict decisions and keep-both does not duplicate on repeat
+PASS Workspace merge asks before choosing project order and preserves rich names in duplicate
+PASS AI streams Ollama with explicit model, context and protocol authentication
+PASS AI streams OpenAiResponses with explicit model, context and protocol authentication
+PASS AI streams OpenAiChat with explicit model, context and protocol authentication
+PASS AI streams Gemini with explicit model, context and protocol authentication
+PASS AI refuses unsafe online URLs, embedded credentials and key query strings
+PASS AI truncated stream is not reported complete or automatically retried
+PASS AI server errors do not reveal response body or retry
+PASS AI Ollama models and memory requests contain no project data
+PASS AI canceled request does not start a fallback provider
+PASS AI HTTP 401 has an actionable safe category without echoing secrets
+PASS AI HTTP 402 has an actionable safe category without echoing secrets
+PASS AI HTTP 403 has an actionable safe category without echoing secrets
+PASS AI HTTP 404 has an actionable safe category without echoing secrets
+PASS AI HTTP 429 has an actionable safe category without echoing secrets
+PASS AI HTTP 503 has an actionable safe category without echoing secrets
+PASS AI distinguishes Gemini model restriction and cloud extra usage without raw server messages
+PASS AI model list HTTP failure keeps the same actionable error as chat
+PASS AI completed stream without text is an error, not a blank successful answer
+PASS Ollama location labels distinguish local, cloud tags and remote servers
+PASS Ollama cloud is never described or requested as a local RAM load
+PASS Responsive shell keeps rich draft, selection and undo across narrow and wide sizes
+PASS Project drawer switches selected project and AI draft remains with its owner
+PASS Compact task drag only commits Next on release and edits comment separately
+PASS All original vector icons render at three sizes and inherit theme color
+PASS Window resize hit testing and cursor axes match all eight sides
+PASS Window edge hover temporarily overrides child I-beam and restores it
+PASS Responsive shell uses vector icons and broad, working split handles
+PASS List toolbar actions preserve formatting and undo as one edit
+PASS Column resize hover and drag use the same header boundary
+PASS Legacy messages never acquire a fabricated timestamp on loading
+PASS Local timeline markers and failed answers never enter AI requests
+PASS Independent chat is saved in its own note file with history, draft and time
+PASS Workspace v2 upgrades all files atomically so old clients reject local-only markers
+PASS Merge keep-both remaps independent conversation and parent IDs
+PASS Chat aligns user right, assistant left, shows time and groups by date/gap
+PASS Save marker works with no AI profile and preserves standalone/project isolation
+PASS Reopening returns to selected conversation rather than the last created
+PASS Streaming response targets message body, not its timestamp (mock transport)
+PASS Interrupted session keeps partial AI answer and original time without resending
+PASS Chat shows safe HTTP error in the saved bubble after reopening without retrying
+PASS Saving a replacement AI connection refreshes the open panel without losing its draft
+PASS Independent chat X hides with saved draft and its own desktop placement
+PASS Detaching AI reuses project editor, history and draft without creating notebooks
+PASS Detached AI follows project selection both ways with isolated draft, notes and markers
+PASS Detached AI survives hiding the board; X hides only AI and preserves geometry/history
+PASS Moving project AI to desktop and hiding board does not cancel an active reply (mock transport)
+PASS Repeated AI reparent drains pending old-root layout and keeps the same composer/progress
+PASS Desktop AI-only session restores selected project and window on restart/startup
+PASS Detached chat resize follows latest message but respects reading old history
+PASS Full project context includes all ordered tasks, notes, links and related conversations but no local markers/drafts
+PASS Fresh context is sent once; old snapshots never override current project data
+PASS AI file .docx generates valid actual bytes and reads Vietnamese content back
+PASS AI file .xlsx generates valid actual bytes and reads Vietnamese content back
+PASS AI file .csv generates valid actual bytes and reads Vietnamese content back
+PASS AI file .txt generates valid actual bytes and reads Vietnamese content back
+PASS AI file .md generates valid actual bytes and reads Vietnamese content back
+PASS Excel extraction includes every sheet, cached formulas, shared strings and cell addresses
+PASS Attachment readers reject oversized files, old Office, macros, DTD and empty input
+PASS Artifact validation rejects paths, executables, reserved names, data loss and excess sheets
+PASS Multimodal Ollama sends native image format and trusted system instruction without credentials in body
+PASS Multimodal OpenAiResponses sends native image format and trusted system instruction without credentials in body
+PASS Multimodal OpenAiChat sends native image format and trusted system instruction without credentials in body
+PASS Multimodal Gemini sends native image format and trusted system instruction without credentials in body
+PASS Attachments, extraction and export audit round-trip in one project file, including merge ID remap
+PASS Workspace v3 upgrades every project to v4 with a backup before attachments are saved
+PASS Chat draft files stay with project; marker attachment stays local; artifact buttons render beside history
+PASS Project send flushes editor and sends exact snapshot without a confirmation dialog
+PASS Provider thinking is expandable, ephemeral and hidden at first answer; Send no longer opens confirmation
+PASS Cancelled and failed thinking does not remain visible or become answer text
+PASS AI typed stream separates provider reasoning and final text: Ollama
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: Ollama
+PASS AI reasoning-only completion is not a successful final answer: Ollama
+PASS AI reasoning does not mask truncated streams or trigger retries: Ollama
+PASS AI cancellation after reasoning stops buffered final tokens: Ollama
+PASS AI in-stream errors preserve prior events without exposing server secrets: Ollama
+PASS AI typed stream separates provider reasoning and final text: OpenAiResponses
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: OpenAiResponses
+PASS AI reasoning-only completion is not a successful final answer: OpenAiResponses
+PASS AI reasoning does not mask truncated streams or trigger retries: OpenAiResponses
+PASS AI cancellation after reasoning stops buffered final tokens: OpenAiResponses
+PASS AI in-stream errors preserve prior events without exposing server secrets: OpenAiResponses
+PASS AI typed stream separates provider reasoning and final text: OpenAiChat
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: OpenAiChat
+PASS AI reasoning-only completion is not a successful final answer: OpenAiChat
+PASS AI reasoning does not mask truncated streams or trigger retries: OpenAiChat
+PASS AI cancellation after reasoning stops buffered final tokens: OpenAiChat
+PASS AI in-stream errors preserve prior events without exposing server secrets: OpenAiChat
+PASS AI typed stream separates provider reasoning and final text: Gemini
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: Gemini
+PASS AI reasoning-only completion is not a successful final answer: Gemini
+PASS AI reasoning does not mask truncated streams or trigger retries: Gemini
+PASS AI cancellation after reasoning stops buffered final tokens: Gemini
+PASS AI in-stream errors preserve prior events without exposing server secrets: Gemini
+PASS AI Ollama emits thinking before content when both arrive together
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":null,"reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"","reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"trace","reasoning":"trace"
+PASS AI Responses emits summary deltas only, not raw reasoning or duplicate done snapshots
+PASS AI Gemini preserves mixed-part order and ignores opaque thought signatures and other candidates
+PASS AI empty and non-string provider reasoning fields do not become text
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama default
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama True
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama False
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses default
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses True
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses False
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat default
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat True
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat False
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini default
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini True
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini False
+PASS AI Ollama thinking defaults to model behavior and preserves all three profile choices
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://api.openai.com/v1
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://generativelanguage.googleapis.com/v1beta
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://generativelanguage.googleapis.com/v1
+PASS AI summary opt-in never imposes settings on unsupported endpoints: http://192.168.1.208:11434 Ollama
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com/v1 OpenAiChat
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://example.test/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com.evil.test/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com:8443/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com/other-api OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://example.test/v1beta Gemini
+PASS AI Ollama permits HTTP loopback and labels it local: localhost
+PASS AI Ollama permits HTTP loopback and labels it local: LOCALHOST
+PASS AI Ollama permits HTTP loopback and labels it local: 127.0.0.1
+PASS AI Ollama permits HTTP loopback and labels it local: 127.254.1.2
+PASS AI Ollama permits HTTP loopback and labels it local: [::1]
+PASS AI Ollama permits HTTP loopback and labels it local: [::ffff:127.0.0.1]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 192.168.1.208
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 10.0.0.1
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 10.255.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 172.16.0.1
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 172.31.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 192.168.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fc00::1]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fdff:ffff::208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fe80::208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fe80::208%2512]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [::ffff:192.168.1.208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [::ffff:10.0.0.1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: 8.8.8.8
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.167.1.208
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.169.1.208
+PASS AI Ollama rejects public or non-approved HTTP addresses: 172.15.255.254
+PASS AI Ollama rejects public or non-approved HTTP addresses: 172.32.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 11.0.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 100.64.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 169.254.169.254
+PASS AI Ollama rejects public or non-approved HTTP addresses: 0.0.0.0
+PASS AI Ollama rejects public or non-approved HTTP addresses: 255.255.255.255
+PASS AI Ollama rejects public or non-approved HTTP addresses: 224.0.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: [::]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [2001:4860:4860::8888]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [ff02::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [fec0::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [::ffff:8.8.8.8]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [2002:0a00:0001::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: example.test
+PASS AI Ollama rejects public or non-approved HTTP addresses: ollama.local
+PASS AI Ollama rejects public or non-approved HTTP addresses: localhost.evil.test
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.168.1.208.evil.test
+PASS AI online protocols still require HTTPS even on private networks: OpenAiResponses
+PASS AI online protocols still require HTTPS even on private networks: OpenAiChat
+PASS AI online protocols still require HTTPS even on private networks: Gemini
+PASS AI URL credentials, secret queries, fragments, and cross-origin paths remain rejected
+PASS AI Ollama LAN model operations send no project data or API secrets
+PASS AI rejects redirect responses without retrying or exposing secrets: MovedPermanently
+PASS AI rejects redirect responses without retrying or exposing secrets: Found
+PASS AI rejects redirect responses without retrying or exposing secrets: RedirectKeepVerb
+PASS AI rejects redirect responses without retrying or exposing secrets: PermanentRedirect
+PASS AI default HTTP transport does not follow a LAN redirect
+PASS Composer upgrade keeps input above two unclipped bottom rows at 340x420
+PASS Composer @ filters without accents, navigates and inserts without sending
+PASS Composer @ Ctrl+Enter selects suggestion before send and Escape preserves draft
+PASS Composer + menu exposes real filenames and drafts, not autonomous tools
+PASS Composer clipboard Ctrl+V/context menu uses exactly one plain-text edit with undo
+PASS Composer plain text still pastes while attachment import is busy
+PASS Composer deferred clipboard cannot paste into a changed project or conversation
+PASS Composer deferred bitmap cannot attach after project switch
+PASS Composer delayed text does not overwrite a newly changed draft or selection
+PASS Composer bitmap bounds reject oversized images without allocating image pixels
+PASS Composer deferred import commits atomically and discards results after switching away/back
+PASS Composer invalid attachment batches report errors without throwing or partially committing
+PASS Composer drop file URI attaches local file; remote URI stays text
+PASS Composer local paths reject HTTP, remote file hosts and UNC shares
+PASS Composer local file safety walk accepts ordinary ancestors and a Windows drive root
+PASS Composer enforces four files, eight MB per file and 32 MB total without trimming history
+PASS Project actions parse only allowlisted append operations
+PASS Read-only blocks project writes; default requires approval; project access scoped
+PASS Project action validates entire batch before any mutation
+PASS Composer project edits enforce ReadOnly without duplicate application
+PASS Composer project edits enforce ConfirmChanges without duplicate application
+PASS Composer project edits enforce ProjectAccess without duplicate application
+PASS PDF Direct failure preserves draft and never sends a text-only substitute
+PASS PDF Docling failure preserves draft and never sends a text-only substitute
+PASS AI settings exposes all four PDF paths without running an OCR engine
+PASS PDF accepts raw bytes, preserves history and never labels it as extracted text
+PASS PDF validates signature and 8MB bound without trusting MIME or history
+PASS PDF preprocessed Markdown replays as text with source provenance, never a native file
+PASS PDF native wire shape and historical bytes: OpenAiResponses
+PASS PDF native wire shape and historical bytes: OpenAiChat
+PASS PDF native wire shape and historical bytes: Gemini
+PASS PDF rejects Ollama and unsupported or spoofed compatible providers before sending
+PASS PDF supported list covers common documented vision models but not arbitrary suffixes
+PASS PDF budget counts history and rejects unsupported attachment roles
+PASS PDF direct and text-only preprocessing never require a runtime or download
+PASS PDF preprocessing honors cancellation before reading runtime or launching
+PASS PDF preprocessing refuses untrusted bridge and invalid page/time settings
+PASS PDF OCR output reader rejects overflow, invalid UTF8, empty and NUL without truncating
+PASS PDF runtime manifest is readiness-only and cannot choose executable or escape model directory
+PASS PDF bounded local subprocess cancels promptly
+PASS PDF bounded local subprocess stops stdout flooding and redacts failed diagnostics
+PASS Reasoning common verified models expose exact supported effort values
+PASS Reasoning allowlist rejects model suffixes and impersonated official endpoints
+PASS Reasoning maximum maps to highest known wire value without mutating profile
+PASS Reasoning emits only its verified protocol parameter: Ollama
+PASS Reasoning unknown maximum is display-only, no invented API parameters: Ollama
+PASS Reasoning emits only its verified protocol parameter: OpenAiResponses
+PASS Reasoning unknown maximum is display-only, no invented API parameters: OpenAiResponses
+PASS Reasoning emits only its verified protocol parameter: OpenAiChat
+PASS Reasoning unknown maximum is display-only, no invented API parameters: OpenAiChat
+PASS Reasoning emits only its verified protocol parameter: Gemini
+PASS Reasoning unknown maximum is display-only, no invented API parameters: Gemini
+PASS Reasoning invalid explicit effort fails before transmitting
+PASS Reasoning and action audit metadata round trip with safe legacy defaults
+PASS Composer options reuse one profile control; responsive bottom rows preserve draft and selection
+PASS Composer send and stop share a black circular slot; timeline icon retains contrast
+PASS Short composer keeps history room and moves checked marker/history controls into plus
+PASS Composer permissions persist to the conversation and rebuild actions without replacing editor
+PASS Changing permission on an empty chat creates exactly one conversation
+PASS Project access warning defaults to cancel and cannot grant access after scope changes
+PASS Imported project permission needs a local grant; revocation saves locally and failed save cannot grant
+PASS Preparation and active request disable permission model and effort without applying hidden selections
+PASS Reasoning is capability-driven and request cloning never mutates the saved profile
+PASS Dictation is an honest Windows launcher and is never started by load resize or settings refresh
+PASS Win H native INPUT layout and partial key cleanup contain no Enter or unrelated modifiers
+RESULT: 304 passed, 0 failed. Temporary test evidence: C:\Users\hoang\AppData\Local\Temp\H2Notes-tests-952d6502f0c14b36aeb39941e61ee300

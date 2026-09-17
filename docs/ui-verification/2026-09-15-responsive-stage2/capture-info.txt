@@ -1,0 +1,5 @@
+Actual Avalonia controls rendered by Release app with isolated demo data.
+RenderTargetBitmap: 96 DPI, logical DIP dimensions in filenames.
+Native screen scaling: 1,25
+Not native screen captures; no Windows input, IME, multimonitor or tray verification implied.
+AI content intentionally empty: no real API was called.

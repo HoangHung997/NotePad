@@ -1,0 +1,1 @@
+Release app actual controls; synthetic evidence, no model calls. Native scaling=1,25. RenderTargetBitmap at 96 DPI, not native screenshot.

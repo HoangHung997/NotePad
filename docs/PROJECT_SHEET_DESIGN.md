@@ -1,5 +1,10 @@
 # H2 Notes: bảng dự án nhẹ từ NeraSpreadSheet
 
+> **Thiết kế lịch sử, đã được thay thế.** Yêu cầu mới nhất là tận dụng chọn lọc
+> Nera, không nhúng nguyên SDK. Bản Avalonia đã được triển khai theo hướng đó.
+> Xem [trạng thái triển khai, cách chạy và giới hạn](PROJECT_SHEET_IMPLEMENTATION.md).
+> Các mục “chưa viết code” và “tích hợp trực tiếp nguyên SDK” dưới đây chỉ là lịch sử.
+
 ## Trạng thái
 
 - Nhánh thử nghiệm local: `codex/project-sheet`.
@@ -7,6 +12,18 @@
 - Đã tải và đọc nguồn NeraSpreadSheet; chưa thay UI, model hoặc dữ liệu H2 Notes.
 - Chưa triển khai bảng. Giữ yêu cầu của chủ app: thảo luận, chốt rồi mới viết code.
 - Không push hoặc chỉnh repository NeraSpreadSheet của chủ app.
+- Chỉ đạo bổ sung của chủ app: dùng SDK UI Avalonia hiện hành của NeraSpreadSheet.
+  Phương án giữ WPF/.NET 8 và lấy chọn lọc source đã được thay thế bằng hướng dưới đây.
+
+## Quyết định nền tảng
+
+H2 Notes mới dùng **Avalonia/.NET 10**, tích hợp trực tiếp
+**NeraSpreadSheet.Avalonia**. Không dùng WPF host của Nera, không nhúng UI WPF vào
+Avalonia và không tự dựng một bảng khác để giả giao diện Nera.
+
+Giữ bản WPF trên `main` để đối chiếu và quay lại. Bản thử Avalonia được triển khai
+riêng trên `codex/project-sheet`, ưu tiên Windows trước. Chưa chuyển source app
+cho đến khi chủ app xác nhận viết code.
 
 ## Nguồn đối chiếu
 
@@ -20,29 +37,30 @@ Những nhận xét dưới đây áp dụng cho SHA này, không phải cam k�
 
 | Thành phần nguồn | Đã thấy trong code | Cách dùng đề xuất |
 | --- | --- | --- |
-| `src/NeraSpreadSheet.Scrolling/ContinuousScrollController.cs` và `ScrollContracts.cs` | Gom input, cuộn theo frame, giữ offset lẻ, giới hạn biên; module không có ProjectReference/PackageReference | Ứng viên tái sử dụng mã nguồn cho cuộn bảng; kiểm lại khi chuyển sang .NET 8 |
-| `src/NeraSpreadSheet.Wpf/NeraSpreadsheetControl.cs` | Một TextBox editor tái sử dụng; layout/viewport riêng; xử lý cuộn qua frame loop | Tận dụng cách thiết kế, không chép nguyên control |
-| `src/NeraSpreadSheet.Wpf/NeraSpreadsheetControl.EditorDraft.cs` | Draft đang gõ tách khỏi dữ liệu đã commit; giữ selection/caret | Áp dụng luồng draft/commit cho rich editor của H2 Notes |
-| `src/NeraSpreadSheet.DataGrid.Core/` | Bốn file contract về nguồn dữ liệu, cột, chọn hàng, sắp xếp; chưa có UI bảng | Tham khảo mô hình cột và dữ liệu theo record, không coi là control hoàn thiện |
-| `src/NeraSpreadSheet.Iconography/` | Catalog, tài nguyên icon và giấy phép icon bên thứ ba | Có thể chọn vài icon phù hợp sau khi chốt UI; giữ attribution khi sao chép |
-| `ARCHITECTURE.md` | Chỉ layout/render vùng nhìn thấy; không tạo control/editor cho mọi ô | Áp dụng nguyên tắc cho bảng H2 Notes |
+| `src/NeraSpreadSheet.Avalonia/NeraSpreadSheet.Avalonia.csproj` | Host Avalonia target .NET 10, tham chiếu engine/UI modules chung | Dependency UI chính cho app mới, dùng phiên bản nguồn/package xác định |
+| `src/NeraSpreadSheet.Avalonia/NeraSpreadsheetControl.cs` | Control bảng thật, có editor dùng lại và lifecycle riêng | Nhúng trực tiếp vào cửa sổ quản lý dự án Avalonia |
+| `src/NeraSpreadSheet.Avalonia/NeraSpreadsheetControl.Editor.cs` | Begin/Commit/Cancel đi qua session chung; editor là TextBox, commit chuỗi; style áp dụng theo ô | Dùng luồng sửa ô thật; không suy rằng đã có sửa định dạng từng đoạn chữ |
+| `src/NeraSpreadSheet.Scrolling/` | Gom input, cuộn theo frame, giữ offset lẻ, giới hạn biên | Dùng qua SDK, không sao chép thành bộ cuộn thứ hai |
+| `src/NeraSpreadSheet.DataGrid.Core/` | Bốn file contract, chưa có UI bảng | Không dùng để dựng control thay thế SDK Avalonia |
+| `src/NeraSpreadSheet.Iconography/` | Catalog, tài nguyên icon và giấy phép icon bên thứ ba | Dùng tài nguyên SDK phù hợp, giữ thương hiệu H2 Notes |
+| `ARCHITECTURE.md` | Chỉ layout/render vùng nhìn thấy; không tạo control/editor cho mọi ô | Giữ kiến trúc/đường input của SDK khi tích hợp |
 
-Không lấy nguyên host bảng tính: WPF host hiện target
-`net10.0-windows10.0.19041.0`, có 16 project trong cây phụ thuộc tính cả host,
-và có backend/package đồ họa. H2 Notes đang là `net8.0-windows`.
-Không thể thêm trực tiếp reference đó vào app hiện tại mà bỏ qua khác biệt target.
+H2 Notes hiện target .NET 8 và dùng WPF; đây là chuyển nền tảng UI thật, không phải
+chỉ đổi tên file XAML hoặc thêm một reference. Giữ logic nghiệp vụ C# phù hợp,
+tách các chỗ phụ thuộc WPF rồi dựng shell/cửa sổ/menu theo Avalonia.
 
-Nera hiện ưu tiên Avalonia cho app mới; WPF vẫn được giữ cho consumer cũ.
-Điều đó không bắt buộc đổi nền tảng H2 Notes. Đề xuất giữ WPF/.NET 8 ở bước này,
-không đưa Ribbon, công thức, biểu đồ, in/PDF hoặc XLSX vào đường chạy của note.
-Số module không tự chứng minh app nặng: mức RAM, thời gian mở và độ trễ thực tế
-vẫn phải đo sau khi có bản tích hợp.
+Tính nhẹ đến từ phạm vi giao diện và cách cập nhật: chỉ hiện các lệnh cần cho note,
+không bắt buộc mở Ribbon đầy đủ, thanh công thức, biểu đồ, in/PDF hoặc nhập XLSX.
+Ẩn UI không đồng nghĩa loại được tất cả dependency; không tự cắt module SDK.
+Mức RAM, thời gian mở và độ trễ phải đo trên bản tích hợp, chưa có kết luận ở bước này.
 
 ## Giao diện đề xuất
 
-Một bảng trong cửa sổ quản lý hiện tại, không biến mỗi dự án thành một workbook.
-Note thường vẫn giữ nguyên. Trong giai đoạn thử nghiệm có chuyển đổi Thẻ / Bảng,
-cùng đọc một bộ dữ liệu, không nhân đôi dự án.
+Một bảng trong cửa sổ quản lý Avalonia, không biến mỗi dự án thành một workbook.
+Note thường được chuyển UI nhưng phải giữ hành vi. Giai đoạn đầu giữ bản WPF
+độc lập để đối chiếu, chưa hứa thêm chế độ Thẻ Avalonia vì không thể dùng lại trực
+tiếp template WPF. Thu gọn nhóm, checkbox và kéo cả nhóm là yêu cầu của H2 Notes;
+phải đối chiếu extension points SDK, không coi tất cả đã có sẵn.
 
 | STT | Dự án / Công việc | Xong | Tiến độ / Việc tiếp theo |
 | --- | --- | --- | --- |
@@ -59,12 +77,15 @@ cùng đọc một bộ dữ liệu, không nhân đôi dự án.
 - Không lặp toàn bộ Notes trong từng hàng: tránh hàng quá cao và soạn chậm.
 - Khi cửa sổ hẹp, ưu tiên tên + checkbox, thông tin tiến độ chuyển thành dòng phụ;
   không ép cửa sổ note phải rộng như Excel.
-- Tên, checklist và Notes tiếp tục giữ định dạng từng đoạn chữ cùng menu hiện có.
+- Tên, checklist và Notes phải giữ định dạng từng đoạn chữ và các chức năng menu
+  hiện có. Đây là điều kiện nghiệm thu cần triển khai/kiểm riêng, không phải tính
+  năng đã được chứng minh sẵn trong editor ô của SDK.
 
 ## Tác vụ và bảo toàn dữ liệu
 
 1. Click chọn hàng; double-click hoặc F2 sửa tên/công việc. Enter xác nhận,
-   Esc hủy draft, Shift+Enter xuống dòng khi sửa. Notes vẫn dùng Enter xuống dòng.
+   Esc hủy draft; ưu tiên Alt+Enter xuống dòng theo editor SDK hiện tại, không
+   ghi đè phím SDK khi chưa có lý do. Notes dùng Enter xuống dòng.
 2. Checkbox đổi trạng thái thật. Việc tiếp theo luôn là checklist chưa xong đầu tiên
    có nội dung, không có ô nhập Next độc lập.
 3. Chuột phải tại mũi tên dự án có “Ưu tiên thực hiện trước”: đưa cả nhóm lên đầu,
@@ -74,29 +95,47 @@ cùng đọc một bộ dữ liệu, không nhân đôi dự án.
    tính lại STT/Next sau khi thả, Esc không để lại thay đổi.
 5. Nếu đang tìm kiếm/lọc, tạm không cho kéo thứ tự để tránh vị trí bị hiểu nhầm;
    lệnh ưu tiên vẫn xác định dự án bằng ID, không bằng chỉ số hàng đang nhìn thấy.
-6. Trước khi đổi dự án đang soạn hoặc đổi chế độ Thẻ/Bảng, commit draft đang dùng.
+6. Trước khi đổi dự án đang soạn hoặc chuyển màn hình, commit draft đang dùng.
    Không dựng lại bảng trong khi bộ gõ tiếng Việt đang nhập tổ hợp ký tự.
-7. JSON, ID dự án, ID checklist, thứ tự collection và rich text XAML hiện có vẫn
-   là nguồn dữ liệu thật. Bảng chỉ là cách hiển thị; không chuyển dữ liệu thật sang XLSX.
+7. Giữ ID dự án, ID checklist, thứ tự và nội dung JSON. Bản thử dùng bản sao dữ
+   liệu ở vùng lưu riêng, không cho hai app đồng thời ghi file state đang dùng.
+   Rich text XAML WPF cần bộ chuyển đổi có phiên bản, sao lưu và kiểm tra round-trip;
+   không nạp bằng loader WPF trong app Avalonia hoặc biến tất cả thành text thuần.
 8. Văn bản thuần dùng để tìm kiếm/preview không bao giờ ghi đè dữ liệu có định dạng.
-   Undo và autosave tác động model H2 Notes, không tạo workbook thứ hai để đồng bộ.
-9. Nút chuyển về Thẻ là cách quay lại UI cũ. Chưa thay tray, opacity, startup,
-   vị trí cửa sổ, ghim trên cùng hoặc note thường trong phạm vi bảng này.
+   Session/workbook của SDK là biểu diễn bảng gắn với model qua ID, không phải
+   kho dữ liệu thứ hai độc lập. Chọn một đường commit/Undo thống nhất, có chặn
+   cập nhật vòng lặp và kiểm tra rollback; không duy trì hai lịch sử mâu thuẫn.
+9. Tray, opacity, startup, vị trí cửa sổ, ghim trên cùng, bám viền và note thường
+   đều cần được chuyển sang host Avalonia và kiểm tra lại trên Windows.
+
+## Điểm cần kiểm chứng trước khi chuyển toàn app
+
+`RichTextDocumentSerializer` hiện dùng `System.Windows.Documents.FlowDocument`
+và `TextRange` để lưu XAML. Trong nguồn SDK Avalonia đã đọc, editor ô là TextBox
+và commit `_editor.Text` theo chuỗi, style editor áp dụng cho cả ô. Chưa có bằng
+chứng đường này hỗ trợ menu định dạng từng phần chữ giống H2 Notes.
+
+Cần thử nghiệm editor rich text tương thích Avalonia cho Notes và phần text trong
+ô, xác minh khả năng tích hợp đúng với SDK. Không tự chọn thư viện mới, giả đầy đủ
+chức năng hoặc âm thầm hạ xuống định dạng cả ô. Nếu SDK thiếu extension point,
+ghi rõ thay đổi tối thiểu cần có và xin chốt trước khi sửa repository SDK.
+Nội dung cũ chưa chuyển được đầy đủ phải giữ bản gốc, báo giới hạn và không ghi đè.
 
 ## Phân lớp khi triển khai
 
 ```text
-NoteDocument / ProjectEntry / ChecklistItem hiện có
+H2 Notes shell/cửa sổ/menu: Avalonia / .NET 10
                   |
                   v
-ProjectSheetAdapter: ánh xạ ID thành hàng đang hiển thị, cache nội dung/tiến độ
+ProjectSheetAdapter: model dự án <-> ID hàng/ô + commit/Undo thống nhất
                   |
                   v
-ProjectSheetView: header + vùng hàng nhìn thấy + selection + preview kéo
+NeraSpreadSheet.Avalonia: control/session/editor/layout/render/cuộn của SDK
                   |
-                  +-- Rich editor dùng lại cho ô đang sửa
-                  +-- Khung rich Notes cho dự án đang chọn
-                  +-- Bộ cuộn: chọn lọc từ NeraSpreadSheet.Scrolling
+                  +-- Các lệnh dự án: ưu tiên, checklist, Next, thu gọn nhóm
+                  +-- Khung rich Notes Avalonia (cần kiểm chứng editor)
+
+Model lưu trữ H2 Notes -> bộ chuyển đổi rich text có phiên bản -> JSON riêng
 ```
 
 Không tính lại preview rich text hoặc serialize cả note mỗi lần gõ/cuộn.
@@ -104,21 +143,23 @@ Giữ debounce hiện tại 900 ms cho autosave khi ngừng gõ, đồng thời 
 editor/đóng app. Cache theo ID và phiên bản nội dung; chỉ vô hiệu phần đã đổi.
 Chỉ giữ frame loop khi thực sự có chuyển động hoặc cần vẽ lại.
 
-Nếu lấy source Nera vào app, dùng thư mục riêng cùng nguồn/SHA/ghi chú thay đổi;
-không reference vào đường dẫn `.artifacts` hoặc bản checkout riêng của người dùng.
-Module độc lập chỉ được chọn sau khi build và regression tests với target app.
+Dùng SDK Avalonia với version/SHA rõ ràng và phụ thuộc được khai báo chính thức;
+không reference vào `.artifacts` hoặc checkout riêng trên máy. Không sao chép
+renderer/editor thành một nhánh engine khác. Chọn PackageReference hoặc nguồn
+vendored có thể khôi phục sau khi xác minh cách phân phối SDK thực tế.
 
 ## Bằng chứng và cổng kiểm tra
 
 Đã chạy trên bản tham khảo: test project `NeraSpreadSheet.Scrolling.Tests`,
 Release, .NET 10: **3 passed, 0 failed, 0 skipped**. Các case kiểm offset lẻ,
 cuộn tiến dần tới đích và giới hạn biên. Chưa phải đo hiệu năng hoặc nghiệm thu
-tích hợp H2 Notes/.NET 8. Chưa build lại H2 Notes vì không sửa source app.
+tích hợp H2 Notes/Avalonia. Chưa build lại H2 Notes vì không sửa source app.
 
 Trước khi thay UI mặc định cần kiểm:
 
 - Đọc/lưu lại bản sao dữ liệu thử: ID, thứ tự, rich text, checkbox giữ nguyên.
-- Đổi Thẻ/Bảng, đóng/mở app, đổi hàng đang sửa không mất draft hoặc định dạng.
+- Nhập bản sao dữ liệu WPF, đóng/mở app Avalonia, đổi hàng đang sửa không mất
+  draft hoặc định dạng; quay lại bản WPF không bị dữ liệu thử ghi đè.
 - Gõ tiếng Việt nhanh, mở menu định dạng, đổi font/màu không mất selection.
 - Ưu tiên/kéo dự án giữ cả nhóm; kéo checklist không kích hoạt kéo dự án.
 - Kéo preview không thay Next; drop mới thay, cancel không thay.
@@ -127,6 +168,7 @@ Trước khi thay UI mặc định cần kiểm:
   độ trễ gõ và bộ nhớ ở 100 dự án/1.000 việc và 1.000 dự án/10.000 việc.
 - Đối chiếu note thường, tray single/double/right click, opacity và startup.
 
-Bước kế tiếp: sau khi chủ app chốt cho viết code, làm lát cắt bảng có chọn dự án,
-thu gọn, tick checklist, sửa rich text và khung Notes trước; đo/kiểm rồi mới mở
-rộng kéo thả và thay UI mặc định. Không tuyên bố bảng hoàn thiện chỉ vì build đạt.
+Bước kế tiếp sau khi chủ app chốt cho viết code: tạo host Avalonia/.NET 10 riêng,
+nhúng control SDK thật với dữ liệu tổng hợp và xác minh rich text/editor trước.
+Sau đó nối bản sao dữ liệu dự án, checklist, Notes; chuyển tray/cửa sổ và đo/kiểm
+rồi mới thay bản dùng hằng ngày. Không tuyên bố app hoàn thiện chỉ vì build đạt.

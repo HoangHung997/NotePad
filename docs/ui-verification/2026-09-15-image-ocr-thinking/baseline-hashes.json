@@ -1,0 +1,52 @@
+[
+  {
+    "State": "UI-01",
+    "File": "01-hep-cong-viec-va-ghi-chu.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-02",
+    "File": "02-hep-doi-du-an.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-03",
+    "File": "03-hep-soan-ghi-chu.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-04",
+    "File": "04-hep-mo-ai.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-05",
+    "File": "05-vua-danh-sach-chi-tiet.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-06",
+    "File": "06-vua-ai-noi.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-07",
+    "File": "07-toan-man-hinh-ai-ben-phai.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-08",
+    "File": "08-keo-ghim-ai-xuong-duoi.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-09",
+    "File": "09-note-thuong-nho-gon.png",
+    "HashMatches": true
+  },
+  {
+    "State": "UI-10",
+    "File": "10-kich-thuoc-toi-thieu.png",
+    "HashMatches": true
+  }
+]

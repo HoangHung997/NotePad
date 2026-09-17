@@ -1,0 +1,9 @@
+  H2Notes.Core -> D:\VSstudio\Nodepad\src\H2Notes.Core\bin\Release\net10.0\H2Notes.Core.dll
+  H2Notes.Avalonia -> D:\VSstudio\Nodepad\src\H2Notes.Avalonia\bin\Release\net10.0\H2Notes.Avalonia.dll
+  H2Notes.Tests -> D:\VSstudio\Nodepad\tests\H2Notes.Tests\bin\Release\net10.0\H2Notes.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.81

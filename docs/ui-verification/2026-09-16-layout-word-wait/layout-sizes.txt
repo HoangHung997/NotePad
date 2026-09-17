@@ -1,0 +1,20 @@
+thinking-docked-1440x860: 1440, 860; native scaling 1,25
+thinking-compact-560x820: 560, 820; native scaling 1,25
+commands-compact-560x820: 560, 820; native scaling 1,25
+lan-settings-620x840: 620, 840; native scaling 1,25
+pdf-image-settings-mineru-620x840: 620, 840; native scaling 1,25
+composer-wide-900x620: 900, 620; native scaling 1,25
+composer-minimum-340x420: 340, 420; native scaling 1,25
+wait-setting-620x840.png: actual 620, 840, nativeScale=1,25
+layout-review-1080x760.png: actual 1080, 760, nativeScale=1,25
+layout-review-680x600.png: actual 680, 600, nativeScale=1,25
+thinking-docked-1440x860: 1440, 860; native scaling 1,25
+thinking-compact-560x820: 560, 820; native scaling 1,25
+commands-compact-560x820: 560, 820; native scaling 1,25
+lan-settings-620x840: 620, 840; native scaling 1,25
+pdf-image-settings-mineru-620x840: 620, 840; native scaling 1,25
+composer-wide-900x620: 900, 620; native scaling 1,25
+composer-minimum-340x420: 340, 420; native scaling 1,25
+wait-setting-620x840.png: actual 620, 840, nativeScale=1,25
+layout-review-1080x760.png: actual 1080, 760, nativeScale=1,25
+layout-review-680x600.png: actual 680, 600, nativeScale=1,25

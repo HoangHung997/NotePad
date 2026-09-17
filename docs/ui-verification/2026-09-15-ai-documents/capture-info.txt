@@ -1,0 +1,2 @@
+Actual Release controls; 96 DPI RenderTargetBitmap, NOT native screenshots. Isolated demo-only fixture, no AI calls.
+Native scaling: 1,25

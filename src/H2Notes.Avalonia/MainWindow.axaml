@@ -1,0 +1,111 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:H2Notes.Avalonia.Controls" x:Class="H2Notes.Avalonia.MainWindow"
+        Title="H2 Notes" Width="1040" Height="760" MinWidth="560" MinHeight="600"
+        ShowInTaskbar="False" CanMinimize="False" CanMaximize="False"
+        WindowDecorations="None" WindowStartupLocation="Manual">
+  <Border BorderBrush="#CCC6BE" BorderThickness="1" CornerRadius="5" ClipToBounds="True" Background="#FCFAF7">
+    <Grid RowDefinitions="44,*,26">
+      <Border x:Name="TitleBar" BorderBrush="#DFDAD3" BorderThickness="0,0,0,1" Background="#FAF7F2">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,3,5,3">
+          <Border Background="#A4573D" CornerRadius="3" Width="28" Height="28" Margin="0,0,10,0"><TextBlock Text="H2" Foreground="White" FontWeight="Bold" FontSize="17" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
+          <TextBlock Grid.Column="1" Text="H2 Notes" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <Image x:Name="BrandImage" IsVisible="False"/>
+          <Button Grid.Column="2" x:Name="PinButton" Classes="quiet" ToolTip.Tip="Ghim trên cùng" AutomationProperties.Name="Ghim trên cùng"><local:AppIcon x:Name="PinIcon" Kind="Pin"/></Button>
+          <Button Grid.Column="3" x:Name="MenuButton" Classes="quiet" ToolTip.Tip="Bố cục, ghi chú và cài đặt" AutomationProperties.Name="Menu ứng dụng"><local:AppIcon Kind="More"/></Button>
+          <Button Grid.Column="4" x:Name="CloseButton" Classes="quiet" ToolTip.Tip="Ẩn cửa sổ" AutomationProperties.Name="Ẩn cửa sổ"><local:AppIcon Kind="Close"/></Button>
+        </Grid>
+      </Border>
+      <Grid x:Name="RootBody" Grid.Row="1" ColumnDefinitions="56,250,*">
+        <Border Grid.Column="0" BorderBrush="#E1DDD7" BorderThickness="0,0,1,0" Background="#FAF7F2">
+          <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,18,0,14">
+            <Button x:Name="ProjectsNavButton" Classes="nav active" AutomationProperties.Name="Dự án"><StackPanel Spacing="7"><local:AppIcon Kind="Folder" Width="23" Height="23"/><TextBlock Text="Dự án" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Button>
+            <Button x:Name="NotesNavButton" Grid.Row="1" Classes="nav" AutomationProperties.Name="Ghi chú"><StackPanel Spacing="7"><local:AppIcon Kind="Document" Width="23" Height="23"/><TextBlock Text="Ghi chú" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Button>
+            <Button x:Name="AiNavButton" Grid.Row="2" Classes="nav" AutomationProperties.Name="Hỏi AI"><StackPanel Spacing="7"><local:AppIcon Kind="Sparkle" Width="24" Height="24"/><TextBlock Text="AI" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Button>
+            <Button x:Name="SettingsNavButton" Grid.Row="4" Classes="nav" AutomationProperties.Name="Cài đặt"><StackPanel Spacing="7"><local:AppIcon Kind="Settings" Width="24" Height="24"/><TextBlock Text="Cài đặt" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Button>
+          </Grid>
+        </Border>
+        <Grid x:Name="WorkAndAi" Grid.Column="2" ColumnDefinitions="*,5,0" RowDefinitions="*,5,0">
+          <Grid x:Name="WorkContent" RowDefinitions="Auto,Auto,*" Margin="16,12,16,0">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
+              <Button x:Name="CompactProjectPicker" Grid.ColumnSpan="2" Classes="outline" HorizontalAlignment="Left" Margin="0,0,0,10" IsVisible="False"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock x:Name="CompactPickerLabel" Text="Dự án"/><local:AppIcon Kind="ChevronDown" Width="14" Height="14"/></StackPanel></Button>
+              <StackPanel Grid.Row="1">
+                <Button x:Name="ProjectPickerButton" Classes="quiet" HorizontalAlignment="Left" Padding="0,3" ToolTip.Tip="Đổi dự án · Ctrl+K">
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="ProjectTitle" Text="Chọn dự án" FontFamily="Georgia" FontSize="22" FontWeight="Bold" TextWrapping="Wrap"/><local:AppIcon Grid.Column="1" Kind="ChevronDown" Width="15" Height="15" Margin="8,0,0,0"/></Grid>
+                </Button>
+                <local:RichEditor x:Name="ProjectTitleEditor" IsVisible="False" MinHeight="48"/>
+                <TextBlock x:Name="ProjectProgress" FontSize="12" Foreground="#88614C" Margin="0,5,0,0"/>
+              </StackPanel>
+              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                <Button x:Name="PriorityButton" Classes="quiet" Padding="5,4" Foreground="#A4573D" ToolTip.Tip="Ưu tiên thực hiện trước" AutomationProperties.Name="Ưu tiên thực hiện trước"><local:AppIcon Kind="Star"/></Button>
+                <Button x:Name="ProjectMenuButton" Classes="quiet" ToolTip.Tip="Tác vụ dự án" AutomationProperties.Name="Tác vụ dự án"><local:AppIcon Kind="More"/></Button>
+                <Button x:Name="AskAiButton" Classes="outline"><StackPanel Orientation="Horizontal" Spacing="7"><local:AppIcon Kind="SparkleFilled"/><TextBlock Text="Hỏi AI" VerticalAlignment="Center"/></StackPanel></Button>
+              </StackPanel>
+            </Grid>
+            <StackPanel x:Name="CompactTabs" Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="False">
+              <Button x:Name="TasksTabButton" Content="Công việc" Classes="quiet"/>
+              <Button x:Name="NotesTabButton" Content="Ghi chú" Classes="quiet"/>
+            </StackPanel>
+            <Grid x:Name="EditorSplit" Grid.Row="2" RowDefinitions="*,8,*">
+              <Border x:Name="TasksPane" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
+                <Grid RowDefinitions="40,*,Auto">
+                  <Grid ColumnDefinitions="*,Auto,Auto" Background="#FAF7F2">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0" VerticalAlignment="Center"><local:AppIcon Kind="Grip" Width="16" Height="16"/><TextBlock x:Name="TasksTitle" Text="Công việc" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
+                    <Button x:Name="AddTaskButton" Grid.Column="1" Classes="quiet" ToolTip.Tip="Thêm công việc" AutomationProperties.Name="Thêm công việc"><local:AppIcon Kind="Plus"/></Button>
+                    <Button x:Name="CollapseTasksButton" Grid.Column="2" Classes="quiet" ToolTip.Tip="Bung / gập công việc" AutomationProperties.Name="Bung / gập công việc"><local:AppIcon x:Name="TasksCollapseIcon" Kind="ChevronDown" Width="17" Height="17"/></Button>
+                  </Grid>
+                  <local:ProjectGrid x:Name="Sheet" Grid.Row="1"/>
+                  <Border Grid.Row="2" Background="#F8EAE2" Padding="10,8" Margin="8" CornerRadius="3"><Grid ColumnDefinitions="Auto,*"><local:AppIcon Kind="Clipboard" Foreground="#A4573D" Margin="0,0,10,0"/><TextBlock Grid.Column="1" x:Name="NextLabel" Foreground="#A4573D" TextWrapping="Wrap" FontSize="13"/></Grid></Border>
+                </Grid>
+              </Border>
+              <local:ResizeSplitter x:Name="NotesSplitter" Grid.Row="1" ResizeDirection="Rows" ToolTip.Tip="Kéo lên / xuống để chia diện tích Công việc và Ghi chú" AutomationProperties.Name="Chia diện tích Công việc và Ghi chú"/>
+              <Border x:Name="NotesPane" Grid.Row="2" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
+                <Grid RowDefinitions="38,Auto,*">
+                  <Grid Background="#FAF7F2" ColumnDefinitions="*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0" VerticalAlignment="Center"><local:AppIcon Kind="Grip" Width="16" Height="16"/><TextBlock x:Name="NotesTitle" Text="Ghi chú" FontFamily="Georgia" FontSize="17" FontWeight="Bold" VerticalAlignment="Center"/></StackPanel>
+                    <Button x:Name="CollapseNotesButton" Grid.Column="1" Classes="quiet" ToolTip.Tip="Bung / gập ghi chú" AutomationProperties.Name="Bung / gập ghi chú"><local:AppIcon x:Name="NotesCollapseIcon" Kind="ChevronDown" Width="17" Height="17"/></Button>
+                  </Grid>
+                  <ContentControl x:Name="NotesToolbar" Grid.Row="1"/>
+                  <Border x:Name="NotesEditorBorder" Grid.Row="2" Background="#FFFDFC" Margin="6"><local:RichEditor x:Name="NotesEditor"/></Border>
+                </Grid>
+              </Border>
+            </Grid>
+          </Grid>
+          <local:ResizeSplitter x:Name="AiVerticalSplitter" Grid.Column="1" ResizeDirection="Columns" IsVisible="False" ToolTip.Tip="Kéo trái / phải để đổi chiều rộng AI"/>
+          <local:ResizeSplitter x:Name="AiHorizontalSplitter" Grid.Row="1" Grid.ColumnSpan="3" ResizeDirection="Rows" IsVisible="False" ToolTip.Tip="Kéo lên / xuống để đổi chiều cao AI"/>
+          <Border x:Name="AiHostBorder" Grid.Column="2" BorderBrush="#D6CEC4" BorderThickness="1" CornerRadius="4" Background="#FCFAF7" IsVisible="False"><Grid><ContentControl x:Name="AiHost"/><Border x:Name="AiResizeGrip" Width="22" Height="22" Background="Transparent" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" ToolTip.Tip="Kéo góc để đổi kích thước AI"><local:AppIcon Kind="ResizeCorner" Width="15" Height="15" Foreground="#AC9789"/></Border></Grid></Border>
+          <Border x:Name="DockPreview" Grid.RowSpan="3" Grid.ColumnSpan="3" Background="#DDF6E6DD" BorderBrush="#A4573D" BorderThickness="2" IsHitTestVisible="False" IsVisible="False" VerticalAlignment="Bottom" Height="220" Margin="12" CornerRadius="5">
+            <TextBlock x:Name="DockPreviewText" Text="Thả để ghim AI ở phía dưới" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#A4573D" FontWeight="SemiBold"/>
+          </Border>
+        </Grid>
+        <Border x:Name="DrawerShade" Grid.Column="1" Grid.ColumnSpan="2" Background="#44000000" IsVisible="False"/>
+        <Border x:Name="Sidebar" Grid.Column="1" BorderBrush="#DFDAD3" BorderThickness="0,0,1,0" Background="#FCFAF7">
+          <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="14,12">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <StackPanel VerticalAlignment="Center"><TextBlock Text="Dự án" FontFamily="Georgia" FontSize="24" FontWeight="Bold"/><TextBlock x:Name="BoardTitle" FontSize="11" Opacity=".65" TextTrimming="CharacterEllipsis"/></StackPanel>
+              <Button x:Name="AddProjectButton" Grid.Column="1" Classes="accent" Padding="8,4" ToolTip.Tip="Thêm dự án" AutomationProperties.Name="Thêm dự án"><local:AppIcon Kind="Plus"/></Button>
+              <Button x:Name="CloseDrawerButton" Grid.Column="2" Classes="quiet" IsVisible="False" ToolTip.Tip="Đóng danh sách dự án" AutomationProperties.Name="Đóng danh sách dự án"><local:AppIcon Kind="Close"/></Button>
+            </Grid>
+            <Grid Grid.Row="1" Margin="0,12,0,12"><TextBox x:Name="SearchBox" PlaceholderText="Tìm dự án hoặc công việc…" Padding="32,7,7,7" FontSize="12"/><local:AppIcon Kind="Search" Width="16" Height="16" HorizontalAlignment="Left" Margin="10,0" Foreground="#796C62"/></Grid>
+            <ListBox x:Name="ProjectList" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
+              <ListBox.ItemTemplate><DataTemplate x:CompileBindings="False">
+                <Grid ColumnDefinitions="32,*" Margin="0,12">
+                  <Border BorderBrush="#DFD7CE" BorderThickness="1" CornerRadius="4" Height="30" VerticalAlignment="Top"><TextBlock Text="{Binding Number}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15"/></Border>
+                  <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="5">
+                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold" FontSize="13"/>
+                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="11" Foreground="#796C62"/>
+                    <ProgressBar Value="{Binding Percent}" Maximum="100" Height="4" Foreground="#A4573D" Background="#E6E1DA"/>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock x:Name="ProjectDragHint" Grid.Row="3" Text="Kéo để sắp xếp · Ctrl+K đổi dự án" FontSize="10" Foreground="#8A7A6E" TextWrapping="Wrap" Margin="0,8,0,0"/>
+          </Grid>
+        </Border>
+      </Grid>
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="12,0">
+        <TextBlock x:Name="StatusLabel" FontSize="11" Foreground="#837568" VerticalAlignment="Center"/>
+        <TextBlock x:Name="SaveLabel" Grid.Column="1" Text="Tự lưu" FontSize="11" Foreground="#837568" VerticalAlignment="Center"/>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

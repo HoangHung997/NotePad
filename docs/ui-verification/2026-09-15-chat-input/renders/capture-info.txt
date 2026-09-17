@@ -1,0 +1,2 @@
+Actual Release controls with isolated synthetic fixtures, no model requests or live data changes. 96 DPI RenderTargetBitmap, NOT native screenshots.
+Native render scaling: 1,25

@@ -1,0 +1,8 @@
+Canonical destination contains other data; refusing to overwrite.
+At D:\VSstudio\Nodepad\tools\ocr\prepare-canonical.ps1:49 char:5
++     throw 'Canonical destination contains other data; refusing to ove ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Canonical desti...g to overwrite.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Canonical destination contains other data; refusing to overwrite.
+ 
+

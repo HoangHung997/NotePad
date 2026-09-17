@@ -1,0 +1,2 @@
+Demo-only synthetic HTTP failures and random credential-free profiles. No network calls from captures.
+Actual Release controls; 96 DPI RenderTargetBitmap, not a native screenshot. Native render scaling: 1,25

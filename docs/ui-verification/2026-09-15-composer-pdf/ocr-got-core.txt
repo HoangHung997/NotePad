@@ -1,0 +1,3 @@
+GotOcr đã được bộ cài đánh dấu sẵn sàng offline; sẽ kiểm tra model lại khi chuyển PDF.
+Đang chuyển PDF sang Markdown trên máy bằng GotOcr; không tải model.
+PASS GotOcr: chars=130; originalPDFNotSent=true; provenance=true; seconds=40,6

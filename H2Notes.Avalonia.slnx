@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/H2Notes.Core/H2Notes.Core.csproj" />
+  <Project Path="src/H2Notes.Avalonia/H2Notes.Avalonia.csproj" />
+  <Project Path="tests/H2Notes.Tests/H2Notes.Tests.csproj" />
+</Solution>

@@ -1,0 +1,19 @@
+PASS Skill discovery is metadata-only and path escape is denied
+PASS AppContainer loads Office libraries; original files, network and child processes are denied
+PASS General Python composes range fonts, conditional fills and formulas; originals stay unchanged
+PASS A different request on the same workbook needs only new Python, not new host tools
+PASS Arbitrary Word tables and mixed run formatting survive readback
+FAIL PDF generation and real page rendering work in the sandbox System.IO.IOException: {"runId":"940ea3f59f7a47969517de11b0b86a14","exitCode":1,"stdout":"(No log file; process may have stopped before Python initialized.)","stderr":"(No log file; process may have stopped before Python initialized.)","artifacts":[],"originalFilesChanged":false,"execution":"Windows AppContainer; no network capability; staged copies only","next":"Inspect results. On error revise code using previous_run if useful. Publish only verified outputs via publish_artifact."}
+   at H2AgentLab.SkillTests.<Run>g__Check|0_1(Boolean ok, String message) in D:\VSstudio\Nodepad\experiments\H2AgentLab\SkillTests.cs:line 13
+   at H2AgentLab.SkillTests.<>c__DisplayClass0_0.<<Run>b__10>d.MoveNext() in D:\VSstudio\Nodepad\experiments\H2AgentLab\SkillTests.cs:line 146
+--- End of stack trace from previous location ---
+   at H2AgentLab.SkillTests.<>c__DisplayClass0_0.<<Run>g__Test|0>d.MoveNext() in D:\VSstudio\Nodepad\experiments\H2AgentLab\SkillTests.cs:line 12
+PASS Failed code returns traceback, a following run repairs it, and previous output cannot escape
+PASS Publication denial and stale destination hash prevent overwrites; allowed publication has backup
+PASS Read-only blocks publishing and removed narrow/unsandboxed tools are not callable
+PASS Cancelled Python cannot write a delayed output after returning
+PASS Script refusal persists for the turn without repeatedly asking
+PASS Recorded runs survive restart; tampered artifacts cannot be published
+PASS Ollama native loop loads skill, executes, inspects, supplies real image bytes and publishes
+PASS Compatible API native loop loads skill, executes, inspects, supplies real image bytes and publishes
+RESULT: 13 passed, 1 failed.

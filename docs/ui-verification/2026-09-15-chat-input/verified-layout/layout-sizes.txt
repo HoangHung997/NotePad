@@ -1,0 +1,4 @@
+thinking-docked-1440x860: requested layout 1440x860, native bounds before offscreen layout 560, 820; native scaling 1,25
+thinking-compact-560x820: requested layout 560x820, native bounds before offscreen layout 560, 820; native scaling 1,25
+commands-compact-560x820: requested layout 560x820, native bounds before offscreen layout 560, 820; native scaling 1,25
+lan-settings-620x840: requested layout 620x840, native bounds before offscreen layout 620, 840; native scaling 1,25

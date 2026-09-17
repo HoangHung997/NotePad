@@ -1,0 +1,9 @@
+PASS list_skills query is optional in schema and omitted query lists all five skills
+PASS Empty and whitespace queries enumerate skills; wrong types remain errors
+PASS Unmatched topic returns actual available skills, not a misleading empty installation
+PASS Unknown tool is rejected with actual tool names; no alias runs
+PASS Unknown skill gives real names and absent bundles report unavailable
+PASS Required mutation arguments remain required
+PASS Portable runtime chosen without any local installation; corrupt bundle never falls back
+PASS Development build retains explicit per-user runtime compatibility
+RESULT: 8 passed, 0 failed. Packaging/arguments only; not an AI quality test.

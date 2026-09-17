@@ -1,0 +1,15 @@
+# Lab execution environment
+
+Use `run_python(code, inputs, previous_run)` to author arbitrary task-specific Python, not a list of preset document actions.
+
+- `inputs` is a newline-separated list of relative paths from the user-selected workspace. They are copied to `input/<same relative path>`. Max 20 files / 48 MB total. No original file is modified by a script.
+- Use `previous_run` (a prior returned runId, or empty string) to copy that run's recorded outputs to `input/previous/`. A run starts a fresh Python process; persist useful data as output files rather than relying on variables surviving.
+- Current directory is the isolated work folder. Save intended artifacts in `output/`, temporary files in `tmp/`. `print` and exceptions return via stdout/stderr. Code is preserved in the run journal folder.
+- CPython 3.12: standard library, openpyxl, python-docx (`docx`), lxml, pypdf, pypdfium2, reportlab and Pillow (`PIL`). Use documented APIs or inspect modules. Do not invent methods. No pip installs, shell, child processes or network in the sandbox. No Codex artifact SDK, tool namespace, Google connector or model call inside Python.
+- Windows AppContainer: private runtime read-only, staged work folder read/write, no network capabilities, one process, 768 MB memory, 120 seconds per script. A host monitor limits ordinary output growth; it is not a filesystem quota or an exhaustive security audit.
+- Only script execution is isolated this way. Other app tools have their own approval rules. Never claim all of Lab or every external app is sandboxed.
+- A failure returns a traceback; diagnose and change the code, then run again. Do not repeat identical failing actions indefinitely. An incomplete model response never executes proposed code.
+- `inspect_artifact(run_id,path)` returns a bounded text/extracted preview and a hash. Use Python to inspect formatting/formulas/structure, not only extracted text. `view_artifact` sends a PNG/JPEG output to the selected model as an actual image; vision support remains model-dependent.
+- `publish_artifact` is separate: run_id, artifact path, destination relative path, and expected_hash (empty only for a new destination). For replacements obtain the current hash from `read_file` first. The host checks it again, asks the user and backs up the old file. Output files over 8 MB and unsupported extensions are not published.
+- Code exit 0 is evidence of execution, not proof the requested changes are correct. Use independent assertions, readback and visual inspection where available. Preserve files outside the requested scope and state anything not verified.
+- Skills are guidance, not permissions. They cannot disable safety controls. Use `read_skill` for needed references; do not expect an instruction pack alone to supply missing runtimes or APIs.

@@ -1,0 +1,65 @@
+﻿{
+    "packageIdentityResult":  15700,
+    "children":  [
+                     {
+                         "Name":  "python",
+                         "Length":  null,
+                         "LastWriteTime":  "\/Date(1789466635065)\/"
+                     },
+                     {
+                         "Name":  "smoke",
+                         "Length":  null,
+                         "LastWriteTime":  "\/Date(1789466334693)\/"
+                     },
+                     {
+                         "Name":  "tmp",
+                         "Length":  null,
+                         "LastWriteTime":  "\/Date(1789466682292)\/"
+                     },
+                     {
+                         "Name":  "venv",
+                         "Length":  null,
+                         "LastWriteTime":  "\/Date(1789465796425)\/"
+                     },
+                     {
+                         "Name":  "canonical-probe.json",
+                         "Length":  168,
+                         "LastWriteTime":  "\/Date(1789466801843)\/"
+                     },
+                     {
+                         "Name":  "install-cpu.log",
+                         "Length":  3754,
+                         "LastWriteTime":  "\/Date(1789466342219)\/"
+                     },
+                     {
+                         "Name":  "install-deps.log",
+                         "Length":  28080,
+                         "LastWriteTime":  "\/Date(1789466593607)\/"
+                     },
+                     {
+                         "Name":  "pip-check.log",
+                         "Length":  31,
+                         "LastWriteTime":  "\/Date(1789466596417)\/"
+                     },
+                     {
+                         "Name":  "pip-report.json",
+                         "Length":  1131193,
+                         "LastWriteTime":  "\/Date(1789466394267)\/"
+                     },
+                     {
+                         "Name":  "requirements.lock.txt",
+                         "Length":  1525,
+                         "LastWriteTime":  "\/Date(1789466600781)\/"
+                     },
+                     {
+                         "Name":  "runtime.json",
+                         "Length":  1268,
+                         "LastWriteTime":  "\/Date(1789466645746)\/"
+                     }
+                 ],
+    "processId":  6952,
+    "canonical":  "C:\\Users\\hoang\\AppData\\Local\\H2Notes\\ocr-runtime",
+    "probeExists":  true,
+    "packagedFinal":  "\\\\?\\C:\\Users\\hoang\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\H2Notes\\ocr-runtime\\runtime.json",
+    "canonicalFinal":  "\\\\?\\C:\\Users\\hoang\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\H2Notes\\ocr-runtime\\runtime.json"
+}

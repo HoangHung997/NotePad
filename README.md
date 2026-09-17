@@ -1,5 +1,37 @@
 # Nodepad
 
+## Approved H2 Notes direction (2026-09-15)
+
+The ten responsive hybrid mockups are now the approved UI baseline. Future UI
+work must compare actual app screenshots against them at each implementation
+stage. This approval also records per-project files, configurable data folders,
+and Ollama/multi-provider AI settings. A first functional implementation is now
+available, with 77 passing tests. It is not fully accepted against the baseline;
+see [implementation status and remaining gaps](D:/VSstudio/Nodepad/docs/RESPONSIVE_IMPLEMENTATION.md).
+
+See [approved product requirements](D:/VSstudio/Nodepad/docs/APPROVED_PRODUCT_SPEC.md),
+[acceptance checklist](D:/VSstudio/Nodepad/docs/UI_ACCEPTANCE.md), and
+[approved image gallery](D:/VSstudio/Nodepad/docs/ui-concepts/2026-09-15-responsive-hybrid/README.md).
+The sections below describe the earlier implemented prototypes.
+
+## H2 Notes Project Sheet (Avalonia branch)
+
+The new lightweight project-table app lives in `H2Notes.Avalonia.slnx`.
+It uses selected NeraSpreadSheet scrolling/grid source, not the full spreadsheet
+engine. The original WPF solution and user data remain unchanged.
+
+```powershell
+dotnet build .\H2Notes.Avalonia.slnx -c Release
+dotnet run --project .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release
+dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release
+```
+
+New data is isolated at `%LOCALAPPDATA%\H2Notes\project-sheet-v1.json`, with an
+initial backup of the legacy data. Add `-- --demo` to run a separate sample board.
+See [implementation and known limits](docs/PROJECT_SHEET_IMPLEMENTATION.md).
+
+## Original WPF App
+
 Nodepad is now a C# WPF desktop sticky-notes app built around a Simple Sticky Notes style workflow:
 
 - tray-first behavior

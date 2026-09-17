@@ -1,0 +1,3 @@
+MinerU đã được bộ cài đánh dấu sẵn sàng offline; sẽ kiểm tra model lại khi chuyển PDF.
+Đang chuyển PDF sang Markdown trên máy bằng MinerU; không tải model.
+PASS MinerU: chars=300; originalPDFNotSent=true; provenance=true; seconds=21,3

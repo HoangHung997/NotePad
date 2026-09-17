@@ -1,0 +1,7 @@
+thinking-docked-1440x860: 1440, 860; native scaling 1,25
+thinking-compact-560x820: 560, 820; native scaling 1,25
+commands-compact-560x820: 560, 820; native scaling 1,25
+lan-settings-620x840: 620, 840; native scaling 1,25
+pdf-settings-docling-620x840: 620, 840; native scaling 1,25
+composer-wide-900x620: 900, 620; native scaling 1,25
+composer-minimum-340x420: 340, 420; native scaling 1,25

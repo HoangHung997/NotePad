@@ -1,0 +1,3 @@
+Release Avalonia controls with isolated, explicitly fabricated chat fixture. No live AI requests.
+96 DPI RenderTargetBitmap output; not native input/DPI/desktop certification.
+Native render scaling: 1,25

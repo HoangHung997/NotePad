@@ -1,0 +1,2 @@
+Layout OCR text editing updates model. Cancel/close does not save. Wait toggle is present. Synthetic data only, no AI/OCR calls. RenderTargetBitmap evidence only.
+Layout OCR text editing updates model. Cancel/close does not save. Wait toggle is present. Synthetic data only, no AI/OCR calls. RenderTargetBitmap evidence only.

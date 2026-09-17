@@ -1,0 +1,15 @@
+PASS Skill discovery is metadata-only and path escape is denied
+PASS AppContainer loads Office libraries; original files, network and child processes are denied
+PASS General Python composes range fonts, conditional fills and formulas; originals stay unchanged
+PASS A different request on the same workbook needs only new Python, not new host tools
+PASS Arbitrary Word tables and mixed run formatting survive readback
+PASS PDF generation and real page rendering work in the sandbox
+PASS Failed code returns traceback, a following run repairs it, and previous output cannot escape
+PASS Publication denial and stale destination hash prevent overwrites; allowed publication has backup
+PASS Read-only blocks publishing and removed narrow/unsandboxed tools are not callable
+PASS Cancelled Python cannot write a delayed output after returning
+PASS Script refusal persists for the turn without repeatedly asking
+PASS Recorded runs survive restart; tampered artifacts cannot be published
+PASS Ollama native loop loads skill, executes, inspects, supplies real image bytes and publishes
+PASS Compatible API native loop loads skill, executes, inspects, supplies real image bytes and publishes
+RESULT: 14 passed, 0 failed.

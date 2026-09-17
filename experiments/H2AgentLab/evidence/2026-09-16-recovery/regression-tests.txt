@@ -1,0 +1,17 @@
+PASS Traversal, absolute paths, ADS, secrets and root writes rejected
+PASS Read-only prevents writes without asking
+PASS Sensitive windows and the app approval UI cannot become computer targets
+PASS Create then read returns exact text and hash
+PASS Stale hash cannot overwrite, fresh hash backs up
+PASS Denied write and cancelled approval never write
+PASS Existing Word structure and indexed paragraphs can be inspected without edits
+PASS No blind Word overwrite or arbitrary shell tool
+PASS Binary PDF cannot silently become a filename-only text result
+PASS Persistent history retains prior session and isolates new context
+PASS Ollama tool loop really reads file before final answer
+PASS Compatible API assembles fragmented tool arguments and returns call id
+PASS Partial stream does not execute proposed tools
+PASS Cancellation interrupts request without retry
+PASS Literal search yields evidence without running code
+PASS Removed unsandboxed build tool cannot execute even in writable mode
+RESULT: 16 passed, 0 failed. Native computer UI and visual Word rendering NOT certified by these tests.

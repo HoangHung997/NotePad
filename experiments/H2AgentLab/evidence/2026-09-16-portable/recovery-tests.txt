@@ -1,0 +1,15 @@
+PASS Missing file returns observed spelling candidates, not invented file contents
+PASS Ambiguous matching names remain separate; discovery never selects or modifies one
+PASS Discovery reports truncated scans and does not cross protected scope
+PASS Ollama premature missing-file conclusion is corrected through discovery and actual read
+PASS API premature missing-file conclusion is corrected through discovery and actual read
+PASS Wrong skill name recovers through actual catalog, not another invented tool
+PASS Wrong resource path is corrected by reading actual SKILL.md
+PASS Assertion failure is diagnosed, revised and read back through a real sandbox run
+PASS Identical failing calls stop executing and an unverified success draft is not delivered
+PASS Invalid Word output is a failed validation; corrected structure must be checked again
+PASS Denied mutation is sticky across retries and alternate publication tool
+PASS Stale hash requires actual reread before a newly approved write
+PASS Malformed completed tool JSON is corrected without executing the malformed batch
+PASS Uncertain side effects require observation before repeat; a plan is not observation
+RESULT: 14 passed, 0 failed. Model steps simulated; file/Python operations real.

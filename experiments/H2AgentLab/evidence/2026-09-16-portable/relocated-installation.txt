@@ -1,0 +1,7 @@
+Installation verification, synthetic fixtures only; no AI calls.
+App: D:\VSstudio\Nodepad\experiments\H2AgentLab\.artifacts\portable relocation r1\H2-Agent-Lab-Portable-20260916-r1\
+Python: D:\VSstudio\Nodepad\experiments\H2AgentLab\.artifacts\portable relocation r1\H2-Agent-Lab-Portable-20260916-r1\python
+Portable Python selected: True
+PASS 5 bundled skills and runtime guidance readable
+{"runId":"552d152782ee4eee8f44bd79d8b48c52","exitCode":0,"stdout":"WORD_EXCEL_PDF_RENDER_READBACK_PASS\r\n","stderr":"","artifacts":[{"Path":"check.docx","Bytes":36597,"Sha256":"6091B86F9C3FDD0ECFC25239A256B92BBC719EC3BA32866FD374E6F35C330E0B"},{"Path":"check.pdf","Bytes":1356,"Sha256":"01A53FFE4527BA5636942C68A11C165E74BB96A1B00666A2EAA514EA9F29FD05"},{"Path":"check.png","Bytes":5716,"Sha256":"3939F6F06AF2E801873B7733D6202E1B416B428A9246E7ACBDC266EB2E87B11C"},{"Path":"check.xlsx","Bytes":4839,"Sha256":"1F46F98F16796DC2E69137A7EE7065087345073F2CB94E3BD286D34C69AE75BD"}],"stagedInputs":[],"outputFolder":"output/","originalFilesChanged":false,"execution":"Windows AppContainer; no network capability; staged copies only","next":"Inspect results. On error revise code using previous_run if useful. Publish only verified outputs via publish_artifact."}
+INSTALLATION_PASS=True; model quality and Microsoft Word installation are not tested.

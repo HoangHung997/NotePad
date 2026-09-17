@@ -1,0 +1,4 @@
+thinking-docked-1440x860: offset=2404; end=2404; latestLine=80/80
+thinking-compact-560x820: offset=1127,1999999999998; end=1127,1999999999998; latestLine=80/80
+thinking-docked-1440x860: offset=2404; end=2404; latestLine=80/80
+thinking-compact-560x820: offset=1127,1999999999998; end=1127,1999999999998; latestLine=80/80
