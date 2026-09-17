@@ -51,7 +51,7 @@ internal static class ChatTests
             var turns = AiHistory.RequestTurns(conversation);
             Check(turns.Count == 2 && turns[0].Content == "question" && turns[1].Content == "reply", "Wrong context included");
         });
-        test("Independent chat is saved in its own note file with history, draft and time", () =>
+        test("Independent chat is saved in its own note file with history and time while draft stays device-local", () =>
         {
             var store = new ProjectWorkspaceStore(Path.Combine(folder, "independent-chat")); var state = store.LoadOrImport();
             var note = new NoteRecord { NoteKind = "ai-chat", Title = "AI độc lập", IsPinned = true, Width = 415, Height = 615 };
@@ -59,7 +59,7 @@ internal static class ChatTests
             note.AiConversations.Add(conversation); note.SelectedAiConversationId = conversation.Id; state.Notes.Add(note);
             var board = SheetStorage.Demo().Notes[0]; state.Notes.Add(board); store.Save(state);
             var read = new ProjectWorkspaceStore(store.Root).Read(); var chat = read.Notes.Single(n => n.IsChat);
-            Check(chat.SelectedAiConversationId == conversation.Id && chat.AiConversations[0].Draft == "Đang soạn", "Conversation selection/draft lost");
+            Check(chat.SelectedAiConversationId == conversation.Id && chat.AiConversations[0].Draft == "", "Conversation selection or device-local draft policy lost");
             Check(chat.AiConversations[0].Messages[0].CreatedAt == conversation.Messages[0].CreatedAt && chat.IsPinned, "Time or pin lost");
             Check(chat.Projects.Count == 0 && read.Notes.Where(n => n.IsBoard).Sum(n => n.Projects.Count) == board.Projects.Count, "Created a fake project");
             Check(Directory.GetFiles(Path.Combine(store.Root, "notes"), "*.h2note.json").Length == 1, "Chat has no independent file");
