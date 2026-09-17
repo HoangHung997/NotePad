@@ -96,6 +96,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-responses-transport-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-openai-responses-transport-tests.txt')
 
+      - name: Run H2 Agent Lab v2 OpenAI Responses WebSocket tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-responses-websocket'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-responses-websocket-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-responses-websocket-transport-tests.txt')
+
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
