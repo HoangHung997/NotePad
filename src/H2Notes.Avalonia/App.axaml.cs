@@ -18,11 +18,14 @@ public partial class App : Application
     public bool IsExiting { get; private set; }
     private INoteStorage _storage = null!;
     private LocalConfiguration _local = new();
+    private readonly LocalChatDraftStore _draftStore = new();
     public LocalConfiguration LocalSettings => _local;
+    public string DeviceId => _local.DeviceId;
     public bool IsChangingStore { get; private set; }
     public bool UsesProjectFiles => _storage is ProjectWorkspaceStore;
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
+    private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly Dictionary<Guid, NoteWindow> _notes = [];
     private readonly Dictionary<Guid, AiChatWindow> _aiWindows = [];
     private readonly List<Window> _windowOrder = [];
@@ -42,6 +45,11 @@ public partial class App : Application
     public string DataPath => _storage.FilePath;
     public IEnumerable<Window> OpenWindows => _notes.Values.Cast<Window>().Concat(_aiWindows.Values).Concat(_main is null ? [] : new Window[] { _main })
         .Concat(_main?.DetachedAiWindow is { } ai ? new Window[] { ai } : []);
+
+    internal void LoadChatDraft(AiChatScope scope, AiConversation conversation) => _draftStore.Load(scope.Id, conversation);
+    internal void SaveChatDraft(AiChatScope scope, AiConversation conversation) => _draftStore.Save(scope.Id, conversation);
+    internal void DeleteChatDraft(AiChatScope scope, AiConversation conversation) => _draftStore.Delete(scope.Id, conversation.Id);
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
     public override void OnFrameworkInitializationCompleted()
     {
@@ -66,17 +74,19 @@ public partial class App : Application
                 }
                 else
                 {
-                    var projectStore = new ProjectWorkspaceStore(_local.DataFolder ?? LocalConfiguration.DefaultDataFolder);
+                    var projectStore = new ProjectWorkspaceStore(_local.DataFolder ?? LocalConfiguration.DefaultDataFolder, writerId: _local.DeviceId);
                     _instanceLock = projectStore.AcquireLock(); _storage = projectStore;
                 }
             }
-            catch (IOException ex) { ShowStartupError(desktop, "Không mở được thư mục hoặc kho đang được một bản H2 Notes khác sử dụng.\n" + ex.Message); return; }
+            catch (IOException ex) { ShowStartupError(desktop, "Không mở được thư mục hoặc bản H2 Notes khác trên máy này đang dùng cùng kho.\n" + ex.Message); return; }
             catch (Exception ex) when (ex is UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
             { ShowStartupError(desktop, "Không mở được kho dữ liệu. Không thay đổi file gốc.\n" + ex.Message); return; }
             try
             {
                 State = _demo ? File.Exists(dataPath) ? SheetStorage.Read(dataPath) : SheetStorage.Demo()
                     : _storage.LoadOrImport(UsesProjectFiles && File.Exists(dataPath) ? dataPath : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nodepad", "state.json"));
+                if (UsesProjectFiles && _local.DesktopSession is not null)
+                    State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
                 _storageReady = true;
             }
             catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidDataException or UnauthorizedAccessException)
@@ -86,9 +96,11 @@ public partial class App : Application
             // OnExplicitShutdown owns the lifetime; assigning MainWindow would auto-show a hidden board.
             _main = new MainWindow(this, plan.Board); TrackWindow(_main);
             _saveTimer.Tick += (_, _) => SaveNow();
+            _syncTimer.Tick += (_, _) => RefreshSharedWorkspace();
             BuildTray();
             RestoreWindows(plan);
             _restoring = false;
+            if (UsesProjectFiles) _syncTimer.Start();
             if (args.Contains("--show")) ShowMain();
             if (args.Contains("--show-ai")) ShowProjectAiWindow();
             ScheduleSave();
@@ -114,7 +126,7 @@ public partial class App : Application
                     try { ShowMain(); await _main.CaptureAiErrorEvidence(Path.GetFullPath(args[aiErrorEvidenceIndex + 1])); }
                     catch (Exception ex) { await Dialogs.Message(_main, "AI error evidence failed", ex.Message); }
                 });
-            desktop.Exit += (_, _) => { IsExiting = true; _saveTimer.Stop(); _tray?.Dispose(); _instanceLock?.Dispose(); };
+            desktop.Exit += (_, _) => { IsExiting = true; _saveTimer.Stop(); _syncTimer.Stop(); _tray?.Dispose(); _instanceLock?.Dispose(); };
             var documentsEvidenceIndex = Array.IndexOf(args, "--documents-evidence");
             if (_demo && dataIndex >= 0 && documentsEvidenceIndex >= 0 && documentsEvidenceIndex + 1 < args.Length)
                 Dispatcher.UIThread.Post(async () =>
@@ -144,11 +156,13 @@ public partial class App : Application
         }
         base.OnFrameworkInitializationCompleted();
     }
+
     private void ShowStartupError(IClassicDesktopStyleApplicationLifetime desktop, string text)
     {
         var window = new Window { Title = "H2 Notes", ShowInTaskbar = false, CanMinimize = false, CanMaximize = false, Width = 490, Height = 200, Content = new TextBlock { Text = text, Margin = new Thickness(24), TextWrapping = global::Avalonia.Media.TextWrapping.Wrap } };
         window.Closed += (_, _) => desktop.Shutdown(); desktop.MainWindow = window; window.Show();
     }
+
     private void BuildTray()
     {
         var menu = new NativeMenu();
@@ -178,6 +192,7 @@ public partial class App : Application
         };
         TrayIcon.SetIcons(this, new TrayIcons { _tray });
     }
+
     public void ScheduleSave()
     {
         if (_saving || !_storageReady || _restoring || IsExiting) return;
@@ -185,6 +200,7 @@ public partial class App : Application
         _main?.SetSaveStatus("Đang soạn…"); _saveTimer.Stop(); _saveTimer.Start();
         foreach (var window in _aiWindows.Values) window.SetSaveStatus("Đang soạn…");
     }
+
     public void SaveNow()
     {
         if (_saving || !_storageReady || _restoring || IsExiting) return;
@@ -194,10 +210,25 @@ public partial class App : Application
             _main?.Flush(); foreach (var window in _notes.Values) window.Flush();
             foreach (var window in _aiWindows.Values) window.Flush();
             CaptureDesktopSession();
+            if (UsesProjectFiles)
+            {
+                _local.DesktopSession = State.DesktopSession is null ? null : ProjectWorkspaceStore.Clone(State.DesktopSession);
+                _local.Save();
+            }
             if (_storage is ProjectWorkspaceStore projectStore) projectStore.SaveIncremental(State, _dirtyProjects);
             else _storage.Save(State);
-            _dirtyProjects.Clear(); LastSaveError = null; _main?.SetSaveStatus("Đã lưu"); _main?.RefreshAfterSave();
-            foreach (var window in _aiWindows.Values) window.SetSaveStatus("Đã lưu");
+            _dirtyProjects.Clear(); LastSaveError = null;
+            var merged = _storage is ProjectWorkspaceStore p && p.LastMergeConflicts.Count > 0;
+            _main?.SetSaveStatus(merged ? "Đã lưu · đã gộp thay đổi từ máy khác" : "Đã lưu");
+            _main?.RefreshAfterSave();
+            foreach (var window in _aiWindows.Values) { window.SetSaveStatus(merged ? "Đã lưu · đã gộp thay đổi" : "Đã lưu"); window.RefreshFromModel(); }
+        }
+        catch (IOException ex) when (ex.Message.StartsWith("Kho dữ liệu đang được thiết bị khác ghi", StringComparison.Ordinal))
+        {
+            LastSaveError = null;
+            _main?.SetSaveStatus("NAS đang bận · sẽ tự lưu lại");
+            foreach (var window in _aiWindows.Values) window.SetSaveStatus("NAS đang bận · sẽ tự lưu lại");
+            _saveTimer.Start();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException or InvalidOperationException)
         {
@@ -207,7 +238,32 @@ public partial class App : Application
         }
         finally { _saving = false; }
     }
+
+    private void RefreshSharedWorkspace()
+    {
+        if (_saving || !_storageReady || _restoring || IsExiting || _storage is not ProjectWorkspaceStore projectStore) return;
+        try
+        {
+            if (!projectStore.RefreshFromDisk(State, _dirtyProjects)) return;
+            LastSaveError = null;
+            _main?.RefreshAfterExternalSync();
+            foreach (var window in _aiWindows.Values) window.RefreshFromModel();
+            var text = projectStore.LastMergeConflicts.Count > 0 ? "Đã đồng bộ · giữ bản đang sửa khi trùng trường" : "Đã đồng bộ thay đổi từ máy khác";
+            _main?.SetSaveStatus(text);
+            foreach (var window in _aiWindows.Values) window.SetSaveStatus(text);
+        }
+        catch (IOException ex) when (ex.Message.StartsWith("Kho dữ liệu đang được thiết bị khác ghi", StringComparison.Ordinal))
+        {
+            _main?.SetSaveStatus("NAS đang có máy khác ghi · vẫn tiếp tục soạn");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        {
+            _main?.SetSaveStatus("Chưa đồng bộ được NAS · vẫn giữ bản đang soạn");
+        }
+    }
+
     public string? LastSaveError { get; private set; }
+
     public void SwitchWorkspace(ProjectWorkspaceStore destination, FileStream destinationLock, SheetState existing,
         WorkspaceTransfer transfer, WorkspaceTransferMode mode, IReadOnlyDictionary<Guid, ConflictResolution>? choices)
     {
@@ -224,21 +280,23 @@ public partial class App : Application
         if (mode != WorkspaceTransferMode.UseExisting) destination.Save(next);
         try { _local.DataFolder = destination.Root; _local.Save(); }
         catch { _local.DataFolder = oldRoot; if (mode != WorkspaceTransferMode.UseExisting) destination.Save(existing); throw; }
-        _restoring = IsChangingStore = true; _saveTimer.Stop();
+        _restoring = IsChangingStore = true; _saveTimer.Stop(); _syncTimer.Stop();
         try
         {
             foreach (var window in OpenWindows.ToArray()) window.Close();
             _notes.Clear(); _aiWindows.Clear(); _windowOrder.Clear();
             _instanceLock?.Dispose(); _instanceLock = destinationLock; _storage = destination; State = next;
+            if (_local.DesktopSession is not null) State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
             var plan = DesktopRestorePlan.Create(State, false);
             _main = new MainWindow(this, plan.Board); TrackWindow(_main);
             ShowMain();
             RestoreWindows(plan); BuildTrayAfterStoreChange();
         }
         finally { _restoring = IsChangingStore = false; }
-        LastSaveError = null;
+        LastSaveError = null; _syncTimer.Start();
         if (mode != WorkspaceTransferMode.UseExisting) ScheduleSave();
     }
+
     public LegacyImportRecord ImportLegacy(LegacyImportPreview preview)
     {
         if (!_storageReady || _saving) throw new InvalidOperationException("App chưa sẵn sàng nhập dữ liệu.");
@@ -260,6 +318,7 @@ public partial class App : Application
         }
         finally { _saving = false; }
     }
+
     public void ShowImported(LegacyImportRecord imported)
     {
         var board = State.Notes.FirstOrDefault(n => imported.NoteIds.Contains(n.Id) && n.IsBoard && !n.IsArchived);
@@ -270,11 +329,13 @@ public partial class App : Application
             if (note is not null) OpenNote(note);
         }
     }
+
     public void ShowMain()
     {
         if (_main is null) return;
         _main.MarkOpen(); _main.Show(); _main.WindowState = WindowState.Normal; _main.Activate(); ScheduleSave();
     }
+
     internal void TrackWindow(Window window)
     {
         _windowOrder.Add(window);
@@ -283,6 +344,7 @@ public partial class App : Application
             _windowOrder.Remove(window); _windowOrder.Add(window); ScheduleSave();
         };
     }
+
     private void CaptureDesktopSession()
     {
         if (State.DesktopSession?.ProjectAiWindow is { } placement) placement.IsVisible = _main?.DetachedAiWindow?.IsVisible == true;
@@ -294,6 +356,7 @@ public partial class App : Application
                 .Select(w => w switch { MainWindow main => main.BoardId, ProjectAiWindow projectAi => projectAi.WindowId, AiChatWindow ai => ai.NotebookId, NoteWindow note => note.NoteId, _ => throw new InvalidOperationException("Unknown session window.") }).ToList()
         };
     }
+
     public void RaiseOpenWindows()
     {
         var windows = _windowOrder.Where(w => w.IsVisible).ToList();
@@ -310,20 +373,25 @@ public partial class App : Application
         }
         windows.LastOrDefault()?.Activate();
     }
+
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
+
     public void NewNote()
     {
         var note = new NoteRecord { Title = "Ghi chú mới", NoteKind = "general", Width = 380, Height = 430 };
         State.Notes.Add(note); OpenNote(note); ScheduleSave();
     }
+
     public void OpenNote(NoteRecord note)
     {
         if (note.IsChat) { OpenChat(note); return; }
         if (!_notes.TryGetValue(note.Id, out var window)) { window = new NoteWindow(this, note); _notes.Add(note.Id, window); TrackWindow(window); }
         note.IsVisibleOnDesktop = true; window.Show(); window.WindowState = WindowState.Normal; window.Activate(); ScheduleSave();
     }
+
     public void ShowProjectAiWindow() => _main?.ShowProjectAiWindow();
+
     private void RestoreWindows(DesktopRestorePlan plan)
     {
         var notes = plan.OpenWindows.ToDictionary(n => n.Id);
@@ -336,12 +404,15 @@ public partial class App : Application
             else OpenNote(notes[id]);
         }
     }
+
     private void BuildTrayAfterStoreChange() { _tray?.Dispose(); BuildTray(); }
+
     private void OpenChat(NoteRecord notebook)
     {
         if (!_aiWindows.TryGetValue(notebook.Id, out var window)) { window = new AiChatWindow(this, notebook); _aiWindows.Add(notebook.Id, window); TrackWindow(window); }
         notebook.IsVisibleOnDesktop = true; window.Show(); window.WindowState = WindowState.Normal; window.Activate(); ScheduleSave();
     }
+
     public void ExitApp()
     {
         CancelAi();
@@ -350,5 +421,6 @@ public partial class App : Application
         IsExiting = true;
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) desktop.Shutdown();
     }
+
     public async void ShowSettings(Window owner) => await new SettingsWindow(this).ShowDialog(owner);
 }
