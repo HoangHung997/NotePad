@@ -81,7 +81,7 @@ public sealed record AgentTransportEvent(
     public static AgentTransportEvent Started(string? responseId = null)
         => new(AgentTransportEventKind.ResponseStarted, ResponseId: responseId);
 
-    public static AgentTransportEvent Text(string text)
+    public static AgentTransportEvent TextDeltaEvent(string text)
         => new(AgentTransportEventKind.TextDelta, Text: text);
 
     public static AgentTransportEvent Reasoning(string text)

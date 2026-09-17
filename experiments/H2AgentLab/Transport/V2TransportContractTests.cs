@@ -40,12 +40,15 @@ public static class V2TransportContractTests
                 [new("read_file", "Read a file", schema.RootElement.Clone())]);
 
             var first = await Collect(transport.StartAsync(start));
-            if (first.Select(e => e.Kind).SequenceEqual([
-                    AgentTransportEventKind.ResponseStarted,
-                    AgentTransportEventKind.TextDelta,
-                    AgentTransportEventKind.ToolCall,
-                    AgentTransportEventKind.Usage,
-                    AgentTransportEventKind.Completed]) == false)
+            var expectedKinds = new[]
+            {
+                AgentTransportEventKind.ResponseStarted,
+                AgentTransportEventKind.TextDelta,
+                AgentTransportEventKind.ToolCall,
+                AgentTransportEventKind.Usage,
+                AgentTransportEventKind.Completed
+            };
+            if (!first.Select(e => e.Kind).SequenceEqual(expectedKinds))
                 throw new InvalidOperationException("Unexpected typed start event sequence.");
             if (first.Single(e => e.Kind == AgentTransportEventKind.ToolCall).ToolCall?.Name != "read_file")
                 throw new InvalidOperationException("Typed tool call was not preserved.");
@@ -144,7 +147,7 @@ public static class V2TransportContractTests
             cancellationToken.ThrowIfCancellationRequested();
             yield return AgentTransportEvent.Started("resp_1");
             await Task.Yield();
-            yield return AgentTransportEvent.Text("working");
+            yield return AgentTransportEvent.TextDeltaEvent("working");
             yield return AgentTransportEvent.Tool(new("call_1", "read_file", "{\"path\":\"brief.md\"}"));
             yield return AgentTransportEvent.Meter(new(InputTokens: 100, CachedInputTokens: 60, OutputTokens: 12, TotalTokens: 112));
             yield return AgentTransportEvent.Complete("resp_1", "tool_calls");
@@ -158,7 +161,7 @@ public static class V2TransportContractTests
             cancellationToken.ThrowIfCancellationRequested();
             if (request.ToolResults.Count != 1 || request.ToolResults[0].ToolCallId != "call_1")
                 throw new InvalidOperationException("Continuation did not preserve typed tool result identity.");
-            yield return AgentTransportEvent.Text("done");
+            yield return AgentTransportEvent.TextDeltaEvent("done");
             await Task.Yield();
             yield return AgentTransportEvent.Complete("resp_2", "stop");
         }
