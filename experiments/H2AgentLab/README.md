@@ -1,5 +1,10 @@
 # H2 Agent Lab: skill-driven agent
 
+> **Active implementation plan (17/09/2026): H2 Agent Lab 2.0.**  
+> Architecture/specification: [AGENTLAB_V2_SPEC.md](AGENTLAB_V2_SPEC.md)  
+> Authoritative sequential task tracker: [AGENTLAB_V2_TASKS.md](AGENTLAB_V2_TASKS.md)  
+> The v1 material below is retained as baseline/history. Do not treat it as the final v2 architecture. V2 is developed inside Agent Lab first; integration into H2 Notes is blocked until the acceptance gate passes and the user explicitly approves it.
+
 Ứng dụng AI thử nghiệm **độc lập với Codex**, dùng Ollama hoặc API tương thích OpenAI Chat Completions. Người dùng chốt hướng này ngày 16/09/2026. Không dùng tài khoản Codex, không đọc khóa hay lịch sử H2 Notes, chưa tích hợp vào H2 Notes.
 
 ## Hướng mới
@@ -61,7 +66,7 @@ Kiểm lỗi mang sang máy khác: `--portability-test <thư mục mới>`. Ki�
 
 Đóng gói Windows x64: `./Publish-Portable.ps1 -Destination <thư mục phát hành mới> -Zip`. Script publish self-contained, chỉ chép runtime/thư viện được chọn và skill, kiểm thực thi sandbox trước khi tạo ZIP. Không đóng gói dữ liệu LocalAppData, hồ sơ kết nối, lịch sử, API key hay model. Giữ sandbox và xác nhận thao tác như cũ.
 
-Kiểm phục hồi: `--recovery-test <thư mục mới>`; các bước model được giả lập có chủ đích, thao tác tệp/Python là thật. `--recovery-live http://localhost:11434 <model> <thư mục mới>` kiểm model thật xử lý một lỗi sai tên tệp được tạo trước, chỉ dùng tài liệu giả, không sửa tệp nguồn, giới hạn benchmark 8 phút. Giới hạn này không áp vào thời gian chờ chat thường.
+Kiểm phục hồi: `--recovery-test <thư mục bằng chứng mới>`; các bước model được giả lập có chủ đích, thao tác tệp/Python là thật. `--recovery-live http://localhost:11434 <model> <thư mục mới>` kiểm model thật xử lý một lỗi sai tên tệp được tạo trước, chỉ dùng tài liệu giả, không sửa tệp nguồn, giới hạn benchmark 8 phút. Giới hạn này không áp vào thời gian chờ chat thường.
 
 Benchmark skill: `H2AgentLab.exe --skills-live http://localhost:11434 <model> <thư mục mới>`: model thật sửa workbook tổng hợp, oracle độc lập; chỉ cho phép xuất result.xlsx, tối đa 8 phút cho benchmark. `--live-eval http://localhost:11434 <model> <thư mục mới>` kiểm đọc dữ liệu; thêm `--word` để thử skill Word. Không dùng model cloud cho các lệnh này.
 
