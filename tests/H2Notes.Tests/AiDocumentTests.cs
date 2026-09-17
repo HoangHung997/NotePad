@@ -106,19 +106,25 @@ internal static class AiDocumentTests
                 else if (protocol == AiProtocol.OpenAiResponses) Check(root.GetProperty("input")[1].GetProperty("content")[1].GetProperty("type").GetString() == "input_image", "Wrong Responses image");
                 else Check(root.GetProperty("messages")[1].GetProperty("content")[1].GetProperty("image_url").GetProperty("url").GetString() == "data:image/png;base64,AQID", "Wrong Chat image");
             });
-        test("Attachments, extraction and export audit round-trip in one project file, including merge ID remap", () =>
+        test("Sent attachments and export audit round-trip in one project file while draft attachments stay device-local", () =>
         {
-            var attachment = AiDocuments.Read("notes.txt", Encoding.UTF8.GetBytes("Tài liệu đính kèm"));
-            var conversation = new AiConversation { DraftAttachments = [attachment], Messages = [new() { Content = "Artifact", SavedFiles = [new("report.txt", "C:/user-selected/report.txt", "sha", DateTime.UtcNow)] }] };
+            var draftAttachment = AiDocuments.Read("draft-notes.txt", Encoding.UTF8.GetBytes("Bản nháp cục bộ"));
+            var sentAttachment = AiDocuments.Read("notes.txt", Encoding.UTF8.GetBytes("Tài liệu đính kèm"));
+            var conversation = new AiConversation
+            {
+                DraftAttachments = [draftAttachment],
+                Messages = [new() { Content = "Artifact", Attachments = [sentAttachment], SavedFiles = [new("report.txt", "C:/user-selected/report.txt", "sha", DateTime.UtcNow)] }]
+            };
             var project = new ProjectRecord { Conversations = [conversation] }; var state = new SheetState { Notes = [new() { Projects = [project] }] };
             var store = new ProjectWorkspaceStore(Path.Combine(folder, "attachments")); _ = store.LoadOrImport(); store.Save(state);
             var restored = store.Read(); var c = restored.Notes[0].Projects[0].Conversations.Single();
-            Check(c.DraftAttachments[0].Data.SequenceEqual(attachment.Data) && c.DraftAttachments[0].Text == attachment.Text && c.Messages[0].SavedFiles.Count == 1, "Lost attachments/audit");
-            Check(!File.ReadAllText(store.FilePath).Contains(attachment.Sha256), "Attachment duplicated in index");
-            var original = c.DraftAttachments[0].Id; AiHistory.RenewIds([c], c.Id); Check(c.DraftAttachments[0].Id != original, "Attachment ID was not remapped");
+            Check(c.DraftAttachments.Count == 0, "Draft attachment leaked to shared NAS storage");
+            Check(c.Messages[0].Attachments[0].Data.SequenceEqual(sentAttachment.Data) && c.Messages[0].Attachments[0].Text == sentAttachment.Text && c.Messages[0].SavedFiles.Count == 1, "Lost sent attachment/audit");
+            Check(!File.ReadAllText(store.FilePath).Contains(sentAttachment.Sha256), "Attachment duplicated in index");
+            var original = c.Messages[0].Attachments[0].Id; AiHistory.RenewIds([c], c.Id); Check(c.Messages[0].Attachments[0].Id != original, "Attachment ID was not remapped");
             ProjectWorkspaceStore.ValidateState(restored);
         });
-        test("Workspace v3 upgrades every project to v4 with a backup before attachments are saved", () =>
+        test("Workspace v3 upgrades every project to current schema with a backup before attachments are saved", () =>
         {
             var root = Path.Combine(folder, "attachments-v3-upgrade"); var store = new ProjectWorkspaceStore(root); _ = store.LoadOrImport(); store.Save(SheetStorage.Demo());
             var index = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllBytes(store.FilePath))!; index["SchemaVersion"] = 3;
@@ -131,7 +137,7 @@ internal static class AiDocumentTests
             File.WriteAllText(store.FilePath, index.ToJsonString()); var before = File.ReadAllBytes(store.FilePath);
             var upgrade = new ProjectWorkspaceStore(root); var state = upgrade.Read(); upgrade.SaveIncremental(state, new HashSet<Guid>());
             var read = new ProjectWorkspaceStore(root).Read(); Check(read.Notes[0].Projects.Count == state.Notes[0].Projects.Count, "Migration lost projects");
-            Check(JsonDocument.Parse(File.ReadAllBytes(store.FilePath)).RootElement.GetProperty("SchemaVersion").GetInt32() == 4, "Still schema 3");
+            Check(JsonDocument.Parse(File.ReadAllBytes(store.FilePath)).RootElement.GetProperty("SchemaVersion").GetInt32() == ProjectWorkspaceStore.SchemaVersion, "Schema was not upgraded");
             Check(Directory.EnumerateFiles(Path.Combine(root, "backups"), "*.bak", SearchOption.AllDirectories).Any(p => File.ReadAllBytes(p).SequenceEqual(before)), "No original index backup");
         });
         test("Chat draft files stay with project; marker attachment stays local; artifact buttons render beside history", () =>
