@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using H2Notes.Core;
 
@@ -39,7 +40,10 @@ internal static class PortabilityDiagnostics
         {
             if (profile.Protocol == AiProtocol.Ollama)
             {
-                if (Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var endpoint) && AiClient.IsLocalMachine(endpoint))
+                var local = Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var endpoint)
+                    && (endpoint.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                        || IPAddress.TryParse(endpoint.Host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address));
+                if (local)
                     Row(profile.Name, false, "Ollama localhost là dịch vụ ngoài app; máy đích phải cài/chạy Ollama và có model " + (profile.Model.Length == 0 ? "đã chọn" : profile.Model) + ". Có thể đổi sang Ollama LAN để dùng chung một máy chủ.");
                 else Row(profile.Name, true, profile.ProcessingLocation + ". Cần mạng tới máy chủ/model đã cấu hình.");
                 continue;
