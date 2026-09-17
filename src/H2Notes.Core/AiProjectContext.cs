@@ -46,15 +46,22 @@ public static class AiProjectContext
             .Where(c => c.Id != exclude)
             .Select(c => (object)new
             {
-                c.Id, c.Title,
-                createdLocal = Local(c.CreatedAtUtc), updatedLocal = Local(c.UpdatedAtUtc),
+                id = c.Id,
+                title = c.Title,
+                createdLocal = Local(c.CreatedAtUtc),
+                updatedLocal = Local(c.UpdatedAtUtc),
                 messages = c.Messages.Where(m => !m.IsTimelineMarker && m.Status == "complete" && m.Role is "user" or "assistant")
                     .Select(m => new
                     {
-                        m.Id, m.ParentId, m.Role, m.Content,
+                        id = m.Id,
+                        parentId = m.ParentId,
+                        role = m.Role,
+                        content = m.Content,
                         createdLocal = LocalMessage(m.CreatedAt),
                         createdUtc = m.CreatedAt == default ? null : (m.CreatedAt.Kind == DateTimeKind.Utc ? m.CreatedAt : m.CreatedAt.ToUniversalTime()).ToString("O"),
-                        m.ProjectActionsApplied, m.ProjectActionsAudit, m.SavedFiles,
+                        projectActionsApplied = m.ProjectActionsApplied,
+                        projectActionsAudit = m.ProjectActionsAudit,
+                        savedFiles = m.SavedFiles,
                         files = AiDocuments.Describe(m.Attachments)
                     }).ToArray()
             }).ToArray();
@@ -62,14 +69,19 @@ public static class AiProjectContext
         var allProjects = workspace?.Notes.Where(n => n.IsBoard).SelectMany(n => n.Projects).ToArray() ?? [];
         var generalNotes = workspace?.Notes.Where(n => !n.IsBoard && !n.IsChat).Select(n => new
         {
-            n.Id, n.Title, n.NoteKind,
-            createdLocal = Local(n.CreatedAtUtc), updatedLocal = Local(n.UpdatedAtUtc),
+            id = n.Id,
+            title = n.Title,
+            noteKind = n.NoteKind,
+            createdLocal = Local(n.CreatedAtUtc),
+            updatedLocal = Local(n.UpdatedAtUtc),
             content = n.ContentRich?.Text ?? n.Content
         }).ToArray() ?? [];
         var standaloneChats = workspace?.Notes.Where(n => n.IsChat).Select(n => new
         {
-            n.Id, n.Title,
-            createdLocal = Local(n.CreatedAtUtc), updatedLocal = Local(n.UpdatedAtUtc),
+            id = n.Id,
+            title = n.Title,
+            createdLocal = Local(n.CreatedAtUtc),
+            updatedLocal = Local(n.UpdatedAtUtc),
             conversations = history ? Conversations(n.AiConversations) : []
         }).ToArray() ?? [];
 
@@ -85,16 +97,23 @@ public static class AiProjectContext
             },
             projectId = project.Id,
             name = project.DisplayName,
-            createdLocal = Local(project.CreatedAtUtc), updatedLocal = Local(project.UpdatedAtUtc),
+            createdLocal = Local(project.CreatedAtUtc),
+            updatedLocal = Local(project.UpdatedAtUtc),
             notes = project.NotesText,
             progress = project.Progress,
             next = project.Next?.DisplayText,
             tasks = project.ChecklistItems.Select((t, i) => new
             {
-                order = i + 1, t.Id, title = t.DisplayText, completed = t.IsCompleted, notes = t.CommentText,
-                createdLocal = Local(t.CreatedAtUtc), updatedLocal = Local(t.UpdatedAtUtc), completedLocal = Local(t.CompletedAtUtc)
+                order = i + 1,
+                id = t.Id,
+                title = t.DisplayText,
+                completed = t.IsCompleted,
+                notes = t.CommentText,
+                createdLocal = Local(t.CreatedAtUtc),
+                updatedLocal = Local(t.UpdatedAtUtc),
+                completedLocal = Local(t.CompletedAtUtc)
             }),
-            links = project.Links.Select(l => new { l.Label, l.Target, contentRead = false }),
+            links = project.Links.Select(l => new { label = l.Label, target = l.Target, contentRead = false }),
             conversations = history ? Conversations(project.Conversations, currentConversation) : [],
             workspaceSources = workspace is null ? null : new
             {
@@ -102,12 +121,22 @@ public static class AiProjectContext
                 standaloneChats,
                 projects = allProjects.Where(p => p.Id != project.Id).Select(p => new
                 {
-                    p.Id, name = p.DisplayName, notes = p.NotesText, progress = p.Progress,
-                    createdLocal = Local(p.CreatedAtUtc), updatedLocal = Local(p.UpdatedAtUtc),
+                    id = p.Id,
+                    name = p.DisplayName,
+                    notes = p.NotesText,
+                    progress = p.Progress,
+                    createdLocal = Local(p.CreatedAtUtc),
+                    updatedLocal = Local(p.UpdatedAtUtc),
                     tasks = p.ChecklistItems.Select((t, i) => new
                     {
-                        order = i + 1, t.Id, title = t.DisplayText, completed = t.IsCompleted, notes = t.CommentText,
-                        createdLocal = Local(t.CreatedAtUtc), updatedLocal = Local(t.UpdatedAtUtc), completedLocal = Local(t.CompletedAtUtc)
+                        order = i + 1,
+                        id = t.Id,
+                        title = t.DisplayText,
+                        completed = t.IsCompleted,
+                        notes = t.CommentText,
+                        createdLocal = Local(t.CreatedAtUtc),
+                        updatedLocal = Local(t.UpdatedAtUtc),
+                        completedLocal = Local(t.CompletedAtUtc)
                     }).ToArray(),
                     conversations = history ? Conversations(p.Conversations) : []
                 }).ToArray()
