@@ -22,14 +22,14 @@ Rules:
 - [x] **V2-0002 — Create authoritative task tracker.**  
   Evidence: this file exists with unique IDs, dependencies and acceptance notes.
 
-- [ ] **V2-0003 — Link spec/tracker from Agent Lab README.**  
-  Acceptance: README clearly states v2 is the active implementation plan and links both files without rewriting historical evaluation evidence.
+- [x] **V2-0003 — Link spec/tracker from Agent Lab README.**  
+  Evidence: README identifies v2 as the active plan and links both documents while retaining v1 historical material.
 
-- [ ] **V2-0004 — Freeze v1 behavior baseline.**  
-  Acceptance: record current deterministic test counts/build result and preserve existing v1 live-evaluation docs; no old evidence deleted.
+- [x] **V2-0004 — Freeze v1 behavior baseline.**  
+  Evidence: `V1_BASELINE_2026-09-17.md` records the current v1 source identities and preserved 46/46 deterministic baseline from the existing evaluation evidence; no historical evidence was removed.
 
-- [ ] **V2-0005 — Add architecture compatibility guard test.**  
-  Acceptance: test proves H2AgentLab still references H2Notes.Core and existing v1 self/recovery/skills tests remain callable while v2 is developed incrementally.
+- [x] **V2-0005 — Add architecture compatibility guard test.**  
+  Evidence: `V2ArchitectureTests.cs` verifies direct `H2Notes.Core` capability references and preserved v1 test entry points. GitHub Actions run `35233985841` built H2 Notes and H2 Agent Lab successfully, ran the H2 Notes tests, the v1 Lab self-test and the v2 architecture guard successfully before publish.
 
 ---
 
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Next task:** `V2-0003 — Link spec/tracker from Agent Lab README`.
+**Next task:** `V2-0101 — Add typed turn trace model`.
