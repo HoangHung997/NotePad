@@ -13,6 +13,7 @@
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <ProjectReference Include="../H2Notes.Core/H2Notes.Core.csproj" />
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="PORTABLE-README.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/install.py" Link="tools/ocr/install.py" CopyToOutputDirectory="PreserveNewest" />
