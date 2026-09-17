@@ -30,6 +30,7 @@ public sealed class SheetPreferences
 public sealed class NoteRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long Revision { get; set; }
     public string Title { get; set; } = "Các dự án";
     public string NoteKind { get; set; } = "project-hub";
     public string Content { get; set; } = "";
@@ -63,6 +64,7 @@ public sealed class NoteRecord
 public sealed class ProjectRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long Revision { get; set; }
     public string Name { get; set; } = "Dự án mới";
     public string Notes { get; set; } = "";
     public RichDocument? NameRich { get; set; }
@@ -85,6 +87,7 @@ public sealed class ProjectRecord
 public sealed class TaskRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long Revision { get; set; }
     public string Text { get; set; } = "Công việc mới";
     public RichDocument? TextRich { get; set; }
     public string Comment { get; set; } = "";
