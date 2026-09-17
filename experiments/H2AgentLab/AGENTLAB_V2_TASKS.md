@@ -73,12 +73,12 @@ Rules:
   Evidence: `Transport/ChatCompletionsTransport.cs` isolates `/chat/completions` streaming behind `IAgentTransport`, preserves provider tool-call IDs plus fragmented function names/JSON arguments, explicit tool-result replay, H2 image/file wire shapes, bearer authentication, H2 Core endpoint safety and capability-driven reasoning effort while rejecting truncated tool proposals before execution. `Transport/V2ChatCompletionsTransportTests.cs` covers direct reasoning/text streaming, fragmented tool continuation, multimodal shapes, truncation and unsafe endpoint rejection. GitHub Actions run `35244902978` passed H2 Notes **336/336**, Agent Lab build/v1 regressions, v2 architecture/metrics/baseline/transport-contract/Ollama suites and the new Chat Completions transport suite, then publish succeeded.
 
 - [x] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
-  Evidence: `Transport/OpenAiResponsesTransport.cs` implements the public Responses HTTP/SSE path behind `IAgentTransport`, using H2 Core endpoint/reasoning checks, bearer auth, typed text/reasoning-summary/tool/usage events, `prompt_cache_key`, parallel tool declarations, native image/file inputs and `store:false` stateless function-call replay with `reasoning.encrypted_content`; it deliberately does **not** use undocumented Codex headers or `previous_response_id` yet. `Transport/V2OpenAiResponsesTransportTests.cs` covers streaming/usage, stateless tool continuation, native inputs, incomplete-response safety and endpoint safety. `Transport/AiProfileSnapshotExtensions.cs` keeps active request settings immutable until V2-0210 extracts a shared Core helper. GitHub Actions run `35246360154` completed successfully, including H2 Notes **336/336**, Agent Lab build/v1 regressions, all v2 transport suites, self-contained publish and `/bin` publish.
+  Evidence: `Transport/OpenAiResponsesTransport.cs` implements the public Responses HTTP/SSE path behind `IAgentTransport`, using H2 Core endpoint/reasoning checks, bearer auth, typed text/reasoning-summary/tool/usage events, `prompt_cache_key`, parallel tool declarations, native image/file inputs and `store:false` stateless function-call replay with `reasoning.encrypted_content`; it deliberately does **not** use undocumented Codex headers. `Transport/V2OpenAiResponsesTransportTests.cs` covers streaming/usage, stateless tool continuation, native inputs, incomplete-response safety and endpoint safety. `Transport/AiProfileSnapshotExtensions.cs` keeps active request settings immutable until V2-0210 extracts a shared Core helper. GitHub Actions run `35246360154` completed successfully, including H2 Notes **336/336**, Agent Lab build/v1 regressions, all v2 transport suites, self-contained publish and `/bin` publish.
 
-- [~] **V2-0206 — Implement OpenAI Responses continuation state.**  
-  Acceptance: tool result continuation does not resend full prior transcript when the public API supports previous response state.
+- [x] **V2-0206 — Implement OpenAI Responses continuation state.**  
+  Evidence: `OpenAiResponsesTransport` now has explicit `Stateless` and `StoredContinuation` modes. Privacy-preserving stateless remains the default (`store:false` + local output replay + encrypted reasoning). Stored continuation is opt-in and restricted to the official `https://api.openai.com/v1/` endpoint; it uses `store:true`, captures the completed response ID and sends later tool results as only new `function_call_output` input with `previous_response_id`, without resending the prior system/user/function-call transcript. Tests also prove compatible endpoints cannot silently claim official stored continuation and a missing response ID never falls back by replaying data unexpectedly. GitHub Actions run `35247235754` completed successfully: H2 Notes **336/336**, Agent Lab build/v1 and every v2 transport suite passed, followed by self-contained artifact and `/bin` publish.
 
-- [ ] **V2-0207 — Implement Responses WebSocket turn session.**  
+- [~] **V2-0207 — Implement Responses WebSocket turn session.**  
   Acceptance: one turn-scoped connection is reused across multiple model calls, with safe HTTP fallback.
 
 - [ ] **V2-0208 — Add WebSocket prewarm where supported.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0206 — Implement OpenAI Responses continuation state`.
+**Active task:** `V2-0207 — Implement Responses WebSocket turn session`.
