@@ -163,15 +163,15 @@ public sealed class AgentContextManager
         var current = AddScalarSection(working, "Current state", currentSource,
             _budget.MaxCurrentStateCharacters, ref remaining, out var currentTruncated);
 
-        var recent = BuildTurnSection(input.RecentTurns ?? [], ref remaining);
+        var recent = BuildTurnSection(input.RecentTurns ?? [], AvailableForNextSection(working, remaining));
         AppendWorkingSection(working, recent.Text, ref remaining);
 
-        var tools = BuildToolSection(input.ToolSummaries ?? [], ref remaining);
+        var tools = BuildToolSection(input.ToolSummaries ?? [], AvailableForNextSection(working, remaining));
         AppendWorkingSection(working, tools.Text, ref remaining);
 
         var compactedSource = Normalize(input.CompactedHistory);
         var compactedCandidate = BuildScalarSection("Compacted history", compactedSource,
-            Math.Min(_budget.MaxCompactedHistoryCharacters, remaining), out var compactedTruncated);
+            Math.Min(_budget.MaxCompactedHistoryCharacters, AvailableForNextSection(working, remaining)), out var compactedTruncated);
         var compacted = AppendWorkingSection(working, compactedCandidate, ref remaining);
         if (compacted.Length < compactedCandidate.Length) compactedTruncated = compactedSource.Length > 0;
 
@@ -213,7 +213,8 @@ public sealed class AgentContextManager
         ref int remaining,
         out bool truncated)
     {
-        var candidate = BuildScalarSection(heading, source, Math.Min(sectionBudget, remaining), out truncated);
+        var available = AvailableForNextSection(working, remaining);
+        var candidate = BuildScalarSection(heading, source, Math.Min(sectionBudget, available), out truncated);
         var emitted = AppendWorkingSection(working, candidate, ref remaining);
         if (emitted.Length < candidate.Length) truncated = source.Length > 0;
         return emitted;
@@ -233,7 +234,7 @@ public sealed class AgentContextManager
         return body.Length == 0 ? "" : prefix + body;
     }
 
-    private SectionBuildResult BuildTurnSection(IReadOnlyList<AgentContextTurn> input, ref int remaining)
+    private SectionBuildResult BuildTurnSection(IReadOnlyList<AgentContextTurn> input, int availableTotal)
     {
         var eligible = input
             .Where(x => x.Relevance > 0 && !string.IsNullOrWhiteSpace(x.Content))
@@ -243,7 +244,7 @@ public sealed class AgentContextManager
             .Take(_budget.MaxRecentTurns)
             .ToArray();
         var eligibleCount = input.Count(x => x.Relevance > 0 && !string.IsNullOrWhiteSpace(x.Content));
-        var limit = Math.Min(_budget.MaxRecentTurnsCharacters, remaining);
+        var limit = Math.Min(_budget.MaxRecentTurnsCharacters, availableTotal);
         return BuildListSection(
             "Recent relevant turns",
             eligible,
@@ -255,7 +256,7 @@ public sealed class AgentContextManager
             limit);
     }
 
-    private SectionBuildResult BuildToolSection(IReadOnlyList<AgentContextToolSummary> input, ref int remaining)
+    private SectionBuildResult BuildToolSection(IReadOnlyList<AgentContextToolSummary> input, int availableTotal)
     {
         var eligible = input
             .Where(x => x.Relevance > 0 && !string.IsNullOrWhiteSpace(x.Summary))
@@ -265,7 +266,7 @@ public sealed class AgentContextManager
             .Take(_budget.MaxToolSummaries)
             .ToArray();
         var eligibleCount = input.Count(x => x.Relevance > 0 && !string.IsNullOrWhiteSpace(x.Summary));
-        var limit = Math.Min(_budget.MaxToolSummariesCharacters, remaining);
+        var limit = Math.Min(_budget.MaxToolSummariesCharacters, availableTotal);
         return BuildListSection(
             "Relevant tool summaries",
             eligible,
@@ -315,6 +316,12 @@ public sealed class AgentContextManager
         var body = string.Join('\n', selected.Select(x => x.Line));
         var output = header + body;
         return new(output, selected.Select(x => sourceId(x.Item)).ToArray(), eligibleCount, output.Length);
+    }
+
+    private static int AvailableForNextSection(StringBuilder working, int remaining)
+    {
+        var separator = working.Length == 0 ? 0 : 2;
+        return Math.Max(0, remaining - separator);
     }
 
     private static string AppendWorkingSection(StringBuilder working, string section, ref int remaining)
