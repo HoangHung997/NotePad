@@ -1,0 +1,689 @@
+{
+  "SheetSchemaVersion": 1,
+  "SheetPreferences": {
+    "RestoreVisibleNotes": true,
+    "RunOnSystemStart": false,
+    "InactiveOpacity": 1,
+    "SnapWindows": true,
+    "AutoHeightTitle": true,
+    "AutoHeightProgress": true,
+    "AutoHeightComment": false
+  },
+  "Notes": [
+    {
+      "Id": "534a53f1-ef56-4574-acf4-d81565171df2",
+      "Title": "C\u00E1c d\u1EF1 \u00E1n",
+      "NoteKind": "project-hub",
+      "Content": "",
+      "ContentRich": null,
+      "Projects": [
+        {
+          "Id": "7acfbfc0-5283-443d-9572-18257c81daec",
+          "Name": "\u0110\u01B0\u1EDDng Gom CT_TA_171",
+          "Notes": "Ch\u1EDD x\u00E1c nh\u1EADn kh\u1ED1i l\u01B0\u1EE3ng",
+          "NameRich": {
+            "Runs": [
+              {
+                "Text": "\u0110\u01B0\u1EDDng Gom CT_TA_171",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "\u0110\u01B0\u1EDDng Gom CT_TA_171"
+          },
+          "NotesRich": {
+            "Runs": [
+              {
+                "Text": "Ch\u1EDD x\u00E1c nh\u1EADn kh\u1ED1i l\u01B0\u1EE3ng",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "Ch\u1EDD x\u00E1c nh\u1EADn kh\u1ED1i l\u01B0\u1EE3ng"
+          },
+          "IsExpanded": false,
+          "ChecklistItems": [
+            {
+              "Id": "602e5d1b-75c3-45b1-8c23-2dd30cd91def",
+              "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng"
+              },
+              "Comment": "\u0110\u00E3 g\u1EEDi 09/06",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "afe3e1d6-3ec0-4ba7-a8ad-03259c352382",
+              "Text": "D\u1EF1ng HSHC",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "D\u1EF1ng HSHC",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "D\u1EF1ng HSHC"
+              },
+              "Comment": "\u0110\u00E3 xong",
+              "CommentRich": null,
+              "IsCompleted": false
+            },
+            {
+              "Id": "73108418-917c-4725-98dc-0f3808802073",
+              "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung"
+              },
+              "Comment": "Ch\u1EDD duy\u1EC7t",
+              "CommentRich": null,
+              "IsCompleted": false
+            }
+          ],
+          "Conversations": [],
+          "SelectedAiConversationId": null,
+          "Links": [],
+          "Layout": {
+            "Tab": "tasks",
+            "AiDock": "hidden",
+            "AiExplicitlyHidden": false,
+            "NotesFraction": 0.5,
+            "HasCustomSplit": false,
+            "TasksCollapsed": false,
+            "NotesCollapsed": false,
+            "AiWidth": 360,
+            "AiHeight": 510,
+            "AiX": -1,
+            "AiY": -1
+          }
+        },
+        {
+          "Id": "093b7e18-dee7-4b74-953e-9da611309838",
+          "Name": "\u0110\u01B0\u1EDDng t\u1EC9nh 156 \u2013 L\u00E0o Cai",
+          "Notes": "Thi c\u00F4ng t\u1EEB 03/05",
+          "NameRich": {
+            "Runs": [
+              {
+                "Text": "\u0110\u01B0\u1EDDng t\u1EC9nh 156 \u2013 L\u00E0o Cai",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "\u0110\u01B0\u1EDDng t\u1EC9nh 156 \u2013 L\u00E0o Cai"
+          },
+          "NotesRich": {
+            "Runs": [
+              {
+                "Text": "Thi c\u00F4ng t\u1EEB 03/05",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "Thi c\u00F4ng t\u1EEB 03/05"
+          },
+          "IsExpanded": false,
+          "ChecklistItems": [
+            {
+              "Id": "bb0cfa64-3605-4ac5-8bbd-005abbfa207b",
+              "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+              "TextRich": null,
+              "Comment": "\u0110\u00E3 g\u1EEDi 09/06",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "f997a912-9924-4bdc-aa4b-4e49e7a8105e",
+              "Text": "D\u1EF1ng HSHC",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "D\u1EF1ng HSHC",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "D\u1EF1ng HSHC"
+              },
+              "Comment": "\u0110\u00E3 xong",
+              "CommentRich": null,
+              "IsCompleted": false
+            },
+            {
+              "Id": "894b3ae6-7e3f-44c2-ab3a-a8901a5998dd",
+              "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+              "TextRich": null,
+              "Comment": "Ch\u1EDD duy\u1EC7t",
+              "CommentRich": null,
+              "IsCompleted": false
+            }
+          ],
+          "Conversations": [],
+          "SelectedAiConversationId": null,
+          "Links": [],
+          "Layout": {
+            "Tab": "tasks",
+            "AiDock": "hidden",
+            "AiExplicitlyHidden": false,
+            "NotesFraction": 0.5,
+            "HasCustomSplit": false,
+            "TasksCollapsed": false,
+            "NotesCollapsed": false,
+            "AiWidth": 360,
+            "AiHeight": 510,
+            "AiX": -1,
+            "AiY": -1
+          }
+        },
+        {
+          "Id": "0201c9cc-e73d-49a0-8100-4b7de566ce74",
+          "Name": "\u0110i\u1EC7n H\u1EA1t Nh\u00E2n I \u2013 Ninh Thu\u1EADn",
+          "Notes": "T\u1EA1m ho\u00E0n th\u00E0nh HSHC, ch\u1EDD ch\u1EE7 \u0111\u1EA7u t\u01B0 ch\u1ED1t.\nC\u1EADp nh\u1EADt kh\u1ED1i l\u01B0\u1EE3ng khi c\u00F3 x\u00E1c nh\u1EADn m\u1EDBi.",
+          "NameRich": {
+            "Runs": [
+              {
+                "Text": "\u0110i\u1EC7n H\u1EA1t Nh\u00E2n I \u2013 Ninh Thu\u1EADn",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "\u0110i\u1EC7n H\u1EA1t Nh\u00E2n I \u2013 Ninh Thu\u1EADn"
+          },
+          "NotesRich": {
+            "Runs": [
+              {
+                "Text": "T\u1EA1m ho\u00E0n th\u00E0nh HSHC, ch\u1EDD ch\u1EE7 \u0111\u1EA7u t\u01B0 ch\u1ED1t.\nC\u1EADp nh\u1EADt kh\u1ED1i l\u01B0\u1EE3ng khi c\u00F3 x\u00E1c nh\u1EADn m\u1EDBi.",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "T\u1EA1m ho\u00E0n th\u00E0nh HSHC, ch\u1EDD ch\u1EE7 \u0111\u1EA7u t\u01B0 ch\u1ED1t.\nC\u1EADp nh\u1EADt kh\u1ED1i l\u01B0\u1EE3ng khi c\u00F3 x\u00E1c nh\u1EADn m\u1EDBi."
+          },
+          "IsExpanded": true,
+          "ChecklistItems": [
+            {
+              "Id": "d8f13232-e345-483f-a45a-1adbd6144081",
+              "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng"
+              },
+              "Comment": "\u0110\u00E3 g\u1EEDi 09/06",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "8a9cd404-6dde-4016-be5a-c577f477f63f",
+              "Text": "D\u1EF1ng HSHC",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "D\u1EF1ng HSHC",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "D\u1EF1ng HSHC"
+              },
+              "Comment": "\u0110\u00E3 xong",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "31aea2d0-dc7d-47c9-a713-f993aa62c4d5",
+              "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung"
+              },
+              "Comment": "Ch\u1EDD duy\u1EC7t",
+              "CommentRich": null,
+              "IsCompleted": false
+            }
+          ],
+          "Conversations": [
+            {
+              "Id": "5f799dba-cdf4-441a-bfdd-ba006d206655",
+              "Title": "Cu\u1ED9c trao \u0111\u1ED5i m\u1EDBi",
+              "Draft": "",
+              "ProfileId": "08a3738e-f552-4079-8853-b14f8c7f2481",
+              "MarkerOnlyMode": false,
+              "Messages": [
+                {
+                  "Id": "21c6014f-55b1-4acf-b825-9b128e648e76",
+                  "ParentId": null,
+                  "Role": "user",
+                  "Content": "C\u00E2u th\u1EED k\u1EBFt n\u1ED1i (d\u1EEF li\u1EC7u minh h\u1ECDa)",
+                  "Model": "",
+                  "Provider": "",
+                  "Context": "",
+                  "Status": "complete",
+                  "ErrorText": "",
+                  "CreatedAt": "2026-09-15T07:22:05.7499807Z",
+                  "IsTimelineMarker": false
+                },
+                {
+                  "Id": "156dd12b-196a-4863-9253-33790cdeaa25",
+                  "ParentId": null,
+                  "Role": "assistant",
+                  "Content": "",
+                  "Model": "gemini-2.5-flash-lite",
+                  "Provider": "",
+                  "Context": "",
+                  "Status": "error",
+                  "ErrorText": "HTTP 404: Model n\u00E0y kh\u00F4ng c\u00F2n nh\u1EADn ng\u01B0\u1EDDi d\u00F9ng m\u1EDBi qua API. H\u00E3y ch\u1ECDn model m\u1EDBi h\u01A1n r\u1ED3i th\u1EED l\u1EA1i; l\u1EA5y \u0111\u01B0\u1EE3c danh s\u00E1ch model kh\u00F4ng c\u00F3 ngh\u0129a t\u00E0i kho\u1EA3n g\u1ECDi \u0111\u01B0\u1EE3c model \u0111\u00F3.",
+                  "CreatedAt": "2026-09-15T07:22:05.7499807Z",
+                  "IsTimelineMarker": false
+                },
+                {
+                  "Id": "cfd1fc2b-2df3-49d3-8aed-732c671dfea3",
+                  "ParentId": null,
+                  "Role": "user",
+                  "Content": "xin ch\u00E0o",
+                  "Model": "minimax-m3:cloud",
+                  "Provider": "Ollama Cloud (minh h\u1ECDa)",
+                  "Context": "",
+                  "Status": "complete",
+                  "ErrorText": "",
+                  "CreatedAt": "2026-09-15T07:23:03.1710341Z",
+                  "IsTimelineMarker": false
+                },
+                {
+                  "Id": "ee5a494c-651d-4686-a673-a21acc016a72",
+                  "ParentId": "cfd1fc2b-2df3-49d3-8aed-732c671dfea3",
+                  "Role": "assistant",
+                  "Content": "",
+                  "Model": "minimax-m3:cloud",
+                  "Provider": "Ollama Cloud (minh h\u1ECDa)",
+                  "Context": "",
+                  "Status": "error",
+                  "ErrorText": "HTTP 402: M\u00E1y ch\u1EE7 y\u00EAu c\u1EA7u thanh to\u00E1n ho\u1EB7c s\u1ED1 d\u01B0 s\u1EED d\u1EE5ng cho model n\u00E0y. Ki\u1EC3m tra h\u1EA1n m\u1EE9c/t\u00E0i kho\u1EA3n ho\u1EB7c ch\u1ECDn model kh\u00E1c.",
+                  "CreatedAt": "2026-09-15T07:23:03.1719801Z",
+                  "IsTimelineMarker": false
+                }
+              ]
+            }
+          ],
+          "SelectedAiConversationId": "5f799dba-cdf4-441a-bfdd-ba006d206655",
+          "Links": [],
+          "Layout": {
+            "Tab": "tasks",
+            "AiDock": "floating",
+            "AiExplicitlyHidden": false,
+            "NotesFraction": 0.5,
+            "HasCustomSplit": false,
+            "TasksCollapsed": false,
+            "NotesCollapsed": false,
+            "AiWidth": 360,
+            "AiHeight": 510,
+            "AiX": 502,
+            "AiY": 243.2
+          }
+        },
+        {
+          "Id": "3ad72845-a98e-4d0d-a32c-0815977c4f5a",
+          "Name": "\u0110\u01B0\u1EDDng gom QL18",
+          "Notes": "Ch\u1EDD b\u1EA3n v\u1EBD",
+          "NameRich": {
+            "Runs": [
+              {
+                "Text": "\u0110\u01B0\u1EDDng gom QL18",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "\u0110\u01B0\u1EDDng gom QL18"
+          },
+          "NotesRich": {
+            "Runs": [
+              {
+                "Text": "Ch\u1EDD b\u1EA3n v\u1EBD",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "Ch\u1EDD b\u1EA3n v\u1EBD"
+          },
+          "IsExpanded": false,
+          "ChecklistItems": [
+            {
+              "Id": "f192f3df-c701-496f-bdf9-b96e777e7d6f",
+              "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+              "TextRich": null,
+              "Comment": "\u0110\u00E3 g\u1EEDi 09/06",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "9f3b8259-1061-451a-9d26-cd2ac4863eb2",
+              "Text": "D\u1EF1ng HSHC",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "D\u1EF1ng HSHC",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "D\u1EF1ng HSHC"
+              },
+              "Comment": "\u0110\u00E3 xong",
+              "CommentRich": null,
+              "IsCompleted": false
+            },
+            {
+              "Id": "d2c70a4f-02f3-4949-85d6-b02599879a08",
+              "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+              "TextRich": null,
+              "Comment": "Ch\u1EDD duy\u1EC7t",
+              "CommentRich": null,
+              "IsCompleted": false
+            }
+          ],
+          "Conversations": [],
+          "SelectedAiConversationId": null,
+          "Links": [],
+          "Layout": {
+            "Tab": "tasks",
+            "AiDock": "hidden",
+            "AiExplicitlyHidden": false,
+            "NotesFraction": 0.5,
+            "HasCustomSplit": false,
+            "TasksCollapsed": false,
+            "NotesCollapsed": false,
+            "AiWidth": 360,
+            "AiHeight": 510,
+            "AiX": -1,
+            "AiY": -1
+          }
+        },
+        {
+          "Id": "eef8ea61-9753-4141-9f9e-5967de67c05b",
+          "Name": "C\u1EA7u V\u1EA1n \u2013 Kinh M\u00F4n",
+          "Notes": "\u0110\u1ED1i chi\u1EBFu nghi\u1EC7m thu",
+          "NameRich": {
+            "Runs": [
+              {
+                "Text": "C\u1EA7u V\u1EA1n \u2013 Kinh M\u00F4n",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "C\u1EA7u V\u1EA1n \u2013 Kinh M\u00F4n"
+          },
+          "NotesRich": {
+            "Runs": [
+              {
+                "Text": "\u0110\u1ED1i chi\u1EBFu nghi\u1EC7m thu",
+                "Style": {
+                  "Font": "Segoe UI",
+                  "Size": 16,
+                  "Bold": false,
+                  "Italic": false,
+                  "Underline": false,
+                  "Strike": false,
+                  "Color": "#302E2B",
+                  "Highlight": null
+                }
+              }
+            ],
+            "Text": "\u0110\u1ED1i chi\u1EBFu nghi\u1EC7m thu"
+          },
+          "IsExpanded": false,
+          "ChecklistItems": [
+            {
+              "Id": "14a920cb-a5cf-45b1-9eef-25a5678620ec",
+              "Text": "Chia l\u1EA1i kh\u1ED1i l\u01B0\u1EE3ng",
+              "TextRich": null,
+              "Comment": "\u0110\u00E3 g\u1EEDi 09/06",
+              "CommentRich": null,
+              "IsCompleted": true
+            },
+            {
+              "Id": "9ba26479-f451-4657-aed3-c49151382036",
+              "Text": "D\u1EF1ng HSHC",
+              "TextRich": {
+                "Runs": [
+                  {
+                    "Text": "D\u1EF1ng HSHC",
+                    "Style": {
+                      "Font": "Segoe UI",
+                      "Size": 16,
+                      "Bold": false,
+                      "Italic": false,
+                      "Underline": false,
+                      "Strike": false,
+                      "Color": "#302E2B",
+                      "Highlight": null
+                    }
+                  }
+                ],
+                "Text": "D\u1EF1ng HSHC"
+              },
+              "Comment": "\u0110\u00E3 xong",
+              "CommentRich": null,
+              "IsCompleted": false
+            },
+            {
+              "Id": "28a98ff8-1704-497c-825a-8a4ba2957d06",
+              "Text": "G\u1EEDi h\u1ED3 s\u01A1 b\u1ED5 sung",
+              "TextRich": null,
+              "Comment": "Ch\u1EDD duy\u1EC7t",
+              "CommentRich": null,
+              "IsCompleted": false
+            }
+          ],
+          "Conversations": [],
+          "SelectedAiConversationId": null,
+          "Links": [],
+          "Layout": {
+            "Tab": "tasks",
+            "AiDock": "hidden",
+            "AiExplicitlyHidden": false,
+            "NotesFraction": 0.5,
+            "HasCustomSplit": false,
+            "TasksCollapsed": false,
+            "NotesCollapsed": false,
+            "AiWidth": 360,
+            "AiHeight": 510,
+            "AiX": -1,
+            "AiY": -1
+          }
+        }
+      ],
+      "AiConversations": [],
+      "SelectedAiConversationId": null,
+      "IsArchived": false,
+      "IsVisibleOnDesktop": true,
+      "IsPinned": false,
+      "SelectedProjectId": "0201c9cc-e73d-49a0-8100-4b7de566ce74",
+      "NoteOpacity": 1,
+      "Left": 120,
+      "Top": 100,
+      "Width": 1100,
+      "Height": 740,
+      "SheetWidth": 1160,
+      "SheetHeight": 809.6,
+      "SheetLeft": 120,
+      "SheetTop": 100
+    }
+  ],
+  "ImportHistory": [],
+  "DesktopSession": {
+    "SelectedBoardId": "534a53f1-ef56-4574-acf4-d81565171df2",
+    "OpenWindowIds": [
+      "534a53f1-ef56-4574-acf4-d81565171df2"
+    ],
+    "ProjectAiWindow": {
+      "Id": "e5bae5db-86bc-4a0f-9fe6-bcd3d46aa385",
+      "IsVisible": false,
+      "IsPinned": true,
+      "Left": 1200,
+      "Top": 94,
+      "Width": 420,
+      "Height": 700
+    }
+  }
+}

@@ -1,0 +1,12 @@
+D:\VSstudio\Nodepad\src\H2Notes.Core\bin\Debug\net10.0\H2Notes.Core.deps.json
+D:\VSstudio\Nodepad\src\H2Notes.Core\bin\Debug\net10.0\H2Notes.Core.dll
+D:\VSstudio\Nodepad\src\H2Notes.Core\bin\Debug\net10.0\H2Notes.Core.pdb
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.AssemblyInfoInputs.cache
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.AssemblyInfo.cs
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.csproj.CoreCompileInputs.cache
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.dll
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\refint\H2Notes.Core.dll
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.pdb
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\ref\H2Notes.Core.dll
+D:\VSstudio\Nodepad\src\H2Notes.Core\obj\Debug\net10.0\H2Notes.Core.csproj.AssemblyReference.cache
