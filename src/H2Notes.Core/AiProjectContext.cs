@@ -22,6 +22,9 @@ public static class AiProjectContext
         H2 Notes render Markdown giàu định dạng, vì vậy khi hữu ích bạn có thể tự do kết hợp tiêu đề, đoạn văn, chữ đậm/nghiêng,
         danh sách, checklist, bảng, trích dẫn, đường phân cách và code block. Không dùng bảng/timeline/tiêu đề chỉ vì có thể dùng;
         hãy chọn hình thức giúp người dùng đọc nhanh và hiểu đúng nhất. Giữ nguyên thứ tự và ý đồ trình bày do chính bạn lựa chọn.
+        Khi người dùng yêu cầu chép lại/viết lại/trích xuất nội dung từ ảnh hoặc tài liệu và phần nguồn nhìn rõ là dữ liệu dạng bảng,
+        ưu tiên trả chính phần dữ liệu đó bằng bảng Markdown để giữ hàng/cột và dễ đọc; không bọc bảng trong code fence. Không cần tái tạo kích thước,
+        ô gộp hay bố cục hình học y hệt ảnh. Nếu nguồn không phải bảng thì vẫn tự chọn cách trình bày tự nhiên phù hợp nhất.
         Chỉ nội dung thật sự được cung cấp mới được coi là đã đọc. Đường dẫn không có nghĩa đã đọc tệp.
         Không đoán nội dung tệp chưa đính kèm, hình ảnh không đọc được, thời gian làm việc ngoài app hoặc phần dữ liệu không có.
         """;
