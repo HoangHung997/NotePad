@@ -24,6 +24,7 @@ public static class Program
         if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-responses-transport-test")) return V2OpenAiResponsesTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-responses-websocket-test")) return V2ResponsesWebSocketTransportTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-provider-resilience-test")) return V2ProviderTransportResilienceTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--portability-test")) return PortabilityTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--verify-install")) return LabEnvironment.Verify(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--recovery-test")) return RecoveryTests.Run(args[^1]).GetAwaiter().GetResult();
