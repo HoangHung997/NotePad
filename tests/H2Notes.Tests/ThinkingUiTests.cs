@@ -92,8 +92,8 @@ internal static class ThinkingUiTests
                 marker.IsChecked = true; input.Focus(); input.Text = "dòng chưa gửi"; input.CaretIndex = input.Text.Length;
                 var shift = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.Shift };
                 input.RaiseEvent(shift); Dispatcher.UIThread.RunJobs();
-                Check(!shift.Handled && project.Conversations.SelectMany(c => c.Messages).Count() == 0,
-                    "Shift+Enter was consumed as Send instead of being left to the multiline editor");
+                Check(input.AcceptsReturn && project.Conversations.SelectMany(c => c.Messages).Count() == 0,
+                    "Shift+Enter sent a message instead of remaining a multiline editor gesture");
 
                 input.Text = "gửi bằng Enter"; input.CaretIndex = input.Text.Length;
                 var enter = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.None };
