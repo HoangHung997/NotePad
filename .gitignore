@@ -1,4 +1,12 @@
-﻿
+bin/
+obj/
+.vs/
+__pycache__/
+*.pyc
+.artifacts/
+*.user
+*.suo
+
 # ===== H2 NOTES GITHUB CLEANUP =====
 
 # Visual Studio
@@ -6,26 +14,26 @@
 *.user
 *.suo
 
-# .NET build
+# .NET
 **/bin/
 **/obj/
 bin/
 obj/
 
-# Build/test artifacts
+# Build/test output
 .artifacts/
 artifacts/
 TestResults/
 coverage/
 releases/
 
-# Package/cache folders
+# Packages / caches
 node_modules/
 packages/
 .cache/
 .idea/
 
-# Temporary files
+# Temp
 *.tmp
 *.temp
 *.log

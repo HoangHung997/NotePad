@@ -1,0 +1,1030 @@
+<Window x:Class="Nodepad.Desktop.Windows.NoteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Nodepad Note"
+        Icon="/Assets/Branding/h2-notes-app-icon-v1.png"
+        Width="380"
+        Height="460"
+        MinWidth="300"
+        MinHeight="320"
+        WindowStartupLocation="Manual"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource AppCanvasBrush}"
+        AllowsTransparency="False"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="8"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <Border x:Name="NoteShell"
+            Margin="0"
+            Padding="14"
+            CornerRadius="0"
+            BorderThickness="0"
+            RenderOptions.ClearTypeHint="Enabled">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="Transparent"
+                    Cursor="SizeAll"
+                    MouseLeftButtonDown="DragSurface_OnMouseLeftButtonDown">
+                <Border x:Name="DragHandleIndicator"
+                        Width="56"
+                        Height="4"
+                        CornerRadius="2"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Opacity="0.55" />
+            </Border>
+
+            <Grid x:Name="HeaderGrip"
+                  Grid.Row="1"
+                  Background="Transparent"
+                  MouseLeftButtonDown="DragSurface_OnMouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="TitleBox"
+                         TextChanged="TitleBox_OnTextChanged"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Padding="0"
+                         FontFamily="Georgia"
+                         FontSize="19"
+                         FontWeight="Bold"
+                         VerticalContentAlignment="Center" />
+
+                <Button x:Name="MenuButton"
+                        Grid.Column="1"
+                        Content="..."
+                        Style="{StaticResource NoteIconButtonStyle}"
+                        Click="MenuButton_OnClick"
+                        Margin="8,0,6,0" />
+
+                <Button x:Name="HideButton"
+                        Grid.Column="2"
+                        Content="X"
+                        Style="{StaticResource NoteIconButtonStyle}"
+                        Click="HideButton_OnClick" />
+            </Grid>
+
+            <TextBlock x:Name="ProjectHubSummaryText"
+                       Grid.Row="1"
+                       Visibility="Collapsed" />
+
+            <Border x:Name="QuickNoteBodyPanel"
+                    Grid.Row="2"
+                    Margin="0,12,0,0"
+                    Visibility="Collapsed">
+                <RichTextBox x:Name="BodyBox"
+                             TextChanged="BodyBox_OnTextChanged"
+                             LostFocus="TypingEditor_OnLostFocus"
+                             PreviewMouseRightButtonDown="RichTextEditor_OnPreviewMouseRightButtonDown"
+                             PreviewMouseRightButtonUp="RichTextEditor_OnPreviewMouseRightButtonUp"
+                             ContextMenuOpening="RichTextEditor_OnContextMenuOpening"
+                             ContextMenu="{x:Null}"
+                             AcceptsTab="True"
+                             SpellCheck.IsEnabled="False" />
+            </Border>
+
+            <Border x:Name="ProjectHubPanel"
+                    Grid.Row="2"
+                    Margin="0,12,0,0"
+                    Padding="0"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer x:Name="ProjectEntriesScrollViewer"
+                                  Grid.Row="0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  VerticalAlignment="Stretch">
+                        <ItemsControl x:Name="ProjectEntriesControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,12"
+                                            Padding="12"
+                                            CornerRadius="14"
+                                            Background="{Binding ElementName=BodyBox, Path=Background}"
+                                            BorderBrush="{Binding ElementName=BodyBox, Path=BorderBrush}"
+                                            BorderThickness="1"
+                                            AllowDrop="True"
+                                            PreviewMouseLeftButtonDown="ProjectCard_OnPreviewMouseLeftButtonDown"
+                                            PreviewMouseMove="ProjectCard_OnPreviewMouseMove"
+                                            PreviewMouseLeftButtonUp="ProjectCard_OnPreviewMouseLeftButtonUp"
+                                            DragOver="ProjectCard_OnDragOver"
+                                            Drop="ProjectCard_OnDrop">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="4" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Grid.Column="0"
+                                                        Margin="0,2,10,2"
+                                                        CornerRadius="2"
+                                                        Background="{Binding ElementName=ProjectHubSummaryText, Path=Foreground}" />
+
+                                                <Grid Grid.Column="1"
+                                                      Cursor="Hand"
+                                                      MouseLeftButtonUp="ProjectHeader_OnMouseLeftButtonUp">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Border VerticalAlignment="Top"
+                                                            Margin="0,2,7,0"
+                                                            Padding="0,0,3,3"
+                                                            Background="Transparent"
+                                                            ToolTip="Chuột trái: mở/thu gọn. Chuột phải: ưu tiên dự án.">
+                                                        <Border.ContextMenu>
+                                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                                         FontFamily="Segoe UI"
+                                                                         FontSize="13"
+                                                                         Background="{StaticResource PanelBrush}"
+                                                                         Foreground="{StaticResource TextBrush}"
+                                                                         BorderBrush="{StaticResource PanelBorderBrush}">
+                                                                <MenuItem Header="Ưu tiên thực hiện trước"
+                                                                          Click="PrioritizeProjectMenuItem_OnClick">
+                                                                    <MenuItem.Icon>
+                                                                        <TextBlock Text="&#xE74A;"
+                                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                                   FontSize="16" />
+                                                                    </MenuItem.Icon>
+                                                                    <MenuItem.Style>
+                                                                        <Style TargetType="MenuItem">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding OrderNumber}" Value="1">
+                                                                                    <Setter Property="IsEnabled" Value="False" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </MenuItem.Style>
+                                                                </MenuItem>
+                                                            </ContextMenu>
+                                                        </Border.ContextMenu>
+                                                        <TextBlock Text="{Binding IsExpanded, Converter={StaticResource BooleanToChevronConverter}}"
+                                                                   FontFamily="Segoe UI Symbol"
+                                                                   FontSize="14"
+                                                                   Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <TextBlock Text="{Binding DisplayOrderLabel}"
+                                                                       Margin="0,1,8,0"
+                                                                       VerticalAlignment="Top"
+                                                                       FontFamily="Georgia"
+                                                                       FontSize="18"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+
+                                                            <RichTextBox Grid.Column="1"
+                                                                         Tag="ProjectTitleEditor"
+                                                                         Margin="0,0,0,0"
+                                                                         BorderThickness="0"
+                                                                         Background="Transparent"
+                                                                         Padding="0"
+                                                                         AcceptsTab="False"
+                                                                         SpellCheck.IsEnabled="False"
+                                                                         Loaded="ProjectNameEditor_OnLoaded"
+                                                                         TextChanged="ProjectNameEditor_OnTextChanged"
+                                                                         LostFocus="TypingEditor_OnLostFocus"
+                                                                         PreviewMouseRightButtonDown="RichTextEditor_OnPreviewMouseRightButtonDown"
+                                                                         PreviewMouseRightButtonUp="RichTextEditor_OnPreviewMouseRightButtonUp"
+                                                                         ContextMenuOpening="RichTextEditor_OnContextMenuOpening"
+                                                                         ContextMenu="{x:Null}"
+                                                                         PreviewKeyDown="ProjectNameEditor_OnPreviewKeyDown"
+                                                                         MinHeight="28"
+                                                                         VerticalAlignment="Top" />
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding HeaderLine}"
+                                                                   Margin="0,4,0,0"
+                                                                   FontFamily="Segoe UI Semibold"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{Binding ElementName=ProjectHubSummaryText, Path=Foreground}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding Preview}"
+                                                                   Margin="0,6,0,0"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{Binding ElementName=BodyBox, Path=Foreground}"
+                                                                   Opacity="0.78">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="2"
+                                                                Margin="10,0,0,0">
+                                                        <Button Content="X"
+                                                                Style="{StaticResource NoteIconButtonStyle}"
+                                                                Click="RemoveProjectButton_OnClick"
+                                                                VerticalAlignment="Top" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Grid>
+
+                                            <Grid x:Name="ProjectDetailsPanel"
+                                                  Margin="0,12,0,0">
+                                                <Grid.Style>
+                                                    <Style TargetType="Grid">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Grid.Style>
+
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <Grid Grid.Row="0"
+                                                      Cursor="Hand"
+                                                      MouseLeftButtonDown="ChecklistSectionHeader_OnMouseLeftButtonDown">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding IsChecklistExpanded, Converter={StaticResource BooleanToChevronConverter}}"
+                                                                   Margin="0,1,8,0"
+                                                                   FontFamily="Segoe UI Symbol"
+                                                                   FontSize="13"
+                                                                   Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+                                                        <TextBlock Text="Checklist"
+                                                                   FontFamily="Segoe UI Semibold"
+                                                                   Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding HeaderLine}"
+                                                               Margin="12,0,0,0"
+                                                               HorizontalAlignment="Right"
+                                                               TextAlignment="Right"
+                                                               TextWrapping="Wrap"
+                                                               FontFamily="Segoe UI Semibold"
+                                                               Foreground="{Binding ElementName=ProjectHubSummaryText, Path=Foreground}" />
+                                                </Grid>
+
+                                                <StackPanel Grid.Row="1" Margin="0,0,0,0">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsChecklistExpanded}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+
+                                                    <ItemsControl ItemsSource="{Binding ChecklistItems}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Margin="0,0,0,0"
+                                                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        AllowDrop="True"
+                                                                        PreviewMouseLeftButtonDown="ChecklistItemContainer_OnPreviewMouseLeftButtonDown"
+                                                                        PreviewMouseMove="ChecklistItemContainer_OnPreviewMouseMove"
+                                                                        PreviewMouseLeftButtonUp="ChecklistItemContainer_OnPreviewMouseLeftButtonUp"
+                                                                        DragOver="ChecklistItemContainer_OnDragOver"
+                                                                        Drop="ChecklistItemContainer_OnDrop">
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+
+                                                                        <Border Grid.Column="0"
+                                                                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                                Cursor="SizeAll"
+                                                                                Padding="0,0,1,0"
+                                                                                PreviewMouseLeftButtonDown="ChecklistItemDragHandle_OnPreviewMouseLeftButtonDown"
+                                                                                PreviewMouseMove="ChecklistItemDragHandle_OnPreviewMouseMove"
+                                                                                PreviewMouseLeftButtonUp="ChecklistItemDragHandle_OnPreviewMouseLeftButtonUp">
+                                                                            <TextBlock Text="⋮⋮"
+                                                                                       FontSize="14"
+                                                                                       Opacity="0.55"
+                                                                                       Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+                                                                        </Border>
+
+                                                                        <CheckBox Grid.Column="1"
+                                                                                  IsChecked="{Binding IsCompleted, UpdateSourceTrigger=PropertyChanged}"
+                                                                                  Checked="ProjectChecklistItemState_OnChanged"
+                                                                                  Unchecked="ProjectChecklistItemState_OnChanged"
+                                                                                  VerticalAlignment="Top"
+                                                                                  Margin="0,4,0,0" />
+
+                                                                        <RichTextBox Grid.Column="2"
+                                                                                     Tag="ChecklistItemEditor"
+                                                                                     Margin="0,0,0,0"
+                                                                                     BorderThickness="0"
+                                                                                     Background="Transparent"
+                                                                                     AcceptsTab="True"
+                                                                                     SpellCheck.IsEnabled="False"
+                                                                                     VerticalScrollBarVisibility="Auto"
+                                                                                     MinHeight="10"
+                                                                                     Loaded="ChecklistItemEditor_OnLoaded"
+                                                                                     TextChanged="ChecklistItemEditor_OnTextChanged"
+                                                                                     LostFocus="TypingEditor_OnLostFocus"
+                                                                                     PreviewMouseRightButtonDown="RichTextEditor_OnPreviewMouseRightButtonDown"
+                                                                                     PreviewMouseRightButtonUp="RichTextEditor_OnPreviewMouseRightButtonUp"
+                                                                                     ContextMenuOpening="RichTextEditor_OnContextMenuOpening"
+                                                                                     ContextMenu="{x:Null}" />
+
+                                                                        <Button Grid.Column="3"
+                                                                                Content="X"
+                                                                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                                Style="{StaticResource NoteIconButtonStyle}"
+                                                                                Click="RemoveProjectChecklistItemButton_OnClick"
+                                                                                Width="10"
+                                                                                Height="20"
+                                                                                VerticalAlignment="Top" />
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                    <Button Content="Add"
+                                                            Style="{StaticResource GhostButtonStyle}"
+                                                            Click="AddProjectChecklistItemButton_OnClick"
+                                                            HorizontalAlignment="Left"
+                                                            Width="50"
+                                                            Height="20"
+                                                            Padding="0,0,0,0"/>
+                                                </StackPanel>
+
+                                                <TextBlock Grid.Row="2"
+                                                            Text="Notes"
+                                                            FontFamily="Segoe UI Semibold"
+                                                            Foreground="{Binding ElementName=BodyBox, Path=Foreground}" />
+                                                <RichTextBox Grid.Row="3"
+                                                             Tag="ProjectNotesEditor"
+                                                             Margin="0,0,0,0"
+                                                             BorderThickness="1"
+                                                             AcceptsTab="True"
+                                                             SpellCheck.IsEnabled="False"
+                                                             MinHeight="84"
+                                                             Loaded="ProjectNotesEditor_OnLoaded"
+                                                             TextChanged="ProjectNotesEditor_OnTextChanged"
+                                                             LostFocus="TypingEditor_OnLostFocus"
+                                                             PreviewMouseRightButtonDown="RichTextEditor_OnPreviewMouseRightButtonDown"
+                                                             PreviewMouseRightButtonUp="RichTextEditor_OnPreviewMouseRightButtonUp"
+                                                             ContextMenuOpening="RichTextEditor_OnContextMenuOpening"
+                                                             ContextMenu="{x:Null}"
+                                                              Padding="5,0,0,0"
+                                                            
+                                                    >
+                                                    <RichTextBox.Resources>
+                                                        <Style TargetType="{x:Type Paragraph}">
+                                                            <Setter Property="Margin" Value="0"/>
+                                                            <Setter Property="LineHeight" Value="10"/>
+                                                        </Style>
+                                                    </RichTextBox.Resources>
+
+                                                </RichTextBox>
+
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="1" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="NewProjectNameTextBox"
+                                 Margin="0,0,8,0"
+                                 BorderThickness="1"
+                                 KeyDown="NewProjectNameTextBox_OnKeyDown" />
+                        <Button Grid.Column="1"
+                                Content="Add project"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Click="AddProjectButton_OnClick" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Popup x:Name="NoteMenuPopup"
+                   PlacementTarget="{Binding ElementName=MenuButton}"
+                   Placement="Bottom"
+                   StaysOpen="False"
+                   AllowsTransparency="True"
+                   PopupAnimation="Fade">
+                <Border x:Name="NoteMenuCard"
+                        Padding="14"
+                        CornerRadius="18"
+                        BorderThickness="1.1"
+                        MinWidth="270">
+                    <StackPanel>
+                        <TextBlock Text="Appearance"
+                                   FontFamily="Segoe UI Semibold"
+                                   Margin="0,0,0,10" />
+                        <WrapPanel x:Name="PalettePanel" Margin="0,0,0,10" />
+
+                        <TextBlock Text="Font"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <ComboBox x:Name="FontFamilyComboBox"
+                                  ItemsSource="{Binding FontOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  SelectionChanged="FontFamilyComboBox_OnSelectionChanged"
+                                  Margin="0,6,0,10" />
+
+                        <TextBlock Text="Size"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <ComboBox x:Name="FontSizeComboBox"
+                                  ItemsSource="{Binding FontSizeOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  SelectionChanged="FontSizeComboBox_OnSelectionChanged"
+                                  Margin="0,6,0,10" />
+
+                        <TextBlock x:Name="OpacityLabel"
+                                   Text="Inactive opacity 100%"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <Slider x:Name="OpacitySlider"
+                                Minimum="0.01"
+                                Maximum="1"
+                                TickFrequency="0.01"
+                                ValueChanged="OpacitySlider_OnValueChanged"
+                                Margin="0,6,0,10" />
+
+                        <TextBlock Text="Tags"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <TextBox x:Name="TagsBox"
+                                 TextChanged="TagsBox_OnTextChanged"
+                                 Margin="0,6,0,10" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <CheckBox x:Name="PinCheckBox"
+                                      Content="Always on top"
+                                      Checked="PinCheckBox_OnChanged"
+                                      Unchecked="PinCheckBox_OnChanged" />
+                            <CheckBox x:Name="StarCheckBox"
+                                      Content="Starred"
+                                      Checked="StarCheckBox_OnChanged"
+                                      Unchecked="StarCheckBox_OnChanged" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="DuplicateButton"
+                                    Content="Duplicate"
+                                    Style="{StaticResource GhostButtonStyle}"
+                                    Click="DuplicateButton_OnClick"
+                                    Margin="0,0,8,0" />
+                            <Button Content="Archive"
+                                    Style="{StaticResource GhostButtonStyle}"
+                                    Click="ArchiveButton_OnClick"
+                                    Margin="0,0,8,0" />
+                            <Button Content="Delete"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="DeleteButton_OnClick" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <Popup x:Name="SelectionFormatPopup"
+                   Placement="MousePoint"
+                   StaysOpen="False"
+                   AllowsTransparency="True"
+                   PopupAnimation="Fade"
+                   Closed="SelectionFormatPopup_OnClosed">
+                <Border x:Name="SelectionFormatCard"
+                        Padding="0"
+                        CornerRadius="16"
+                        BorderThickness="1.1"
+                        MinWidth="390"
+                        RenderTransformOrigin="0,0">
+                    <Border.LayoutTransform>
+                        <ScaleTransform ScaleX="0.715" ScaleY="0.715" />
+                    </Border.LayoutTransform>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Margin="14,14,14,12">
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+
+                                <ComboBox x:Name="SelectionFontFamilyComboBox"
+                                          ItemsSource="{Binding FontOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          SelectionChanged="SelectionFontFamilyComboBox_OnSelectionChanged"
+                                          Margin="0,0,8,0" />
+
+                                <Button x:Name="SelectionDecreaseFontButton"
+                                        Grid.Column="1"
+                                        Content="−"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionDecreaseFontButton_OnClick" />
+
+                                <ComboBox x:Name="SelectionFontSizeComboBox"
+                                          Grid.Column="2"
+                                          ItemsSource="{Binding FontSizeOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          SelectionChanged="SelectionFontSizeComboBox_OnSelectionChanged"
+                                          Margin="6,0" />
+
+                                <Button x:Name="SelectionIncreaseFontButton"
+                                        Grid.Column="3"
+                                        Content="+"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Margin="6,0,0,0"
+                                        Click="SelectionIncreaseFontButton_OnClick" />
+
+                                <Button x:Name="SelectionQuickTextColorButton"
+                                        Grid.Column="4"
+                                        Content="A"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Margin="6,0,0,0"
+                                        FontFamily="Segoe UI Semibold"
+                                        Click="SelectionApplyTextRgbButton_OnClick" />
+
+                                <Button x:Name="SelectionQuickHighlightButton"
+                                        Grid.Column="5"
+                                        Content="▨"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Margin="6,0,0,0"
+                                        FontFamily="Segoe UI Symbol"
+                                        Click="SelectionApplyHighlightRgbButton_OnClick" />
+                            </Grid>
+
+                            <TextBlock Text="Style"
+                                       Foreground="{StaticResource MutedTextBrush}" />
+                            <WrapPanel x:Name="SelectionStylePanel"
+                                       Margin="0,6,0,12">
+                                <Button x:Name="SelectionBoldButton"
+                                        Content="B"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        FontWeight="Bold"
+                                        Click="SelectionBoldButton_OnClick" />
+                                <Button x:Name="SelectionItalicButton"
+                                        Content="I"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        FontStyle="Italic"
+                                        Click="SelectionItalicButton_OnClick" />
+                                <Button x:Name="SelectionUnderlineButton"
+                                        Content="U"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionUnderlineButton_OnClick" />
+                                <Button x:Name="SelectionStrikethroughButton"
+                                        Content="S"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionStrikethroughButton_OnClick" />
+                                <Button x:Name="SelectionCaseButton"
+                                        Content="aA"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionToggleCaseButton_OnClick" />
+                            </WrapPanel>
+
+                            <TextBlock Text="Paragraph"
+                                       Foreground="{StaticResource MutedTextBrush}" />
+                            <WrapPanel x:Name="SelectionParagraphPanel"
+                                       Margin="0,6,0,12">
+                                <Button x:Name="SelectionAlignLeftButton"
+                                        Content="☰"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionAlignLeftButton_OnClick" />
+                                <Button x:Name="SelectionDecreaseIndentButton"
+                                        Content="⇤"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionDecreaseIndentButton_OnClick" />
+                                <Button x:Name="SelectionIncreaseIndentButton"
+                                        Content="⇥"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionIncreaseIndentButton_OnClick" />
+                                <Button x:Name="SelectionBulletsButton"
+                                        Content="•"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionBulletsButton_OnClick" />
+                                <Button x:Name="SelectionNumberingButton"
+                                        Content="1."
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionNumberingButton_OnClick" />
+                                <Button x:Name="SelectionAlignJustifyButton"
+                                        Content="↕"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionAlignJustifyButton_OnClick" />
+                            </WrapPanel>
+
+                            <TextBlock Text="Insert"
+                                       Foreground="{StaticResource MutedTextBrush}" />
+                            <WrapPanel Margin="0,6,0,12">
+                                <Button Content="+•"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionInsertBulletTextButton_OnClick" />
+                                <Button Content="☐"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionInsertChecklistButton_OnClick" />
+                                <Button Content="1."
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionInsertNumberedTextButton_OnClick" />
+                                <Button Content="🔗"
+                                        Style="{StaticResource SelectionToolButtonStyle}"
+                                        Click="SelectionInsertLinkButton_OnClick" />
+                            </WrapPanel>
+
+                            <Expander Header="Colors"
+                                      IsExpanded="False">
+                                <StackPanel Margin="0,10,0,0">
+                                    <TextBlock Text="Text color"
+                                               Foreground="{StaticResource MutedTextBrush}" />
+                                    <WrapPanel x:Name="SelectionTextColorPanel"
+                                               Margin="0,6,0,10" />
+
+                                    <TextBlock Text="Highlight"
+                                               Foreground="{StaticResource MutedTextBrush}" />
+                                    <WrapPanel x:Name="SelectionHighlightColorPanel"
+                                               Margin="0,6,0,10" />
+
+                                    <TextBlock Text="RGB"
+                                               Foreground="{StaticResource MutedTextBrush}" />
+                                    <StackPanel Margin="0,6,0,0">
+                                        <Border x:Name="SelectionRgbPreview"
+                                                Width="52"
+                                                Height="24"
+                                                CornerRadius="6"
+                                                BorderThickness="1"
+                                                HorizontalAlignment="Left"
+                                                Margin="0,0,0,10" />
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="R"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource MutedTextBrush}" />
+                                            <Slider x:Name="SelectionRedSlider"
+                                                    Grid.Column="1"
+                                                    Minimum="0"
+                                                    Maximum="255"
+                                                    TickFrequency="1"
+                                                    ValueChanged="SelectionRgbSlider_OnValueChanged" />
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="G"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource MutedTextBrush}" />
+                                            <Slider x:Name="SelectionGreenSlider"
+                                                    Grid.Column="1"
+                                                    Minimum="0"
+                                                    Maximum="255"
+                                                    TickFrequency="1"
+                                                    ValueChanged="SelectionRgbSlider_OnValueChanged" />
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="B"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource MutedTextBrush}" />
+                                            <Slider x:Name="SelectionBlueSlider"
+                                                    Grid.Column="1"
+                                                    Minimum="0"
+                                                    Maximum="255"
+                                                    TickFrequency="1"
+                                                    ValueChanged="SelectionRgbSlider_OnValueChanged" />
+                                        </Grid>
+
+                                        <WrapPanel>
+                                            <Button Content="Text RGB"
+                                                    Style="{StaticResource SelectionToolbarButtonStyle}"
+                                                    Click="SelectionApplyTextRgbButton_OnClick" />
+                                            <Button Content="Highlight RGB"
+                                                    Style="{StaticResource SelectionToolbarButtonStyle}"
+                                                    Click="SelectionApplyHighlightRgbButton_OnClick" />
+                                            <Button Content="Clear highlight"
+                                                    Style="{StaticResource SelectionToolbarButtonStyle}"
+                                                    Click="SelectionClearHighlightButton_OnClick" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1">
+                            <Border Height="1"
+                                    Background="{StaticResource PanelBorderBrush}" />
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionUndoButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="↶"
+                                               FontSize="18"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Undo"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+Z"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionCutButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="✂"
+                                               FontSize="16"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Cut"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+X"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionCopyButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="⧉"
+                                               FontSize="16"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Copy"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+C"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionPasteButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="📋"
+                                               FontSize="15"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Paste"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+V"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="SelectionPastePlainButton"
+                                    Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionPastePlainButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="T"
+                                               FontSize="15"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Paste without formatting"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Shift+Ctrl+V"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionDeleteButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="🗑"
+                                               FontSize="15"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Delete"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Del"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionSelectAllButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="◫"
+                                               FontSize="15"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Select All"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+A"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Border Height="1"
+                                    Margin="8,4"
+                                    Background="{StaticResource PanelBorderBrush}" />
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionFindReplaceButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="⌕"
+                                               FontSize="16"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Find &amp; Replace"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="›"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionSearchGoogleButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="☁"
+                                               FontSize="15"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock x:Name="SelectionSearchGoogleLabel"
+                                               Grid.Column="1"
+                                               Text="Search at Google"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Ctrl+G"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Border Height="1"
+                                    Margin="8,4"
+                                    Background="{StaticResource PanelBorderBrush}" />
+
+                            <Button Style="{StaticResource SelectionMenuRowButtonStyle}"
+                                    Click="SelectionClearFormattingButton_OnClick">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="⌫"
+                                               FontSize="16"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="Clear Formatting"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Popup>
+
+            <Popup x:Name="DragPreviewPopup"
+                   PlacementTarget="{Binding ElementName=NoteShell}"
+                   Placement="Relative"
+                   AllowsTransparency="True"
+                   StaysOpen="True"
+                   IsHitTestVisible="False"
+                   PopupAnimation="Fade">
+                <Border x:Name="DragPreviewCard"
+                        Padding="10"
+                        CornerRadius="12"
+                        BorderThickness="1"
+                        Opacity="0.96">
+                    <StackPanel MaxWidth="260">
+                        <TextBlock x:Name="DragPreviewTitleText"
+                                   FontFamily="Segoe UI Semibold"
+                                   TextWrapping="Wrap" />
+                        <TextBlock x:Name="DragPreviewBodyText"
+                                   Margin="0,4,0,0"
+                                   Opacity="0.78"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Popup>
+        </Grid>
+    </Border>
+</Window>
