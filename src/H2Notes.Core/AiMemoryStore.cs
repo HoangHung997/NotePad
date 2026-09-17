@@ -72,8 +72,6 @@ public sealed class AiMemoryStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            // Memory is derived from canonical project/chat data. Failure to update memory must never
-            // block the main save; the next successful sync can rebuild it completely.
             return false;
         }
     }
@@ -195,7 +193,7 @@ public sealed class AiMemoryStore
             Kind = kind,
             SourceType = sourceType,
             SourceId = sourceId,
-            CreatedUtc = created is null ? null : created.Value.Kind == DateTimeKind.Utc ? created : created.Value.ToUniversalTime(),
+            CreatedUtc = created is null ? null : created.Value.Kind == DateTimeKind.Utc ? created.Value : created.Value.ToUniversalTime(),
             UpdatedUtc = updated.Kind == DateTimeKind.Utc ? updated : updated.ToUniversalTime(),
             Title = title,
             Text = text,
@@ -243,16 +241,16 @@ public sealed class AiMemoryStore
         return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    private static (DateTime Start, DateTime End)? ResolveTimeWindow(string query, DateTimeOffset now)
+    private static LocalWindow? ResolveTimeWindow(string query, DateTimeOffset now)
     {
         var q = RemoveDiacritics(query.ToLowerInvariant());
         if (!q.Contains("hom nay") && !q.Contains("sang nay") && !q.Contains("chieu nay") && !q.Contains("toi nay") && !q.Contains("dem nay")) return null;
         var day = now.LocalDateTime.Date;
-        if (q.Contains("sang nay")) return (day.AddHours(5), day.AddHours(12).AddTicks(-1));
-        if (q.Contains("chieu nay")) return (day.AddHours(12), day.AddHours(18).AddTicks(-1));
-        if (q.Contains("toi nay")) return (day.AddHours(18), day.AddHours(23).AddTicks(-1));
-        if (q.Contains("dem nay")) return (day.AddHours(23), day.AddDays(1).AddHours(5).AddTicks(-1));
-        return (day, day.AddDays(1).AddTicks(-1));
+        if (q.Contains("sang nay")) return new(day.AddHours(5), day.AddHours(12).AddTicks(-1));
+        if (q.Contains("chieu nay")) return new(day.AddHours(12), day.AddHours(18).AddTicks(-1));
+        if (q.Contains("toi nay")) return new(day.AddHours(18), day.AddHours(23).AddTicks(-1));
+        if (q.Contains("dem nay")) return new(day.AddHours(23), day.AddDays(1).AddHours(5).AddTicks(-1));
+        return new(day, day.AddDays(1).AddTicks(-1));
     }
 
     private static bool IsBroadWorkspaceQuery(string query)
@@ -319,6 +317,5 @@ public sealed class AiMemoryStore
     private readonly record struct LocalWindow(DateTime Start, DateTime End)
     {
         public bool Contains(DateTime local) => local >= Start && local <= End;
-        public static implicit operator LocalWindow((DateTime Start, DateTime End) value) => new(value.Start, value.End);
     }
 }
