@@ -1,3 +1,5 @@
+using H2AgentLab.Prompting;
+using H2AgentLab.Transport;
 using H2Notes.Core;
 
 namespace H2AgentLab;
@@ -74,6 +76,48 @@ public static class V2ArchitectureTests
             if (AiModelCapabilities.IsOfficialOpenAi(compatible)
                 || AiModelCapabilities.GetReasoningOptions(compatible).Count != 0)
                 throw new InvalidOperationException("Compatible endpoint inherited official OpenAI capability privileges.");
+        });
+
+        Test("V2 prompt keeps stable prefix ahead of all runtime context", () =>
+        {
+            const string sessionSentinel = "SESSION_JOURNAL_2026-09-18T01:23:45+07:00";
+            const string workspaceSentinel = "WORKSPACE_MUTABLE_STATE_42";
+            const string timeSentinel = "CURRENT_TIME_2026-09-18T01:23:45+07:00";
+            const string userSentinel = "USER_INPUT_SENTINEL";
+
+            var layout = AgentPromptLayout.Create(
+                new AgentPromptStablePrefix(
+                    BasePolicy: "BASE_POLICY_STABLE",
+                    SecurityPolicy: "SECURITY_POLICY_STABLE",
+                    ModelPolicy: "MODEL_POLICY_STABLE",
+                    ToolNamespaceMetadata: "TOOL_NAMESPACE_STABLE"),
+                new AgentPromptRuntimeContext(
+                    TaskContract: "TASK_CONTRACT_DYNAMIC",
+                    WorkingState: sessionSentinel + "\n" + workspaceSentinel,
+                    LiveEnvironment: timeSentinel),
+                userSentinel);
+
+            if (layout.CacheBoundaryIndex != layout.StablePrefix.Count || layout.CacheBoundaryIndex != 4)
+                throw new InvalidOperationException("Stable prompt cache boundary moved or is ambiguous.");
+            if (!layout.Messages.Take(layout.CacheBoundaryIndex).SequenceEqual(layout.StablePrefix))
+                throw new InvalidOperationException("Stable prefix is not the first contiguous message block.");
+
+            var stableText = string.Join("\n", layout.StablePrefix.Select(x => x.Content));
+            if (stableText.Contains(sessionSentinel, StringComparison.Ordinal)
+                || stableText.Contains(workspaceSentinel, StringComparison.Ordinal)
+                || stableText.Contains(timeSentinel, StringComparison.Ordinal)
+                || stableText.Contains(userSentinel, StringComparison.Ordinal))
+                throw new InvalidOperationException("Dynamic time/session/workspace/user data leaked before the stable cache boundary.");
+
+            var dynamicText = string.Join("\n", layout.DynamicSuffix.Select(x => x.Content));
+            if (!dynamicText.Contains(sessionSentinel, StringComparison.Ordinal)
+                || !dynamicText.Contains(workspaceSentinel, StringComparison.Ordinal)
+                || !dynamicText.Contains(timeSentinel, StringComparison.Ordinal)
+                || !dynamicText.Contains(userSentinel, StringComparison.Ordinal))
+                throw new InvalidOperationException("Runtime context was not preserved after the stable prefix.");
+            if (layout.Messages[^1].Role != AgentTransportMessageRole.User
+                || layout.Messages[^1].Content != userSentinel)
+                throw new InvalidOperationException("User input must remain the final dynamic message.");
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
