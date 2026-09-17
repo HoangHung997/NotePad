@@ -60,13 +60,13 @@ Rules:
 
 ## Phase 02 — transport abstraction
 
-- [~] **V2-0201 — Define `IAgentTransport` and typed stream events.**  
-  Must support start/continue/cancel/dispose and capability reporting; orchestration must not know provider JSON.
+- [x] **V2-0201 — Define `IAgentTransport` and typed stream events.**  
+  Evidence: `Transport/IAgentTransport.cs` now owns provider-neutral start/continue/cancel/dispose contracts plus typed response/text/reasoning/tool/usage/completion events; provider/network JSON types do not leak through the interface. `Transport/V2TransportContractTests.cs` verifies the lifecycle and typed start/continuation sequence. GitHub Actions run `35239473355` completed successfully, including H2 Notes 336/336, Agent Lab build/v1 regressions and the v2 transport contract test step.
 
-- [ ] **V2-0202 — Define `AgentTransportCapabilities`.**  
-  Flags: native tools, incremental continuation, WebSocket, provider compaction, prompt cache control, parallel tool calls, native image/file input, usage metrics.
+- [x] **V2-0202 — Define `AgentTransportCapabilities`.**  
+  Evidence: `Transport/AgentTransportCapabilities.cs` exposes independent flags for native tools, incremental continuation, WebSocket, provider compaction, prompt cache control, parallel tools, native image/file input and usage metrics, with minimal/Ollama/Chat fallback profiles. The same contract suite verifies independent capability preservation; CI run `35239473355` passed.
 
-- [ ] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
+- [~] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
   Acceptance: native tool calls + thinking replay work with existing mock tests; no regression.
 
 - [ ] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0201 — Define IAgentTransport and typed stream events`.
+**Active task:** `V2-0203 — Wrap current Ollama behavior in OllamaTransport`.
