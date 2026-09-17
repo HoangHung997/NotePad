@@ -44,13 +44,10 @@ public sealed partial class AiChatPanel
         var effort = _conversation?.ReasoningEffort;
         var supported = AiModelCapabilities.GetReasoningOptions(profile);
         var copy = AiModelCapabilities.WithReasoning(profile, effort is not null && supported.Contains(effort) ? effort : null);
-        // An unknown model has no verified effort parameter, even if another model
-        // previously had a per-conversation or profile selection.
         if (supported.Count == 0) copy.ReasoningEffort = "";
         return copy;
     }
 
-    // Null means provider/profile default, including models without a known effort API.
     public string? SelectedReasoningEffort
     {
         get
@@ -61,9 +58,7 @@ public sealed partial class AiChatPanel
         }
     }
 
-    // Injectable for tests: creating/reopening a panel must never start the microphone.
     public IChatDictationService DictationService { get; set; } = new ChatDictationService();
-    // Tests replace this BEFORE selecting permissions; never write the user's live config.
     public Action<LocalConfiguration> PersistComposerPermissions { get; set; } = settings => settings.Save();
     public event Action? ComposerOptionsChanged;
 
@@ -111,7 +106,6 @@ public sealed partial class AiChatPanel
         _stop.Name = "ChatStop";
         _send.Content = new AppIcon(IconKind.ArrowUp, 18) { Foreground = Brushes.White };
         _stop.Content = new AppIcon(IconKind.Stop, 17) { Foreground = Brushes.White };
-        // Main replaces this content for timeline markers; restore only the normal send icon.
         _markerMode.IsCheckedChanged += (_, _) => RefreshComposerSendIcon();
         _send.PropertyChanged += (_, e) =>
         {
@@ -252,7 +246,6 @@ public sealed partial class AiChatPanel
             finally { _permissionPromptOpen = false; RefreshComposerOptions(); }
             if (!accepted) return;
         }
-        // A delayed modal must never grant access to a different conversation/project.
         if (scope != _scope || conversation != _conversation || version != _composerScopeVersion || ComposerOptionsBusy) return;
         var selected = EnsureConversation();
         var previousGrants = _app.LocalSettings.Ai.ProjectAccessConversationIds ?? [];
@@ -298,7 +291,7 @@ public sealed partial class AiChatPanel
     {
         AiPermissionMode.ReadOnly => "Chỉ trả lời; không áp dụng thay đổi dữ liệu dự án và không lưu tệp từ AI.",
         AiPermissionMode.ProjectAccess => "Chỉ trong dự án H2 Notes đang chọn: AI được tự thêm, sửa hoặc xóa công việc; thêm, sửa hoặc xóa đúng đoạn ghi chú; và định dạng phần nội dung AI thêm/sửa. "
-            + "Các thao tác hợp lệ tự áp dụng sau khi AI trả lời, không hỏi lại từng lần. Đây không phải quyền hệ điều hành: AI không chạy shell, không truy cập toàn máy và không tự ghi/xóa tệp ngoài dự án.",
+            + "Các thao tác hợp lệ tự áp dụng sau khi AI trả lời, không hỏi lại từng lần. Đây không phải quyền hệ điều hành của Codex: AI không chạy lệnh/shell, không truy cập toàn máy. Không tự xóa hoặc ghi đè tệp ngoài dự án. Lưu tệp ngoài dự án vẫn do bạn chọn.",
         _ => "AI có thể đề xuất thêm, sửa hoặc xóa dữ liệu trong dự án. Khi có thay đổi, H2 Notes hiện ngay nội dung cụ thể cần thay đổi; bạn bấm Đồng ý một lần để áp dụng. Không có quyền hệ điều hành/shell và không tự ghi tệp ngoài dự án."
     };
     private static string EffortLabel(string value) => value switch
