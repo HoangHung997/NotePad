@@ -90,6 +90,30 @@ public static class V2MetricsTests
             return Task.CompletedTask;
         });
 
+        await Test("V2 trace persists policy safety and toolset versions for reproducibility", () =>
+        {
+            var state = Path.Combine(root, "versioned-trace");
+            var versions = AgentVersions.Current;
+            var telemetry = new AgentRunTelemetry(Guid.NewGuid(), Guid.NewGuid(), versions);
+            telemetry.Trace.Mark(AgentTraceKind.ContextReady, "v2-context");
+            var path = AgentTraceStore.Save(state, telemetry.Trace, telemetry.Metrics);
+
+            using var parsed = JsonDocument.Parse(File.ReadAllText(path));
+            var document = parsed.RootElement;
+            Check(document.GetProperty("schemaVersion").GetInt32() == AgentTrace.SchemaVersion,
+                "Persisted trace schema version did not advance with version metadata.");
+            var persisted = document.GetProperty("versions");
+            Check(persisted.GetProperty("agentPolicyVersion").GetString() == versions.AgentPolicyVersion,
+                "Agent policy version was not persisted.");
+            Check(persisted.GetProperty("safetyPolicyVersion").GetString() == versions.SafetyPolicyVersion,
+                "Safety policy version was not persisted.");
+            Check(persisted.GetProperty("toolsetVersion").GetString() == versions.ToolsetVersion,
+                "Toolset version was not persisted.");
+            Check(!File.ReadAllText(path).Contains("BASE AGENT POLICY", StringComparison.Ordinal),
+                "Versioned trace unexpectedly stored prompt policy text.");
+            return Task.CompletedTask;
+        });
+
         await Test("AgentRunner records cancellation without retrying", async () =>
         {
             var workspace = Path.Combine(root, "cancel-workspace");
