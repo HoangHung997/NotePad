@@ -24,7 +24,6 @@ public sealed class MarkdownMessageView : StackPanel
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
-    private static readonly Regex UnicodeEscape = new(@"\\u(?<hex>[0-9A-Fa-f]{4})", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private string _source = "";
 
     public string Markdown { get; private set; } = "";
@@ -48,7 +47,7 @@ public sealed class MarkdownMessageView : StackPanel
         foreach (var block in document) RenderBlock(block, Children, 0);
     }
 
-    private void RenderBlock(Block block, Controls controls, int depth)
+    private void RenderBlock(Block block, global::Avalonia.Controls.Controls controls, int depth)
     {
         switch (block)
         {
@@ -118,7 +117,7 @@ public sealed class MarkdownMessageView : StackPanel
         }
     }
 
-    private void RenderList(ListBlock list, Controls controls, int depth)
+    private void RenderList(ListBlock list, global::Avalonia.Controls.Controls controls, int depth)
     {
         var ordinal = 0;
         foreach (var item in list.OfType<ListItemBlock>())
@@ -135,7 +134,6 @@ public sealed class MarkdownMessageView : StackPanel
             {
                 if (child is ParagraphBlock paragraph && paragraph.Inline is not null)
                 {
-                    if (paragraph.Inline.FirstChild is TaskList marker) marker.Remove();
                     body.Children.Add(InlineBlock(paragraph.Inline, 13, FontWeight.Normal, "MarkdownListText"));
                 }
                 else RenderBlock(child, body.Children, depth + 1);
@@ -194,8 +192,6 @@ public sealed class MarkdownMessageView : StackPanel
                 lengths[c] = Math.Max(lengths[c], Math.Min(80, text.Length));
             }
         }
-        // Square root avoids one verbose column swallowing the whole bubble while still giving
-        // descriptive columns more room than short status/index columns.
         return lengths.Select(value => Math.Clamp(Math.Sqrt(value), 1.0, 4.5)).ToArray();
     }
 
@@ -352,9 +348,6 @@ public sealed class MarkdownMessageView : StackPanel
     private static string NormalizeDisplayText(string text)
     {
         if (!text.Contains("\\u", StringComparison.Ordinal)) return text;
-        // Some providers double-escape JSON unicode and send the characters "\\uXXXX" literally.
-        // Decode only valid scalar escapes; ordinary Markdown backslash escapes remain untouched and
-        // are handled by Markdig according to the CommonMark rules.
         var result = new StringBuilder(text.Length);
         for (var i = 0; i < text.Length;)
         {
