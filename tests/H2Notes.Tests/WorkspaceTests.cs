@@ -28,6 +28,41 @@ internal static class WorkspaceTests
             Check(bytes.SequenceEqual(File.ReadAllBytes(legacy)) && state.Notes[0].Projects.Count == 5);
             Check(Directory.GetFiles(Path.Combine(store.Root, "backups"), "migration-*.json").Any());
         });
+        test("AI time context exposes real timestamps and never invents legacy dates", () =>
+        {
+            var now = DateTimeOffset.Now;
+            var board = new NoteRecord { Title = "Board", NoteKind = "project-hub" };
+            var project = new ProjectRecord
+            {
+                Name = "Timed project", CreatedAtUtc = now.UtcDateTime.AddHours(-3), UpdatedAtUtc = now.UtcDateTime.AddHours(-1)
+            };
+            project.ChecklistItems.Add(new TaskRecord
+            {
+                Text = "Timed task", IsCompleted = true,
+                CreatedAtUtc = now.UtcDateTime.AddHours(-2.5), UpdatedAtUtc = now.UtcDateTime.AddHours(-1.5), CompletedAtUtc = now.UtcDateTime.AddHours(-1.5)
+            });
+            var message = new AiMessage { Content = "Recorded turn", CreatedAt = now.UtcDateTime.AddMinutes(-30) };
+            project.Conversations.Add(new AiConversation { Title = "Timed chat", CreatedAtUtc = now.UtcDateTime.AddHours(-2), Messages = [message] });
+            board.Projects.Add(project);
+            var known = new NoteRecord { Title = "Known note", NoteKind = "general", Content = "known", CreatedAtUtc = now.UtcDateTime.AddHours(-2), UpdatedAtUtc = now.UtcDateTime.AddHours(-1) };
+            var legacy = new NoteRecord { Title = "Legacy note", NoteKind = "general", Content = "legacy" };
+            var state = new SheetState { Notes = [board, known, legacy] };
+
+            using var context = JsonDocument.Parse(AiProjectContext.Build(state, project, null, true));
+            var root = context.RootElement;
+            Check(root.GetProperty("timeContext").GetProperty("currentLocalTime").GetString()!.Length > 10);
+            Check(root.GetProperty("timeContext").GetProperty("dayParts").GetProperty("morning").GetString() == "05:00-11:59");
+            Check(root.GetProperty("tasks")[0].GetProperty("completedLocal").ValueKind == JsonValueKind.String);
+            Check(root.GetProperty("conversations")[0].GetProperty("messages")[0].GetProperty("createdLocal").ValueKind == JsonValueKind.String);
+            var notes = root.GetProperty("workspaceSources").GetProperty("notes").EnumerateArray().ToArray();
+            Check(notes.Single(n => n.GetProperty("title").GetString() == "Known note").GetProperty("createdLocal").ValueKind == JsonValueKind.String);
+            Check(notes.Single(n => n.GetProperty("title").GetString() == "Legacy note").GetProperty("createdLocal").ValueKind == JsonValueKind.Null);
+
+            var timedTurn = AiHistory.RequestTurns(project.Conversations[0]).Single();
+            Check(timedTurn.Content.Contains("createdLocal=") && timedTurn.Content.Contains("Recorded turn"));
+            var untimed = new AiConversation { Messages = [new AiMessage { Content = "Legacy turn" }] };
+            Check(AiHistory.RequestTurns(untimed).Single().Content == "Legacy turn");
+        });
         test("Workspace rename keeps a stable GUID file path and project identity", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
