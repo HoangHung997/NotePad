@@ -247,7 +247,7 @@ public sealed partial class AiChatPanel
             try
             {
                 accepted = await Dialogs.Confirm(owner, "Toàn quyền dự án", PermissionDescription(mode)
-                    + "\n\nÁp dụng cho cuộc trao đổi hiện tại trong dự án: " + scope.Title + ".\nChỉ bật nếu bạn chấp nhận các thay đổi bổ sung này sau mỗi lần bấm Gửi.", "Cho phép trong dự án");
+                    + "\n\nÁp dụng cho cuộc trao đổi hiện tại trong dự án: " + scope.Title + ".\nKhi bật, các thao tác được phép trong dự án sẽ tự áp dụng sau khi AI trả lời, không hỏi lại từng lần.", "Cho phép trong dự án");
             }
             finally { _permissionPromptOpen = false; RefreshComposerOptions(); }
             if (!accepted) return;
@@ -296,10 +296,10 @@ public sealed partial class AiChatPanel
     };
     private static string PermissionDescription(AiPermissionMode mode) => mode switch
     {
-        AiPermissionMode.ReadOnly => "Chỉ trả lời; không tạo bản nháp tệp, không áp dụng thay đổi hay lưu tệp từ AI.",
-        AiPermissionMode.ProjectAccess => "Chỉ trong H2 Notes: AI được thêm nội dung vào ghi chú và thêm công việc của dự án đang chọn mà không hỏi lại từng lần. "
-            + "Không phải quyền hệ điều hành của Codex: không chạy lệnh/shell, không truy cập toàn máy. Không tự xóa hoặc ghi đè; thao tác phá hủy và ghi đè tệp ngoài vẫn cần bạn xác nhận. Lưu tệp vẫn do bạn chọn.",
-        _ => "AI trả lời hoặc đề xuất bản nháp; bạn xem trước và tự xác nhận áp dụng thay đổi hoặc lưu tệp. Không có quyền hệ điều hành/shell."
+        AiPermissionMode.ReadOnly => "Chỉ trả lời; không áp dụng thay đổi dữ liệu dự án và không lưu tệp từ AI.",
+        AiPermissionMode.ProjectAccess => "Chỉ trong dự án H2 Notes đang chọn: AI được tự thêm, sửa hoặc xóa công việc; thêm, sửa hoặc xóa đúng đoạn ghi chú; và định dạng phần nội dung AI thêm/sửa. "
+            + "Các thao tác hợp lệ tự áp dụng sau khi AI trả lời, không hỏi lại từng lần. Đây không phải quyền hệ điều hành: AI không chạy shell, không truy cập toàn máy và không tự ghi/xóa tệp ngoài dự án.",
+        _ => "AI có thể đề xuất thêm, sửa hoặc xóa dữ liệu trong dự án. Khi có thay đổi, H2 Notes hiện ngay nội dung cụ thể cần thay đổi; bạn bấm Đồng ý một lần để áp dụng. Không có quyền hệ điều hành/shell và không tự ghi tệp ngoài dự án."
     };
     private static string EffortLabel(string value) => value switch
     {
