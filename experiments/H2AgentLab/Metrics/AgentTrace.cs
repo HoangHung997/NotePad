@@ -39,7 +39,7 @@ public sealed record AgentTraceEvent
 /// </summary>
 public sealed class AgentTrace
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
     public const int MaxEvents = 4096;
     public const int MaxNameCharacters = 256;
     public const int MaxDetailCharacters = 4096;
@@ -49,16 +49,27 @@ public sealed class AgentTrace
     private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
     private long _sequence;
 
-    public AgentTrace(Guid? taskId = null, Guid? turnId = null, DateTimeOffset? startedUtc = null)
+    public AgentTrace(
+        Guid? taskId = null,
+        Guid? turnId = null,
+        DateTimeOffset? startedUtc = null,
+        AgentVersionIdentifiers? versions = null)
     {
         TaskId = taskId ?? Guid.NewGuid();
         TurnId = turnId ?? Guid.NewGuid();
         StartedUtc = startedUtc ?? DateTimeOffset.UtcNow;
+        Versions = versions;
     }
 
     public Guid TaskId { get; }
     public Guid TurnId { get; }
     public DateTimeOffset StartedUtc { get; }
+
+    /// <summary>
+    /// Optional v2 policy/toolset identity. V1 traces intentionally leave this null; v2 callers pass
+    /// the same immutable metadata carried by AgentPromptLayout so persisted evidence is reproducible.
+    /// </summary>
+    public AgentVersionIdentifiers? Versions { get; }
 
     [JsonIgnore]
     public double ElapsedMilliseconds => Stopwatch.GetElapsedTime(_startedTimestamp).TotalMilliseconds;
