@@ -81,6 +81,7 @@ public sealed partial class AiChatPanel
             if (result.Length == 0) { UpdateConnectionStatus(); return; }
             AiComposerInputData.CheckBudget(target.Scope.Conversations, target.Conversation, result);
             target.Conversation.DraftAttachments.AddRange(result);
+            _app.SaveChatDraft(target.Scope, target.Conversation);
             Touch(target.Scope); RenderAttachments();
             _status.Text = "Đã đính kèm: " + string.Join(", ", result.Select(a => a.Name))
                 + ". Bấm Gửi mới gửi AI; ảnh cần model đọc ảnh.";
@@ -126,7 +127,13 @@ public sealed partial class AiChatPanel
             ToolTip.SetTip(label, file.Name + "\n" + file.Notice);
             label.Click += async (_, _) => { if (TopLevel.GetTopLevel(this) is Window owner) await PreviewAttachment(owner, file); };
             var remove = AppIcon.Button(IconKind.Close, "Bỏ tệp đính kèm"); remove.Padding = new Thickness(5); remove.Width = 28;
-            remove.Click += (_, _) => { if (scope != _scope || conversation != _conversation) return; conversation?.DraftAttachments.Remove(file); Touch(scope); RenderAttachments(); };
+            remove.Click += (_, _) =>
+            {
+                if (scope != _scope || conversation != _conversation || conversation is null || scope is null) return;
+                conversation.DraftAttachments.Remove(file);
+                _app.SaveChatDraft(scope, conversation);
+                Touch(scope); RenderAttachments();
+            };
             row.Children.Add(label); row.Children.Add(remove); Grid.SetColumn(remove, 1); _draftFiles.Children.Add(row);
         }
     }
