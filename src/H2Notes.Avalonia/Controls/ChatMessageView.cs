@@ -10,8 +10,6 @@ namespace H2Notes.Avalonia.Controls;
 public sealed class ChatMessageView : Border
 {
     public AiMessage Message { get; }
-    // Kept as the canonical display text surface for existing actions/tests. Assistant messages
-    // render this text through MarkdownMessageView while Body itself stays hidden.
     public SelectableTextBlock Body { get; }
     public StackPanel Actions { get; } = new() { Spacing = 5 };
     private readonly TextBlock _time;
@@ -26,28 +24,27 @@ public sealed class ChatMessageView : Border
     private readonly ScrollViewer _thinkingScroll;
     private bool _thinkingScrollQueued;
     private readonly TextBlock _error = new() { Name = "MessageError", FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = RichEditor.Brush("#9C422B") };
+    private readonly bool _user;
+    private Control? _widthHost;
 
     public ChatMessageView(AiMessage message)
     {
         Message = message;
-        var user = message.Role == "user";
-        // Assistant content is allowed to use the whole available chat width. This is important for
-        // responsive Markdown tables: when the AI panel is resized, star-sized columns reflow with
-        // the bubble instead of remaining trapped in the old fixed 300 px width.
-        HorizontalAlignment = user ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
-        Margin = user ? new Thickness(72, 0, 0, 0) : new Thickness(0, 0, 18, 0);
+        _user = message.Role == "user";
+        HorizontalAlignment = _user ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        Margin = _user ? new Thickness(72, 0, 0, 0) : new Thickness(0, 0, 18, 0);
         Padding = new Thickness(12, 9);
-        if (user) MaxWidth = 520;
-        CornerRadius = user ? new CornerRadius(12, 12, 3, 12) : new CornerRadius(12, 12, 12, 3);
-        Background = RichEditor.Brush(user ? "#F4E7DC" : "#FFFFFF");
-        BorderBrush = RichEditor.Brush(user ? "#E7CCBA" : "#E5DCD3"); BorderThickness = new Thickness(1);
+        if (_user) MaxWidth = 520;
+        CornerRadius = _user ? new CornerRadius(12, 12, 3, 12) : new CornerRadius(12, 12, 12, 3);
+        Background = RichEditor.Brush(_user ? "#F4E7DC" : "#FFFFFF");
+        BorderBrush = RichEditor.Brush(_user ? "#E7CCBA" : "#E5DCD3"); BorderThickness = new Thickness(1);
         Body = new SelectableTextBlock { Name = "MessageBody", Text = message.Content, TextWrapping = TextWrapping.Wrap, FontSize = 13 };
         Body.PropertyChanged += (_, e) =>
         {
             if (e.Property == TextBlock.TextProperty) RefreshRenderedBody();
         };
         _time = new TextBlock { Name = "MessageTime", FontSize = 10, Foreground = RichEditor.Brush("#857568"), HorizontalAlignment = HorizontalAlignment.Right };
-        var title = new TextBlock { Text = message.IsTimelineMarker ? "Mốc ghi nhớ · chỉ lưu trong H2" : user ? "Bạn" : "AI · " + message.Model,
+        var title = new TextBlock { Text = message.IsTimelineMarker ? "Mốc ghi nhớ · chỉ lưu trong H2" : _user ? "Bạn" : "AI · " + message.Model,
             FontSize = 10, FontWeight = FontWeight.SemiBold, Foreground = RichEditor.Brush("#796C62"), TextWrapping = TextWrapping.Wrap };
         _thinkingScroll = new ScrollViewer { Name = "MessageThinkingScroll", MaxHeight = 150, Content = _thinkingText,
             HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
@@ -60,8 +57,37 @@ public sealed class ChatMessageView : Border
         };
         ToolTip.SetTip(_thinking, "Thu gọn: xem một dòng tiến trình mới nhất. Mở rộng: xem toàn bộ tiến trình model cung cấp. Không lưu vào lịch sử.");
         Child = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch, Children = { title, _thinking, _markdownBody, Body, _error, Actions, _time } };
+
+        // Keep the familiar left-aligned assistant bubble, but size it from its live chat host.
+        // Responsive Markdown tables therefore reflow whenever the dock/floating window is resized.
+        AttachedToVisualTree += (_, _) => AttachWidthHost();
+        DetachedFromVisualTree += (_, _) => DetachWidthHost();
         SetThinking("");
         Refresh();
+    }
+
+    private void AttachWidthHost()
+    {
+        if (_user) return;
+        DetachWidthHost();
+        _widthHost = Parent as Control;
+        if (_widthHost is null) return;
+        _widthHost.SizeChanged += WidthHostChanged;
+        ApplyAssistantWidth();
+    }
+
+    private void DetachWidthHost()
+    {
+        if (_widthHost is not null) _widthHost.SizeChanged -= WidthHostChanged;
+        _widthHost = null;
+    }
+
+    private void WidthHostChanged(object? sender, SizeChangedEventArgs e) => ApplyAssistantWidth();
+
+    private void ApplyAssistantWidth()
+    {
+        if (_user || _widthHost is null || _widthHost.Bounds.Width <= 0) return;
+        Width = Math.Max(180, _widthHost.Bounds.Width - Margin.Left - Margin.Right);
     }
 
     public void SetThinking(string text)
