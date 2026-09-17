@@ -34,7 +34,7 @@ public sealed record AgentToolDefinition(
     JsonElement Parameters,
     bool SupportsParallelExecution = false)
 {
-    public AgentToolDefinition Clone()
+    public AgentToolDefinition Snapshot()
         => this with { Parameters = Parameters.Clone() };
 }
 
