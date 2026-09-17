@@ -36,10 +36,44 @@ public static class V2ArchitectureTests
             var coreAssembly = typeof(AiProfile).Assembly;
             if (typeof(AiDocuments).Assembly != coreAssembly
                 || typeof(AiModelCapabilities).Assembly != coreAssembly
+                || typeof(AiProfileSnapshot).Assembly != coreAssembly
                 || typeof(AiPdfProcessor).Assembly != coreAssembly)
                 throw new InvalidOperationException("Expected shared H2Notes.Core capabilities are not from the same referenced assembly.");
             if (!string.Equals(coreAssembly.GetName().Name, "H2Notes.Core", StringComparison.Ordinal))
                 throw new InvalidOperationException("H2AgentLab no longer resolves H2Notes.Core directly.");
+        });
+
+        Test("Shared AI snapshot and endpoint capability checks stay in H2 Core", () =>
+        {
+            var original = new AiProfile
+            {
+                Id = Guid.NewGuid(),
+                Name = "official-openai",
+                Protocol = AiProtocol.OpenAiResponses,
+                BaseUrl = "https://api.openai.com/v1",
+                Model = "gpt-5",
+                TimeoutSeconds = 321,
+                WaitForCompletion = false,
+                RequestReasoningSummary = true,
+                ReasoningEffort = "high"
+            };
+            var snapshot = AiProfileSnapshot.Create(original);
+            original.Model = "mutated-after-snapshot";
+            original.ReasoningEffort = "low";
+
+            if (snapshot.Model != "gpt-5" || snapshot.ReasoningEffort != "high"
+                || snapshot.TimeoutSeconds != 321 || snapshot.WaitForCompletion)
+                throw new InvalidOperationException("Core AI profile snapshot did not preserve request-local settings.");
+            if (!AiModelCapabilities.IsOfficialOpenAi(snapshot))
+                throw new InvalidOperationException("Official OpenAI endpoint was not recognized by H2 Core.");
+            if (AiModelCapabilities.ResolveReasoningEffort(snapshot) != "high")
+                throw new InvalidOperationException("Core reasoning capability resolution changed unexpectedly.");
+
+            var compatible = AiProfileSnapshot.Create(snapshot);
+            compatible.BaseUrl = "https://example.test/v1";
+            if (AiModelCapabilities.IsOfficialOpenAi(compatible)
+                || AiModelCapabilities.GetReasoningOptions(compatible).Count != 0)
+                throw new InvalidOperationException("Compatible endpoint inherited official OpenAI capability privileges.");
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
