@@ -83,6 +83,8 @@ internal static class WorkspaceConcurrency
         List<WorkspaceMergeConflict> conflicts)
     {
         var path = $"note/{local.Id}";
+        local.CreatedAtUtc = Earliest(baseline?.CreatedAtUtc, local.CreatedAtUtc, remote.CreatedAtUtc);
+        local.UpdatedAtUtc = Latest(baseline?.UpdatedAtUtc, local.UpdatedAtUtc, remote.UpdatedAtUtc);
         if (baseline is null)
         {
             if (local.IsBoard && remote.IsBoard) MergeProjects(null, local, remote, dirtyProjects, writerId, conflicts);
@@ -165,6 +167,8 @@ internal static class WorkspaceConcurrency
             return;
         }
 
+        local.CreatedAtUtc = Earliest(baseline?.CreatedAtUtc, local.CreatedAtUtc, remote.CreatedAtUtc);
+        local.UpdatedAtUtc = Latest(baseline?.UpdatedAtUtc, local.UpdatedAtUtc, remote.UpdatedAtUtc);
         if (baseline is not null)
         {
             local.Name = MergeValue(baseline.Name, local.Name, remote.Name, path + "/name", conflicts);
@@ -182,6 +186,8 @@ internal static class WorkspaceConcurrency
 
     private static void CopyProjectShared(ProjectRecord source, ProjectRecord target)
     {
+        target.CreatedAtUtc = source.CreatedAtUtc;
+        target.UpdatedAtUtc = source.UpdatedAtUtc;
         target.Name = source.Name;
         target.NameRich = ProjectWorkspaceStore.Clone(source.NameRich);
         target.Notes = source.Notes;
@@ -195,7 +201,8 @@ internal static class WorkspaceConcurrency
     }
 
     private static bool SameProjectShared(ProjectRecord a, ProjectRecord b)
-        => Same(a.Name, b.Name) && Same(a.NameRich, b.NameRich)
+        => Same(a.CreatedAtUtc, b.CreatedAtUtc) && Same(a.UpdatedAtUtc, b.UpdatedAtUtc)
+           && Same(a.Name, b.Name) && Same(a.NameRich, b.NameRich)
            && Same(a.Notes, b.Notes) && Same(a.NotesRich, b.NotesRich)
            && Same(a.ChecklistItems, b.ChecklistItems) && Same(a.Conversations, b.Conversations)
            && Same(a.Links, b.Links) && Same(a.Extra, b.Extra);
@@ -241,6 +248,8 @@ internal static class WorkspaceConcurrency
 
     private static void MergeTask(TaskRecord? baseline, TaskRecord local, TaskRecord remote, string path, List<WorkspaceMergeConflict> conflicts)
     {
+        local.CreatedAtUtc = Earliest(baseline?.CreatedAtUtc, local.CreatedAtUtc, remote.CreatedAtUtc);
+        local.UpdatedAtUtc = Latest(baseline?.UpdatedAtUtc, local.UpdatedAtUtc, remote.UpdatedAtUtc);
         if (baseline is not null)
         {
             local.Text = MergeValue(baseline.Text, local.Text, remote.Text, path + "/text", conflicts);
@@ -249,6 +258,13 @@ internal static class WorkspaceConcurrency
             local.CommentRich = MergeValue(baseline.CommentRich, local.CommentRich, remote.CommentRich, path + "/comment-rich", conflicts);
             local.IsCompleted = MergeValue(baseline.IsCompleted, local.IsCompleted, remote.IsCompleted, path + "/completed", conflicts);
             local.Extra = MergeValue(baseline.Extra, local.Extra, remote.Extra, path + "/extra", conflicts);
+            local.CompletedAtUtc = local.IsCompleted
+                ? MergeValue(baseline.CompletedAtUtc, local.CompletedAtUtc, remote.CompletedAtUtc, path + "/completed-at", conflicts)
+                : null;
+        }
+        else
+        {
+            local.CompletedAtUtc = local.IsCompleted ? Earliest(local.CompletedAtUtc, remote.CompletedAtUtc) : null;
         }
         local.Revision = Math.Max(Math.Max(local.Revision, remote.Revision), baseline?.Revision ?? 0) + 1;
     }
@@ -307,7 +323,8 @@ internal static class WorkspaceConcurrency
     }
 
     private static bool SameConversationShared(AiConversation a, AiConversation b)
-        => Same(a.Title, b.Title) && Same(a.Messages, b.Messages);
+        => Same(a.CreatedAtUtc, b.CreatedAtUtc) && Same(a.UpdatedAtUtc, b.UpdatedAtUtc)
+           && Same(a.Title, b.Title) && Same(a.Messages, b.Messages);
 
     private static void MergeConversation(
         AiConversation? baseline,
@@ -317,6 +334,8 @@ internal static class WorkspaceConcurrency
         string writerId,
         List<WorkspaceMergeConflict> conflicts)
     {
+        local.CreatedAtUtc = Earliest(baseline?.CreatedAtUtc, local.CreatedAtUtc, remote.CreatedAtUtc);
+        local.UpdatedAtUtc = Latest(baseline?.UpdatedAtUtc, local.UpdatedAtUtc, remote.UpdatedAtUtc);
         if (baseline is not null)
             local.Title = MergeValue(baseline.Title, local.Title, remote.Title, path + "/title", conflicts);
 
@@ -361,6 +380,7 @@ internal static class WorkspaceConcurrency
 
     private static void MergeMessage(AiMessage? baseline, AiMessage local, AiMessage remote, string path, List<WorkspaceMergeConflict> conflicts)
     {
+        if (local.CreatedAt == default) local.CreatedAt = remote.CreatedAt;
         if (baseline is null)
         {
             if (local.Status == "streaming" && remote.Status != "streaming") CopyMessageMutable(remote, local);
@@ -413,6 +433,7 @@ internal static class WorkspaceConcurrency
 
     private static void CopyMessageMutable(AiMessage source, AiMessage target)
     {
+        if (target.CreatedAt == default) target.CreatedAt = source.CreatedAt;
         target.Content = source.Content; target.Status = source.Status; target.ErrorText = source.ErrorText;
         target.SavedFiles = ProjectWorkspaceStore.Clone(source.SavedFiles);
         target.ProjectActionsApplied = source.ProjectActionsApplied; target.ProjectActionsAudit = source.ProjectActionsAudit;
@@ -438,6 +459,12 @@ internal static class WorkspaceConcurrency
             if (!result.Any(x => x.SourceName == record.SourceName && x.Sha256 == record.Sha256 && x.ImportedAt == record.ImportedAt)) result.Add(record);
         return result.OrderBy(x => x.ImportedAt).ToList();
     }
+
+    private static DateTime? Earliest(params DateTime?[] values)
+        => values.Where(v => v.HasValue).Select(v => v!.Value).Cast<DateTime?>().OrderBy(v => v).FirstOrDefault();
+
+    private static DateTime? Latest(params DateTime?[] values)
+        => values.Where(v => v.HasValue).Select(v => v!.Value).Cast<DateTime?>().OrderByDescending(v => v).FirstOrDefault();
 
     private static T MergeValue<T>(T baseline, T local, T remote, string path, List<WorkspaceMergeConflict> conflicts)
     {
