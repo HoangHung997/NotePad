@@ -94,10 +94,10 @@ Rules:
 
 ## Phase 03 — stable prompt, cache and context foundation
 
-- [~] **V2-0301 — Split static base policy from dynamic runtime context.**  
-  Acceptance: time/session journal/workspace data cannot appear before stable prefix.
+- [x] **V2-0301 — Split static base policy from dynamic runtime context.**  
+  Evidence: `Prompting/AgentPromptLayout.cs` introduces separate `AgentPromptStablePrefix` and `AgentPromptRuntimeContext` types. The provider-neutral layout always emits stable base/security/model/tool-namespace system messages before a declared `CacheBoundaryIndex`, then task/current-state/live-environment context and finally user input. The frozen v1 `AgentRunner` prompt assembly remains unchanged for A/B comparison until its explicit migration task. `V2ArchitectureTests` uses distinct time/session/workspace/user sentinels and fails if any runtime sentinel appears in the stable prefix. Source commit `af4b52644c36e8c0b8979743a033953527346de3`; GitHub Actions push run `35256240260` and PR run `35256246638` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **5/5**, metrics **6/6**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained artifact upload and `/bin` publication all succeeded. The workflow-generated portable commit is `a4e15ffbdf274b4864a98f74d4431e7785ef1ebc` (`[skip ci]`).
 
-- [ ] **V2-0302 — Add agent policy/toolset version identifiers.**  
+- [~] **V2-0302 — Add agent policy/toolset version identifiers.**  
   Used for cache identity and trace reproducibility.
 
 - [ ] **V2-0303 — Add prompt-cache identity builder.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0301 — Split static base policy from dynamic runtime context`.
+**Active task:** `V2-0302 — Add agent policy/toolset version identifiers`.
