@@ -622,12 +622,9 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 
     private static Uri WebSocketEndpoint(AiProfile profile)
     {
-        var http = AiClient.Endpoint(profile, "responses");
-        if (!http.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
-            || !http.IdnHost.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase)
-            || !http.IsDefaultPort
-            || !http.AbsolutePath.Equals("/v1/responses", StringComparison.Ordinal))
+        if (!AiModelCapabilities.IsOfficialOpenAi(profile))
             throw new InvalidOperationException("Responses WebSocket v2 hiện chỉ bật cho endpoint OpenAI chính thức https://api.openai.com/v1.");
+        var http = AiClient.Endpoint(profile, "responses");
         var builder = new UriBuilder(http) { Scheme = "wss", Port = -1 };
         return builder.Uri;
     }
