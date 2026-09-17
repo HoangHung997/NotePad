@@ -8,6 +8,7 @@ namespace H2AgentLab.Prompting;
 /// state. Later cache-identity work can hash this prefix without inspecting runtime context.
 /// </summary>
 public sealed record AgentPromptStablePrefix(
+    AgentVersionIdentifiers Versions,
     string BasePolicy,
     string SecurityPolicy,
     string ModelPolicy,
@@ -34,14 +35,18 @@ public sealed class AgentPromptLayout
     private readonly AgentTransportMessage[] _messages;
 
     private AgentPromptLayout(
+        AgentVersionIdentifiers versions,
         AgentTransportMessage[] stablePrefix,
         AgentTransportMessage[] dynamicSuffix)
     {
+        Versions = versions;
         _stablePrefix = stablePrefix;
         _dynamicSuffix = dynamicSuffix;
         _messages = [.. stablePrefix, .. dynamicSuffix];
     }
 
+    /// <summary>Out-of-band version metadata used by cache identity and persisted trace evidence.</summary>
+    public AgentVersionIdentifiers Versions { get; }
     public IReadOnlyList<AgentTransportMessage> StablePrefix => _stablePrefix;
     public IReadOnlyList<AgentTransportMessage> DynamicSuffix => _dynamicSuffix;
     public IReadOnlyList<AgentTransportMessage> Messages => _messages;
@@ -55,6 +60,7 @@ public sealed class AgentPromptLayout
         string userInput)
     {
         ArgumentNullException.ThrowIfNull(stable);
+        ArgumentNullException.ThrowIfNull(stable.Versions);
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentException.ThrowIfNullOrWhiteSpace(stable.BasePolicy);
         ArgumentException.ThrowIfNullOrWhiteSpace(stable.SecurityPolicy);
@@ -72,7 +78,7 @@ public sealed class AgentPromptLayout
         AddSystem(dynamicMessages, runtime.LiveEnvironment);
         dynamicMessages.Add(new(AgentTransportMessageRole.User, userInput));
 
-        return new(stableMessages.ToArray(), dynamicMessages.ToArray());
+        return new(stable.Versions, stableMessages.ToArray(), dynamicMessages.ToArray());
     }
 
     private static void AddSystem(List<AgentTransportMessage> target, string? content)
