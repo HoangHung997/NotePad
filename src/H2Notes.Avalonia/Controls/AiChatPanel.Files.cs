@@ -33,8 +33,30 @@ public sealed partial class AiChatPanel
     private string BuildProjectContext()
     {
         PrepareProjectContext?.Invoke();
-        return _includeProject.IsChecked == true && _scope?.Project is { } p
-            ? AiProjectContext.Build(_app.State, p, _conversation?.Id, _includeHistory.IsChecked == true) : "";
+        if (_includeProject.IsChecked != true || _scope?.Project is not { } project) return "";
+        var query = _composer.Text?.Trim() ?? "";
+        var workspaceScope = AiProjectContext.NeedsWorkspaceScope(_app.State, project, query);
+        var memory = AiMemoryContext.Empty;
+        if (_app.UsesProjectFiles)
+        {
+            try
+            {
+                var store = new AiMemoryStore(_app.DataFolder, _app.DeviceId);
+                // Canonical memory lives beside the shared project files. This operation is idempotent
+                // and uses its own short NAS lock; each PC keeps only a disposable local search cache.
+                store.SyncFromState(_app.State);
+                memory = store.Query(query, project.Id, workspaceScope);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+            {
+                // Memory/index failure must never make project data inaccessible. The request still uses
+                // live structured state and recent chat; a later save/query can rebuild the memory cache.
+                _status.Text = "AI memory tạm chưa đồng bộ; đang dùng dữ liệu dự án hiện tại.";
+                memory = new AiMemoryContext([], workspaceScope);
+            }
+        }
+        else memory = new AiMemoryContext([], workspaceScope);
+        return AiProjectContext.BuildForRequest(_app.State, project, _conversation?.Id, query, memory, _includeHistory.IsChecked == true);
     }
 
     private Task PickAttachments() => PickAttachments(false);
@@ -195,8 +217,8 @@ public sealed partial class AiChatPanel
 
     private static string RequestPreview(AiProfile? profile, IReadOnlyList<AiTurn> turns) =>
         (profile is null ? "Chưa chọn kết nối" : profile.ProcessingLocation + " · " + new Uri(profile.BaseUrl).Host + "\nModel: " + profile.Model)
-        + "\n\nWord/Excel gửi chữ đã trích xuất, ảnh gửi nguyên ảnh. PDF theo Thiết lập AI: gửi gốc hoặc chuyển sang Markdown trước khi gửi. Bản xem này chưa chạy OCR. Các tệp liên kết chưa chọn không được đọc.\n"
-        + "Mốc riêng tư và bản nháp các chat khác không gửi. Đây chỉ là bản xem trước; đóng để tiếp tục soạn. Chỉ nút Gửi ở ô soạn mới gửi AI.\n\n"
+        + "\n\nWord/Excel gửi chữ đã trích xuất, ảnh mới gửi nguyên ảnh. Ảnh/PDF lịch sử không tự gửi lại; OCR đã lưu được dùng dưới dạng text. PDF theo Thiết lập AI: gửi gốc hoặc chuyển sang Markdown trước khi gửi. Các tệp liên kết chưa chọn không được đọc.\n"
+        + "Mốc riêng tư và bản nháp các chat khác không gửi. H2 Notes chỉ gửi ngữ cảnh gần đây + memory liên quan thay vì toàn bộ lịch sử. Đây chỉ là bản xem trước.\n\n"
         + string.Join("\n\n", turns.Where(t => t.Role != "system").Select(t => "[" + t.Role + "]\n" + t.Content
             + string.Concat((t.Images ?? []).Select(i => $"\n[Ảnh {i.MimeType}, {i.Data.Length / 1024d:0.#} KB sẽ gửi cho model]"))
             + string.Concat((t.Files ?? []).Select(f => $"\n[PDF {f.Name}, {f.Data.Length / 1024d:0.#} KB; xử lý theo thiết lập PDF]"))));
