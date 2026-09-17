@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -21,9 +20,7 @@ namespace H2Notes.Avalonia.Controls;
 /// </summary>
 public sealed class MarkdownMessageView : StackPanel
 {
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
-        .Build();
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
     private string _source = "";
 
     public string Markdown { get; private set; } = "";
@@ -42,7 +39,6 @@ public sealed class MarkdownMessageView : StackPanel
         _source = markdown;
         Children.Clear();
         if (markdown.Length == 0) return;
-
         var document = Markdig.Markdown.Parse(markdown, Pipeline);
         foreach (var block in document) RenderBlock(block, Children, 0);
     }
@@ -86,10 +82,8 @@ public sealed class MarkdownMessageView : StackPanel
             {
                 var code = fenced.Lines.ToString() ?? "";
                 var nested = Markdig.Markdown.Parse(code, Pipeline);
-                if (nested.Count == 1 && nested[0] is Table nestedTable)
-                    controls.Add(RenderTable(nestedTable));
-                else
-                    controls.Add(CodeBlock(code, fenced.Info.ToString() ?? ""));
+                if (nested.Count == 1 && nested[0] is Table nestedTable) controls.Add(RenderTable(nestedTable));
+                else controls.Add(CodeBlock(code, fenced.Info?.ToString() ?? ""));
                 break;
             }
             case CodeBlock code:
@@ -120,22 +114,21 @@ public sealed class MarkdownMessageView : StackPanel
     private void RenderList(ListBlock list, global::Avalonia.Controls.Controls controls, int depth)
     {
         var ordinal = 0;
+        _ = int.TryParse(list.OrderedStart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var orderedStart);
+        if (orderedStart <= 0) orderedStart = 1;
         foreach (var item in list.OfType<ListItemBlock>())
         {
             ordinal++;
             var row = new Grid { Name = "MarkdownListItem", ColumnDefinitions = new ColumnDefinitions("Auto,*"), Margin = new Thickness(Math.Min(24, depth * 10), 0, 0, 1) };
-            var prefix = list.IsOrdered ? ((list.OrderedStart > 0 ? list.OrderedStart : 1) + ordinal - 1).ToString(CultureInfo.InvariantCulture) + "." : "•";
+            var prefix = list.IsOrdered ? (orderedStart + ordinal - 1).ToString(CultureInfo.InvariantCulture) + "." : "•";
             var body = new StackPanel { Spacing = 3 };
             var firstParagraph = item.OfType<ParagraphBlock>().FirstOrDefault();
-            if (firstParagraph?.Inline?.FirstChild is TaskList task)
-                prefix = task.Checked ? "☑" : "☐";
+            if (firstParagraph?.Inline?.FirstChild is TaskList task) prefix = task.Checked ? "☑" : "☐";
             row.Children.Add(new TextBlock { Text = prefix, FontSize = 12, Margin = new Thickness(0, 1, 7, 0), Foreground = RichEditor.Brush("#796C62") });
             foreach (var child in item)
             {
                 if (child is ParagraphBlock paragraph && paragraph.Inline is not null)
-                {
                     body.Children.Add(InlineBlock(paragraph.Inline, 13, FontWeight.Normal, "MarkdownListText"));
-                }
                 else RenderBlock(child, body.Children, depth + 1);
             }
             Grid.SetColumn(body, 1); row.Children.Add(body); controls.Add(row);
@@ -147,11 +140,9 @@ public sealed class MarkdownMessageView : StackPanel
         var rows = table.OfType<TableRow>().ToArray();
         var columns = rows.Select(r => r.OfType<TableCell>().Count()).DefaultIfEmpty(0).Max();
         if (columns == 0) return PlainBlock(SourceText(table), 12.5, FontWeight.Normal, "MarkdownFallback");
-
         var grid = new Grid { Name = "MarkdownTable", Margin = new Thickness(0, 3), HorizontalAlignment = HorizontalAlignment.Stretch, ClipToBounds = true };
         var weights = EstimateColumnWeights(rows, columns);
-        for (var c = 0; c < columns; c++)
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(weights[c], GridUnitType.Star), MinWidth = 0 });
+        for (var c = 0; c < columns; c++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(weights[c], GridUnitType.Star), MinWidth = 0 });
         for (var r = 0; r < rows.Length; r++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         for (var r = 0; r < rows.Length; r++)
@@ -257,13 +248,12 @@ public sealed class MarkdownMessageView : StackPanel
                     break;
                 case HtmlInline html:
                     if (IsBreakHtml(html.Tag)) output.Add(new LineBreak());
-                    else AddRun(output, html.Tag, style);
+                    else AddRun(output, html.Tag ?? "", style);
                     break;
                 case HtmlEntityInline entity:
                     AddRun(output, entity.Transcoded.ToString(), style);
                     break;
                 case LinkInline link:
-                {
                     if (link.IsImage)
                     {
                         var alt = new StringBuilder(); AppendPlain(link, alt);
@@ -271,15 +261,10 @@ public sealed class MarkdownMessageView : StackPanel
                     }
                     else AddInlines(output, link, style with { Link = true });
                     break;
-                }
                 case EmphasisInline emphasis:
                 {
                     var next = style;
-                    if (emphasis.DelimiterChar is '*' or '_')
-                    {
-                        if (emphasis.DelimiterCount >= 2) next = next with { Bold = true };
-                        else next = next with { Italic = true };
-                    }
+                    if (emphasis.DelimiterChar is '*' or '_') next = emphasis.DelimiterCount >= 2 ? next with { Bold = true } : next with { Italic = true };
                     else if (emphasis.DelimiterChar == '~') next = next with { Strike = true };
                     AddInlines(output, emphasis, next);
                     break;
@@ -297,27 +282,31 @@ public sealed class MarkdownMessageView : StackPanel
     private static void AddRun(InlineCollection output, string text, InlineStyle style)
     {
         if (text.Length == 0) return;
-        var decorations = style.Strike ? TextDecorations.Strikethrough : style.Link ? TextDecorations.Underline : null;
-        output.Add(new Run
+        var run = new Run
         {
             Text = text,
             FontWeight = style.Bold ? FontWeight.Bold : FontWeight.Normal,
-            FontStyle = style.Italic ? FontStyle.Italic : FontStyle.Normal,
-            FontFamily = style.Code ? new FontFamily("Consolas") : null,
-            Foreground = style.Code ? RichEditor.Brush("#7B3E2B") : style.Link ? RichEditor.Brush("#A4573D") : null,
-            TextDecorations = decorations
-        });
+            FontStyle = style.Italic ? FontStyle.Italic : FontStyle.Normal
+        };
+        if (style.Code)
+        {
+            run.FontFamily = new FontFamily("Consolas");
+            run.Foreground = RichEditor.Brush("#7B3E2B");
+        }
+        else if (style.Link)
+        {
+            run.Foreground = RichEditor.Brush("#A4573D");
+            run.TextDecorations = TextDecorations.Underline;
+        }
+        if (style.Strike) run.TextDecorations = TextDecorations.Strikethrough;
+        output.Add(run);
     }
 
     private static Control CodeBlock(string code, string language)
     {
         var panel = new StackPanel { Spacing = 4 };
         if (!string.IsNullOrWhiteSpace(language)) panel.Children.Add(new TextBlock { Text = language, FontSize = 10, Foreground = RichEditor.Brush("#796C62") });
-        panel.Children.Add(new SelectableTextBlock
-        {
-            Name = "MarkdownCodeText", Text = code, FontFamily = new FontFamily("Consolas"), FontSize = 12,
-            TextWrapping = TextWrapping.WrapWithOverflow
-        });
+        panel.Children.Add(new SelectableTextBlock { Name = "MarkdownCodeText", Text = code, FontFamily = new FontFamily("Consolas"), FontSize = 12, TextWrapping = TextWrapping.WrapWithOverflow });
         return new Border
         {
             Name = "MarkdownCode", Background = RichEditor.Brush("#F3F0EC"), BorderBrush = RichEditor.Brush("#DED6CE"),
@@ -331,9 +320,9 @@ public sealed class MarkdownMessageView : StackPanel
         return _source.Substring(block.Span.Start, block.Span.End - block.Span.Start + 1);
     }
 
-    private static bool IsBreakHtml(string text)
+    private static bool IsBreakHtml(string? text)
     {
-        var value = text.Trim();
+        var value = text?.Trim() ?? "";
         return value.Equals("<br>", StringComparison.OrdinalIgnoreCase)
             || value.Equals("<br/>", StringComparison.OrdinalIgnoreCase)
             || value.Equals("<br />", StringComparison.OrdinalIgnoreCase);
