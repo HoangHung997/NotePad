@@ -1,3 +1,4 @@
+using H2AgentLab.Context;
 using H2AgentLab.Prompting;
 using H2AgentLab.Transport;
 using H2Notes.Core;
@@ -232,6 +233,78 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("A stable cache input changed without invalidating prompt cache identity.");
             if (changed.Distinct(StringComparer.Ordinal).Count() != changed.Length)
                 throw new InvalidOperationException("Distinct stable cache inputs unexpectedly collided in deterministic fixtures.");
+        });
+
+        Test("AgentContextManager enforces explicit budgets and deterministic provenance", () =>
+        {
+            var budget = new AgentContextBudget
+            {
+                MaxTotalCharacters = 600,
+                MaxTaskContractCharacters = 60,
+                MaxCurrentStateCharacters = 100,
+                MaxRecentTurnsCharacters = 160,
+                MaxToolSummariesCharacters = 140,
+                MaxCompactedHistoryCharacters = 100,
+                MaxCharactersPerItem = 40,
+                MaxRecentTurns = 2,
+                MaxToolSummaries = 1
+            };
+            var turns = Enumerable.Range(0, 20)
+                .Select(i => new AgentContextTurn(
+                    $"turn-{i}",
+                    i % 2 == 0 ? AgentTransportMessageRole.User : AgentTransportMessageRole.Assistant,
+                    $"TURN-{i}-" + new string((char)('a' + (i % 20)), 120),
+                    i,
+                    i == 19 ? 1 : i == 18 ? 0.9 : 0.1))
+                .ToArray();
+            var tools = Enumerable.Range(0, 10)
+                .Select(i => new AgentContextToolSummary(
+                    $"tool-{i}",
+                    "fixture_tool",
+                    $"TOOL-{i}-" + new string((char)('k' + (i % 10)), 120),
+                    i,
+                    i == 3 ? 1 : 0.2))
+                .ToArray();
+            var input = new AgentContextInput(
+                TaskContract: "TASK-" + new string('t', 500),
+                CurrentState: "STATE-" + new string('s', 500),
+                RecentTurns: turns,
+                ToolSummaries: tools,
+                CompactedHistory: "HISTORY-" + new string('h', 500));
+
+            var first = new AgentContextManager(budget).Build(input);
+            var reversed = new AgentContextManager(budget).Build(input with
+            {
+                RecentTurns = turns.Reverse().ToArray(),
+                ToolSummaries = tools.Reverse().ToArray()
+            });
+
+            var runtimeLength = (first.RuntimeContext.TaskContract?.Length ?? 0)
+                + (first.RuntimeContext.WorkingState?.Length ?? 0);
+            if (first.Usage.TotalCharacters != runtimeLength || runtimeLength > budget.MaxTotalCharacters)
+                throw new InvalidOperationException("Context total character budget was not enforced exactly.");
+            if (first.Usage.TaskContractCharacters > budget.MaxTaskContractCharacters
+                || first.Usage.CurrentStateCharacters > budget.MaxCurrentStateCharacters
+                || first.Usage.RecentTurnsCharacters > budget.MaxRecentTurnsCharacters
+                || first.Usage.ToolSummariesCharacters > budget.MaxToolSummariesCharacters
+                || first.Usage.CompactedHistoryCharacters > budget.MaxCompactedHistoryCharacters)
+                throw new InvalidOperationException("A context section exceeded its explicit budget.");
+            if (!first.Usage.TaskContractTruncated || !first.Usage.CurrentStateTruncated || !first.Usage.CompactedHistoryTruncated)
+                throw new InvalidOperationException("Context truncation evidence was not reported.");
+            if (!first.RecentTurnSourceIds.SequenceEqual(new[] { "turn-18", "turn-19" })
+                || !first.ToolSummarySourceIds.SequenceEqual(new[] { "tool-3" }))
+                throw new InvalidOperationException("Context manager did not preserve deterministic relevant source provenance.");
+            if (first.Usage.SelectedRecentTurns != 2 || first.Usage.DroppedRecentTurns != 18
+                || first.Usage.SelectedToolSummaries != 1 || first.Usage.DroppedToolSummaries != 9)
+                throw new InvalidOperationException("Context selected/dropped counts do not match the bounded selection.");
+            var working = first.RuntimeContext.WorkingState ?? "";
+            if (first.RecentTurnSourceIds.Any(id => !working.Contains($"[turn:{id}]", StringComparison.Ordinal))
+                || first.ToolSummarySourceIds.Any(id => !working.Contains($"[tool:{id}]", StringComparison.Ordinal)))
+                throw new InvalidOperationException("Selected context source IDs are not present in emitted runtime context.");
+            if (first.RuntimeContext != reversed.RuntimeContext
+                || !first.RecentTurnSourceIds.SequenceEqual(reversed.RecentTurnSourceIds)
+                || !first.ToolSummarySourceIds.SequenceEqual(reversed.ToolSummarySourceIds))
+                throw new InvalidOperationException("Context output depends on input enumeration order instead of relevance/sequence/source identity.");
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
