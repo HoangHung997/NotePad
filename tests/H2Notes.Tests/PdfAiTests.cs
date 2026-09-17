@@ -205,7 +205,10 @@ internal static class PdfAiTests
                 var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
                 start.ArgumentList.Add("/c"); start.ArgumentList.Add(cancel ? "ping -n 30 127.0.0.1 >NUL" : "for /L %i in (1,1,8000) do @echo diagnostic-secret-%i 1>&2");
                 using var cts = new CancellationTokenSource(cancel ? 180 : 4000);
-                Throws<OperationCanceledException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
+                if (cancel)
+                    Throws<OperationCanceledException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
+                else
+                    Throws<InvalidDataException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
             }
         }
         finally { try { Directory.Delete(temp, true); } catch { } }
