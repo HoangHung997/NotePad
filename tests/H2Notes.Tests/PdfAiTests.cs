@@ -66,8 +66,6 @@ internal static class PdfAiTests
             {
                 var profile = Profile(protocol, protocol == AiProtocol.Gemini ? "gemini-2.5-pro" : "gpt-4.1");
                 using var handler = new CapabilityStub(protocol); using var client = new AiClient(handler);
-                // AiClient supports native files when the request builder explicitly supplies them. The
-                // interactive H2 request builder now supplies native bytes only for the current send.
                 var turns = new AiTurn[] { new("user", "old", Files: [new("old.pdf", "application/pdf", Pdf)]), new("assistant", "read"), new("user", "new", Files: [new("new.pdf", "application/pdf", Pdf)]) };
                 Drain(client.StreamEvents(profile, "test-secret", turns)).GetAwaiter().GetResult();
                 using var json = JsonDocument.Parse(handler.Body!); var root = json.RootElement;
@@ -112,7 +110,7 @@ internal static class PdfAiTests
         });
         test("PDF budget counts history and rejects unsupported attachment roles", () =>
         {
-            var over = new byte[AiDocuments.MaxFileBytes];
+            var over = new byte[AiDocuments.MaxFileBytes]; "%PDF-"u8.CopyTo(over);
             Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("user", "a", Files: [new("a.pdf", "application/pdf", over), new("b.pdf", "application/pdf", over)])]));
             Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("assistant", "a", Files: [new("a.pdf", "application/pdf", Pdf)])]));
         });
@@ -152,7 +150,7 @@ internal static class PdfAiTests
                 var file = Path.Combine(dir, "out.md");
                 File.WriteAllText(file, "ok"); Check((string)((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult() == "ok");
                 File.WriteAllBytes(file, new byte[(AiDocuments.MaxTextCharacters * 4) + 1]); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
-                File.WriteAllBytes(file, [0xff, 0xfe]); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
+                File.WriteAllBytes(file, [0xff, 0xfe]); Throws<DecoderFallbackException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
                 File.WriteAllText(file, "   "); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
                 File.WriteAllText(file, "a\0b"); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
             }
@@ -204,7 +202,7 @@ internal static class PdfAiTests
         {
             if (OperatingSystem.IsWindows())
             {
-                var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+                var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
                 start.ArgumentList.Add("/c"); start.ArgumentList.Add(cancel ? "ping -n 30 127.0.0.1 >NUL" : "for /L %i in (1,1,8000) do @echo diagnostic-secret-%i 1>&2");
                 using var cts = new CancellationTokenSource(cancel ? 180 : 4000);
                 Throws<OperationCanceledException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
