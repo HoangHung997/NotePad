@@ -58,9 +58,9 @@ internal static class ThinkingUiTests
             }
             finally { window.Close(); }
         });
-        test("Assistant Markdown renders headings lists tables and quotes without forcing a template", () =>
+        test("Assistant Markdown renders natural structure, fenced tables and Unicode escapes", () =>
         {
-            var markdown = "## Tổng quan\n\n**Tchom** đã xong.\n\n- [x] Hợp đồng\n- [ ] Hoàn công\n\n| Dự án | Trạng thái |\n|---|---|\n| Tchom | Đã xong |\n\n> Diện tích đã được cập nhật.\n\n```text\nKrong 11,49 ha\n```";
+            var markdown = "## \\uD83D\\uDCDD Tổng quan\n\n**Tchom** đã xong.\n\n- [x] Hợp đồng\n- [ ] Hoàn công\n\n| Dự án | Trạng thái |\n|---|---|\n| Tchom | Đã xong |\n\n> Diện tích đã được cập nhật.\n\n```text\nKrong 11,49 ha\n```\n\n```text\n| TT | Dự án | Diện tích |\n|---|---|---|\n| 1 | Ia Tchom 1 | 3 |\n| 2 | Sê San 4A | 12,51 |\n```";
             var assistant = new AiMessage { Role = "assistant", Status = "complete", Content = markdown };
             var bubble = new ChatMessageView(assistant);
             var window = new Window { Content = bubble, Width = 480, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
@@ -68,11 +68,17 @@ internal static class ThinkingUiTests
             {
                 var rendered = Named<MarkdownMessageView>(bubble, "MessageMarkdownBody");
                 Check(rendered.IsVisible && !bubble.Body.IsVisible && bubble.Body.Text == markdown, "Assistant Markdown source/render surface mismatch");
-                Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownHeading"), "Markdown heading not rendered");
+                var heading = rendered.GetVisualDescendants().OfType<SelectableTextBlock>().Single(c => c.Name == "MarkdownHeading");
+                var headingText = string.Concat(heading.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text));
+                Check(heading.FontSize is > 13 and <= 18, "Chat heading is still oversized");
+                Check(headingText.Contains("📝") && !rendered.Markdown.Contains("\\uD83D", StringComparison.Ordinal), "Literal Unicode escape was not normalized for display");
                 Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownListItem") == 2, "Markdown checklist/list not rendered");
-                Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownTable"), "Markdown table not rendered");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownTable") == 2, "Markdown or fenced table not rendered as a real table");
                 Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownQuote"), "Markdown quote not rendered");
-                Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownCode"), "Markdown code block not rendered");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownCode") == 1, "A fenced table stayed as code or ordinary code was lost");
+                Check(AiProjectContext.Instructions.Contains("bảng Markdown", StringComparison.Ordinal)
+                    && AiProjectContext.Instructions.Contains("không bọc bảng trong code fence", StringComparison.Ordinal),
+                    "Vision transcription guidance no longer preserves table structure");
 
                 var user = new ChatMessageView(new AiMessage { Role = "user", Status = "complete", Content = "**literal user text**" });
                 Check(user.Body.IsVisible && user.Body.Text == "**literal user text**", "User-authored text was unexpectedly reformatted");
