@@ -1,8 +1,48 @@
-bin/
-obj/
+# Visual Studio / IDE
 .vs/
-__pycache__/
-*.pyc
-.artifacts/
+.idea/
 *.user
 *.suo
+
+# .NET build output
+bin/
+obj/
+**/bin/
+**/obj/
+*.pdb
+*.ilk
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated artifacts / test output
+.artifacts/
+artifacts/
+releases/
+TestResults/
+coverage/
+.cache/
+
+# Package/cache directories
+node_modules/
+packages/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.cache
+*.bak
+
+# Local secrets / credentials
+.env
+.env.*
+secrets.json
+credentials.json
+*.pfx
+*.p12
+*.pem
+*.key
