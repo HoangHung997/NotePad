@@ -127,6 +127,7 @@ public static class PortableOcrPackager
         var destination = AppRuntimeRoot;
         if (SamePath(source, destination))
         {
+            PortableOcrRuntime.Invalidate(destination);
             PortableOcrRuntime.EnsureRelocated(destination);
             return Inspect(destination);
         }
@@ -156,6 +157,7 @@ public static class PortableOcrPackager
             try
             {
                 Directory.Move(stage, destination);
+                PortableOcrRuntime.Invalidate(destination);
                 PortableOcrRuntime.EnsureRelocated(destination);
                 var final = Inspect(destination);
                 if (!final.Ready) throw new InvalidDataException("OCR portable chưa sẵn sàng sau khi chuyển vào thư mục ứng dụng.");
@@ -165,6 +167,7 @@ public static class PortableOcrPackager
             }
             catch
             {
+                PortableOcrRuntime.Invalidate(destination);
                 if (Directory.Exists(destination)) Directory.Delete(destination, true);
                 if (Directory.Exists(backup)) Directory.Move(backup, destination);
                 throw;
