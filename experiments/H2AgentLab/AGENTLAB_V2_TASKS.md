@@ -87,14 +87,14 @@ Rules:
 - [x] **V2-0209 — Add provider transport tests.**  
   Evidence: `Transport/V2ProviderTransportResilienceTests.cs` adds one cross-provider safety matrix on top of the existing successful-wire/continuation suites. Ollama, Chat Completions and Responses HTTP are each tested for cancellation with exactly one request, malformed provider JSON with no tool/completion exposure, and premature stream disconnect with no retry/completion. Responses WebSocket is separately tested for cancellation after one write, malformed frames and premature end, with proof that no HTTP fallback replay occurs after an ambiguous write. The matrix also asserts continuation capability flags while the provider-specific suites continue to verify successful tool continuation wire shapes. GitHub Actions run `35251742605` completed successfully, including H2 Notes tests, all Agent Lab v1/v2 transport suites, the new resilience matrix, self-contained publish and `/bin` publish.
 
-- [~] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
-  Acceptance: no duplicated endpoint-security logic; reasoning settings continue to use `AiModelCapabilities` when appropriate.
+- [x] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
+  Evidence: `H2Notes.Core` now owns the public `AiProfileSnapshot` contract and official OpenAI/Gemini endpoint capability checks. Agent Lab's snapshot adapter delegates to Core instead of mirroring the `AiProfile` field list; Ollama and Chat Completions use that shared snapshot, Responses HTTP/WebSocket reuse Core official-endpoint classification, and Ollama named reasoning effort goes through `AiModelCapabilities.ResolveReasoningEffort` before the legacy bool fallback. `V2ArchitectureTests` verifies snapshot isolation and that compatible endpoints cannot inherit official-provider capabilities; `V2OllamaTransportTests` verifies `ReasoningEffort=max` maps to the verified Ollama `high` wire value. GitHub Actions run `35255521158` completed successfully: builds had **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, and the self-contained Windows x64 artifact upload succeeded.
 
 ---
 
 ## Phase 03 — stable prompt, cache and context foundation
 
-- [ ] **V2-0301 — Split static base policy from dynamic runtime context.**  
+- [~] **V2-0301 — Split static base policy from dynamic runtime context.**  
   Acceptance: time/session journal/workspace data cannot appear before stable prefix.
 
 - [ ] **V2-0302 — Add agent policy/toolset version identifiers.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0210 — Reuse H2 Core endpoint/model capability checks`.
+**Active task:** `V2-0301 — Split static base policy from dynamic runtime context`.
