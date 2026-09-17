@@ -66,10 +66,10 @@ Rules:
 - [x] **V2-0202 — Define `AgentTransportCapabilities`.**  
   Evidence: `Transport/AgentTransportCapabilities.cs` exposes independent flags for native tools, incremental continuation, WebSocket, provider compaction, prompt cache control, parallel tools, native image/file input and usage metrics, with minimal/Ollama/Chat fallback profiles. The same contract suite verifies independent capability preservation; CI run `35239473355` passed.
 
-- [~] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
-  Acceptance: native tool calls + thinking replay work with existing mock tests; no regression.
+- [x] **V2-0203 — Wrap current Ollama behavior in `OllamaTransport`.**  
+  Evidence: `Transport/OllamaTransport.cs` isolates native Ollama `/api/chat` streaming behind `IAgentTransport`, reuses H2 Core `AiClient.Endpoint` safety, preserves native image input, explicit thinking settings, provider thinking replay on active tool turns, completed tool-call identity/arguments and public token/cache counters while rejecting native files and incomplete tool results before execution. `Transport/V2OllamaTransportTests.cs` verifies direct answers, thinking true/false, tool continuation, usage, image/file boundaries and endpoint safety. GitHub Actions run `35241305423` completed successfully: H2 Notes **336/336**, Lab build/v1 regressions, v2 architecture/metrics/baseline/transport-contract tests and the new Ollama transport suite all passed, then self-contained publish and `/bin` publish succeeded.
 
-- [ ] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
+- [~] **V2-0204 — Wrap existing Chat Completions behavior in `ChatCompletionsTransport`.**  
   Acceptance: tool call IDs/arguments/streaming remain compatible with existing tests.
 
 - [ ] **V2-0205 — Implement OpenAI Responses HTTP transport.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0203 — Wrap current Ollama behavior in OllamaTransport`.
+**Active task:** `V2-0204 — Wrap existing Chat Completions behavior in ChatCompletionsTransport`.
