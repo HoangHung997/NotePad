@@ -63,9 +63,10 @@ public static class V2OpenAiResponsesTransportTests
             using var payload = JsonDocument.Parse(handler.Requests.Single());
             var root = payload.RootElement;
             Check(root.GetProperty("model").GetString() == "fixture" && root.GetProperty("stream").GetBoolean(), "Responses model/stream fields mismatch.");
-            Check(!root.GetProperty("store").GetBoolean(), "Agent Lab baseline must keep Responses store=false.");
+            Check(!root.GetProperty("store").GetBoolean(), "Default Agent Lab Responses mode must keep store=false.");
             Check(root.GetProperty("prompt_cache_key").GetString() == "stable-prefix", "Prompt cache key missing.");
             Check(root.GetProperty("include")[0].GetString() == "reasoning.encrypted_content", "Stateless encrypted reasoning include missing.");
+            Check(!transport.Capabilities.IncrementalContinuation, "Stateless mode must not advertise provider continuation.");
         });
 
         await Test("Responses function call continuation replays exact output items without previous response state", async () =>
@@ -108,12 +109,65 @@ public static class V2OpenAiResponsesTransportTests
 
             using var payload = JsonDocument.Parse(handler.Requests[1]);
             var root = payload.RootElement;
-            Check(!root.TryGetProperty("previous_response_id", out _), "V2-0205 must remain stateless; V2-0206 owns previous_response_id.");
+            Check(!root.TryGetProperty("previous_response_id", out _), "Default stateless mode must not invent previous_response_id.");
             var input = root.GetProperty("input");
             Check(input.GetArrayLength() == 3, "Stateless continuation should replay user + function_call + function_call_output.");
             Check(input[1].GetProperty("type").GetString() == "function_call" && input[1].GetProperty("call_id").GetString() == "call_abc", "Completed provider function_call was not replayed exactly.");
             Check(input[2].GetProperty("type").GetString() == "function_call_output" && input[2].GetProperty("call_id").GetString() == "call_abc", "Function output item missing.");
             Check(input[2].GetProperty("output").GetString()!.Contains("hello", StringComparison.Ordinal), "Function output content missing.");
+        });
+
+        await Test("Official stored continuation sends only tool output plus previous response id", async () =>
+        {
+            var handler = new QueueHandler(
+                Sse(
+                    """{"type":"response.created","response":{"id":"resp_state_1","status":"in_progress"}}""",
+                    """{"type":"response.output_item.done","output_index":0,"item":{"id":"fc_state","type":"function_call","status":"completed","call_id":"call_state","name":"read_file","arguments":"{\"path\":\"state.txt\"}"}}""",
+                    """{"type":"response.completed","response":{"id":"resp_state_1","status":"completed","output":[{"id":"fc_state","type":"function_call","status":"completed","call_id":"call_state","name":"read_file","arguments":"{\"path\":\"state.txt\"}"}],"usage":{"input_tokens":50,"output_tokens":6,"total_tokens":56}}}"""),
+                Sse(
+                    """{"type":"response.created","response":{"id":"resp_state_2","status":"in_progress"}}""",
+                    """{"type":"response.output_text.delta","delta":"state verified"}""",
+                    """{"type":"response.output_item.done","output_index":0,"item":{"id":"msg_state","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"state verified","annotations":[]}]}}""",
+                    """{"type":"response.completed","response":{"id":"resp_state_2","status":"completed","output":[{"id":"msg_state","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"state verified","annotations":[]}]}],"usage":{"input_tokens":8,"output_tokens":3,"total_tokens":11}}}"""));
+
+            var profile = Profile("https://api.openai.com/v1");
+            var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { path = new { type = "string" } } });
+            var task = Guid.NewGuid();
+            var turn = Guid.NewGuid();
+            await using var transport = new OpenAiResponsesTransport(profile, "test", handler, OpenAiResponsesStateMode.StoredContinuation);
+            Check(transport.Capabilities.IncrementalContinuation, "Stored mode must advertise incremental continuation.");
+            var first = await Collect(transport.StartAsync(new(task, turn,
+                [new(AgentTransportMessageRole.System, "stable policy"), new(AgentTransportMessageRole.User, "Read state.txt")],
+                [new("read_file", "read", schema)])));
+            var call = first.Single(e => e.Kind == AgentTransportEventKind.ToolCall).ToolCall!;
+            _ = await Collect(transport.ContinueAsync(new(task, turn, [new(call.Id, call.Name, "{\"content\":\"ok\"}")])));
+
+            using var firstRequest = JsonDocument.Parse(handler.Requests[0]);
+            Check(firstRequest.RootElement.GetProperty("store").GetBoolean(), "Stored mode must explicitly send store=true.");
+            Check(!firstRequest.RootElement.TryGetProperty("previous_response_id", out _), "First stored request must not have previous_response_id.");
+            Check(!firstRequest.RootElement.TryGetProperty("include", out _), "Stored mode does not need encrypted stateless reasoning output.");
+
+            using var continuation = JsonDocument.Parse(handler.Requests[1]);
+            var root = continuation.RootElement;
+            Check(root.GetProperty("store").GetBoolean(), "Stored continuation must keep store=true.");
+            Check(root.GetProperty("previous_response_id").GetString() == "resp_state_1", "Stored continuation did not link previous response id.");
+            var input = root.GetProperty("input");
+            Check(input.GetArrayLength() == 1, "Stored continuation must not resend system/user/function-call transcript.");
+            Check(input[0].GetProperty("type").GetString() == "function_call_output" && input[0].GetProperty("call_id").GetString() == "call_state", "Stored continuation should send only the new function output.");
+        });
+
+        await Test("Stored continuation is explicit and restricted to official OpenAI endpoint", () =>
+        {
+            try
+            {
+                _ = new OpenAiResponsesTransport(Profile("https://example.invalid/v1"), "", stateMode: OpenAiResponsesStateMode.StoredContinuation);
+                throw new InvalidOperationException("Compatible endpoint was allowed to claim official stored continuation.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Check(ex.Message.Contains("OpenAI Responses chính thức", StringComparison.Ordinal), "Expected explicit official-endpoint rejection.");
+            }
+            return Task.CompletedTask;
         });
 
         await Test("Responses request preserves H2 native image file and function tool shapes", async () =>
