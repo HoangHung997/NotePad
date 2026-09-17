@@ -84,10 +84,10 @@ Rules:
 - [x] **V2-0208 — Add WebSocket prewarm where supported.**  
   Evidence: `OpenAiResponsesWebSocketTransport` now performs best-effort `response.create` prewarm with `generate:false` on the official Responses WebSocket path. A successful warmup remains on the same turn socket and the real generation references the warm response with empty duplicate input; a warmup error never changes task semantics—the real request keeps the original full input. A broken warmup connection may be recreated because generate=false cannot produce model/tool effects, while the existing no-replay rule still applies after a real generation write. `AgentTraceKind.PrewarmStart/PrewarmFinish` records warmup timing/status without reasoning text. `V2ResponsesWebSocketTransportTests` verifies successful reuse, failure fallback semantics and trace ordering. GitHub Actions run `35250947951` completed successfully: H2 Notes, Lab build/v1, all transport suites including WebSocket/prewarm, publish and `/bin` publish all passed.
 
-- [~] **V2-0209 — Add provider transport tests.**  
-  Mock HTTP/SSE/WebSocket/Ollama streams; continuation, disconnect, cancel and malformed-response cases.
+- [x] **V2-0209 — Add provider transport tests.**  
+  Evidence: `Transport/V2ProviderTransportResilienceTests.cs` adds one cross-provider safety matrix on top of the existing successful-wire/continuation suites. Ollama, Chat Completions and Responses HTTP are each tested for cancellation with exactly one request, malformed provider JSON with no tool/completion exposure, and premature stream disconnect with no retry/completion. Responses WebSocket is separately tested for cancellation after one write, malformed frames and premature end, with proof that no HTTP fallback replay occurs after an ambiguous write. The matrix also asserts continuation capability flags while the provider-specific suites continue to verify successful tool continuation wire shapes. GitHub Actions run `35251742605` completed successfully, including H2 Notes tests, all Agent Lab v1/v2 transport suites, the new resilience matrix, self-contained publish and `/bin` publish.
 
-- [ ] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
+- [~] **V2-0210 — Reuse H2 Core endpoint/model capability checks.**  
   Acceptance: no duplicated endpoint-security logic; reasoning settings continue to use `AiModelCapabilities` when appropriate.
 
 ---
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0209 — Add provider transport tests`.
+**Active task:** `V2-0210 — Reuse H2 Core endpoint/model capability checks`.
