@@ -234,22 +234,23 @@ public sealed class MarkdownMessageView : StackPanel
 
     private static void AddInlines(SelectableTextBlock block, string text)
     {
+        var inlines = block.Inlines!;
         var i = 0;
         while (i < text.Length)
         {
             if (TryDelimited(text, ref i, "**", "**", out var bold))
             {
-                block.Inlines.Add(new Run { Text = bold, FontWeight = FontWeight.Bold });
+                inlines.Add(new Run { Text = bold, FontWeight = FontWeight.Bold });
                 continue;
             }
             if (TryDelimited(text, ref i, "__", "__", out var boldUnderscore))
             {
-                block.Inlines.Add(new Run { Text = boldUnderscore, FontWeight = FontWeight.Bold });
+                inlines.Add(new Run { Text = boldUnderscore, FontWeight = FontWeight.Bold });
                 continue;
             }
             if (TryDelimited(text, ref i, "`", "`", out var code))
             {
-                block.Inlines.Add(new Run { Text = code, FontFamily = new FontFamily("Consolas"), Foreground = RichEditor.Brush("#7B3E2B") });
+                inlines.Add(new Run { Text = code, FontFamily = new FontFamily("Consolas"), Foreground = RichEditor.Brush("#7B3E2B") });
                 continue;
             }
             if ((text[i] == '*' || text[i] == '_') && i + 1 < text.Length)
@@ -257,7 +258,7 @@ public sealed class MarkdownMessageView : StackPanel
                 var marker = text[i].ToString();
                 if (TryDelimited(text, ref i, marker, marker, out var italic))
                 {
-                    block.Inlines.Add(new Run { Text = italic, FontStyle = FontStyle.Italic });
+                    inlines.Add(new Run { Text = italic, FontStyle = FontStyle.Italic });
                     continue;
                 }
             }
@@ -269,14 +270,14 @@ public sealed class MarkdownMessageView : StackPanel
                     var end = text.IndexOf(')', close + 2);
                     if (end > close)
                     {
-                        block.Inlines.Add(new Run { Text = text[(i + 1)..close], Foreground = RichEditor.Brush("#A4573D") });
+                        inlines.Add(new Run { Text = text[(i + 1)..close], Foreground = RichEditor.Brush("#A4573D") });
                         i = end + 1; continue;
                     }
                 }
             }
             var next = NextInlineMarker(text, i + 1);
             var endPlain = next < 0 ? text.Length : next;
-            block.Inlines.Add(new Run { Text = text[i..endPlain].Replace("\\*", "*", StringComparison.Ordinal).Replace("\\_", "_", StringComparison.Ordinal) });
+            inlines.Add(new Run { Text = text[i..endPlain].Replace("\\*", "*", StringComparison.Ordinal).Replace("\\_", "_", StringComparison.Ordinal) });
             i = endPlain;
         }
     }
