@@ -87,6 +87,7 @@ public static class V2ArchitectureTests
 
             var layout = AgentPromptLayout.Create(
                 new AgentPromptStablePrefix(
+                    Versions: AgentVersions.Current,
                     BasePolicy: "BASE_POLICY_STABLE",
                     SecurityPolicy: "SECURITY_POLICY_STABLE",
                     ModelPolicy: "MODEL_POLICY_STABLE",
@@ -118,6 +119,35 @@ public static class V2ArchitectureTests
             if (layout.Messages[^1].Role != AgentTransportMessageRole.User
                 || layout.Messages[^1].Content != userSentinel)
                 throw new InvalidOperationException("User input must remain the final dynamic message.");
+        });
+
+        Test("V2 policy safety and toolset versions are validated out-of-band metadata", () =>
+        {
+            var versions = AgentVersions.Current;
+            if (versions.AgentPolicyVersion != AgentVersions.AgentPolicy
+                || versions.SafetyPolicyVersion != AgentVersions.SafetyPolicy
+                || versions.ToolsetVersion != AgentVersions.Toolset)
+                throw new InvalidOperationException("Current v2 version identifiers are inconsistent.");
+
+            var layout = AgentPromptLayout.Create(
+                new AgentPromptStablePrefix(versions, "base", "security", "model", "tools"),
+                new AgentPromptRuntimeContext(),
+                "user");
+            if (layout.Versions != versions)
+                throw new InvalidOperationException("Prompt layout lost its policy/toolset version metadata.");
+
+            var promptText = string.Join("\n", layout.Messages.Select(x => x.Content));
+            if (promptText.Contains(versions.AgentPolicyVersion, StringComparison.Ordinal)
+                || promptText.Contains(versions.SafetyPolicyVersion, StringComparison.Ordinal)
+                || promptText.Contains(versions.ToolsetVersion, StringComparison.Ordinal))
+                throw new InvalidOperationException("Version metadata was injected into model prompt text.");
+
+            try
+            {
+                _ = new AgentVersionIdentifiers("policy ok", "safety-v1", "tools-v1");
+                throw new InvalidOperationException("Unsafe version label was accepted.");
+            }
+            catch (ArgumentException) { }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
