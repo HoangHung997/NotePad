@@ -83,6 +83,13 @@ jobs:
         if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
         shell: pwsh
         run: |
+          git fetch origin "${{ github.ref_name }}" --depth=1
+          $remoteHead = (git rev-parse "origin/${{ github.ref_name }}").Trim()
+          if ($remoteHead -ne '${{ github.sha }}') {
+            Write-Host "Branch advanced to $remoteHead while this run was executing; skip stale /bin publish for ${{ github.sha }}."
+            exit 0
+          }
+
           New-Item -ItemType Directory -Force -Path .\bin | Out-Null
           $zip = '.\bin\H2Notes-Avalonia-Portable-win-x64.zip'
           if (Test-Path $zip) { Remove-Item -LiteralPath $zip -Force }
