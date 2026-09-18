@@ -1,5 +1,6 @@
 using H2AgentLab.Context;
 using H2AgentLab.Metrics;
+using H2AgentLab.Session;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
 using H2Notes.Core;
@@ -48,6 +49,8 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             contextManager,
             registry,
             permissionPolicy: new ScopedAgentRuntimePermissionPolicy(
-                _ => !tools.ReadOnly));
+                _ => !tools.ReadOnly),
+            evidenceProjector: new AgentRuntimeEvidenceProjector(
+                new ArtifactStore(tools.StateRoot)));
     }
 }
