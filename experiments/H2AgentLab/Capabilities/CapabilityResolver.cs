@@ -56,6 +56,7 @@ public sealed class CapabilityResolver
         _installed = installed ?? throw new ArgumentNullException(nameof(installed));
         _available = available ?? throw new ArgumentNullException(nameof(available));
         _catalogs = catalogs ?? throw new ArgumentNullException(nameof(catalogs));
+        _available.Bind(() => _catalogs.CachedView().Entries);
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _agentVersion = Version.Parse(agentVersion);
         _catalogMaxAge = catalogMaxAge ?? TimeSpan.FromHours(24);
@@ -93,8 +94,7 @@ public sealed class CapabilityResolver
         if (availableCandidates.Count == 0
             || !_catalogs.HasFreshMetadata(_catalogMaxAge, DateTime.UtcNow))
         {
-            var merged = await _catalogs.RefreshAsync(cancellationToken).ConfigureAwait(false);
-            _available.Rebuild(merged.Entries);
+            _ = await _catalogs.RefreshAsync(cancellationToken).ConfigureAwait(false);
             availableCandidates = _available.Search(query, 12);
             refreshed = true;
         }
