@@ -252,6 +252,8 @@ Acceptance:
 
 ## [~] MB-22 — Use AgentPromptLayout and cache identity in real requests
 
+Implementation note: real AgentRuntime now derives provider/model cache identity after stable namespace metadata is merged; normal AgentOrchestratedRun supplies provider/model cache scope, dynamic task/session state remains outside the stable hash, and dedicated runtime acceptance tests are wired for verification.
+
 Goal:
 
 Separate stable prefix from dynamic runtime suffix in normal execution.
