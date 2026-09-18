@@ -109,7 +109,7 @@ public static class PythonResultVerifier
         return new VerificationReport(
             VerifierId,
             [exit, artifacts, assertions],
-            [run.EvidenceId]
+            new[] { run.EvidenceId }
                 .Concat(run.Artifacts.Select(x => x.EvidenceId))
                 .Concat(expectation.Assertions.Select(x => x.EvidenceId)));
     }
