@@ -177,11 +177,11 @@ Rules:
   Acceptance: exact selected schemas are traceable; duplicates coalesced.  
   Evidence: per-task `DeferredToolDiscovery` tracks loaded schema identities and deterministic `ToolSchemaLoadRecord` batches; `ExecuteToolSearch` returns selected/newly-loaded identities and next-request schemas. Architecture guard verifies traceability and duplicate coalescing. GitHub Actions run `35298480630` passed full build/regression/publish.
 
-- [~] **V2-0506 — Add parallel read-only execution support.**  
+- [x] **V2-0506 — Add parallel read-only execution support.**  
   Serialize overlapping mutations to same resource.  
-  Scheduler + deterministic concurrency guard added; full CI verification in progress.
+  Evidence: `ToolExecutionScheduler` runs parallel-safe reads concurrently, requires mutation resource identity and serializes overlapping mutation keys; architecture guard proves read overlap and mutation exclusion. GitHub Actions run `35298862819` passed full build/regression/publish.
 
-- [ ] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
+- [~] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
   Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.
 
 - [ ] **V2-0508 — Tool-search regression/performance tests.**  
@@ -387,4 +387,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0506 — Add parallel read-only execution support`.
+**Active task:** `V2-0507 — Migrate SkillCatalog into deferred registry model`.
