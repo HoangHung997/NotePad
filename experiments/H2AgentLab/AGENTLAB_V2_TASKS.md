@@ -193,11 +193,11 @@ Rules:
 
 ## Phase 06 — verification framework
 
-- [~] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
+- [x] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
   Machine-readable pass/fail per criterion with evidence IDs.  
-  Implementation + architecture guard added; full CI verification in progress.
+  Evidence: `Verification/VerificationReport.cs` provides per-criterion Passed/Failed/NotVerified results, typed failures, evidence IDs, coverage checks and aggregate pass state; architecture guard passed in GitHub Actions run `35304076438`, together with full regression/publish.
 
-- [ ] **V2-0602 — Add file/hash/scope verifier.**  
+- [~] **V2-0602 — Add file/hash/scope verifier.**  
   Check exact changed files, expected hashes and unintended output.
 
 - [ ] **V2-0603 — Add generic artifact verifier contract.**  
@@ -390,4 +390,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0601 — Add VerificationReport / VerificationFailure`.
+**Active task:** `V2-0602 — Add file/hash/scope verifier`.
