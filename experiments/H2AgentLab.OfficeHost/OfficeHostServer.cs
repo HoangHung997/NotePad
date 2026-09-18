@@ -26,7 +26,11 @@ public sealed class OfficeHostServer
         _fixtureMode = fixtureMode;
     }
 
-    public async Task RunAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Intentionally synchronous: this method stays on Program.Main's STA thread so every COM
+    /// discovery/read/mutation is executed on the same STA, not on a thread-pool continuation.
+    /// </summary>
+    public void Run(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -35,14 +39,23 @@ public sealed class OfficeHostServer
                 PipeDirection.InOut,
                 1,
                 PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                PipeOptions.CurrentUserOnly);
 
-            await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-            await HandleConnectionAsync(server, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                server.WaitForConnection();
+            }
+            catch (IOException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            HandleConnection(server, cancellationToken);
         }
     }
 
-    private async Task HandleConnectionAsync(Stream stream, CancellationToken cancellationToken)
+    private void HandleConnection(Stream stream, CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(
             stream,
@@ -57,29 +70,28 @@ public sealed class OfficeHostServer
             leaveOpen: true)
         {
             AutoFlush = true,
-            NewLine = "
-"
+            NewLine = "\n"
         };
 
         string? line;
         try
         {
-            line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            line = reader.ReadLine();
         }
         catch (DecoderFallbackException)
         {
-            await WriteAsync(writer, Error("", "invalid_json", "OfficeHost request is not valid UTF-8."), cancellationToken).ConfigureAwait(false);
+            Write(writer, Error("", "invalid_json", "OfficeHost request is not valid UTF-8."));
             return;
         }
 
         if (string.IsNullOrWhiteSpace(line))
         {
-            await WriteAsync(writer, Error("", "invalid_request", "OfficeHost request is empty."), cancellationToken).ConfigureAwait(false);
+            Write(writer, Error("", "invalid_request", "OfficeHost request is empty."));
             return;
         }
         if (Encoding.UTF8.GetByteCount(line) > OfficeProtocolConstants.MaxMessageBytes)
         {
-            await WriteAsync(writer, Error("", "request_too_large", "OfficeHost request exceeds the protocol size limit."), cancellationToken).ConfigureAwait(false);
+            Write(writer, Error("", "request_too_large", "OfficeHost request exceeds the protocol size limit."));
             return;
         }
 
@@ -90,7 +102,7 @@ public sealed class OfficeHostServer
         }
         catch (JsonException)
         {
-            await WriteAsync(writer, Error("", "invalid_json", "OfficeHost request JSON is invalid."), cancellationToken).ConfigureAwait(false);
+            Write(writer, Error("", "invalid_json", "OfficeHost request JSON is invalid."));
             return;
         }
 
@@ -98,14 +110,16 @@ public sealed class OfficeHostServer
             || string.IsNullOrWhiteSpace(request.Id)
             || string.IsNullOrWhiteSpace(request.Method))
         {
-            await WriteAsync(writer, Error(request?.Id ?? "", "invalid_request", "OfficeHost request requires id and method."), cancellationToken).ConfigureAwait(false);
+            Write(writer, Error(request?.Id ?? "", "invalid_request", "OfficeHost request requires id and method."));
             return;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         OfficeRpcResponse response;
         try
         {
-            var result = await DispatchAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = Dispatch(request, cancellationToken);
             response = new OfficeRpcResponse(
                 request.Id,
                 true,
@@ -125,10 +139,10 @@ public sealed class OfficeHostServer
             response = Error(request.Id, "host_error", Sanitize(ex.Message));
         }
 
-        await WriteAsync(writer, response, cancellationToken).ConfigureAwait(false);
+        Write(writer, response);
     }
 
-    private async Task<object> DispatchAsync(
+    private object Dispatch(
         OfficeRpcRequest request,
         CancellationToken cancellationToken)
     {
@@ -153,13 +167,13 @@ public sealed class OfficeHostServer
             "word.patch" => _backend.PatchWord(Parameters<WordPatchRequest>(request)),
             "word.saveCopy" => _backend.SaveWordCopy(Parameters<OfficeSaveCopyRequest>(request)),
 
-            "fixture.delay" when _fixtureMode => await FixtureDelayAsync(request, cancellationToken).ConfigureAwait(false),
+            "fixture.delay" when _fixtureMode => FixtureDelay(request, cancellationToken),
             "fixture.crash" when _fixtureMode => CrashFixture(),
             _ => throw new OfficeHostFaultException("unknown_method", $"OfficeHost method '{request.Method}' is not supported.")
         };
     }
 
-    private static async Task<object> FixtureDelayAsync(
+    private static object FixtureDelay(
         OfficeRpcRequest request,
         CancellationToken cancellationToken)
     {
@@ -170,7 +184,15 @@ public sealed class OfficeHostServer
             : 1_000;
         if (delay is < 0 or > 30_000)
             throw new OfficeHostFaultException("invalid_request", "Fixture delay must be 0..30000 ms.");
-        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+
+        var remaining = delay;
+        while (remaining > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var slice = Math.Min(remaining, 50);
+            Thread.Sleep(slice);
+            remaining -= slice;
+        }
         return new { delayedMilliseconds = delay };
     }
 
@@ -197,24 +219,20 @@ public sealed class OfficeHostServer
     private static OfficeRpcResponse Error(string id, string code, string message)
         => new(id, false, null, new OfficeRpcError(code, Sanitize(message)));
 
-    private static async Task WriteAsync(
-        StreamWriter writer,
-        OfficeRpcResponse response,
-        CancellationToken cancellationToken)
+    private static void Write(StreamWriter writer, OfficeRpcResponse response)
     {
         var json = JsonSerializer.Serialize(response, Json);
         if (Encoding.UTF8.GetByteCount(json) > OfficeProtocolConstants.MaxMessageBytes)
             json = JsonSerializer.Serialize(
                 Error(response.Id, "response_too_large", "OfficeHost response exceeds the protocol size limit."),
                 Json);
-        await writer.WriteLineAsync(json.AsMemory(), cancellationToken).ConfigureAwait(false);
+        writer.WriteLine(json);
     }
 
     private static string Sanitize(string value)
     {
         value ??= "";
-        value = value.Replace('', ' ').Replace('
-', ' ').Trim();
+        value = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
         return value.Length <= 1_000 ? value : value[..1_000];
     }
 }
