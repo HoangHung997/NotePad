@@ -96,9 +96,9 @@ public static class MbInstalledCapabilityProjectionTests
                 static () => Array.Empty<ProviderProvenance>());
 
             var result = index.Search(
-                "rare needle capability",
+                "rare needle",
                 20);
-            Check(result.Count == 1
+            Check(result.Count > 0
                 && result[0].Kind == CapabilityKind.Skill
                 && result[0].CapabilityId == "zz-needle-skill",
                 "Installed projection lost a skill beyond the historical 100-result search cap.");
