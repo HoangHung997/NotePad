@@ -139,9 +139,9 @@ Evidence: `Runtime/AgentRuntime.cs` owns bounded prompt/context assembly, deferr
 
 ---
 
-## [~] MB-11 — Wire AgentOrchestrator to AgentRuntime
+## [x] MB-11 — Wire AgentOrchestrator to AgentRuntime
 
-Implementation note: normal `AgentOrchestratedRun` now constructs/runs `AgentRuntime` through `AgentOrchestrator`; compatibility `AgentRunner` remains diagnostic-only. Dedicated MB-11 guard tests are wired into CI; verification run in progress.
+Evidence: normal `AgentOrchestratedRun` now constructs/runs `AgentRuntime` through `AgentOrchestrator`; compatibility `AgentRunner` remains diagnostic/A-B only. Dedicated `MbOrchestratorRuntimeTests` prove normal read-only execution uses AgentRuntime, mutating execution remains blocked without verifier evidence, and source guards reject any return to AgentRunner. GitHub Actions run `35342575027`: **3 passed, 0 failed**, full regression/transport/publish pipeline SUCCESS.
 
 Goal:
 
@@ -177,7 +177,7 @@ Acceptance:
 
 ---
 
-## [ ] MB-12 — Wire the provider-neutral transport into the real loop
+## [~] MB-12 — Wire the provider-neutral transport into the real loop
 
 Goal:
 
