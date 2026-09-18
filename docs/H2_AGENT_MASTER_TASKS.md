@@ -250,7 +250,7 @@ Acceptance:
 
 ---
 
-## [~] MB-22 — Use AgentPromptLayout and cache identity in real requests
+## [x] MB-22 — Use AgentPromptLayout and cache identity in real requests
 
 Implementation note: real AgentRuntime now derives provider/model cache identity after stable namespace metadata is merged; normal AgentOrchestratedRun supplies provider/model cache scope, dynamic task/session state remains outside the stable hash, and dedicated runtime acceptance tests are wired for verification.
 
@@ -264,11 +264,13 @@ Acceptance:
 - current task/session/time state does not contaminate stable cache identity;
 - skill hash changes invalidate only the relevant stable identity where configured.
 
+Evidence: `Runtime/MbPromptCacheRuntimeTests.cs` runs against normal `AgentOrchestratedRun -> AgentRuntime` and direct runtime requests. GitHub Actions run `35348776770` reported **3 passed, 0 failed**: dynamic task/session state preserves the same stable cache key, namespace metadata invalidates the stable identity, and changing only the configured skill hash invalidates only that stable identity.
+
 ---
 
 # Stage D — Make ToolRegistry the only normal callable path
 
-## [ ] MB-30 — Replace full AgentTools.Definitions exposure
+## [~] MB-30 — Replace full AgentTools.Definitions exposure
 
 Goal:
 
