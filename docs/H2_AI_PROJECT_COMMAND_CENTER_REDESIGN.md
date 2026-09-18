@@ -1,3 +1,12 @@
+> **SUPERSEDED FOR FUTURE H2 PRODUCT ARCHITECTURE (2026-09-18).**
+>
+> This file is retained as design-history evidence. The canonical future H2 product specification and task tracker are now:
+>
+> - `docs/H2_PRODUCT_MASTER_SPEC.md`
+> - `docs/H2_PRODUCT_MASTER_TASKS.md`
+>
+> Important simplification: the master design keeps Command Center / Project Workspace / Work Assistant, but removes/defer duplicate H2-owned Agent state systems such as giant ProjectState, independent AI Inbox/Research stores, QuickWorkSession, and a second permission/evidence/task engine.
+
 # H2 Notes Redesign — AI Project Command Center
 
 Status: **Approved direction / future H2 redesign specification**  
