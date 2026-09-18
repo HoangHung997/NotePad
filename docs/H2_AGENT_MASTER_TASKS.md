@@ -368,9 +368,7 @@ Evidence: `Runtime/AgentRuntime.cs` routes normal runtime calls through `ToolExe
 
 # Stage E — Permission / evidence / verification becomes part of the loop
 
-## [~] MB-40 — Centralize normal runtime permission enforcement
-
-Implementation note: centralized runtime permission policy + real-runtime MB-40 acceptance suite are implemented; full regression CI retry is in progress.
+## [x] MB-40 — Centralize normal runtime permission enforcement
 
 Goal:
 
@@ -391,9 +389,11 @@ Acceptance:
 - one tool cannot bypass a declined mutation through a different executor;
 - skill text cannot grant permissions.
 
+Evidence: `Runtime/AgentRuntimePermission.cs` centralizes host authorization and declined-scope memory before ToolRegistry execution; `Runtime/MbPermissionRuntimeTests.cs` covers read-only mutation denial, alternate-tool bypass after a declined scope, hostile skill/model permission claims, and v1 mutation scope coverage. Regression run `35358313815` on code commit `0a155ab7d1665113c0e96fefe75fbde621de0d3d` passed MB-33, MB-40, Desktop/Office acceptance, and the complete provider transport matrix after restoring the MB-33 fail-closed invariant for unscoped mutations.
+
 ---
 
-## [ ] MB-41 — Wire artifacts/evidence into tool results
+## [~] MB-41 — Wire artifacts/evidence into tool results
 
 Goal:
 
