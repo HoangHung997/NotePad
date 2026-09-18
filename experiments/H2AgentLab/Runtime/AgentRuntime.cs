@@ -691,7 +691,12 @@ public sealed class AgentRuntime : IAsyncDisposable
         AgentTaskContract contract,
         VerificationReport? latestVerification)
     {
-        if (!contract.VerificationPolicy.RequireVerification)
+        var policy = contract.VerificationPolicy;
+        var requiresHostCompletionGate =
+            contract.IsMutating
+            || policy.RequireVerification
+            || policy.RequiredVerifierIds.Count > 0;
+        if (!requiresHostCompletionGate)
             return;
 
         if (latestVerification is null)
