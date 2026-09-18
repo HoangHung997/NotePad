@@ -658,8 +658,7 @@ public sealed class PluginManager
 
     private static string Bound(string value, int max)
     {
-        value = value.Replace('', ' ').Replace('
-', ' ').Trim();
+        value = value.Replace((char)13, ' ').Replace((char)10, ' ').Trim();
         return value.Length <= max ? value : value[..max];
     }
 
