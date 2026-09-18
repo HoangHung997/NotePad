@@ -210,9 +210,19 @@ public interface IWordLanguageEvidenceProvider
 /// </summary>
 public sealed class DefaultWordLanguageEvidenceProvider : IWordLanguageEvidenceProvider
 {
-    private static readonly Regex LegalPattern = new(
-        @"(?:Luật|Nghị định|Thông tư|Quyết định)s+(?:sốs+)?(?<id>d+(?:/d{4})?/[A-ZĐ-]+(?:-[A-ZĐ]+)?)",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex LegalPattern = BuildLegalPattern();
+
+    private static Regex BuildLegalPattern()
+    {
+        var bs = ((char)92).ToString();
+        var pattern =
+            bs + "b(?:Luật|Nghị định|Thông tư|Quyết định)"
+            + bs + "s+(?:số" + bs + "s+)?"
+            + "(?<id>[0-9]+(?:/[0-9]{4})?/[A-ZĐ0-9-]+(?:-[A-ZĐ0-9]+)?)";
+        return new Regex(
+            pattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
 
     public Task<IReadOnlyList<WordSpellingCandidate>> GetSpellingErrorsAsync(
         string text,
