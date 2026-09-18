@@ -313,40 +313,49 @@ Rules:
 
 ## Phase 09 — DesktopHost / computer use
 
-- [~] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
+- [x] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
   Separate from UI/model/Python sandbox.  
-  DesktopProtocol + DesktopHost + client + safety policy + Phase 09 acceptance suite added; Agent Lab compile fix applied; full Phase 09 CI verification retry in progress.
+  Evidence: isolated `H2AgentLab.DesktopProtocol` + `H2AgentLab.DesktopHost` process, STA named-pipe RPC, Agent Lab client and project-boundary acceptance. GitHub Actions run `35316212135`: PASS 0901.
 
-- [ ] **V2-0902 — Implement safe app/window enumeration.**  
-  Block sensitive/system/password-manager/security windows according to explicit policy.
+- [x] **V2-0902 — Implement safe app/window enumeration.**  
+  Block sensitive/system/password-manager/security windows according to explicit policy.  
+  Evidence: `DesktopSafetyPolicy` blocks terminal/system/security/password-manager processes and sensitive title terms; DesktopHost self-test passed 3/3 and process acceptance passed in run `35316212135`: PASS 0902.
 
-- [ ] **V2-0903 — Implement `observe` screenshot + bounds + DPI + foreground metadata.**
+- [x] **V2-0903 — Implement `observe` screenshot + bounds + DPI + foreground metadata.**  
+  Evidence: Win32/UIA backend captures bounded PNG, SHA-256, window bounds, DPI, foreground/process identity and deterministic state_id. CI run `35316212135`: PASS 0903.
 
-- [ ] **V2-0904 — Add compact UI Automation tree to observation.**  
-  Short-lived element tokens bound to state/window.
+- [x] **V2-0904 — Add compact UI Automation tree to observation.**  
+  Short-lived element tokens bound to state/window.  
+  Evidence: bounded UIA traversal excludes password controls and emits short-lived element tokens tied to exact state/window/runtime-id; old tokens are rejected after a new observation. CI run `35316212135`: PASS 0904.
 
-- [ ] **V2-0905 — Implement click/double-click/key/type/scroll/drag/wait actions.**
+- [x] **V2-0905 — Implement click/double-click/key/type/scroll/drag/wait actions.**  
+  Evidence: DesktopHost implements UIA/Win32 click, double-click, structured type, bounded safe keys, scroll, drag and wait; fixture exercises every action with fresh observations. CI run `35316212135`: PASS 0905.
 
-- [ ] **V2-0906 — Enforce observe-after-mutation.**  
-  A mutating action result cannot be final evidence without a newer observation.
+- [x] **V2-0906 — Enforce observe-after-mutation.**  
+  A mutating action result cannot be final evidence without a newer observation.  
+  Evidence: mutation results carry mutation_id + prior observation sequence and `DesktopEvidenceGate` accepts evidence only when a newer observation explicitly reports that mutation_id. CI run `35316212135`: PASS 0906.
 
-- [ ] **V2-0907 — Add stale-state protection.**  
-  Action with stale `state_id` is rejected or requires re-observation.
+- [x] **V2-0907 — Add stale-state protection.**  
+  Action with stale `state_id` is rejected or requires re-observation.  
+  Evidence: host re-fingerprints window screenshot/UIA/bounds before action; state_id mismatch, expired observation or stale element token is rejected. Resize fixture proves old coordinates/state cannot be reused. CI run `35316212135`: PASS 0907.
 
-- [ ] **V2-0908 — Add vision input adapter for screenshot observations.**  
-  Only providers/models with image input receive pixels; UIA fallback remains available.
+- [x] **V2-0908 — Add vision input adapter for screenshot observations.**  
+  Only providers/models with image input receive pixels; UIA fallback remains available.  
+  Evidence: `DesktopVisionInputAdapter` branches on `AgentTransportCapabilities.NativeImageInput`; non-vision transports receive UIA text only, vision-capable transports receive validated PNG pixels. CI run `35316212135`: PASS 0908.
 
-- [ ] **V2-0909 — Preserve structured-adapter priority.**  
-  Tests prove Excel/Word requests prefer OfficeHost and do not fall straight to pixel clicking.
+- [x] **V2-0909 — Preserve structured-adapter priority.**  
+  Tests prove Excel/Word requests prefer OfficeHost and do not fall straight to pixel clicking.  
+  Evidence: `InteractionAdapterPreference` enforces OfficeStructured > DesktopAutomation for Word/Excel intent, with Python only as explicit/fallback escape hatch. CI run `35316212135`: PASS 0909.
 
-- [ ] **V2-0910 — Dedicated desktop test window acceptance suite.**  
-  Verify observe→act→observe, no coordinate guessing after resize, cancel/denial.
+- [x] **V2-0910 — Dedicated desktop test window acceptance suite.**  
+  Verify observe→act→observe, no coordinate guessing after resize, cancel/denial.  
+  Evidence: `Desktop/V2DesktopHostTests.cs` runs a separate-process deterministic desktop fixture and covers observe→act→observe, resize invalidation, cancellation/restart and permission denial. GitHub Actions run `35316212135`: Phase 09 suite 10 passed, 0 failed.
 
 ---
 
 ## Phase 10 — Python/runtime migration and fallback
 
-- [ ] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**
+- [~] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**
 
 - [ ] **V2-1002 — Preserve WindowsPythonSandbox security regression suite.**
 
@@ -419,4 +428,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0901 — Create H2AgentLab.DesktopHost helper project`.
+**Active task:** `V2-1001 — Adapt ScriptWorkspace to v2 artifact/evidence IDs`.
