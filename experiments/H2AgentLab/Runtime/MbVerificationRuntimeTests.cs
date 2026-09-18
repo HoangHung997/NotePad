@@ -144,7 +144,9 @@ public static class MbVerificationRuntimeTests
             var artifactBytes = Encoding.UTF8.GetBytes("python verified artifact");
             var artifactSha = global::H2AgentLab.SafeWorkspace.Hash(artifactBytes);
             var runRoot = Path.Combine(stateRoot, "runs", runId);
-            Directory.CreateDirectory(runRoot);
+            var outputRoot = Path.Combine(runRoot, "work", "output");
+            Directory.CreateDirectory(outputRoot);
+            File.WriteAllBytes(Path.Combine(outputRoot, "result.txt"), artifactBytes);
             var run = new global::H2AgentLab.ScriptRun(
                 runId,
                 workspace.Root,
