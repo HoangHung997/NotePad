@@ -519,7 +519,7 @@ Evidence: `H2AgentLab.Skills.SkillCatalog` is now the canonical host-facing cata
 
 ---
 
-## [ ] MB-51 — Codex-style discovery only: name + description
+## [x] MB-51 — Codex-style discovery only: name + description
 
 Goal:
 
@@ -545,6 +545,8 @@ with description mentioning dynamic blocks must be selectable for:
 without the query containing `cad-integrity`.
 
 Do not satisfy this test by adding AutoCAD-specific synonym code to Agent core.
+
+Evidence: canonical local skill discovery ranks only bounded `name + description` metadata from `BuiltInSkillSource` / `PluginSkillSource`; full `SKILL.md` body content is not part of discovery. Minimal skill authoring requires only `name` and `description`, with description length bounded by the host parser. Generic capability ranking no longer expands terms through the former hard-coded synonym dictionary (`dynamic/parameters/actions/blocks/autocad/legal` mappings were removed), leaving domain meaning to skill/tool descriptions, model understanding, or optional specialized search extensions. `Skills/MbSkillDiscoveryTests.cs` proves the exact acceptance query `"check parameters and actions of these dynamic blocks"` selects differently named `cad-integrity` from its description, proves body-only sentinel terms are not searchable, proves minimal name+description authoring plus metadata bounds, and source-guards against domain synonym tables or mandatory aliases/intents/examples parsing. Exact functional source commit `a59e6cc46fab106b0bb21d72879b6edde9edf88e`, GitHub Actions run `35371871246`: MB-51 **4 passed, 0 failed**; H2 Notes, Phase 10/11/extensibility, MB-10 through MB-50, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `50c09c4d8e69f769fd4c73193fcee35b8b0226f1`; portable ZIP SHA256 `b2cd38882f375c77abf3af008f9ba0bf0cf19cb58969462a36b589cb92474d4a`.
 
 ---
 
