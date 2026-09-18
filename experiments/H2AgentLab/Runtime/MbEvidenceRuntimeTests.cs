@@ -131,6 +131,39 @@ public static class MbEvidenceRuntimeTests
                 "Small evidence raw output did not round-trip.");
         });
 
+        await Test("MB-41 v1 important tool metadata declares verification evidence capability", () =>
+        {
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(
+                registry,
+                new DelegatingToolExecutor(
+                    "mb41-v1-metadata",
+                    (call, ct) => ValueTask.FromResult("{}")));
+
+            foreach (var name in new[]
+            {
+                "read_file",
+                "inspect_artifact",
+                "read_run",
+                "word_paragraphs",
+                "check_word",
+                "inspect_window",
+                "write_text",
+                "run_python"
+            })
+            {
+                Check(registry.TryGet(name, out var descriptor),
+                    "V1 registry is missing " + name + ".");
+                Check(descriptor.CanProvideVerificationEvidence,
+                    "V1 evidence-capable tool is not marked: " + name + ".");
+            }
+
+            Check(registry.TryGet("list_skills", out var skillList)
+                  && !skillList.CanProvideVerificationEvidence,
+                "Non-evidence skill discovery was incorrectly promoted to verification evidence.");
+            return Task.CompletedTask;
+        });
+
         await Test("MB-41 verifier receives evidence IDs from real mutation tool results", async () =>
         {
             var state = Path.Combine(root, "verifier-evidence");
