@@ -69,7 +69,7 @@ Evidence: `experiments/H2AgentLab/MB_BASELINE.md` freezes branch HEAD `39e873dc6
 
 ---
 
-## [~] MB-01 — Reconcile documentation and stop old tracker drift
+## [x] MB-01 — Reconcile documentation and stop old tracker drift
 
 Goal:
 
@@ -90,11 +90,13 @@ Acceptance:
 - no ambiguity about which task tracker is authoritative;
 - H2 Notes redesign and non-AI bug-ledger docs remain separate.
 
+Evidence: Agent Lab README now links the Master Spec/Tasks as canonical authority; the V2 spec/tracker headers explicitly mark them historical/superseded and forbid new execution work; the two H2 Notes documents remain separately linked and explicitly not superseded.
+
 ---
 
 # Stage B — Make the V2 machine actually boot
 
-## [ ] MB-10 — Introduce the real AgentRuntime
+## [~] MB-10 — Introduce the real AgentRuntime
 
 Goal:
 
