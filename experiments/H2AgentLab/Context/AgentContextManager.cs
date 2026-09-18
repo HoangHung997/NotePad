@@ -357,9 +357,10 @@ public sealed class AgentContextManager
 
     private static long EstimateCandidateCharacters(AgentContextInput input)
     {
-        long total = Normalize(input.TaskContract).Length
-            + Normalize(input.CurrentState).Length
-            + Normalize(input.CompactedHistory).Length;
+        long total = 0;
+        total = SaturatingAdd(total, Normalize(input.TaskContract).Length);
+        total = SaturatingAdd(total, Normalize(input.CurrentState).Length);
+        total = SaturatingAdd(total, Normalize(input.CompactedHistory).Length);
         foreach (var turn in input.RecentTurns ?? [])
             if (turn.Relevance > 0 && !string.IsNullOrWhiteSpace(turn.Content))
                 total = SaturatingAdd(total, Normalize(turn.Content).Length);
