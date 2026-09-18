@@ -108,7 +108,7 @@ public sealed class WebEvidenceStore
     private static string NormalizeExcerpt(string value)
     {
         value ??= "";
-        value = System.Text.RegularExpressions.Regex.Replace(value, "\s+", " ").Trim();
+        value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
         return value.Length <= MaxInlineExcerptCharacters
             ? value
             : value[..MaxInlineExcerptCharacters] + "…";
