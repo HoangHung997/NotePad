@@ -109,10 +109,10 @@ Rules:
 - [x] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
   Evidence: `Context/LabSessionContextAdapter.cs` is the v2-only bridge from durable `LabSession` history into `AgentContextManager`; it never calls the legacy `LabSession.Context()` concatenation path. Only completed `user`/`assistant` journal events are eligible as recent turns, while `script`, `recovery`, `unverified-draft` and unknown future event kinds remain durable on disk but are not blindly re-injected. `V2SessionContextTests.cs` proves bounded recent selection/source IDs, exact raw `session.json` preservation/reload, prompt consumption of the bounded snapshot, and exclusion of non-conversation journal kinds. The first CI attempt exposed a constructor named-argument compiler error and was fixed before acceptance. Source commit `bd6ff06d6f88103623d4aef5e374a236087941e0`; GitHub Actions push run `35290186199` and PR run `35290186955` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `dddf3d02d3b913714fbe4b2a25b31f467231a8b7` records source `bd6ff06d...` and ZIP SHA256 `a80302af61207a1f3fdc1343ece365bfef59c4ac8cc2e079975d4d3fd44fd70b`.
 
-- [~] **V2-0306 — Add artifact handles for large tool output.**  
-  Long stdout/stderr/document extracts stored out-of-context; model sees concise summary + retrievable handle.
+- [x] **V2-0306 — Add artifact handles for large tool output.**  
+  Evidence: `Session/ArtifactStore.cs` persists large UTF-8 tool/stdout/stderr/document-extract text outside active model context using opaque `h2a1_...` handles, atomic content/manifest writes, byte count and SHA-256 integrity metadata. `StoreText` returns only a bounded `AgentContextToolSummary` containing caller-provided summary + handle/hash/size metadata and never exposes the local state path or full large output; `ReadText`/ `LoadHandle` explicitly retrieve and verify stored content. `V2ArtifactStoreTests.cs` proves a 120k-character output stays out of active context while exact content remains retrievable, tampered content is rejected by hash/size verification, and summaries/handles are bounded and path-like handles rejected. Source commit `ad4a56e62928dcffb7ef4016cd0205618eec721f`; GitHub Actions push run `35290643923` and PR run `35290646835` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `29fbee68f1667a0658adca29a83b10e8c8f7398a` records source `ad4a56e6...` and ZIP SHA256 `9f34d9c9a3b588ec12275a93274c1fab829db9aee17bf001e742cf65144f40c9`.
 
-- [ ] **V2-0307 — Add compaction checkpoint model.**  
+- [~] **V2-0307 — Add compaction checkpoint model.**  
   Raw history preserved, active context can be replaced by summary + durable source references.
 
 - [ ] **V2-0308 — Add automatic context budget trigger.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0306 — Add artifact handles for large tool output`.
+**Active task:** `V2-0307 — Add compaction checkpoint model`.
