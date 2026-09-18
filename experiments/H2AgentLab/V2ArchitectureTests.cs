@@ -362,7 +362,11 @@ public static class V2ArchitectureTests
         {
             var inputs = new List<string> { " input-a ", "input-b" };
             var requiredChanges = new List<string> { "change-a" };
-            var criteria = new List<string> { "criterion-a", "criterion-b" };
+            var criteria = new List<AgentAcceptanceCriterion>
+            {
+                new("criterion-a", "criterion-a"),
+                new("criterion-b", "criterion-b")
+            };
             var contract = new AgentTaskContract(
                 Guid.NewGuid(),
                 " Update the target safely ",
@@ -386,7 +390,7 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Task contract did not normalize required scalar fields.");
             if (!contract.Inputs.SequenceEqual(new[] { "input-a", "input-b" })
                 || !contract.RequiredChanges.SequenceEqual(new[] { "change-a" })
-                || !contract.AcceptanceCriteria.SequenceEqual(new[] { "criterion-a", "criterion-b" }))
+                || !contract.AcceptanceCriteria.Select(x => x.CriterionId).SequenceEqual(new[] { "criterion-a", "criterion-b" }))
                 throw new InvalidOperationException("Caller mutation changed an accepted task contract snapshot.");
             if (!contract.VerificationPolicy.RequiredVerifierIds.SequenceEqual(new[] { "build", "tests" })
                 || !contract.VerificationPolicy.RequireVerification
@@ -397,7 +401,7 @@ public static class V2ArchitectureTests
 
             var readOnly = new AgentTaskContract(
                 Guid.NewGuid(), "Read the target", "workspace:/fixture", null, null, null, null,
-                ["return requested facts"], AgentTaskRiskClass.ReadOnly,
+                [new AgentAcceptanceCriterion("return-facts", "return requested facts")], AgentTaskRiskClass.ReadOnly,
                 new AgentVerificationPolicy(requireVerification: false));
             if (readOnly.IsMutating)
                 throw new InvalidOperationException("Read-only contract was classified as mutating.");
@@ -410,6 +414,64 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Empty task ID was accepted.");
             }
             catch (ArgumentException) { }
+        });
+
+        Test("Acceptance criteria preserve identity and use typed durable evidence", () =>
+        {
+            var source = new AgentAcceptanceCriterion("keep-formulas", "Existing formulas remain unchanged.");
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Edit workbook safely",
+                "workspace:/fixture",
+                ["book.xlsx"],
+                ["update target cells"],
+                ["preserve formulas"],
+                ["edited workbook"],
+                [source],
+                AgentTaskRiskClass.Medium,
+                new AgentVerificationPolicy(requiredVerifierIds: ["excel-verify"]));
+
+            var evidence = new AgentEvidenceReference(
+                AgentEvidenceKind.TestBuildResult,
+                "ci:35293190864",
+                new string('a', 64),
+                "full regression passed");
+            var withEvidence = contract.WithCriterionEvidence("keep-formulas", evidence);
+
+            if (contract.AcceptanceCriteria[0].Evidence.Count != 0)
+                throw new InvalidOperationException("Recording evidence mutated the prior task contract snapshot.");
+            if (withEvidence.AcceptanceCriteria.Count != 1
+                || withEvidence.AcceptanceCriteria[0].Requirement != source.Requirement
+                || withEvidence.AcceptanceCriteria[0].Evidence.Count != 1
+                || withEvidence.AcceptanceCriteria[0].Evidence[0].Kind != AgentEvidenceKind.TestBuildResult
+                || withEvidence.AcceptanceCriteria[0].Evidence[0].ReferenceId != "ci:35293190864")
+                throw new InvalidOperationException("Typed acceptance evidence was not preserved.");
+
+            var expanded = withEvidence.ExpandAcceptanceCriteria(
+                [new AgentAcceptanceCriterion("output-exists", "Expected output artifact exists.")]);
+            if (expanded.AcceptanceCriteria.Count != 2
+                || !expanded.AcceptanceCriteria.Select(x => x.CriterionId)
+                    .SequenceEqual(new[] { "keep-formulas", "output-exists" }))
+                throw new InvalidOperationException("Contract criterion expansion did not preserve existing requirements.");
+
+            try
+            {
+                _ = expanded.ExpandAcceptanceCriteria(
+                    [new AgentAcceptanceCriterion("keep-formulas", "Silently changed requirement")]);
+                throw new InvalidOperationException("Existing acceptance criterion was silently redefined.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("cannot be silently redefined", StringComparison.Ordinal))
+            {
+            }
+
+            try
+            {
+                _ = new AgentEvidenceReference(AgentEvidenceKind.ArtifactHash, "artifact-1", "not-a-sha");
+                throw new InvalidOperationException("Invalid evidence SHA-256 was accepted.");
+            }
+            catch (ArgumentException)
+            {
+            }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
