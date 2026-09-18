@@ -205,11 +205,11 @@ Rules:
   Allows domain verifiers without coupling orchestrator to Excel/Word.  
   Evidence: `Verification/IArtifactVerifier.cs` defines domain-neutral target/request/verifier/registry abstractions with criterion scoping; architecture guard passed in GitHub Actions run `35304979625`, together with full regression/publish.
 
-- [~] **V2-0604 — Add `AgentRepairController`.**  
+- [x] **V2-0604 — Add `AgentRepairController`.**  
   Convert failed criteria into concise repair context; preserve already-passed criteria.  
-  Implementation + architecture guard added; full CI verification in progress.
+  Evidence: `Verification/AgentRepairController.cs` emits bounded failure-only repair context plus explicit passed-criterion preservation; architecture guard passed in GitHub Actions run `35305244484`, together with full regression/publish.
 
-- [ ] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
+- [~] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
   Runtime/protocol recovery remains distinct from semantic repair.
 
 - [ ] **V2-0606 — Add verification-gate tests.**  
@@ -393,4 +393,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0604 — Add AgentRepairController`.
+**Active task:** `V2-0605 — Integrate RecoverySupervisor below verifier layer`.
