@@ -248,7 +248,8 @@ Rules:
   Evidence: `Tools/DocumentToolPreference.cs` is applied inside `DeferredToolDiscovery.Search/SearchAndLoad`; structured Office/file tools outrank Python for document intent while explicit Python/custom-transform intent is preserved. GitHub Actions run `35309660295` passed full regression/publish.
 
 - [~] **V2-0708 — Closed-file acceptance tests.**  
-  Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.
+  Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.  
+  Dedicated closed-file CI suite added; full Phase 07 verification in progress.
 
 ---
 
