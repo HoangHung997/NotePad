@@ -61,7 +61,7 @@ public sealed record AgentTaskContract
         IEnumerable<string>? requiredChanges,
         IEnumerable<string>? preserveConstraints,
         IEnumerable<string>? outputRequirements,
-        IEnumerable<string>? acceptanceCriteria,
+        IEnumerable<AgentAcceptanceCriterion>? acceptanceCriteria,
         AgentTaskRiskClass riskClass,
         AgentVerificationPolicy verificationPolicy)
     {
@@ -75,7 +75,7 @@ public sealed record AgentTaskContract
         RequiredChanges = NormalizeItems(requiredChanges, nameof(requiredChanges));
         PreserveConstraints = NormalizeItems(preserveConstraints, nameof(preserveConstraints));
         OutputRequirements = NormalizeItems(outputRequirements, nameof(outputRequirements));
-        AcceptanceCriteria = NormalizeItems(acceptanceCriteria, nameof(acceptanceCriteria));
+        AcceptanceCriteria = NormalizeCriteria(acceptanceCriteria);
         RiskClass = riskClass;
         VerificationPolicy = verificationPolicy ?? throw new ArgumentNullException(nameof(verificationPolicy));
 
@@ -90,11 +90,69 @@ public sealed record AgentTaskContract
     public IReadOnlyList<string> RequiredChanges { get; }
     public IReadOnlyList<string> PreserveConstraints { get; }
     public IReadOnlyList<string> OutputRequirements { get; }
-    public IReadOnlyList<string> AcceptanceCriteria { get; }
+    public IReadOnlyList<AgentAcceptanceCriterion> AcceptanceCriteria { get; }
     public AgentTaskRiskClass RiskClass { get; }
     public AgentVerificationPolicy VerificationPolicy { get; }
 
     public bool IsMutating => RequiredChanges.Count > 0 || RiskClass != AgentTaskRiskClass.ReadOnly;
+
+    /// <summary>
+    /// Adds new acceptance requirements without permitting an existing criterion to disappear or
+    /// be redefined. This is the only contract-level criterion expansion operation.
+    /// </summary>
+    public AgentTaskContract ExpandAcceptanceCriteria(IEnumerable<AgentAcceptanceCriterion> additions)
+    {
+        ArgumentNullException.ThrowIfNull(additions);
+        var merged = AcceptanceCriteria.ToList();
+        foreach (var addition in additions)
+        {
+            ArgumentNullException.ThrowIfNull(addition);
+            var existing = merged.FirstOrDefault(x => x.CriterionId == addition.CriterionId);
+            if (existing is null)
+            {
+                merged.Add(addition);
+                continue;
+            }
+
+            if (!string.Equals(existing.Requirement, addition.Requirement, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Acceptance criterion '{addition.CriterionId}' cannot be silently redefined.");
+
+            foreach (var evidence in addition.Evidence)
+                existing = existing.WithEvidence(evidence);
+            merged[merged.FindIndex(x => x.CriterionId == addition.CriterionId)] = existing;
+        }
+
+        return CopyWithCriteria(merged);
+    }
+
+    /// <summary>
+    /// Appends evidence to one existing criterion while preserving the full accepted criterion set.
+    /// </summary>
+    public AgentTaskContract WithCriterionEvidence(string criterionId, AgentEvidenceReference evidence)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(criterionId);
+        ArgumentNullException.ThrowIfNull(evidence);
+        var index = AcceptanceCriteria.ToList().FindIndex(x => x.CriterionId == criterionId.Trim());
+        if (index < 0)
+            throw new KeyNotFoundException($"Unknown acceptance criterion '{criterionId.Trim()}'.");
+
+        var criteria = AcceptanceCriteria.ToArray();
+        criteria[index] = criteria[index].WithEvidence(evidence);
+        return CopyWithCriteria(criteria);
+    }
+
+    private AgentTaskContract CopyWithCriteria(IEnumerable<AgentAcceptanceCriterion> criteria)
+        => new(
+            TaskId,
+            UserGoal,
+            Scope,
+            Inputs,
+            RequiredChanges,
+            PreserveConstraints,
+            OutputRequirements,
+            criteria,
+            RiskClass,
+            VerificationPolicy);
 
     private static string NormalizeRequired(string? value, string parameterName, int maxLength)
     {
@@ -118,6 +176,22 @@ public sealed record AgentTaskContract
                 throw new ArgumentException("Task contract item exceeds 8,000 characters.", parameterName);
             if (!result.Contains(normalized, StringComparer.Ordinal))
                 result.Add(normalized);
+        }
+        return Array.AsReadOnly(result.ToArray());
+    }
+
+    private static IReadOnlyList<AgentAcceptanceCriterion> NormalizeCriteria(IEnumerable<AgentAcceptanceCriterion>? values)
+    {
+        if (values is null) return Array.Empty<AgentAcceptanceCriterion>();
+
+        var result = new List<AgentAcceptanceCriterion>();
+        foreach (var criterion in values)
+        {
+            ArgumentNullException.ThrowIfNull(criterion);
+            var existing = result.FirstOrDefault(x => x.CriterionId == criterion.CriterionId);
+            if (existing is not null)
+                throw new ArgumentException($"Duplicate acceptance criterion ID '{criterion.CriterionId}'.", nameof(values));
+            result.Add(criterion);
         }
         return Array.AsReadOnly(result.ToArray());
     }
