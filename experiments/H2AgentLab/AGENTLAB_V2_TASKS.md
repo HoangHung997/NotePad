@@ -214,7 +214,8 @@ Rules:
   Evidence: `Verification/VerificationRecoveryCoordinator.cs` wraps existing `RecoverySupervisor` below semantic verification and keeps runtime recovery state independent from verifier failures; architecture guard passed in GitHub Actions run `35305569774`, together with full regression/publish.
 
 - [~] **V2-0606 — Add verification-gate tests.**  
-  Model saying “done” must not pass if verifier fails.
+  Model saying “done” must not pass if verifier fails.  
+  Verification completion gate + dedicated CI suite added; full Phase 06 CI verification in progress.
 
 ---
 
