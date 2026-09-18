@@ -69,12 +69,20 @@ public sealed class DeferredToolDiscovery
     }
 
     public IReadOnlyList<ToolSearchResult> Search(string query, int maxResults = 8)
-        => _search.Search(query, maxResults);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        if (maxResults is < 1 or > 50)
+            throw new ArgumentOutOfRangeException(nameof(maxResults));
+
+        var candidateLimit = Math.Min(50, Math.Max(maxResults * 4, maxResults));
+        var candidates = _search.Search(query, candidateLimit);
+        return DocumentToolPreference.Apply(query, candidates, maxResults);
+    }
 
     public ToolSchemaLoadBatch SearchAndLoad(string query, int maxResults = 8)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
-        var selected = _search.Search(query, maxResults);
+        var selected = Search(query, maxResults);
         var selectedNames = selected.Select(x => x.Descriptor.Name).ToArray();
 
         var schemas = new List<JsonElement>();
