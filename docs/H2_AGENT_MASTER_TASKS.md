@@ -233,13 +233,13 @@ Acceptance:
 
 ---
 
-## [~] MB-21 — Wire CompactionManager into runtime pressure
+## [x] MB-21 — Wire CompactionManager into runtime pressure
 
 Goal:
 
 Use compaction automatically when context pressure requires it.
 
-Implementation note: `RuntimeCompactionCoordinator` is wired into normal `AgentOrchestratedRun`; checkpoint creation/reuse/chaining tests are 2/3 green in run `35347262818`. Final typed-trace assertion fix is being re-verified.
+Evidence: `RuntimeCompactionCoordinator` is wired into normal `AgentOrchestratedRun`; it creates/reuses/chains bounded checkpoints, keeps raw journal durable, trims covered history from active input and exposes checkpoint evidence in typed trace. GitHub Actions run `35347797965`: MB-21 **3 passed, 0 failed** and full regression/extension/transport/publish pipeline SUCCESS.
 
 Acceptance:
 
@@ -250,7 +250,7 @@ Acceptance:
 
 ---
 
-## [ ] MB-22 — Use AgentPromptLayout and cache identity in real requests
+## [~] MB-22 — Use AgentPromptLayout and cache identity in real requests
 
 Goal:
 
