@@ -157,11 +157,11 @@ Rules:
 
 ## Phase 05 — tool registry and deferred tool discovery
 
-- [~] **V2-0501 — Define tool descriptor/namespace/registry types.**  
+- [x] **V2-0501 — Define tool descriptor/namespace/registry types.**  
   Include risk, mutating/read-only, parallel capability, schema version and runtime executor reference.  
-  Implementation + architecture guard added; compile fix applied; full CI verification retry in progress.
+  Evidence: `Tools/ToolRegistry.cs` defines namespaces, descriptors, access/risk/parallel/schema metadata, executor references and versioned registry; architecture guard verifies normalization/versioning/duplicate protection. GitHub Actions run `35296169905` passed full build/regression/publish.
 
-- [ ] **V2-0502 — Register existing v1 tools through registry adapters.**  
+- [~] **V2-0502 — Register existing v1 tools through registry adapters.**  
   No functional deletion yet.
 
 - [ ] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
@@ -382,4 +382,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0501 — Define tool descriptor/namespace/registry types`.
+**Active task:** `V2-0502 — Register existing v1 tools through registry adapters`.
