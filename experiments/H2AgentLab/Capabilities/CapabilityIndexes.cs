@@ -177,7 +177,7 @@ internal static class CapabilityRanking
         int maxResults)
         => records
             .Select(x => new { Record = x, Score = Score(query, x.CapabilityId, x.Description) })
-            .Where(x => string.IsNullOrWhiteSpace(query) || x.Score > 0)
+            .Where(x => string.IsNullOrWhiteSpace(query) || x.Score >= MinimumScore(query))
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Record.CapabilityId, StringComparer.Ordinal)
             .Take(maxResults)
@@ -194,7 +194,7 @@ internal static class CapabilityRanking
                 Record = record,
                 Score = AvailableScore(query, record)
             })
-            .Where(x => string.IsNullOrWhiteSpace(query) || x.Score > 0)
+            .Where(x => string.IsNullOrWhiteSpace(query) || x.Score >= MinimumScore(query))
             .OrderByDescending(x => x.Score)
             .ThenByDescending(x => x.Record.SourcePriority)
             .ThenByDescending(x => Version.Parse(x.Record.PluginVersion))
@@ -202,6 +202,14 @@ internal static class CapabilityRanking
             .Take(maxResults)
             .Select(x => x.Record)
             .ToArray();
+
+    private static double MinimumScore(string query)
+    {
+        var concepts = H2AgentLab.Skills.BuiltInSkillSource.Tokens(query)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        return concepts >= 4 ? 6d : 1d;
+    }
 
     private static double AvailableScore(string query, AvailableCapabilityRecord record)
     {
