@@ -46,6 +46,8 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         return new AgentRuntime(
             transport,
             contextManager,
-            registry);
+            registry,
+            permissionPolicy: new ScopedAgentRuntimePermissionPolicy(
+                _ => !tools.ReadOnly));
     }
 }
