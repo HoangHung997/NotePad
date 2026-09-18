@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using H2AgentLab.Context;
 using H2AgentLab.Metrics;
+using H2AgentLab.Session;
 using H2AgentLab.Transport;
 
 namespace H2AgentLab;
@@ -21,6 +22,7 @@ public static class Program
         if (args.Contains("--v2-metrics-test")) return V2MetricsTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-baseline-test")) return V2BaselineTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-session-context-test")) return V2SessionContextTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-artifact-store-test")) return V2ArtifactStoreTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-transport-contract-test")) return V2TransportContractTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-ollama-transport-test")) return V2OllamaTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
