@@ -1,40 +1,68 @@
 namespace H2AgentLab.Tools;
 
-public enum InteractionAdapterKind
+public sealed record InteractionAdapterCandidate
 {
-    OfficeStructured = 0,
-    DesktopAutomation = 1,
-    PythonEscapeHatch = 2,
-    None = 3
+    public InteractionAdapterCandidate(
+        string adapterId,
+        string capabilityFamily,
+        ToolInteractionFidelity interactionFidelity,
+        bool available = true,
+        bool explicitRequestOnly = false,
+        IEnumerable<string>? explicitRequestTerms = null)
+    {
+        AdapterId = ToolNamespace.NormalizeId(adapterId, nameof(adapterId));
+        Preference = new ToolPreferenceMetadata(
+            capabilityFamily,
+            interactionFidelity,
+            explicitRequestOnly,
+            explicitRequestTerms);
+        Available = available;
+    }
+
+    public string AdapterId { get; }
+    public ToolPreferenceMetadata Preference { get; }
+    public bool Available { get; }
 }
 
 /// <summary>
-/// Host-side adapter routing rule from the v2 spec:
-/// structured app adapter > accessibility/UIA > screenshot/vision > Python escape hatch.
-/// For Word/Excel intent, an available OfficeHost is always selected before DesktopHost.
+/// Generic adapter ordering:
+/// structured typed interface > accessibility/UIA > screenshot/pixel > escape hatch.
+/// Providers/extensions supply metadata; the core contains no application-family switch.
 /// </summary>
 public static class InteractionAdapterPreference
 {
-    public static InteractionAdapterKind Choose(
+    public static InteractionAdapterCandidate? Choose(
         string query,
-        bool officeHostAvailable,
-        bool desktopHostAvailable,
-        bool pythonAvailable = true)
+        IEnumerable<InteractionAdapterCandidate> candidates)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentNullException.ThrowIfNull(candidates);
 
-        if (DocumentToolPreference.IsExplicitPythonIntent(query) && pythonAvailable)
-            return InteractionAdapterKind.PythonEscapeHatch;
+        return candidates
+            .Where(x => x is not null && x.Available)
+            .Where(x => !x.Preference.ExplicitRequestOnly
+                || x.Preference.MatchesExplicitRequest(query))
+            .OrderByDescending(x => IsExactAdapterRequest(query, x))
+            .ThenBy(x => DocumentToolPreference.FidelityRank(
+                x.Preference.InteractionFidelity))
+            .ThenBy(x => x.AdapterId, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
 
-        if (DocumentToolPreference.IsDocumentIntent(query) && officeHostAvailable)
-            return InteractionAdapterKind.OfficeStructured;
-
-        if (desktopHostAvailable)
-            return InteractionAdapterKind.DesktopAutomation;
-
-        if (pythonAvailable)
-            return InteractionAdapterKind.PythonEscapeHatch;
-
-        return InteractionAdapterKind.None;
+    private static bool IsExactAdapterRequest(
+        string query,
+        InteractionAdapterCandidate candidate)
+    {
+        var normalized = query
+            .Trim()
+            .ToLowerInvariant()
+            .Replace(' ', '_');
+        return string.Equals(
+                normalized,
+                candidate.AdapterId,
+                StringComparison.Ordinal)
+            || query.Contains(
+                candidate.AdapterId,
+                StringComparison.OrdinalIgnoreCase);
     }
 }
