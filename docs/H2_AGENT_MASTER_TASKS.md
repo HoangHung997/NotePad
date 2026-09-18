@@ -486,7 +486,7 @@ Evidence: host completion ownership remains in `AgentOrchestrator`/`AgentTaskSta
 
 # Stage F — Simplify Skills instead of building a second AI
 
-## [ ] MB-50 — Establish one canonical SkillCatalog
+## [x] MB-50 — Establish one canonical SkillCatalog
 
 Goal:
 
@@ -514,6 +514,8 @@ Acceptance:
 - provenance retained;
 - compatibility adapter allowed temporarily;
 - no duplicate parser behavior after final migration.
+
+Evidence: `H2AgentLab.Skills.SkillCatalog` is now the canonical host-facing catalog and owns the single `Search` / `Read` / `ReadResource` dispatch surface for registered sources. `BuiltInSkillSource` owns built-in metadata parsing and preserves source/hash provenance; `PluginSkillSource` remains the plugin source adapter over `PluginSkillCatalog`. Historical `UnifiedSkillCatalog` is a behavior-free subclass compatibility name, while the root `H2AgentLab.SkillCatalog` is now a thin v1 facade that constructs/registers `BuiltInSkillSource` and delegates discovery/reads to the canonical catalog instead of parsing frontmatter itself. `DeferredSkillSession` now wraps the canonical catalog and only caches selected content hashes/versions; it no longer owns a separate filesystem/parser path. Installed capability projection and the historical missing-capability continuation now accept the canonical catalog type. `Skills/MbSkillCatalogTests.cs` proves canonical built-in search/read/provenance, multi-source dispatch with plugin provenance, legacy/deferred adapter identity, and a source guard against duplicate built-in parser/catalog logic. Exact functional source commit `219e5325007d0d97a76c2de537ab2d8585109ce7`, GitHub Actions run `35371132588`: MB-50 **4 passed, 0 failed**; H2 Notes, legacy/v2 Agent suites, MB-10 through MB-44, Phase 10/11/extensibility regression, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `06e6ca8b0b4feda281215640ffa3566fded06a22`; portable ZIP SHA256 `afe24c8c7c09daeb23f413bf7575bc3f27b3f912682e1334ef7b50889ba2baff`.
 
 ---
 
