@@ -5,10 +5,12 @@ namespace H2AgentLab.Tools;
 public sealed class V1AgentToolsExecutor : IAgentToolExecutor
 {
     private readonly global::H2AgentLab.AgentTools _tools;
+    private readonly SkillRuntimeToolExecutor _skills;
 
     public V1AgentToolsExecutor(global::H2AgentLab.AgentTools tools)
     {
         _tools = tools ?? throw new ArgumentNullException(nameof(tools));
+        _skills = new SkillRuntimeToolExecutor(_tools.Skills.Canonical);
     }
 
     public string ExecutorId => "v1-agent-tools";
@@ -16,7 +18,13 @@ public sealed class V1AgentToolsExecutor : IAgentToolExecutor
     public async ValueTask<string> ExecuteAsync(
         global::H2AgentLab.ToolCall call,
         CancellationToken cancellationToken)
-        => await _tools.Execute(call, cancellationToken);
+    {
+        if (call.Name is SkillRuntimeToolExecutor.SearchToolName
+            or SkillRuntimeToolExecutor.ReadToolName)
+            return await _skills.ExecuteAsync(call, cancellationToken);
+
+        return await _tools.Execute(call, cancellationToken);
+    }
 }
 
 public static class V1ToolRegistryAdapter
