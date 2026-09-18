@@ -115,10 +115,10 @@ Rules:
 - [x] **V2-0307 — Add compaction checkpoint model.**  
   Evidence: `Session/CompactionManager.cs` persists bounded `h2cp1_...` checkpoints containing only a compact summary plus 1..8 typed durable references to journal events, artifacts, tool results, snapshots or prior checkpoints. Checkpoints carry UTC creation time, covered sequence, summary SHA-256 and optional validated previous-checkpoint link; rendering is capped to 4,000 characters so it can feed the existing compacted-history budget. The manager never deletes or rewrites source evidence. `V2CompactionTests.cs` proves raw `session.json` bytes remain unchanged while active context uses checkpoint summary/references + recent turns, checkpoint chains round-trip, and source-less/unsafe/tampered/missing-link checkpoints are rejected. Source commit `4e5deded90e3e5937c8998825b056813834ed922`; GitHub Actions push run `35291069507` and PR run `35291074993` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, compaction **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `c6aa389b58e81fefde13b6402aea167b21376a2c` records source `4e5deded...` and ZIP SHA256 `8a1b9d964d01c2c5aeded56e0a19cd63b41968899a5ee9dda980c03641473216`.
 
-- [~] **V2-0308 — Add automatic context budget trigger.**  
-  Acceptance: active context remains bounded as synthetic conversation grows to hundreds of turns.
+- [x] **V2-0308 — Add automatic context budget trigger.**  
+  Evidence: `AgentContextManager` now emits host-owned `AgentContextPressure` metadata on every bounded snapshot with `RequiresCompaction`, estimated candidate characters, actual active characters and deterministic pressure reasons for total-budget pressure, scalar truncation, dropped recent/tool candidates, per-item truncation and compacted-history truncation. Candidate-size estimation uses saturating `long` arithmetic; the trigger never deletes or compacts durable history itself. `V2ArchitectureTests` stress-tests 500 synthetic turns: active context remains within the 1,000-character fixture budget, only the newest four equally relevant turns survive, 496 are reported dropped, pressure requests compaction with explicit reasons, and a small two-turn context does not trigger compaction. Source commit `6e61375a90f67b226ee4244f6d650a96b28aa4c7`; GitHub Actions push run `35291516190` and PR run `35291518534` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **10/10**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, compaction **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `25adfd4f676be90b01c5515bd84c1ca3b01d881d` records source `6e61375a...` and ZIP SHA256 `090e8c6e3e1fbaeb891493bd994d232f374aed64eb2f2b5bd25bb00eb6db2800`.
 
-- [ ] **V2-0309 — Add context/cache tests.**  
+- [~] **V2-0309 — Add context/cache tests.**  
   Verify stable prefix equality, budget enforcement, source preservation and no linear unbounded growth.
 
 ---
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0308 — Add automatic context budget trigger`.
+**Active task:** `V2-0309 — Add context/cache tests`.
