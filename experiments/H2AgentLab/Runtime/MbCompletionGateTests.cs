@@ -54,20 +54,14 @@ public static class MbCompletionGateTests
                 new AgentContextManager(),
                 new ToolRegistry());
 
-            try
-            {
-                _ = await orchestrator.RunRuntimeAsync(
-                    session,
-                    runtime,
-                    Request(contract),
-                    CancellationToken.None);
-                throw new InvalidOperationException(
-                    "Model final text unexpectedly completed a mutating task.");
-            }
-            catch (AgentVerificationRequiredException)
-            {
-            }
+            var result = await orchestrator.RunRuntimeAsync(
+                session,
+                runtime,
+                Request(contract),
+                CancellationToken.None);
 
+            Check(result.FinalText == "done",
+                "Fixture did not preserve the model completion claim for host evaluation.");
             Check(session.StateMachine.State == AgentTaskState.Blocked,
                 "Host did not block mutation after model-only completion claim.");
             Check(session.StateMachine.State != AgentTaskState.Completed,
