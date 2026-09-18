@@ -134,7 +134,8 @@ Rules:
   Evidence: stable criterion IDs, typed durable evidence references and append-only criterion expansion/evidence APIs in `Tasking/AgentAcceptanceEvidence.cs` + `AgentTaskContract.cs`; architecture guard covers evidence typing, snapshot immutability and redefinition rejection. GitHub Actions run `35293534110` passed full build/regression/publish.
 
 - [~] **V2-0403 — Add `AgentTaskState` state machine.**  
-  Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.
+  Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0404 — Enforce no mutation completion without verification.**  
   Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.
