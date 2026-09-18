@@ -50,11 +50,19 @@ public interface ISkillSource
 
 public sealed class BuiltInSkillSource : ISkillSource
 {
-    private readonly global::H2AgentLab.SkillCatalog _catalog;
+    private readonly global::H2AgentLab.LabSkill[] _skills;
 
     public BuiltInSkillSource(global::H2AgentLab.SkillCatalog catalog, string sourceId = "built-in")
     {
-        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        ArgumentNullException.ThrowIfNull(catalog);
+        _skills = catalog.Skills.ToArray();
+        SourceId = NormalizeId(sourceId);
+    }
+
+    public BuiltInSkillSource(string root, string sourceId = "built-in")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        _skills = ScanMetadataOnly(Path.GetFullPath(root));
         SourceId = NormalizeId(sourceId);
     }
 
@@ -65,7 +73,7 @@ public sealed class BuiltInSkillSource : ISkillSource
     {
         ValidateMax(maxResults);
         return Rank(
-            _catalog.Skills.Select(skill =>
+            _skills.Select(skill =>
             {
                 var entry = Path.Combine(skill.Directory, "SKILL.md");
                 var hash = File.Exists(entry) ? HashFile(entry) : "";
@@ -89,7 +97,7 @@ public sealed class BuiltInSkillSource : ISkillSource
     public SkillContent Read(SkillIdentity identity)
     {
         ValidateIdentity(identity);
-        var skill = _catalog.Skills.SingleOrDefault(x => x.Name == identity.SkillId)
+        var skill = _skills.SingleOrDefault(x => x.Name == identity.SkillId)
             ?? throw new KeyNotFoundException($"Built-in skill '{identity.SkillId}' is unavailable.");
         var entry = Path.Combine(skill.Directory, "SKILL.md");
         var content = ReadBounded(entry, 80_000);
@@ -106,13 +114,85 @@ public sealed class BuiltInSkillSource : ISkillSource
     public SkillResourceContent ReadResource(SkillIdentity identity, string relativePath)
     {
         ValidateIdentity(identity);
-        var skill = _catalog.Skills.SingleOrDefault(x => x.Name == identity.SkillId)
+        var skill = _skills.SingleOrDefault(x => x.Name == identity.SkillId)
             ?? throw new KeyNotFoundException($"Built-in skill '{identity.SkillId}' is unavailable.");
         var relative = ValidateProgressiveResource(relativePath);
         var scope = new global::H2AgentLab.SafeWorkspace(skill.Directory);
         var path = scope.Resolve(relative);
         var content = ReadBounded(path, 80_000);
         return new SkillResourceContent(identity, relative, HashText(content), content);
+    }
+
+    private static global::H2AgentLab.LabSkill[] ScanMetadataOnly(string root)
+    {
+        if (!Directory.Exists(root))
+            return [];
+
+        var skills = new List<global::H2AgentLab.LabSkill>();
+        foreach (var directory in Directory.EnumerateDirectories(root).OrderBy(x => x, StringComparer.Ordinal))
+        {
+            var path = Path.Combine(directory, "SKILL.md");
+            if (!File.Exists(path))
+                continue;
+            var info = new FileInfo(path);
+            if (info.Length > 80_000)
+                throw new IOException("Built-in skill exceeds 80 KB: " + directory);
+
+            var header = ReadFrontmatter(path);
+            string Field(string name)
+            {
+                var match = Regex.Match(
+                    header,
+                    "(?m)^" + Regex.Escape(name) + @":\s*(.+)$",
+                    RegexOptions.CultureInvariant);
+                return match.Success
+                    ? match.Groups[1].Value.Trim().Trim((char)34, (char)39)
+                    : "";
+            }
+
+            var name = Field("name");
+            var description = Field("description");
+            if (!Regex.IsMatch(name, "^[a-z0-9-]{1,64}$", RegexOptions.CultureInvariant)
+                || description.Length is < 5 or > 1_500
+                || skills.Any(x => x.Name == name))
+                throw new IOException("Invalid or duplicate built-in skill metadata: " + directory);
+
+            skills.Add(new global::H2AgentLab.LabSkill(name, description, directory));
+        }
+
+        return skills.ToArray();
+    }
+
+    private static string ReadFrontmatter(string path)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            4 * 1024,
+            FileOptions.SequentialScan);
+        using var reader = new StreamReader(
+            stream,
+            new UTF8Encoding(false, true),
+            detectEncodingFromByteOrderMarks: true,
+            bufferSize: 4 * 1024,
+            leaveOpen: false);
+
+        var builder = new StringBuilder();
+        var lines = 0;
+        while (!reader.EndOfStream && builder.Length <= 16_000 && lines++ < 200)
+        {
+            var line = reader.ReadLine() ?? "";
+            builder.Append(line).Append((char)10);
+            if (lines > 1 && line.Trim() == "---")
+                break;
+        }
+        var text = builder.ToString();
+        if (!text.StartsWith("---", StringComparison.Ordinal)
+            || text.IndexOf(((char)10).ToString() + "---", 3, StringComparison.Ordinal) < 0)
+            throw new IOException("Built-in skill frontmatter is invalid: " + path);
+        return text;
     }
 
     private void ValidateIdentity(SkillIdentity identity)
