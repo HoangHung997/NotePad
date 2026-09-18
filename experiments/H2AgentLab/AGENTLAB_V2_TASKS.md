@@ -138,7 +138,8 @@ Rules:
   Evidence: deterministic host-owned lifecycle + repair loop/terminal guards in `Tasking/AgentTaskStateMachine.cs`; architecture guard covers happy path, repair, cancellation, illegal skips and terminal lockout. GitHub Actions run `35293866199` passed full build/regression/publish.
 
 - [~] **V2-0404 — Enforce no mutation completion without verification.**  
-  Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.
+  Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.  
+  Verification-only completion API + deterministic guard tests added; full CI verification in progress.
 
 - [ ] **V2-0405 — Add fast-path router.**  
   Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.
