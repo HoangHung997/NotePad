@@ -229,11 +229,11 @@ Rules:
   `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.  
   Evidence: `Documents/LabPdfOcrService.cs` delegates attachment preparation/layout/runtime status to H2 Core `AiPdfProcessor`; architecture guard validates direct PDF routing without a separate Lab OCR path. GitHub Actions run `35306657854` passed full regression/publish.
 
-- [~] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
+- [x] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
   Values/formulas/styles/merges/sheets/hidden state needed by verifier.  
-  Snapshot reader + OpenXML fixture guard added; typed OpenXML state/style normalization fix applied; full CI verification retry in progress.
+  Evidence: `Documents/ClosedWorkbookSnapshot.cs` captures deterministic sheet/cell/formula/style/merge/hidden-row/hidden-column state behind H2 Core safety validation; OpenXML fixture guard passed after typed SDK-v3 enum normalization. GitHub Actions run `35308041247` passed full regression/publish.
 
-- [ ] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
+- [~] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
   Paragraph/run/style/table/section/header/footer fields needed by verifier.
 
 - [ ] **V2-0705 — Add `ExcelVerifier` for closed files.**
@@ -398,4 +398,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0703 — Add deterministic closed-XLSX snapshot model`.
+**Active task:** `V2-0704 — Add deterministic closed-DOCX snapshot model`.
