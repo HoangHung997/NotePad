@@ -121,26 +121,24 @@ public sealed class PluginSkillCatalog
     {
         if (content.StartsWith("---", StringComparison.Ordinal))
         {
-            var end = content.IndexOf("
----", 3, StringComparison.Ordinal);
+            var marker = ((char)10).ToString() + "---";
+            var end = content.IndexOf(marker, 3, StringComparison.Ordinal);
             if (end > 0)
             {
                 var header = content[..end];
-                var line = header.Split('
-')
+                var line = header.Split((char)10)
                     .Select(x => x.Trim())
                     .FirstOrDefault(x => x.StartsWith("description:", StringComparison.OrdinalIgnoreCase));
                 if (line is not null)
                 {
-                    var value = line[(line.IndexOf(':') + 1)..].Trim().Trim('"', ''');
+                    var value = line[(line.IndexOf(':') + 1)..].Trim().Trim((char)34, (char)39);
                     if (value.Length > 0)
                         return value.Length <= 1_000 ? value : value[..1_000];
                 }
             }
         }
 
-        var first = content.Split('
-')
+        var first = content.Split((char)10)
             .Select(x => x.Trim())
             .FirstOrDefault(x => x.Length > 0 && !x.StartsWith("#", StringComparison.Ordinal));
         return string.IsNullOrWhiteSpace(first)
