@@ -351,6 +351,13 @@ public sealed class AgentRuntime : IAsyncDisposable
 
             if (!permission.Allowed)
             {
+                if (string.Equals(
+                        permission.Code,
+                        "missing_resource_scope",
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        $"Mutating tool '{descriptor.Name}' requires a resource key for serialization.");
+
                 results[i] = new AgentToolResult(
                     transportCall.Id,
                     transportCall.Name,
