@@ -170,6 +170,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         var toolRounds = 0;
         var toolCalls = 0;
         var repairRounds = 0;
+        var failedMutationSignatures = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -218,6 +219,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     turnId,
                     toolRounds,
                     round.ToolCalls,
+                    failedMutationSignatures,
                     cancellationToken).ConfigureAwait(false);
 
                 evidenceHistory.AddRange(execution.Evidence);
@@ -238,26 +240,37 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                     if (report is not null)
                     {
-                        latestVerification = report;
-                        verificationHistory.Add(report);
-                        if (!report.Passed)
+                        var effectiveReport = MergeVerificationReports(
+                            latestVerification,
+                            report);
+                        latestVerification = effectiveReport;
+                        verificationHistory.Add(effectiveReport);
+                        if (!effectiveReport.Passed)
                         {
-                            if (report.Failures.Count == 0)
+                            if (effectiveReport.Failures.Count == 0)
                                 throw new InvalidOperationException(
                                     "Verifier returned non-passing state without actionable failures.");
                             if (++repairRounds > request.MaxRepairRounds)
                                 throw new InvalidOperationException(
                                     $"AgentRuntime exceeded the {request.MaxRepairRounds}-round repair budget.");
 
-                            var repair = _repairController.Build(request.Contract, report);
+                            foreach (var signature in execution.ExecutedMutationSignatures)
+                                failedMutationSignatures.Add(signature);
+
+                            var repair = _repairController.Build(
+                                request.Contract,
+                                effectiveReport);
                             if (results.Length == 0)
                                 throw new InvalidOperationException(
                                     "Verification failure has no tool result continuation target.");
 
-                            results[0] = results[0] with
+                            var feedbackIndex = FirstRepairFeedbackIndex(
+                                execution.Calls,
+                                results);
+                            results[feedbackIndex] = results[feedbackIndex] with
                             {
                                 Content = BoundToolOutput(
-                                    results[0].Content
+                                    results[feedbackIndex].Content
                                     + Environment.NewLine
                                     + Environment.NewLine
                                     + "[HOST VERIFICATION FAILED]"
@@ -298,13 +311,15 @@ public sealed class AgentRuntime : IAsyncDisposable
         Guid turnId,
         int toolRound,
         IReadOnlyList<AgentTransportToolCall> transportCalls,
+        IReadOnlySet<string> failedMutationSignatures,
         CancellationToken cancellationToken)
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
         var results = new AgentToolResult?[transportCalls.Count];
         var evidence = new List<AgentEvidenceReference>();
         var rawToolOutputs = new Dictionary<string, string>(StringComparer.Ordinal);
-        var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request, AgentRuntimePermissionRequest Permission)>();
+        var executedMutationSignatures = new List<string>();
+        var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request, AgentRuntimePermissionRequest Permission, string? MutationSignature)>();
         var newlyLoadedSchemas = new List<AgentToolDefinition>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
 
@@ -414,13 +429,34 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            var mutationSignature = descriptor.IsMutating
+                ? MutationSignature(call)
+                : null;
+            if (mutationSignature is not null
+                && failedMutationSignatures.Contains(mutationSignature))
+            {
+                results[i] = new AgentToolResult(
+                    transportCall.Id,
+                    transportCall.Name,
+                    JsonSerializer.Serialize(new
+                    {
+                        ok = false,
+                        error = "repeated_failed_mutation",
+                        message = "Host blocked an identical mutation that already failed verification. Re-observe state or change the corrective action.",
+                        scope = permission.ResourceKey
+                    }),
+                    IsError: true);
+                continue;
+            }
+
             scheduled.Add((
                 i,
                 new ToolExecutionRequest(
                     descriptor,
                     call,
                     permission.ResourceKey),
-                permissionRequest with { ResourceKey = permission.ResourceKey }));
+                permissionRequest with { ResourceKey = permission.ResourceKey },
+                mutationSignature));
         }
 
         if (scheduled.Count > 0)
@@ -435,6 +471,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var scheduledResult = scheduledResults[i];
                 var rawOutput = scheduledResult.Output ?? "";
                 rawToolOutputs[calls[original].Id] = rawOutput;
+                if (scheduled[i].MutationSignature is { } mutationSignature)
+                    executedMutationSignatures.Add(mutationSignature);
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
                     rawOutput);
@@ -467,11 +505,115 @@ public sealed class AgentRuntime : IAsyncDisposable
                 .Select(x => x.First())
                 .ToArray(),
             evidence.ToArray(),
-            rawToolOutputs);
+            rawToolOutputs,
+            executedMutationSignatures.ToArray());
     }
 
     private static string? ResourceKey(ToolDescriptor descriptor)
         => descriptor.ResourceScope?.ScopeId;
+
+    private static VerificationReport MergeVerificationReports(
+        VerificationReport? previous,
+        VerificationReport current)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        if (previous is null
+            || !string.Equals(
+                previous.VerifierId,
+                current.VerifierId,
+                StringComparison.Ordinal))
+            return current;
+
+        var criteria = previous.Criteria
+            .ToDictionary(x => x.CriterionId, StringComparer.Ordinal);
+        foreach (var result in current.Criteria)
+            criteria[result.CriterionId] = result;
+
+        return new VerificationReport(
+            current.VerifierId,
+            criteria.Values
+                .OrderBy(x => x.CriterionId, StringComparer.Ordinal)
+                .ToArray(),
+            previous.ReportEvidenceIds
+                .Concat(current.ReportEvidenceIds)
+                .Distinct(StringComparer.Ordinal)
+                .Take(256)
+                .ToArray());
+    }
+
+    private static int FirstRepairFeedbackIndex(
+        IReadOnlyList<global::H2AgentLab.ToolCall> calls,
+        IReadOnlyList<AgentToolResult> results)
+    {
+        for (var i = 0; i < calls.Count; i++)
+        {
+            if (i >= results.Count)
+                break;
+            if (results[i].IsError)
+                continue;
+            if (_StaticMutationCheck(calls[i].Name))
+                return i;
+        }
+        return 0;
+    }
+
+    private static bool _StaticMutationCheck(string toolName)
+        => !string.IsNullOrWhiteSpace(toolName);
+
+    private static string MutationSignature(global::H2AgentLab.ToolCall call)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+            WriteCanonicalJson(writer, call.Arguments);
+        var canonical = Encoding.UTF8.GetString(stream.ToArray());
+        var material = Encoding.UTF8.GetBytes(call.Name + "\n" + canonical);
+        return Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(material))
+            .ToLowerInvariant();
+    }
+
+    private static void WriteCanonicalJson(
+        Utf8JsonWriter writer,
+        JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var property in value.EnumerateObject()
+                    .OrderBy(x => x.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteCanonicalJson(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in value.EnumerateArray())
+                    WriteCanonicalJson(writer, item);
+                writer.WriteEndArray();
+                break;
+            case JsonValueKind.String:
+                writer.WriteStringValue(value.GetString());
+                break;
+            case JsonValueKind.Number:
+                writer.WriteRawValue(value.GetRawText());
+                break;
+            case JsonValueKind.True:
+                writer.WriteBooleanValue(true);
+                break;
+            case JsonValueKind.False:
+                writer.WriteBooleanValue(false);
+                break;
+            case JsonValueKind.Null:
+                writer.WriteNullValue();
+                break;
+            default:
+                throw new InvalidOperationException(
+                    "Unsupported JSON value in mutation signature.");
+        }
+    }
 
     private static JsonElement ParseArguments(string json)
     {
@@ -646,7 +788,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         IReadOnlyList<AgentToolResult> Results,
         IReadOnlyList<AgentToolDefinition> NewlyLoadedTools,
         IReadOnlyList<AgentEvidenceReference> Evidence,
-        IReadOnlyDictionary<string, string> RawToolOutputs);
+        IReadOnlyDictionary<string, string> RawToolOutputs,
+        IReadOnlyList<string> ExecutedMutationSignatures);
 
     private sealed class MutableUsage
     {
