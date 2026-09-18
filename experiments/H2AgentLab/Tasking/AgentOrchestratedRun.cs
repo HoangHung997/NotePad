@@ -197,6 +197,22 @@ public sealed class AgentOrchestratedRun
                 "runtime-state",
                 "AgentRuntime kết thúc; host state=" + session.StateMachine.State + ".");
 
+            foreach (var evidence in result.Evidence)
+            {
+                var hash = string.IsNullOrWhiteSpace(evidence.Sha256)
+                    ? ""
+                    : "; sha256=" + evidence.Sha256;
+                var summary = string.IsNullOrWhiteSpace(evidence.Summary)
+                    ? ""
+                    : "; " + evidence.Summary;
+                Emit(
+                    trace,
+                    output,
+                    AgentTraceEventKind.Evidence,
+                    "runtime-evidence",
+                    evidence.Kind + ":" + evidence.ReferenceId + hash + summary);
+            }
+
             if (!string.IsNullOrWhiteSpace(result.FinalText))
             {
                 labSession.Add("assistant", result.FinalText);
