@@ -153,7 +153,7 @@ public static class MbCompactionRuntimeTests
                 (_, _) => { });
 
             var trace = new List<string>();
-            _ = await run.RunAsync(
+            var inspection = await run.RunAsync(
                 new AiProfile
                 {
                     Protocol = AiProtocol.Ollama,
@@ -182,8 +182,10 @@ public static class MbCompactionRuntimeTests
                 "Recent historical state was lost after automatic compaction.");
             Check(!combined.Contains("OLD-RAW-0000", StringComparison.Ordinal),
                 "Oldest raw history was replayed after automatic compaction.");
-            Check(trace.Any(x => x.Contains("context-compacted", StringComparison.Ordinal)),
-                "Normal runtime trace did not expose the compaction evidence event.");
+            Check(inspection.TraceEvents.Any(x =>
+                    x.Code == "context-compacted"
+                    && x.Kind == AgentTraceEventKind.Evidence),
+                "Normal runtime typed trace did not expose the compaction evidence event.");
         });
 
         lines.Add($"RESULT: {lines.Count - failed} passed, {failed} failed.");
