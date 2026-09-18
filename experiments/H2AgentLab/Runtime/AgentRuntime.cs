@@ -55,6 +55,7 @@ public interface IAgentRuntimeVerifier
 /// </summary>
 public sealed class AgentRuntime : IAsyncDisposable
 {
+    // MB-10: this is the new provider-neutral runtime path; UI ownership moves here in MB-11.
     private const int MaxToolOutputCharacters = 64_000;
 
     private readonly IAgentTransport _transport;
