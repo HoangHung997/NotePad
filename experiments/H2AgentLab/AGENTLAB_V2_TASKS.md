@@ -230,7 +230,8 @@ Rules:
   Evidence: `Documents/LabPdfOcrService.cs` delegates attachment preparation/layout/runtime status to H2 Core `AiPdfProcessor`; architecture guard validates direct PDF routing without a separate Lab OCR path. GitHub Actions run `35306657854` passed full regression/publish.
 
 - [~] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
-  Values/formulas/styles/merges/sheets/hidden state needed by verifier.
+  Values/formulas/styles/merges/sheets/hidden state needed by verifier.  
+  Snapshot reader + OpenXML fixture guard added; full CI verification in progress.
 
 - [ ] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
   Paragraph/run/style/table/section/header/footer fields needed by verifier.
