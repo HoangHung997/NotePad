@@ -297,6 +297,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-extension-registration-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-extension-registration-tests.txt')
 
+      - name: Run H2 Agent MB-61 generic tool preference tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-generic-tool-preference'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-generic-tool-preference-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-generic-tool-preference-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
