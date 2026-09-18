@@ -204,6 +204,34 @@ public static class MbThinCapabilityResolverTests
                 "Resolver did not report compatibility status.");
         });
 
+        await Test("MB-73 provider-only package is reported without inventing a skill", async () =>
+        {
+            var providerOnly = Package(
+                "provider.telemetry",
+                toolSummaries: Array.Empty<string>(),
+                skills: Array.Empty<AvailableSkillMetadata>(),
+                providers:
+                [
+                    "telemetry metrics events"
+                ]);
+            var resolver = Resolver(
+                EmptyInstalled(),
+                Catalog(providerOnly),
+                _ => true);
+
+            var result = await resolver.ResolveAsync(
+                "telemetry metrics events",
+                CancellationToken.None);
+
+            var candidate = result.Candidates.Single();
+            Check(result.Status == CapabilityResolutionStatus.AVAILABLE
+                && candidate.CapabilityId == "provider.telemetry"
+                && candidate.SkillId is null
+                && candidate.AvailablePackage?.Providers.Count == 1
+                && candidate.AvailablePackage.ToolSummaries.Count == 0,
+                "Resolver still assumes a package must expose a skill/tool child candidate.");
+        });
+
         await Test("MB-73 source guard keeps resolver thin and model-neutral", () =>
         {
             var repo = FindRepoRoot();
