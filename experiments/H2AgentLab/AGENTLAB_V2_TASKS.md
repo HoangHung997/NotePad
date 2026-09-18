@@ -235,7 +235,7 @@ Rules:
 
 - [~] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
   Paragraph/run/style/table/section/header/footer fields needed by verifier.  
-  Snapshot reader + OpenXML fixture guard added; full CI verification in progress.
+  Snapshot reader + OpenXML fixture guard added; OpenXML margin type fix applied; full CI verification retry in progress.
 
 - [ ] **V2-0705 — Add `ExcelVerifier` for closed files.**
 
