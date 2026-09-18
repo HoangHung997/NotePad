@@ -7,7 +7,8 @@ public enum AgentEvidenceKind
     VerifierReport = 2,
     ScreenshotState = 3,
     ArtifactHash = 4,
-    TestBuildResult = 5
+    TestBuildResult = 5,
+    HostClassification = 6
 }
 
 /// <summary>
