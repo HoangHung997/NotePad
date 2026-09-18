@@ -70,13 +70,13 @@ public sealed class PluginSkillCatalog
 
         var active = _plugins.GetActive(pluginId)
             ?? throw new KeyNotFoundException($"Plugin '{pluginId}' is not active.");
-        var manifest = active.Value.Manifest;
+        var manifest = active.Manifest;
         if (!manifest.Skills.Contains(skillId, StringComparer.Ordinal))
             throw new KeyNotFoundException(
                 $"Skill '{skillId}' is not declared by active plugin '{pluginId}'.");
 
         var path = Path.Combine(
-            active.Value.VersionRoot,
+            active.VersionRoot,
             "skills",
             skillId,
             "SKILL.md");
