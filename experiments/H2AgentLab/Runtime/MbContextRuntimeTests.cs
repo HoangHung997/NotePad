@@ -77,8 +77,9 @@ public static class MbContextRuntimeTests
         await Test("MB-20 tool journal becomes bounded tool summary rather than conversation replay", async () =>
         {
             var sample = await RunHistoryAsync(root, 80, includeLargeToolEvent: true);
-            var combined = string.Join("
-", sample.Request.Messages.Select(x => x.Content));
+            var combined = string.Join(
+                ((char)10).ToString(),
+                sample.Request.Messages.Select(x => x.Content));
 
             Check(combined.Contains("TOOL-SUMMARY-LATEST", StringComparison.Ordinal),
                 "Latest tool journal evidence was not projected as bounded tool context.");
