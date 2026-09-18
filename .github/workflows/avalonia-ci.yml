@@ -143,6 +143,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-closed-file-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-closed-file-tests.txt')
 
+      - name: Run H2 Agent Lab v2 Phase 10 acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-phase10'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-phase10-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-phase10-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
