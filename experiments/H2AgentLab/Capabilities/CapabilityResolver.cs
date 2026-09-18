@@ -185,9 +185,9 @@ public sealed class CapabilityResolver
 
     private static double Score(string query, string name, string description)
     {
-        var q = CapabilityRanking.SemanticTerms(query).Distinct(StringComparer.Ordinal).ToArray();
-        var n = CapabilityRanking.SemanticTerms(name).ToHashSet(StringComparer.Ordinal);
-        var d = CapabilityRanking.SemanticTerms(description).ToHashSet(StringComparer.Ordinal);
+        var q = CapabilityRanking.LexicalTerms(query).Distinct(StringComparer.Ordinal).ToArray();
+        var n = CapabilityRanking.LexicalTerms(name).ToHashSet(StringComparer.Ordinal);
+        var d = CapabilityRanking.LexicalTerms(description).ToHashSet(StringComparer.Ordinal);
         var score = 0d;
         foreach (var term in q)
         {
