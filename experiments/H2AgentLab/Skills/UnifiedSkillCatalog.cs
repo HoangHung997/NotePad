@@ -48,7 +48,16 @@ public interface ISkillSource
     SkillResourceContent ReadResource(SkillIdentity identity, string relativePath);
 }
 
-public sealed class BuiltInSkillSource : ISkillSource
+/// <summary>
+/// Optional exact installed-metadata snapshot seam. Sources that participate in host-wide
+/// installed projections implement this so correctness never depends on a search result cap.
+/// </summary>
+public interface IInstalledSkillMetadataSource
+{
+    IReadOnlyList<SkillSummary> SnapshotMetadata();
+}
+
+public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSource
 {
     private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
     {
@@ -80,8 +89,12 @@ public sealed class BuiltInSkillSource : ISkillSource
     public IReadOnlyList<SkillSummary> Search(string query, int maxResults = 20)
     {
         ValidateMax(maxResults);
-        return Rank(
-            _skills.Select(skill =>
+        return Rank(SnapshotMetadata(), query, maxResults);
+    }
+
+    public IReadOnlyList<SkillSummary> SnapshotMetadata()
+        => _skills
+            .Select(skill =>
             {
                 var entry = Path.Combine(skill.Directory, "SKILL.md");
                 var hash = File.Exists(entry) ? HashFile(entry) : "";
@@ -97,10 +110,9 @@ public sealed class BuiltInSkillSource : ISkillSource
                     skill.Description,
                     "installed",
                     "built-in");
-            }),
-            query,
-            maxResults);
-    }
+            })
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
+            .ToArray();
 
     public SkillContent Read(SkillIdentity identity)
     {
@@ -349,7 +361,7 @@ public sealed class BuiltInSkillSource : ISkillSource
     }
 }
 
-public sealed class PluginSkillSource : ISkillSource
+public sealed class PluginSkillSource : ISkillSource, IInstalledSkillMetadataSource
 {
     private readonly PluginManager _plugins;
     private readonly PluginSkillCatalog _catalog;
@@ -374,7 +386,14 @@ public sealed class PluginSkillSource : ISkillSource
 
         // Local installed discovery is allowed to inspect bounded frontmatter metadata. Full
         // SKILL.md content is returned only by Read after selection.
-        var summaries = _catalog.Discover("")
+        return BuiltInSkillSource.Rank(
+            SnapshotMetadata(),
+            query,
+            maxResults);
+    }
+
+    public IReadOnlyList<SkillSummary> SnapshotMetadata()
+        => _catalog.Discover("")
             .Select(x => new SkillSummary(
                 new SkillIdentity(
                     SourceKind,
@@ -386,9 +405,11 @@ public sealed class PluginSkillSource : ISkillSource
                 x.SkillId,
                 x.Description,
                 "installed",
-                "plugin"));
-        return BuiltInSkillSource.Rank(summaries, query, maxResults);
-    }
+                "plugin"))
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
+            .ThenBy(x => x.Identity.PluginId, StringComparer.Ordinal)
+            .ThenBy(x => x.Identity.PluginVersion, StringComparer.Ordinal)
+            .ToArray();
 
     public SkillContent Read(SkillIdentity identity)
     {
@@ -482,6 +503,26 @@ public class SkillCatalog
             .SelectMany(x => x.Search(query, maxResults))
             .ToArray();
         return BuiltInSkillSource.Rank(candidates, query, maxResults);
+    }
+
+    public IReadOnlyList<SkillSummary> SnapshotMetadata()
+    {
+        var output = new List<SkillSummary>();
+        foreach (var source in _sources)
+        {
+            if (source is not IInstalledSkillMetadataSource snapshot)
+                throw new InvalidOperationException(
+                    $"Skill source '{source.SourceId}' does not support exact installed metadata snapshots; refusing to silently truncate correctness.");
+            output.AddRange(snapshot.SnapshotMetadata());
+        }
+
+        return output
+            .OrderBy(x => x.Identity.SourceKind)
+            .ThenBy(x => x.Identity.SourceId, StringComparer.Ordinal)
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
+            .ThenBy(x => x.Identity.PluginId, StringComparer.Ordinal)
+            .ThenBy(x => x.Identity.PluginVersion, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public SkillContent Read(SkillIdentity identity)
