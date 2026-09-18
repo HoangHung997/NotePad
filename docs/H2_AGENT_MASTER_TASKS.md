@@ -636,7 +636,7 @@ Evidence: `ToolDescriptor` now accepts optional `ToolPreferenceMetadata` contain
 
 ---
 
-## [ ] MB-62 — Convert general computer capability inventory to provider registration
+## [x] MB-62 — Convert general computer capability inventory to provider registration
 
 Review:
 
@@ -658,6 +658,8 @@ Browser extension registers browser.*
 Acceptance:
 
 AgentRuntime knows only ToolRegistry, not the list of all possible computer functions.
+
+Evidence: `GeneralComputerCapabilityCatalog` no longer contains any computer tool definitions; it is now a compatibility projection over the authoritative `ToolRegistry`, filtered only by provider provenance. Capability ownership is split into independent first-party provider cards under `FirstPartyExtensions/Computer`: `FileSystemComputerExtension` owns `filesystem.*`, `ProcessShellComputerExtension` owns `process.* / shell.*`, `DesktopComputerExtension` owns `app.* / window.* / uia.* / input.* / screen.*`, and `BrowserComputerExtension` owns `browser.*`. Shared registration mechanics live in `ComputerCapabilityExtensionBase`, while each provider file owns its own names/descriptions/risk/access/fidelity metadata and registers through the MB-60 extension bus into ToolRegistry. Phase-10 regression `1012` was migrated from the old static master inventory to actual provider registration and provenance checks. `Computer/MbComputerExtensionRegistrationTests.cs` proves independent namespace ownership, proves partial registration does not invent absent capability families, proves a brand-new `camera.*` family appears through registry provenance without editing the compatibility catalog or AgentRuntime, proves real AgentRuntime executes `filesystem.list` through ordinary `tool_search -> ToolRegistry`, and source-guards that the compatibility catalog contains no master capability names. Exact functional source commit `f20c2f07e3ef2b0799251e1705ce123ce3c78773`, GitHub Actions run `35377085374`: MB-62 **5 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-61, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `20f319bcdde6c1c5fbd4c8f599594e1214eafda6`; portable ZIP SHA256 `be47ad319ccb1ea0934f953316d9febf5648ce6508680eda9c7e89bb06ae5891`.
 
 ---
 
