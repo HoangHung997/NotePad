@@ -1,6 +1,7 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using S = DocumentFormat.OpenXml.Spreadsheet;
+using W = DocumentFormat.OpenXml.Wordprocessing;
 using System.Text.Json;
 using H2AgentLab.Context;
 using H2AgentLab.Documents;
@@ -1439,6 +1440,40 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Workbook merge/hidden row-column snapshot is incomplete.");
         });
 
+        Test("Closed DOCX snapshot captures deterministic paragraph run table section header footer state", () =>
+        {
+            var bytes = CreateArchitectureWordFixture();
+            var reader = new ClosedWordSnapshotReader();
+            var first = reader.Read("fixture.docx", bytes);
+            var second = reader.Read("fixture.docx", bytes);
+
+            if (JsonSerializer.Serialize(first) != JsonSerializer.Serialize(second))
+                throw new InvalidOperationException("Closed Word snapshot is not deterministic.");
+            if (first.BodyParagraphs.Count != 1
+                || first.BodyParagraphs[0].StyleId != "BodyStyle"
+                || first.BodyParagraphs[0].Text != "Hello world")
+                throw new InvalidOperationException("Word body paragraph/style snapshot is incomplete.");
+            if (first.BodyParagraphs[0].Runs.Count != 2
+                || !first.BodyParagraphs[0].Runs[0].Bold
+                || !first.BodyParagraphs[0].Runs[1].Italic)
+                throw new InvalidOperationException("Word run formatting snapshot is incomplete.");
+            if (first.Tables.Count != 1
+                || first.Tables[0].Rows.Count != 1
+                || first.Tables[0].Rows[0].Cells.Select(x => x.Text).SequenceEqual(new[] { "A", "B" }) is false)
+                throw new InvalidOperationException("Word table snapshot is incomplete.");
+            if (first.Sections.Count != 1
+                || first.Sections[0].PageWidthTwips != 12240
+                || first.Sections[0].MarginLeftTwips != 1440
+                || first.Sections[0].HeaderReferences.Count != 1
+                || first.Sections[0].FooterReferences.Count != 1)
+                throw new InvalidOperationException("Word section/header-footer reference snapshot is incomplete.");
+            if (first.Headers.Count != 1
+                || first.Headers[0].Paragraphs.Single().Text != "Header fixture"
+                || first.Footers.Count != 1
+                || first.Footers[0].Paragraphs.Single().Text != "Footer fixture")
+                throw new InvalidOperationException("Word header/footer content snapshot is incomplete.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
@@ -1465,6 +1500,80 @@ public static class V2ArchitectureTests
         await File.WriteAllLinesAsync(report, lines);
         Console.WriteLine(string.Join("\n", lines));
         return failed == 0 ? 0 : 1;
+    }
+
+    private static byte[] CreateArchitectureWordFixture()
+    {
+        using var stream = new MemoryStream();
+        using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document, true))
+        {
+            var main = document.AddMainDocumentPart();
+
+            var styles = main.AddNewPart<StyleDefinitionsPart>();
+            styles.Styles = new W.Styles(
+                new W.Style(
+                    new W.StyleName { Val = "Body Style" })
+                {
+                    Type = W.StyleValues.Paragraph,
+                    StyleId = "BodyStyle"
+                });
+            styles.Styles.Save();
+
+            var header = main.AddNewPart<HeaderPart>();
+            header.Header = new W.Header(
+                new W.Paragraph(new W.Run(new W.Text("Header fixture"))));
+            header.Header.Save();
+
+            var footer = main.AddNewPart<FooterPart>();
+            footer.Footer = new W.Footer(
+                new W.Paragraph(new W.Run(new W.Text("Footer fixture"))));
+            footer.Footer.Save();
+
+            var paragraph = new W.Paragraph(
+                new W.ParagraphProperties(new W.ParagraphStyleId { Val = "BodyStyle" }),
+                new W.Run(
+                    new W.RunProperties(new W.Bold()),
+                    new W.Text("Hello ") { Space = SpaceProcessingModeValues.Preserve }),
+                new W.Run(
+                    new W.RunProperties(new W.Italic()),
+                    new W.Text("world")));
+
+            var table = new W.Table(
+                new W.TableRow(
+                    new W.TableCell(new W.Paragraph(new W.Run(new W.Text("A")))),
+                    new W.TableCell(new W.Paragraph(new W.Run(new W.Text("B"))))));
+
+            var section = new W.SectionProperties(
+                new W.HeaderReference
+                {
+                    Id = main.GetIdOfPart(header),
+                    Type = W.HeaderFooterValues.Default
+                },
+                new W.FooterReference
+                {
+                    Id = main.GetIdOfPart(footer),
+                    Type = W.HeaderFooterValues.Default
+                },
+                new W.PageSize
+                {
+                    Width = 12240,
+                    Height = 15840
+                },
+                new W.PageMargin
+                {
+                    Top = 1440,
+                    Right = 1440,
+                    Bottom = 1440,
+                    Left = 1440,
+                    Header = 720,
+                    Footer = 720,
+                    Gutter = 0
+                });
+
+            main.Document = new W.Document(new W.Body(paragraph, table, section));
+            main.Document.Save();
+        }
+        return stream.ToArray();
     }
 
     private static byte[] CreateArchitectureWorkbookFixture()
