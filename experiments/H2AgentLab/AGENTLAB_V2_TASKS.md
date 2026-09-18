@@ -475,34 +475,39 @@ Rules:
   Evidence: `CanonicalWordLegalScenario` executes unsaved structured Word read → spelling/citation extraction → authoritative freshness/web evidence → typed legal verification → scoped patch → live reread/preservation verification and hard-fails if Desktop calls are nonzero. CI run `35326883411`: PASS 1115; Phase 11 suite 15 passed, 0 failed.
 
 
-- [~] **V2-1116 — Add unified skill-source abstraction and canonical skill envelope.**  
+- [x] **V2-1116 — Add unified skill-source abstraction and canonical skill envelope.**  
   Built-in and plugin skills must share one logical search path using bounded name + description + provenance metadata; selected skills load progressively as metadata → SKILL.md → on-demand references/scripts/assets.  
-  Refinement implementation + dedicated 7-case acceptance suite added; semantic evidence threshold fix applied; full CI retry in progress.
+  Evidence: `Skills/UnifiedSkillCatalog.cs` adds `ISkillSource`, provenance-bearing `SkillIdentity`, metadata-only built-in/plugin discovery, description-aware unified search and progressive selected-resource loading. Plugin discovery reads bounded frontmatter + stream hash instead of preloading every SKILL.md. GitHub Actions run `35330936392`: PASS 1116.
 
-- [ ] **V2-1117 — Add InstalledCapabilityIndex + AvailableCapabilityIndex.**  
-  Installed index rebuilds from active built-ins/plugins/providers without network; available index rebuilds from compact cached catalog metadata only and never stores full SKILL.md/reference/tool schemas.
+- [x] **V2-1117 — Add InstalledCapabilityIndex + AvailableCapabilityIndex.**  
+  Installed index rebuilds from active built-ins/plugins/providers without network; available index rebuilds from compact cached catalog metadata only and never stores full SKILL.md/reference/tool schemas.  
+  Evidence: `Capabilities/CapabilityIndexes.cs` separates offline installed records from compact available catalog metadata and provides deterministic rebuild/search. Run `35330936392`: PASS 1117.
 
-- [ ] **V2-1118 — Add CatalogSource + CatalogSourceManager contracts.**  
-  Multiple deterministic sources, priority/trust metadata, deterministic conflict handling, stale/unavailable source behavior and no single-repository dependency.
+- [x] **V2-1118 — Add CatalogSource + CatalogSourceManager contracts.**  
+  Multiple deterministic sources, priority/trust metadata, deterministic conflict handling, stale/unavailable source behavior and no single-repository dependency.  
+  Evidence: `Catalog/CatalogSources.cs` supports multiple source kinds/priorities/trust states, cached stale fallback and explicit publisher/hash conflict records that priority cannot silently override. Run `35330936392`: PASS 1118.
 
-- [ ] **V2-1119 — Add CapabilityResolver and semantic catalog candidate search.**  
-  Resolve installed first, then cached available metadata, optional refresh when stale/missing; description-aware skill routing; lexical + semantic candidate reduction; no package download/install without host policy.
+- [x] **V2-1119 — Add CapabilityResolver and semantic catalog candidate search.**  
+  Resolve installed first, then cached available metadata, optional refresh when stale/missing; description-aware skill routing; lexical + semantic candidate reduction; no package download/install without host policy.  
+  Evidence: `Capabilities/CapabilityResolver.cs` searches installed state first, refreshes metadata only when needed, uses description-aware semantic scoring with stopword/false-positive thresholds and returns policy states without downloading/installing package bytes. Run `35330936392`: PASS 1119.
 
-- [ ] **V2-1120 — Add TaskCapabilitySnapshot and safe refresh boundaries.**  
-  Pin registry/provider/plugin/tool/skill identities for each task; updates cannot silently swap versions mid-task; explicit install causes traceable snapshot revision and bounded evidence.
+- [x] **V2-1120 — Add TaskCapabilitySnapshot and safe refresh boundaries.**  
+  Pin registry/provider/plugin/tool/skill identities for each task; updates cannot silently swap versions mid-task; explicit install causes traceable snapshot revision and bounded evidence.  
+  Evidence: `Capabilities/TaskCapabilitySnapshot.cs` pins RegistryVersion, provider/plugin/tool/schema versions and skill hashes; guard rejects silent mid-task changes and explicit install creates the next snapshot revision with bounded evidence. Run `35330936392`: PASS 1120.
 
-- [ ] **V2-1121 — Add package-retriever abstraction and deterministic staged retrieval tests.**  
-  Catalog metadata search remains separate from package bytes; retriever supports cancel/timeout/size/hash/staging and packages still pass existing PluginManager verification before activation.
+- [x] **V2-1121 — Add package-retriever abstraction and deterministic staged retrieval tests.**  
+  Catalog metadata search remains separate from package bytes; retriever supports cancel/timeout/size/hash/staging and packages still pass existing PluginManager verification before activation.  
+  Evidence: `Catalog/PackageRetriever.cs` defines `IPackageRetriever`; deterministic local retriever enforces approved roots, cancel/timeout/size/hash and private staging, then retrieved bytes still pass existing PluginManager validation/activation. Run `35330936392`: PASS 1121.
 
-- [ ] **V2-1122 — Add end-to-end missing-capability continuation test.**  
-  A differently named remote skill must be found from description metadata, approved by host policy, retrieved, verified, installed, indexed, selected and progressively loaded, then the original task resumes without user restatement and records exact capability versions.
-
+- [x] **V2-1122 — Add end-to-end missing-capability continuation test.**  
+  A differently named remote skill must be found from description metadata, approved by host policy, retrieved, verified, installed, indexed, selected and progressively loaded, then the original task resumes without user restatement and records exact capability versions.  
+  Evidence: `Capabilities/MissingCapabilityContinuation.cs` implements pause → metadata candidate → host policy → immutable retrieval → PluginManager install → installed-index refresh → selected SKILL.md → required reference only → TaskCapabilitySnapshot revision → resume original query. Deterministic AutoCAD fixture finds `cad-integrity` from “audit dynamic block parameters/actions” despite name mismatch and records plugin/provider/tool/skill versions. Run `35330936392`: PASS 1122; refinement suite 7 passed, 0 failed.
 
 ---
 
 ## Phase 12 — acceptance gate before H2 Notes integration
 
-- [ ] **V2-1201 — Build final 30+ task acceptance corpus.**  
+- [~] **V2-1201 — Build final 30+ task acceptance corpus.**  
   Corpus must explicitly include MCP provider lifecycle/scope, plugin install/update/rollback, filesystem/process/shell safety, WebResearchHost/freshness/legal research, AutoCAD structured-provider boundaries and the canonical Word + legal-research scenario.
 
 - [ ] **V2-1202 — Run each accepted model/provider configuration >= 3 times per task.**
@@ -545,4 +550,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-1116 — Add unified skill-source abstraction and canonical skill envelope`.
+**Active task:** `V2-1201 — Build final 30+ task acceptance corpus`.
