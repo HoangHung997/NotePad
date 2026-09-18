@@ -7,6 +7,7 @@ using H2AgentLab.Desktop;
 using H2AgentLab.Metrics;
 using H2AgentLab.Office;
 using H2AgentLab.Phase10;
+using H2AgentLab.Phase11;
 using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
@@ -37,6 +38,7 @@ public static class Program
         if (args.Contains("--v2-verification-test")) return V2VerificationTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-closed-file-test")) return V2ClosedFileTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-phase10-test")) return V2Phase10Tests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-phase11-test")) return V2Phase11Tests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
