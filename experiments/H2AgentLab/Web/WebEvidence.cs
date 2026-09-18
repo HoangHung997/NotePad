@@ -108,10 +108,31 @@ public sealed class WebEvidenceStore
     private static string NormalizeExcerpt(string value)
     {
         value ??= "";
-        value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
+        value = CollapseWhitespace(value);
         return value.Length <= MaxInlineExcerptCharacters
             ? value
             : value[..MaxInlineExcerptCharacters] + "…";
+    }
+
+    private static string CollapseWhitespace(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        var pendingSpace = false;
+        foreach (var ch in value)
+        {
+            if (char.IsWhiteSpace(ch))
+            {
+                pendingSpace = builder.Length > 0;
+                continue;
+            }
+            if (pendingSpace)
+            {
+                builder.Append(' ');
+                pendingSpace = false;
+            }
+            builder.Append(ch);
+        }
+        return builder.ToString().Trim();
     }
 
     private static string Bound(string value, int max)
