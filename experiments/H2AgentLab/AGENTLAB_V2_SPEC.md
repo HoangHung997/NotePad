@@ -1176,3 +1176,30 @@ Phase 12 acceptance must additionally prove:
 
 No Phase 13 H2 Notes integration may begin earlier. H2 Notes integration must preserve the accepted long-running agent behavior; it must not collapse the engine back to one-shot chat.
 
+---
+
+## 27. Skill / Tool Extensibility Refinement
+
+`docs/H2_AGENT_SKILL_TOOL_EXTENSIBILITY_REFINEMENT.md` is normative before Phase 12 acceptance.
+
+Phase 10 foundations are reused. Do not replace `ToolRegistry`, `DeferredToolDiscovery`, `PluginManager`, MCP normalization, rollback/quarantine or existing provider provenance.
+
+Required additional architecture:
+
+- one logical skill discovery surface over built-in and plugin sources;
+- canonical pre-load skill metadata centered on name + description + provenance;
+- progressive loading: metadata → selected SKILL.md → only required references/scripts/assets;
+- provenance-bearing skill identity: source, plugin/version when applicable, skill ID and SHA-256;
+- rebuildable `InstalledCapabilityIndex` for locally usable tool/skill/provider capabilities;
+- compact `AvailableCapabilityIndex` from cached catalog metadata only;
+- configurable multi-source catalog abstraction/manager with deterministic trust/conflict handling;
+- host-owned `CapabilityResolver` that searches installed first and catalog metadata only when needed;
+- `TaskCapabilitySnapshot` pinning registry/provider/plugin/tool/skill versions and hashes for a running task;
+- controlled capability refresh only at safe boundaries;
+- explicit task-driven install transition when a missing capability is required;
+- separate `IPackageRetriever` between catalog metadata and PluginManager;
+- offline installed capabilities remain fully usable when remote catalogs are unavailable;
+- task evidence records exact plugin/skill/tool/provider identities without embedding huge schemas or skill bodies.
+
+Phase 12 cannot begin until V2-1116 through V2-1122 pass their deterministic acceptance suite.
+
