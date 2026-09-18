@@ -259,31 +259,44 @@ public static class V2DesktopHostTests
                 "Vision-capable transport did not receive screenshot pixels.");
         });
 
-        await Test("0909 Excel and Word intent prefers OfficeHost before DesktopHost pixel automation", () =>
+        await Test("0909 generic interaction fidelity prefers structured then accessibility then pixels", () =>
         {
-            Check(
-                InteractionAdapterPreference.Choose(
-                    "edit the active Excel workbook cell A1",
-                    officeHostAvailable: true,
-                    desktopHostAvailable: true)
-                == InteractionAdapterKind.OfficeStructured,
-                "Excel intent did not prefer OfficeHost.");
+            var candidates = new[]
+            {
+                new InteractionAdapterCandidate(
+                    "fixture.pixel",
+                    "active-content",
+                    ToolInteractionFidelity.Visual),
+                new InteractionAdapterCandidate(
+                    "fixture.uia",
+                    "active-content",
+                    ToolInteractionFidelity.Accessibility),
+                new InteractionAdapterCandidate(
+                    "fixture.structured",
+                    "active-content",
+                    ToolInteractionFidelity.Structured)
+            };
 
             Check(
                 InteractionAdapterPreference.Choose(
-                    "change Word paragraph formatting",
-                    officeHostAvailable: true,
-                    desktopHostAvailable: true)
-                == InteractionAdapterKind.OfficeStructured,
-                "Word intent did not prefer OfficeHost.");
+                    "edit the active content",
+                    candidates)?.AdapterId == "fixture.structured",
+                "Structured adapter was not preferred over UIA/pixel adapters.");
+
+            var withoutStructured = candidates
+                .Where(x => x.AdapterId != "fixture.structured")
+                .ToArray();
+            Check(
+                InteractionAdapterPreference.Choose(
+                    "edit the active content",
+                    withoutStructured)?.AdapterId == "fixture.uia",
+                "Accessibility/UIA adapter was not preferred over pixel adapter.");
 
             Check(
                 InteractionAdapterPreference.Choose(
-                    "click the Save button in another application",
-                    officeHostAvailable: false,
-                    desktopHostAvailable: true)
-                == InteractionAdapterKind.DesktopAutomation,
-                "Non-Office UI intent did not select DesktopHost.");
+                    "fixture.pixel",
+                    candidates)?.AdapterId == "fixture.pixel",
+                "Explicit adapter request did not select the requested pixel adapter.");
             return Task.CompletedTask;
         });
 
