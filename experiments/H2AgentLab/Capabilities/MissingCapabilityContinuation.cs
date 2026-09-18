@@ -44,6 +44,9 @@ public sealed class MissingCapabilityContinuation
         _installed = installed ?? throw new ArgumentNullException(nameof(installed));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+
+        // Keep installed discovery as a live derived projection over authoritative stores.
+        _installed.Bind(_registry, _skills, _providers);
     }
 
     public async Task<MissingCapabilityContinuationResult> ResolveInstallAndContinueAsync(
@@ -144,11 +147,6 @@ public sealed class MissingCapabilityContinuation
             AgentTraceEventKind.Phase,
             "capability-installed",
             $"Installed and atomically activated {installed.PluginId}@{installed.Version} through PluginManager.");
-
-        _installed.Rebuild(
-            _registry,
-            _skills,
-            _providers());
 
         var selectedSkill = SelectInstalledSkill(
             originalQuery,
