@@ -356,53 +356,67 @@ Rules:
 
 ## Phase 10 — Python/runtime migration, MCP providers and extensibility foundations
 
-- [~] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**  
-  Phase 10 implementation (Python/MCP/computer/plugin layers) + dedicated 15-case acceptance suite added; third compile-fix retry in progress.
+- [x] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**  
+  Evidence: new runs persist run-level evidence IDs plus per-output artifact/evidence IDs; legacy manifests are normalized deterministically on load and publish propagates source evidence. CI run `35319749812`: PASS 1001.
 
-- [ ] **V2-1002 — Preserve WindowsPythonSandbox security regression suite.**
+- [x] **V2-1002 — Preserve WindowsPythonSandbox security regression suite.**  
+  Evidence: `PythonSandboxSecurityProfile` exposes the preserved AppContainer/no-network/1-process/768MB/120s/128MB contract and secret environment keys remain excluded. CI run `35319749812`: PASS 1002.
 
-- [ ] **V2-1003 — Make `run_python` deferred/escape-hatch only.**
+- [x] **V2-1003 — Make `run_python` deferred/escape-hatch only.**  
+  Evidence: `DeferredToolDiscovery` filters `run_python` when structured/non-Python tools satisfy ordinary intent, while explicit Python/custom-transform intent can still load it. CI run `35319749812`: PASS 1003.
 
-- [ ] **V2-1004 — Add Python result verifier requirements.**  
-  Exit code 0 alone is insufficient; artifact or explicit task assertions required.
+- [x] **V2-1004 — Add Python result verifier requirements.**  
+  Exit code 0 alone is insufficient; artifact or explicit task assertions required.  
+  Evidence: `Verification/PythonResultVerifier.cs` requires artifact expectations and/or explicit assertions in addition to process exit state. CI run `35319749812`: PASS 1004.
 
-- [ ] **V2-1005 — Add fallback test: unsupported Office transform → Python → deterministic verifier.**
+- [x] **V2-1005 — Add fallback test: unsupported Office transform → Python → deterministic verifier.**  
+  Evidence: fallback router preserves structured Office priority, selects Python only when structured support is insufficient, and deterministic artifact/assertion verification gates the fallback result. CI run `35319749812`: PASS 1005.
 
-- [ ] **V2-1006 — Define generic capability-provider/MCP contracts and provenance.**  
-  Provider identity, server/tool/schema/version provenance, namespace summaries and health state must be host-owned and provider-neutral.
+- [x] **V2-1006 — Define generic capability-provider/MCP contracts and provenance.**  
+  Provider identity, server/tool/schema/version provenance, namespace summaries and health state must be host-owned and provider-neutral.  
+  Evidence: `Providers/CapabilityProvider.cs` defines provider-neutral lifecycle/tool/resource contracts, provenance and host-owned health/scope policy. CI run `35319749812`: PASS 1006.
 
-- [ ] **V2-1007 — Implement MCP connection lifecycle.**  
-  Connect/disconnect/reconnect, cancellation, timeout, bounded errors and deterministic health transitions; no secret values in prompt/tool metadata.
+- [x] **V2-1007 — Implement MCP connection lifecycle.**  
+  Connect/disconnect/reconnect, cancellation, timeout, bounded errors and deterministic health transitions; no secret values in prompt/tool metadata.  
+  Evidence: `McpServerConnection` + bounded stdio JSON-RPC transport negotiate initialize, reconnect after transient disconnect, enforce timeout/cancel, bound diagnostics and expose environment keys without secret values. CI run `35319749812`: PASS 1007.
 
-- [ ] **V2-1008 — Normalize MCP tools/resources into ToolRegistry with deferred schemas.**  
-  Compact namespace metadata first; detailed schemas/resources load only after selection and are invalidated by provider/registry version.
+- [x] **V2-1008 — Normalize MCP tools/resources into ToolRegistry with deferred schemas.**  
+  Compact namespace metadata first; detailed schemas/resources load only after selection and are invalidated by provider/registry version.  
+  Evidence: `McpToolProvider` emits compact summaries/resources and `McpToolRegistryAdapter` registers only selected detailed schemas with provider provenance. CI run `35319749812`: PASS 1008.
 
-- [ ] **V2-1009 — Enforce MCP scope/permission/parallel/trust boundaries.**  
-  Preserve read-only vs mutating classification, provider/resource/session scope, serialization keys and parallel safety; one provider cannot broaden another provider's scope; provider claims are not trusted verifier evidence.
+- [x] **V2-1009 — Enforce MCP scope/permission/parallel/trust boundaries.**  
+  Preserve read-only vs mutating classification, provider/resource/session scope, serialization keys and parallel safety; one provider cannot broaden another provider's scope; provider claims are not trusted verifier evidence.  
+  Evidence: conservative MCP defaults + `CapabilityProviderPolicy/Manager` enforce scope/access/serialization metadata and all MCP/plugin tool results default to `CanProvideVerificationEvidence=false`. CI run `35319749812`: PASS 1009.
 
-- [ ] **V2-1010 — Add typed `filesystem.*` capability family.**  
-  List/stat/search/read/write/copy/move/hash/watch and policy-controlled delete with explicit workspace/scope boundaries and durable evidence.
+- [x] **V2-1010 — Add typed `filesystem.*` capability family.**  
+  List/stat/search/read/write/copy/move/hash/watch and policy-controlled delete with explicit workspace/scope boundaries and durable evidence.  
+  Evidence: `Computer/FilesystemCapabilities.cs` is rooted in `SafeWorkspace`, hash-guards mutations/deletes, backups deletes and provides deterministic watch/diff tokens. CI run `35319749812`: PASS 1010.
 
-- [ ] **V2-1011 — Add bounded `process.*` and `shell.*` capability families.**  
-  List/start/wait/exit-status and policy-controlled terminate; bounded shell/build/test/script execution with timeout, cancellation, side-effect policy and evidence.
+- [x] **V2-1011 — Add bounded `process.*` and `shell.*` capability families.**  
+  List/start/wait/exit-status and policy-controlled terminate; bounded shell/build/test/script execution with timeout, cancellation, side-effect policy and evidence.  
+  Evidence: `ProcessShellCapabilities` uses executable allow-lists + separated arguments, workspace-bound working dirs, secret-env stripping, timeout/output bounds and only terminates host-started processes. CI run `35319749812`: PASS 1011.
 
-- [ ] **V2-1012 — Normalize `app.*` / `window.*` / `uia.*` / `input.*` / `screen.*` / `browser.*` capability families.**  
-  Reuse DesktopHost where applicable; browser capability remains fallback behind structured WebResearchHost; no monolithic unrestricted computer-control tool.
+- [x] **V2-1012 — Normalize `app.*` / `window.*` / `uia.*` / `input.*` / `screen.*` / `browser.*` capability families.**  
+  Reuse DesktopHost where applicable; browser capability remains fallback behind structured WebResearchHost; no monolithic unrestricted computer-control tool.  
+  Evidence: `GeneralComputerCapabilityCatalog` defines typed families/backings and marks browser as WebResearch/browser fallback; acceptance asserts all required namespaces and no monolithic control tool. CI run `35319749812`: PASS 1012.
 
-- [ ] **V2-1013 — Add H2 Plugin Manifest, catalog metadata and rebuildable capability index.**  
-  Separate Tool/Skill/Plugin concepts; catalogs expose compact discovery metadata before package download or schema/skill loading.
+- [x] **V2-1013 — Add H2 Plugin Manifest, catalog metadata and rebuildable capability index.**  
+  Separate Tool/Skill/Plugin concepts; catalogs expose compact discovery metadata before package download or schema/skill loading.  
+  Evidence: `Plugins/H2PluginManifest.cs` validates bounded manifests, trust/catalog metadata and rebuildable tool/skill capability index without installing discovered packages. CI run `35319749812`: PASS 1013.
 
-- [ ] **V2-1014 — Add staged plugin install/update activation.**  
-  Validate manifest, hash/signature/source identity, agent compatibility, capability/permission delta, paths/conflicts/native helpers and self-test; use a versioned store and atomic activation/hot ToolRegistry registration at controlled boundaries.
+- [x] **V2-1014 — Add staged plugin install/update activation.**  
+  Validate manifest, hash/signature/source identity, agent compatibility, capability/permission delta, paths/conflicts/native helpers and self-test; use a versioned store and atomic activation/hot ToolRegistry registration at controlled boundaries.  
+  Evidence: `PluginManager` verifies archive/payload hashes, trust/policy/compatibility/paths/helpers/hooks, uses versioned staging + declarative self-test, hot-registers only at non-in-flight boundaries and updates active pointer after successful registration. CI run `35319749812`: PASS 1014.
 
-- [ ] **V2-1015 — Add plugin update discovery, rollback/quarantine and progressive skill/version evidence tests.**  
-  Failed updates keep the previous version; broader permissions require renewed policy/approval; changed plugin/skill hashes invalidate caches; task evidence records exact plugin/skill/tool versions.
+- [x] **V2-1015 — Add plugin update discovery, rollback/quarantine and progressive skill/version evidence tests.**  
+  Failed updates keep the previous version; broader permissions require renewed policy/approval; changed plugin/skill hashes invalidate caches; task evidence records exact plugin/skill/tool versions.  
+  Evidence: update metadata discovery, failed-self-test retention, permission-delta approval, rollback/quarantine diagnostics and `PluginSkillCatalog` version/hash cache identity are covered by real ZIP fixtures; task evidence records plugin/skill/tool versions. CI run `35319749812`: PASS 1015; Phase 10 suite 15 passed, 0 failed.
 
 ---
 
 ## Phase 11 — end-to-end v2 loop, WebResearchHost, structured providers and UI
 
-- [ ] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
+- [~] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
   Keep a temporary v1 diagnostic mode only if needed for A/B comparison.
 
 - [ ] **V2-1102 — Add UI progress based on typed trace events.**  
@@ -492,4 +506,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-1001 — Adapt ScriptWorkspace to v2 artifact/evidence IDs`.
+**Active task:** `V2-1101 — Move Lab UI send path to AgentOrchestrator`.
