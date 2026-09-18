@@ -141,11 +141,11 @@ Rules:
   Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.  
   Evidence: `AgentTaskCompletionGate` + protected `Complete(...)` API reject direct completion, failed verification and missing required verifiers; architecture guard proves verified mutation is the only completion path. GitHub Actions run `35294254411` passed full build/regression/publish.
 
-- [~] **V2-0405 — Add fast-path router.**  
+- [x] **V2-0405 — Add fast-path router.**  
   Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.  
-  Deterministic router + architecture guard added; full CI verification in progress.
+  Evidence: deterministic `AgentFastPathRouter` classifies Direct/Retrieval/Action/ComplexAgent before heavy schema loading; Direct has schema mode None and zero namespaces, Retrieval is files-only, Action/Complex defer discovery. GitHub Actions run `35294624217` passed full build/regression/publish.
 
-- [ ] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
+- [~] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
   Existing AgentRunner retained as compatibility path until migration completes.
 
 - [ ] **V2-0407 — Add orchestrator deterministic tests.**  
@@ -379,4 +379,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0405 — Add fast-path router`.
+**Active task:** `V2-0406 — Add AgentOrchestrator skeleton`.
