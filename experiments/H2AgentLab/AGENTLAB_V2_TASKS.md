@@ -201,11 +201,11 @@ Rules:
   Check exact changed files, expected hashes and unintended output.  
   Evidence: `Verification/FileScopeVerifier.cs` compares before/after snapshots for exact changed paths, expected SHA-256 values and unintended created outputs; architecture guard passed in GitHub Actions run `35304688210`, together with full regression/publish.
 
-- [~] **V2-0603 — Add generic artifact verifier contract.**  
+- [x] **V2-0603 — Add generic artifact verifier contract.**  
   Allows domain verifiers without coupling orchestrator to Excel/Word.  
-  Generic target/request/verifier/registry contract + architecture guard added; full CI verification in progress.
+  Evidence: `Verification/IArtifactVerifier.cs` defines domain-neutral target/request/verifier/registry abstractions with criterion scoping; architecture guard passed in GitHub Actions run `35304979625`, together with full regression/publish.
 
-- [ ] **V2-0604 — Add `AgentRepairController`.**  
+- [~] **V2-0604 — Add `AgentRepairController`.**  
   Convert failed criteria into concise repair context; preserve already-passed criteria.
 
 - [ ] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
@@ -392,4 +392,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0603 — Add generic artifact verifier contract`.
+**Active task:** `V2-0604 — Add AgentRepairController`.
