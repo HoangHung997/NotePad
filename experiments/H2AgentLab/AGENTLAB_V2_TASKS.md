@@ -174,7 +174,8 @@ Rules:
   Evidence: `DeferredToolDiscovery.BuildInitialExposure` exposes only `tool_search` + optional stable `update_plan`, while namespace descriptions advertise deferred capabilities. Architecture guard proves file/Python/Desktop schemas do not leak initially. GitHub Actions run `35298186826` passed full build/regression/publish.
 
 - [~] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
-  Acceptance: exact selected schemas are traceable; duplicates coalesced.
+  Acceptance: exact selected schemas are traceable; duplicates coalesced.  
+  Per-task load state, runtime tool_search handler and architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0506 — Add parallel read-only execution support.**  
   Serialize overlapping mutations to same resource.
