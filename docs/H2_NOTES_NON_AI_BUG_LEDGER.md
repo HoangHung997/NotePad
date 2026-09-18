@@ -59,7 +59,14 @@ Exclude:
 
 ## Observed behavior
 
-Two PCs are configured to use the same shared H2 Notes workspace on NAS.
+Two physical PCs are configured to use the same shared H2 Notes workspace on NAS.
+
+Observed mapped paths:
+- PC1: `X:\\.Note`
+- PC2: `X:\\Dữ liệu Hưng\\.Note`
+
+These are user-confirmed NAS paths. The two Windows drive mappings are not required to have identical local path strings; the acceptance question is whether they resolve to the same intended NAS workspace/root.
+
 
 PC1 saves updated project content. PC2 sees that something changed, but it does not refresh to the new project state. PC2 reports:
 
@@ -292,14 +299,15 @@ A local temp directory does not prove:
 Before final H2 Notes integration acceptance, add a real-device test matrix using the intended NAS/share type.
 
 At minimum:
-1. PC1 and PC2 open the same workspace.
-2. Alternate rapid saves on different projects.
-3. Simultaneous edits to different fields of the same project.
-4. Same-field conflict.
-5. Kill one writer during transaction.
-6. Disconnect NAS during save and reconnect.
-7. Verify no persistent index/file hash mismatch.
-8. Verify both clients converge without data loss.
+1. Reproduce with the user's real NAS mappings: PC1 `X:\\.Note`, PC2 `X:\\Dữ liệu Hưng\\.Note`, after confirming both resolve to the same intended shared workspace.
+2. PC1 and PC2 open the same workspace.
+3. Alternate rapid saves on different projects.
+4. Simultaneous edits to different fields of the same project.
+5. Same-field conflict.
+6. Kill one writer during transaction.
+7. Disconnect NAS during save and reconnect.
+8. Verify no persistent index/file hash mismatch.
+9. Verify both clients converge without data loss.
 
 ---
 
