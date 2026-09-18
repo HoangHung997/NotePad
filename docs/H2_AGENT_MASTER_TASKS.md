@@ -688,7 +688,7 @@ Evidence: the working first-party implementations were preserved and adapted as 
 
 # Stage H — Remove over-design from capability/catalog layer
 
-## [ ] MB-70 — Remove generic domain synonym intelligence
+## [x] MB-70 — Remove generic domain synonym intelligence
 
 Required:
 
@@ -707,6 +707,8 @@ Acceptance:
 
 - no AutoCAD/legal domain synonym dictionary in generic capability code;
 - tests rely on realistic descriptions/model selection, not hidden domain mapping.
+
+Evidence: generic capability ranking is now explicitly lexical-only: `CapabilityRanking.SemanticTerms` was removed/renamed to `LexicalTerms`, and both `InstalledCapabilityIndex`, `AvailableCapabilityIndex`, and `CapabilityResolver` match only normalized tokens present in capability IDs/descriptions/compact package metadata. No domain-expansion table is consulted by capability core; meaning must come from realistic tool/skill/plugin descriptions, model reasoning, or an optional specialized search extension outside this core. `Capabilities/MbDomainNeutralCapabilitySearchTests.cs` proves negative behavior (`dynamic`, `audit`, `legal`, and `autocad` do not magically match unrelated `parameters/actions/visibility`, `inspect/check/review`, `law/regulation`, or `CAD` terms), proves realistic installed AutoCAD/legal descriptions remain discoverable when the query and metadata actually share relevant terms, proves available package search works from compact realistic metadata, and source-guards `CapabilityIndexes.cs` + `CapabilityResolver.cs` against synonym helpers or the prohibited domain mappings. Exact functional source commit `0fa8a8afce87a0d1cf91ad9ee6615e209c0a5f56`, GitHub Actions run `35379228605`: MB-70 **4 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-63, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `a69390cf3033ef60f51bbbeee21dd37321563675`; portable ZIP SHA256 `a4b2834519c7bee4f7c6eeaaacd8aec9411a8fa4d551a1e5134c6b4f13ceaa4f`.
 
 ---
 
