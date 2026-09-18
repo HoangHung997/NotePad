@@ -292,7 +292,7 @@ Evidence: `Runtime/MbInitialToolExposureTests.cs` constructs the real V1-backed 
 
 ---
 
-## [~] MB-31 — Execute tool calls through ToolRegistry
+## [x] MB-31 — Execute tool calls through ToolRegistry
 
 Goal:
 
@@ -310,9 +310,11 @@ Acceptance:
 - descriptor access/risk/scope data is available at execution;
 - normal runtime does not use the giant `AgentTools.Execute` switch directly.
 
+Evidence: `Runtime/MbToolRegistryExecutionTests.cs` verifies the selected descriptor executor is the only executed path, unknown model tools return a typed fail-closed `unknown_tool` result without fallback execution, descriptor access/risk/scope metadata is present at the scheduler boundary, and normal runtime/orchestrated source contains no direct `AgentTools.Execute` call. GitHub Actions run `35351897477` reported **3 passed, 0 failed** and full CI succeeded.
+
 ---
 
-## [ ] MB-32 — Make deferred tool loading real during the same task
+## [~] MB-32 — Make deferred tool loading real during the same task
 
 Goal:
 
