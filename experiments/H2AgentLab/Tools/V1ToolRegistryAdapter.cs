@@ -25,7 +25,8 @@ public static class V1ToolRegistryAdapter
         string Namespace,
         AgentToolRisk Risk,
         AgentToolAccess Access,
-        bool Parallel);
+        bool Parallel,
+        bool Evidence = false);
 
     private static readonly IReadOnlyDictionary<string, Metadata> MetadataByName =
         new Dictionary<string, Metadata>(StringComparer.Ordinal)
@@ -35,22 +36,22 @@ public static class V1ToolRegistryAdapter
             ["update_plan"] = new("core", AgentToolRisk.Low, AgentToolAccess.Mutating, false),
 
             ["run_python"] = new("python", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
-            ["inspect_artifact"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
-            ["read_run"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
+            ["inspect_artifact"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
+            ["read_run"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
             ["view_artifact"] = new("python", AgentToolRisk.Low, AgentToolAccess.Mutating, false),
             ["publish_artifact"] = new("python", AgentToolRisk.High, AgentToolAccess.Mutating, false),
 
             ["list_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
             ["find_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
-            ["read_file"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
+            ["read_file"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
             ["search_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
             ["write_text"] = new("files", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
             ["open_file"] = new("files", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
 
-            ["word_paragraphs"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
-            ["check_word"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
+            ["word_paragraphs"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
+            ["check_word"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
 
-            ["inspect_window"] = new("desktop", AgentToolRisk.Low, AgentToolAccess.ReadOnly, false),
+            ["inspect_window"] = new("desktop", AgentToolRisk.Low, AgentToolAccess.ReadOnly, false, true),
             ["click_control"] = new("desktop", AgentToolRisk.High, AgentToolAccess.Mutating, false),
             ["type_control"] = new("desktop", AgentToolRisk.High, AgentToolAccess.Mutating, false)
         };
@@ -135,7 +136,9 @@ public static class V1ToolRegistryAdapter
                 resourceScope: resourceScope,
                 serializationKey: metadata.Access == AgentToolAccess.Mutating
                     ? MutationScope(name)
-                    : metadata.Namespace));
+                    : metadata.Namespace,
+                canProvideVerificationEvidence:
+                    metadata.Evidence || metadata.Access == AgentToolAccess.Mutating));
         }
 
         var missingDefinitions = MetadataByName.Keys.Where(x => !seen.Contains(x)).ToArray();
