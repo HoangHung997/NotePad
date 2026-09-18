@@ -138,6 +138,21 @@ public sealed class PluginManager
                 $"Plugin requires Agent {manifest.MinAgentVersion}, current {_agentVersion}.");
 
         ValidatePolicy(manifest, catalogEntry, policy, userApproved);
+
+        var previousActive = GetActive(manifest.Id);
+        if (previousActive is not null)
+        {
+            var addedPermissions = manifest.Permissions
+                .Except(
+                    previousActive.Value.Manifest.Permissions,
+                    StringComparer.Ordinal)
+                .ToArray();
+            if (addedPermissions.Length > 0 && !userApproved)
+                throw new UnauthorizedAccessException(
+                    "Plugin update requests broader permissions and requires new approval: "
+                    + string.Join(", ", addedPermissions));
+        }
+
         ValidateEntries(zip, manifest, policy);
 
         var pluginRoot = Path.Combine(_root, manifest.Id);
@@ -162,7 +177,7 @@ public sealed class PluginManager
             throw;
         }
 
-        var previous = ReadActivation(pluginRoot)?.ActiveVersion;
+        var previous = previousActive?.Manifest.Version;
         var registered = ActivateIntoRegistry(manifest, finalRoot);
         WriteActivation(
             pluginRoot,
