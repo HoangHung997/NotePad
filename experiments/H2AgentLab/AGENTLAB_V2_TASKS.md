@@ -106,10 +106,10 @@ Rules:
 - [x] **V2-0304 — Add bounded `AgentContextManager`.**  
   Evidence: `Context/AgentContextManager.cs` adds explicit hard budgets for total active context, task contract, current state, recent relevant turns, relevant tool summaries, compacted history, per-item size and selected-item counts. Selection is deterministic by relevance/recency/source ID, selected turn/tool provenance is retained as source IDs, emitted list items are restored to chronological order, and truncation plus selected/dropped counts are machine-readable in `AgentContextUsage`. The manager returns a bounded `AgentPromptRuntimeContext` without modifying the frozen v1 `LabSession.Context()` path. `V2ArchitectureTests` verifies total/section caps, truncation flags, deterministic provenance, selected/dropped counts and order-independent input enumeration. Source commit `8139677c93266c55d837d69747a9396044ce48b8`; GitHub Actions push run `35259116155` and PR run `35259119900` completed successfully. Push evidence: H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `47081637da34bca7c0b66593f58706535dbee8bf` records source `8139677c...` and ZIP SHA256 `47a262251204d84e71db8a5676ea0e3af5d0af9f979d7a358adbf402ab7fcb7f`.
 
-- [~] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
-  Raw LabSession journal remains persisted but not blindly injected.
+- [x] **V2-0305 — Replace direct `session.Context()` injection in v2 path.**  
+  Evidence: `Context/LabSessionContextAdapter.cs` is the v2-only bridge from durable `LabSession` history into `AgentContextManager`; it never calls the legacy `LabSession.Context()` concatenation path. Only completed `user`/`assistant` journal events are eligible as recent turns, while `script`, `recovery`, `unverified-draft` and unknown future event kinds remain durable on disk but are not blindly re-injected. `V2SessionContextTests.cs` proves bounded recent selection/source IDs, exact raw `session.json` preservation/reload, prompt consumption of the bounded snapshot, and exclusion of non-conversation journal kinds. The first CI attempt exposed a constructor named-argument compiler error and was fixed before acceptance. Source commit `bd6ff06d6f88103623d4aef5e374a236087941e0`; GitHub Actions push run `35290186199` and PR run `35290186955` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `dddf3d02d3b913714fbe4b2a25b31f467231a8b7` records source `bd6ff06d...` and ZIP SHA256 `a80302af61207a1f3fdc1343ece365bfef59c4ac8cc2e079975d4d3fd44fd70b`.
 
-- [ ] **V2-0306 — Add artifact handles for large tool output.**  
+- [~] **V2-0306 — Add artifact handles for large tool output.**  
   Long stdout/stderr/document extracts stored out-of-context; model sees concise summary + retrievable handle.
 
 - [ ] **V2-0307 — Add compaction checkpoint model.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0305 — Replace direct session.Context() injection in v2 path`.
+**Active task:** `V2-0306 — Add artifact handles for large tool output`.
