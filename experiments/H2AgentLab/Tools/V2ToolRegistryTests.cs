@@ -79,7 +79,7 @@ public static class V2ToolRegistryTests
             var clock = Stopwatch.StartNew();
             for (var i = 0; i < 1_000; i++)
             {
-                _ = index.Search(i % 3 switch
+                _ = index.Search((i % 3) switch
                 {
                     0 => "read workbook file",
                     1 => "inspect window control",
