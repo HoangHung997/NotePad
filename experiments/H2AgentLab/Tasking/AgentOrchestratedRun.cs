@@ -263,6 +263,30 @@ public sealed class AgentOrchestratedRun
             Emit(trace, output, AgentTraceEventKind.Warning, "cancelled", "Tác vụ đã bị hủy.");
             throw;
         }
+        catch (AgentVerificationRequiredException ex)
+        {
+            if (!session.StateMachine.IsTerminal)
+                _orchestrator.Block(session, ex.Message);
+            Emit(
+                trace,
+                output,
+                AgentTraceEventKind.Warning,
+                "verification-required",
+                "Tác vụ có thay đổi chưa được đánh dấu hoàn tất vì chưa có bằng chứng xác minh đạt yêu cầu.");
+
+            var blockedContext = _orchestrator.ContextManager.Build(contextInput);
+            var blockedDiagnostics = AgentDiagnostics.FromContext(blockedContext);
+            return new AgentInspectionSnapshot(
+                contract.TaskId,
+                contract.UserGoal,
+                session.StateMachine.State,
+                session.Route.RouteClass,
+                contract.AcceptanceCriteria,
+                trace.Events,
+                blockedContext.Usage.TotalCharacters,
+                blockedContext.Pressure.RequiresCompaction,
+                blockedDiagnostics);
+        }
         catch
         {
             if (!session.StateMachine.IsTerminal)
