@@ -372,8 +372,8 @@ public sealed class WebResearchHost : ICapabilityProvider
         if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
         {
             var html = Encoding.UTF8.GetString(bytes);
-            text = Regex.Replace(html, "<script[\s\S]*?</script>", " ", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, "<style[\s\S]*?</style>", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(html, @"<script[\s\S]*?</script>", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<style[\s\S]*?</style>", " ", RegexOptions.IgnoreCase);
             text = Regex.Replace(text, "<[^>]+>", " ");
             text = WebUtility.HtmlDecode(text);
         }
@@ -388,7 +388,7 @@ public sealed class WebResearchHost : ICapabilityProvider
             return "";
         }
 
-        text = Regex.Replace(text, "\s+", " ").Trim();
+        text = Regex.Replace(text, @"\s+", " ").Trim();
         return text.Length <= maxCharacters
             ? text
             : text[..maxCharacters] + "…[truncated]";
