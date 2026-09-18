@@ -145,11 +145,11 @@ Rules:
   Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.  
   Evidence: deterministic `AgentFastPathRouter` classifies Direct/Retrieval/Action/ComplexAgent before heavy schema loading; Direct has schema mode None and zero namespaces, Retrieval is files-only, Action/Complex defer discovery. GitHub Actions run `35294624217` passed full build/regression/publish.
 
-- [~] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
+- [x] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
   Existing AgentRunner retained as compatibility path until migration completes.  
-  Orchestrator skeleton + architecture guard added; full CI verification in progress.
+  Evidence: `Tasking/AgentOrchestrator.cs` owns v2 contract/router/state/context boundaries, append-only contract updates and explicit v1 compatibility factory without modifying `AgentRunner`; architecture guard verifies the boundary. GitHub Actions run `35294966469` passed full build/regression/publish.
 
-- [ ] **V2-0407 — Add orchestrator deterministic tests.**  
+- [~] **V2-0407 — Add orchestrator deterministic tests.**  
   Cover direct/retrieval/action/repair/cancel/blocked transitions.
 
 ---
@@ -380,4 +380,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0406 — Add AgentOrchestrator skeleton`.
+**Active task:** `V2-0407 — Add orchestrator deterministic tests`.
