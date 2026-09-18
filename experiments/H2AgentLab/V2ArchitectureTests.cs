@@ -1123,6 +1123,56 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("FileScopeVerifier detects exact changes hashes and unintended outputs", () =>
+        {
+            static string Hash(char c) => new string(c, 64);
+
+            var before = new[]
+            {
+                new FileVerificationEntry("input/a.txt", Hash('a')),
+                new FileVerificationEntry("input/b.txt", Hash('b'))
+            };
+            var after = new[]
+            {
+                new FileVerificationEntry("input/a.txt", Hash('c')),
+                new FileVerificationEntry("input/b.txt", Hash('b')),
+                new FileVerificationEntry("output/result.txt", Hash('d'))
+            };
+            var expected = new FileVerificationExpectation(
+                expectedChangedPaths: ["input/a.txt", "output/result.txt"],
+                expectedHashes: new Dictionary<string, string>
+                {
+                    ["input/a.txt"] = Hash('c'),
+                    ["output/result.txt"] = Hash('d')
+                },
+                allowedOutputPaths: ["output/result.txt"]);
+
+            var pass = FileScopeVerifier.Verify(before, after, expected);
+            if (!pass.Passed
+                || pass.Criteria.Count != 3
+                || pass.Criteria.Any(x => x.Status != VerificationCriterionStatus.Passed))
+                throw new InvalidOperationException("Expected file/hash/scope fixture did not pass.");
+
+            var badAfter = after.Append(new FileVerificationEntry("output/rogue.txt", Hash('e')));
+            var fail = FileScopeVerifier.Verify(before, badAfter, expected);
+            if (fail.Passed
+                || fail.Failures.Count < 2
+                || !fail.Failures.Any(x => x.CriterionId == FileScopeVerifier.ExactChangesCriterionId)
+                || !fail.Failures.Any(x => x.CriterionId == FileScopeVerifier.UnintendedOutputCriterionId))
+                throw new InvalidOperationException("Unexpected changed/output scope was not rejected.");
+
+            var wrongHash = new FileVerificationExpectation(
+                expectedChangedPaths: ["input/a.txt", "output/result.txt"],
+                expectedHashes: new Dictionary<string, string>
+                {
+                    ["input/a.txt"] = Hash('f')
+                },
+                allowedOutputPaths: ["output/result.txt"]);
+            var hashFail = FileScopeVerifier.Verify(before, after, wrongHash);
+            if (!hashFail.Failures.Any(x => x.CriterionId == FileScopeVerifier.ExpectedHashesCriterionId))
+                throw new InvalidOperationException("Expected hash mismatch was not reported.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
