@@ -74,6 +74,8 @@ public sealed class BuiltInSkillSource : ISkillSource
 
     public string SourceId { get; }
     public SkillSourceKind SourceKind => SkillSourceKind.BuiltIn;
+    public IReadOnlyList<global::H2AgentLab.LabSkill> InstalledSkills
+        => Array.AsReadOnly(_skills.ToArray());
 
     public IReadOnlyList<SkillSummary> Search(string query, int maxResults = 20)
     {
@@ -448,7 +450,11 @@ public sealed class PluginSkillSource : ISkillSource
     }
 }
 
-public sealed class UnifiedSkillCatalog
+/// <summary>
+/// Canonical host-facing skill catalog. All built-in/plugin/future skill sources register here;
+/// compatibility facades must delegate to this type rather than implement another catalog.
+/// </summary>
+public class SkillCatalog
 {
     private readonly List<ISkillSource> _sources = [];
 
@@ -487,4 +493,12 @@ public sealed class UnifiedSkillCatalog
                 && x.SourceKind == identity.SourceKind)
             ?? throw new KeyNotFoundException(
                 $"Skill source '{identity.SourceId}' is not registered.");
+}
+
+/// <summary>
+/// Historical Phase-11 name kept only as a source-compatible adapter.
+/// New code must use <see cref="SkillCatalog"/>.
+/// </summary>
+public sealed class UnifiedSkillCatalog : SkillCatalog
+{
 }
