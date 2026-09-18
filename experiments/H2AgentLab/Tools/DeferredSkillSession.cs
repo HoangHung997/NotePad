@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using H2AgentLab.Skills;
 
 namespace H2AgentLab.Tools;
 
@@ -12,24 +13,28 @@ public sealed record SkillReadResult(
     bool Unchanged);
 
 /// <summary>
-/// Per-task progressive skill reader. SkillCatalog remains the v1 source of validation and content;
-/// this wrapper remembers source stamps and content hashes so unchanged guidance is not resent to
-/// the model on every tool turn.
+/// Per-task compatibility cache over the canonical Skills.SkillCatalog. It no longer owns skill
+/// discovery/parsing; it only suppresses resending unchanged selected content.
 /// </summary>
 public sealed class DeferredSkillSession
 {
-    private readonly global::H2AgentLab.SkillCatalog _catalog;
+    private readonly H2AgentLab.Skills.SkillCatalog _catalog;
     private readonly Dictionary<string, CacheEntry> _cache = new(StringComparer.Ordinal);
 
     public DeferredSkillSession(global::H2AgentLab.SkillCatalog catalog)
+        : this((catalog ?? throw new ArgumentNullException(nameof(catalog))).Canonical)
+    {
+    }
+
+    public DeferredSkillSession(H2AgentLab.Skills.SkillCatalog catalog)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     }
 
-    public global::H2AgentLab.SkillCatalog Catalog => _catalog;
+    public H2AgentLab.Skills.SkillCatalog Catalog => _catalog;
 
-    public object Discover(string query)
-        => _catalog.Discover(query ?? "");
+    public IReadOnlyList<SkillSummary> Discover(string query)
+        => _catalog.Search(query ?? "", 100);
 
     public SkillReadResult Read(string skillName, string resourcePath)
     {
@@ -38,10 +43,27 @@ public sealed class DeferredSkillSession
 
         var name = skillName.Trim();
         var relative = resourcePath.Trim().Replace('\\', '/');
-        var key = name + "\n" + relative;
-        var stamp = ResolveStamp(name, relative);
+        var selected = _catalog.Search("", 100)
+            .SingleOrDefault(x => string.Equals(x.Name, name, StringComparison.Ordinal))
+            ?? throw new global::H2AgentLab.AgentFaultException(
+                "skill_not_found",
+                "Unknown skill. Use list_skills. Available names: "
+                + string.Join(", ", _catalog.Search("", 100).Select(x => x.Name)));
 
-        if (_cache.TryGetValue(key, out var cached) && cached.Stamp == stamp)
+        var content = relative == "SKILL.md"
+            ? _catalog.Read(selected.Identity).EntryPoint
+            : _catalog.ReadResource(selected.Identity, relative).Content;
+        var hash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
+        var version = "sha256:" + hash[..16];
+        var key = selected.Identity.SourceId
+            + "\n"
+            + selected.Identity.SkillId
+            + "\n"
+            + relative;
+
+        if (_cache.TryGetValue(key, out var cached)
+            && string.Equals(cached.Sha256, hash, StringComparison.Ordinal))
         {
             return new SkillReadResult(
                 name,
@@ -52,12 +74,7 @@ public sealed class DeferredSkillSession
                 Unchanged: true);
         }
 
-        var content = _catalog.Read(name, relative);
-        var hash = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
-        var version = "sha256:" + hash[..16];
-        _cache[key] = new CacheEntry(stamp, hash, version);
-
+        _cache[key] = new CacheEntry(hash, version);
         return new SkillReadResult(
             name,
             relative,
@@ -73,32 +90,5 @@ public sealed class DeferredSkillSession
             x => x.Value.Version,
             StringComparer.Ordinal);
 
-    private SourceStamp ResolveStamp(string skillName, string resourcePath)
-    {
-        string path;
-        if (resourcePath == "references/runtime.md")
-        {
-            path = Path.Combine(AppContext.BaseDirectory, "runtime-guide.md");
-        }
-        else
-        {
-            var skill = _catalog.Skills.SingleOrDefault(
-                x => string.Equals(x.Name, skillName, StringComparison.Ordinal))
-                ?? throw new global::H2AgentLab.AgentFaultException(
-                    "skill_not_found",
-                    "Unknown skill. Use list_skills. Available names: "
-                    + string.Join(", ", _catalog.Skills.Select(x => x.Name)));
-
-            var scope = new global::H2AgentLab.SafeWorkspace(skill.Directory);
-            path = scope.Resolve(resourcePath);
-        }
-
-        var info = new FileInfo(path);
-        if (!info.Exists)
-            return new SourceStamp(-1, -1);
-        return new SourceStamp(info.Length, info.LastWriteTimeUtc.Ticks);
-    }
-
-    private sealed record CacheEntry(SourceStamp Stamp, string Sha256, string Version);
-    private readonly record struct SourceStamp(long Length, long LastWriteTicks);
+    private sealed record CacheEntry(string Sha256, string Version);
 }
