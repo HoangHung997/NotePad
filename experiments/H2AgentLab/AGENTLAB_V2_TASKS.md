@@ -257,7 +257,7 @@ Rules:
 
 - [~] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
   Separate process, STA, named-pipe/JSON-RPC boundary, no model/API key access.  
-  OfficeProtocol + OfficeHost + client + Phase 08 acceptance suite added; compile fixes applied; full Phase 08 CI verification in progress.
+  OfficeProtocol + OfficeHost + client + Phase 08 acceptance suite added; COM backend compile fixes applied; full Phase 08 CI verification retry in progress.
 
 - [ ] **V2-0802 — Add OfficeHost process lifecycle/timeout/restart handling.**
 
