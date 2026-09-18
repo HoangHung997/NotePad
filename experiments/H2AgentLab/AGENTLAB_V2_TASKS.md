@@ -225,11 +225,11 @@ Rules:
   Reuse H2 Core safety/size/hash/Office extraction rather than duplicate readers.  
   Evidence: `Documents/LabDocumentInspectionService.cs` is a thin adapter over `AiDocuments.Read`; architecture guard proves extracted text/hash/MIME/safety stay identical to H2 Core. GitHub Actions run `35306375793` passed full regression/publish.
 
-- [~] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
+- [x] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
   `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.  
-  Thin H2 Core PDF/OCR adapter + architecture guard added; full CI verification in progress.
+  Evidence: `Documents/LabPdfOcrService.cs` delegates attachment preparation/layout/runtime status to H2 Core `AiPdfProcessor`; architecture guard validates direct PDF routing without a separate Lab OCR path. GitHub Actions run `35306657854` passed full regression/publish.
 
-- [ ] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
+- [~] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
   Values/formulas/styles/merges/sheets/hidden state needed by verifier.
 
 - [ ] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
@@ -397,4 +397,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter`.
+**Active task:** `V2-0703 — Add deterministic closed-XLSX snapshot model`.
