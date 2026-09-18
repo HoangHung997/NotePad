@@ -167,7 +167,7 @@ Rules:
 
 - [~] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
   No embedding dependency. Cache by registry version.  
-  Implementation + architecture guard added; callable-name ranking strengthened after second guard failure; full CI retry in progress.
+  Implementation + architecture guard added; root-cause Unicode tokenizer escaping fixed after guard failure; full CI retry in progress.
 
 - [ ] **V2-0504 — Expose `tool_search` as initial callable tool.**  
   Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.
