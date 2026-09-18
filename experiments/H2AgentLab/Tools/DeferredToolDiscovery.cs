@@ -1,3 +1,4 @@
+using H2AgentLab.Verification;
 using System.Text.Json;
 
 namespace H2AgentLab.Tools;
@@ -76,7 +77,10 @@ public sealed class DeferredToolDiscovery
 
         var candidateLimit = Math.Min(50, Math.Max(maxResults * 4, maxResults));
         var candidates = _search.Search(query, candidateLimit);
-        return DocumentToolPreference.Apply(query, candidates, maxResults);
+        var preferred = DocumentToolPreference.Apply(query, candidates, candidateLimit);
+        if (!PythonFallbackRouter.ShouldExposeRunPython(query, preferred))
+            preferred = preferred.Where(x => x.Descriptor.Name != "run_python").ToArray();
+        return preferred.Take(maxResults).ToArray();
     }
 
     public ToolSchemaLoadBatch SearchAndLoad(string query, int maxResults = 8)
