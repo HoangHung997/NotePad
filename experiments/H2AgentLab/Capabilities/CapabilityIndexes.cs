@@ -49,27 +49,71 @@ public sealed record AvailableCapabilityRecord(
 
 public sealed class InstalledCapabilityIndex
 {
-    private InstalledCapabilityRecord[] _records = [];
+    private ToolRegistry? _registry;
+    private H2AgentLab.Skills.SkillCatalog? _skills;
+    private Func<IReadOnlyList<ProviderProvenance>> _providers
+        = static () => Array.Empty<ProviderProvenance>();
 
-    public IReadOnlyList<InstalledCapabilityRecord> Records => _records;
+    /// <summary>
+    /// Derived live projection only. Authoritative installed state remains in ToolRegistry,
+    /// SkillCatalog and provider/plugin managers.
+    /// </summary>
+    public IReadOnlyList<InstalledCapabilityRecord> Records
+        => Project();
 
+    /// <summary>
+    /// Compatibility binding for callers that only have a provider snapshot.
+    /// Tools and skills remain live; provider data is the caller-supplied derived snapshot.
+    /// </summary>
     public void Rebuild(
         ToolRegistry registry,
         H2AgentLab.Skills.SkillCatalog skills,
         IEnumerable<ProviderProvenance>? providers = null)
     {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(skills);
+        var snapshot = (providers ?? Array.Empty<ProviderProvenance>())
+            .ToArray();
+        Bind(registry, skills, () => snapshot);
+    }
+
+    public void Bind(
+        ToolRegistry registry,
+        H2AgentLab.Skills.SkillCatalog skills,
+        Func<IReadOnlyList<ProviderProvenance>> providers)
+    {
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _skills = skills ?? throw new ArgumentNullException(nameof(skills));
+        _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+    }
+
+    public IReadOnlyList<InstalledCapabilityRecord> Search(
+        string query,
+        int maxResults = 20)
+    {
+        if (maxResults is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(maxResults));
+        return CapabilityRanking.RankInstalled(
+            Project(),
+            query,
+            maxResults);
+    }
+
+    private InstalledCapabilityRecord[] Project()
+    {
+        if (_registry is null || _skills is null)
+            return [];
 
         var records = new List<InstalledCapabilityRecord>();
-        foreach (var tool in registry.Tools)
+
+        foreach (var tool in _registry.Tools)
         {
             records.Add(new InstalledCapabilityRecord(
                 CapabilityKind.Tool,
                 tool.Name,
                 tool.Description,
                 tool.Provenance?.ProviderId ?? "built-in",
-                tool.Provenance?.ProviderId?.StartsWith("plugin.", StringComparison.Ordinal) == true
+                tool.Provenance?.ProviderId?.StartsWith(
+                    "plugin.",
+                    StringComparison.Ordinal) == true
                     ? tool.Provenance.ProviderId["plugin.".Length..]
                     : null,
                 tool.Provenance?.ProviderVersion,
@@ -80,7 +124,7 @@ public sealed class InstalledCapabilityIndex
                 "installed"));
         }
 
-        foreach (var skill in skills.Search("", 100))
+        foreach (var skill in _skills.SnapshotMetadata())
         {
             records.Add(new InstalledCapabilityRecord(
                 CapabilityKind.Skill,
@@ -96,7 +140,7 @@ public sealed class InstalledCapabilityIndex
                 skill.Availability));
         }
 
-        foreach (var provider in providers ?? Array.Empty<ProviderProvenance>())
+        foreach (var provider in _providers())
         {
             records.Add(new InstalledCapabilityRecord(
                 CapabilityKind.Provider,
@@ -112,20 +156,11 @@ public sealed class InstalledCapabilityIndex
                 "installed"));
         }
 
-        _records = records
+        return records
             .OrderBy(x => x.Kind)
             .ThenBy(x => x.CapabilityId, StringComparer.Ordinal)
             .ThenBy(x => x.SourceId, StringComparer.Ordinal)
             .ToArray();
-    }
-
-    public IReadOnlyList<InstalledCapabilityRecord> Search(
-        string query,
-        int maxResults = 20)
-    {
-        if (maxResults is < 1 or > 100)
-            throw new ArgumentOutOfRangeException(nameof(maxResults));
-        return CapabilityRanking.RankInstalled(_records, query, maxResults);
     }
 }
 
