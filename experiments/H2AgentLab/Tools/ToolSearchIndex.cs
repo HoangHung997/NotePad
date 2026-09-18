@@ -70,14 +70,14 @@ public sealed partial class ToolSearchIndex
 
                 var normalizedQuery = NormalizeIdentifierLike(query);
                 if (document.Descriptor.Name == normalizedQuery)
-                    score += 5d;
+                    score += 200d;
                 else if (query.Contains(document.Descriptor.Name, StringComparison.OrdinalIgnoreCase))
-                    score += 4d;
+                    score += 100d;
                 else
                 {
                     var nameTerms = Tokenize(document.Descriptor.Name).Distinct(StringComparer.Ordinal).ToArray();
                     if (nameTerms.Length > 0 && nameTerms.All(queryTerms.Contains))
-                        score += 2.5d;
+                        score += 25d;
                 }
                 if (document.Descriptor.Namespace.Name == normalizedQuery)
                     score += 1.5d;
