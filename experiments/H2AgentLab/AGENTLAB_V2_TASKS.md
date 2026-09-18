@@ -182,7 +182,8 @@ Rules:
   Evidence: `ToolExecutionScheduler` runs parallel-safe reads concurrently, requires mutation resource identity and serializes overlapping mutation keys; architecture guard proves read overlap and mutation exclusion. GitHub Actions run `35298862819` passed full build/regression/publish.
 
 - [~] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
-  Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.
+  Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.  
+  Deferred skill session + registry/cache guard added; full CI verification in progress.
 
 - [ ] **V2-0508 — Tool-search regression/performance tests.**  
   Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.
