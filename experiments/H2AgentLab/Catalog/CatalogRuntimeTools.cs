@@ -165,7 +165,7 @@ public sealed class CatalogRuntimeToolExecutor : IAgentToolExecutor
             ?? throw new InvalidOperationException(
                 "Plugin activation completed without an active manifest.");
         if (!string.Equals(
-                active.Value.Manifest.Version,
+                active.Manifest.Version,
                 installed.Version,
                 StringComparison.Ordinal))
             throw new InvalidOperationException(
@@ -177,9 +177,9 @@ public sealed class CatalogRuntimeToolExecutor : IAgentToolExecutor
             pluginId = installed.PluginId,
             version = installed.Version,
             registeredTools = installed.RegisteredTools,
-            skills = active.Value.Manifest.Skills,
-            providers = active.Value.Manifest.Providers,
-            permissions = active.Value.Manifest.Permissions,
+            skills = active.Manifest.Skills,
+            providers = active.Manifest.Providers,
+            permissions = active.Manifest.Permissions,
             archiveSha256 = installed.ArchiveSha256,
             payloadSha256 = installed.PayloadSha256,
             note = "Extension activated at a completed tool-call boundary. Use tool_search/list_skills again to discover the refreshed surface; the original task continues."
