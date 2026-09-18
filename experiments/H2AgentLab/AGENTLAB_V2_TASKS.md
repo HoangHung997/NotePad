@@ -197,11 +197,11 @@ Rules:
   Machine-readable pass/fail per criterion with evidence IDs.  
   Evidence: `Verification/VerificationReport.cs` provides per-criterion Passed/Failed/NotVerified results, typed failures, evidence IDs, coverage checks and aggregate pass state; architecture guard passed in GitHub Actions run `35304076438`, together with full regression/publish.
 
-- [~] **V2-0602 — Add file/hash/scope verifier.**  
+- [x] **V2-0602 — Add file/hash/scope verifier.**  
   Check exact changed files, expected hashes and unintended output.  
-  Implementation + architecture guard added; compile fix applied; full CI verification retry in progress.
+  Evidence: `Verification/FileScopeVerifier.cs` compares before/after snapshots for exact changed paths, expected SHA-256 values and unintended created outputs; architecture guard passed in GitHub Actions run `35304688210`, together with full regression/publish.
 
-- [ ] **V2-0603 — Add generic artifact verifier contract.**  
+- [~] **V2-0603 — Add generic artifact verifier contract.**  
   Allows domain verifiers without coupling orchestrator to Excel/Word.
 
 - [ ] **V2-0604 — Add `AgentRepairController`.**  
@@ -391,4 +391,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0602 — Add file/hash/scope verifier`.
+**Active task:** `V2-0603 — Add generic artifact verifier contract`.
