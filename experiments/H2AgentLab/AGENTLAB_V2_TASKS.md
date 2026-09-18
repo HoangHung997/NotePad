@@ -126,7 +126,8 @@ Rules:
 ## Phase 04 — task contract and orchestrator state machine
 
 - [~] **V2-0401 — Add `AgentTaskContract`.**  
-  Fields: goal, scope, inputs, required changes, preserve constraints, outputs, acceptance criteria, risk class, verification policy.
+  Fields: goal, scope, inputs, required changes, preserve constraints, outputs, acceptance criteria, risk class, verification policy.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0402 — Add criterion/evidence types.**  
   Acceptance criterion cannot be silently removed after task starts; evidence references are typed.
