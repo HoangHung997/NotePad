@@ -202,8 +202,7 @@ public sealed class McpToolProvider : ICapabilityProvider
             throw new IOException("MCP resources/read response is missing contents.");
 
         var text = string.Join(
-            "
-",
+            ((char)10).ToString(),
             contents.EnumerateArray()
                 .Select(item => item.TryGetProperty("text", out var node)
                     && node.ValueKind == JsonValueKind.String
@@ -214,8 +213,7 @@ public sealed class McpToolProvider : ICapabilityProvider
         const int maxChars = 64_000;
         return text.Length <= maxChars
             ? text
-            : text[..maxChars] + "
-[truncated]";
+            : text[..maxChars] + ((char)10) + "[truncated]";
     }
 
     public async ValueTask<string> ExecuteToolAsync(
@@ -348,8 +346,7 @@ public sealed class McpToolProvider : ICapabilityProvider
 
     private static string Bound(string value, int max)
     {
-        value = value.Trim().Replace('', ' ').Replace('
-', ' ');
+        value = value.Trim().Replace((char)13, ' ').Replace((char)10, ' ');
         return value.Length <= max ? value : value[..max];
     }
 }
