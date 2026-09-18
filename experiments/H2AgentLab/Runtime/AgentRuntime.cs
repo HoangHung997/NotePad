@@ -16,7 +16,9 @@ public sealed record AgentRuntimeRequest(
     AgentContextInput Context,
     string? PromptCacheKey = null,
     int MaxToolRounds = 24,
-    int MaxRepairRounds = 4);
+    int MaxRepairRounds = 4,
+    AgentPromptCacheScope? PromptCacheScope = null,
+    IReadOnlyList<AgentStableSkillHash>? StableSkillHashes = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -33,7 +35,8 @@ public sealed record AgentRuntimeResult(
     AgentRuntimeUsage Usage,
     AgentContextSnapshot ContextSnapshot,
     IReadOnlyList<VerificationReport> VerificationHistory,
-    IReadOnlyList<string> LoadedToolSchemas);
+    IReadOnlyList<string> LoadedToolSchemas,
+    AgentPromptCacheIdentity? PromptCacheIdentity = null);
 
 public sealed record AgentRuntimeVerificationContext(
     AgentTaskContract Contract,
@@ -113,6 +116,17 @@ public sealed class AgentRuntime : IAsyncDisposable
             contextSnapshot.RuntimeContext,
             request.UserInput);
 
+        AgentPromptCacheIdentity? promptCacheIdentity = null;
+        if (request.PromptCacheScope is not null)
+        {
+            promptCacheIdentity = AgentPromptCacheIdentityBuilder.Build(
+                layout,
+                request.PromptCacheScope,
+                request.StableSkillHashes);
+        }
+        var promptCacheKey = request.PromptCacheKey
+            ?? promptCacheIdentity?.Key;
+
         var taskId = request.Contract.TaskId;
         var turnId = Guid.NewGuid();
         var initialTools = initialExposure.CallableSchemas
@@ -135,7 +149,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                         turnId,
                         layout.Messages,
                         initialTools,
-                        request.PromptCacheKey,
+                        promptCacheKey,
                         _transport.Capabilities.ParallelToolCalls),
                     cancellationToken),
                 usage,
@@ -156,7 +170,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                         usage.Snapshot(),
                         contextSnapshot,
                         verificationHistory.ToArray(),
-                        _discovery.LoadedSchemaNames);
+                        _discovery.LoadedSchemaNames,
+                        promptCacheIdentity);
                 }
 
                 if (++toolRounds > request.MaxToolRounds)
