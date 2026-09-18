@@ -112,10 +112,10 @@ Rules:
 - [x] **V2-0306 — Add artifact handles for large tool output.**  
   Evidence: `Session/ArtifactStore.cs` persists large UTF-8 tool/stdout/stderr/document-extract text outside active model context using opaque `h2a1_...` handles, atomic content/manifest writes, byte count and SHA-256 integrity metadata. `StoreText` returns only a bounded `AgentContextToolSummary` containing caller-provided summary + handle/hash/size metadata and never exposes the local state path or full large output; `ReadText`/ `LoadHandle` explicitly retrieve and verify stored content. `V2ArtifactStoreTests.cs` proves a 120k-character output stays out of active context while exact content remains retrievable, tampered content is rejected by hash/size verification, and summaries/handles are bounded and path-like handles rejected. Source commit `ad4a56e62928dcffb7ef4016cd0205618eec721f`; GitHub Actions push run `35290643923` and PR run `35290646835` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `29fbee68f1667a0658adca29a83b10e8c8f7398a` records source `ad4a56e6...` and ZIP SHA256 `9f34d9c9a3b588ec12275a93274c1fab829db9aee17bf001e742cf65144f40c9`.
 
-- [~] **V2-0307 — Add compaction checkpoint model.**  
-  Raw history preserved, active context can be replaced by summary + durable source references.
+- [x] **V2-0307 — Add compaction checkpoint model.**  
+  Evidence: `Session/CompactionManager.cs` persists bounded `h2cp1_...` checkpoints containing only a compact summary plus 1..8 typed durable references to journal events, artifacts, tool results, snapshots or prior checkpoints. Checkpoints carry UTC creation time, covered sequence, summary SHA-256 and optional validated previous-checkpoint link; rendering is capped to 4,000 characters so it can feed the existing compacted-history budget. The manager never deletes or rewrites source evidence. `V2CompactionTests.cs` proves raw `session.json` bytes remain unchanged while active context uses checkpoint summary/references + recent turns, checkpoint chains round-trip, and source-less/unsafe/tampered/missing-link checkpoints are rejected. Source commit `4e5deded90e3e5937c8998825b056813834ed922`; GitHub Actions push run `35291069507` and PR run `35291074993` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **9/9**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, compaction **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `c6aa389b58e81fefde13b6402aea167b21376a2c` records source `4e5deded...` and ZIP SHA256 `8a1b9d964d01c2c5aeded56e0a19cd63b41968899a5ee9dda980c03641473216`.
 
-- [ ] **V2-0308 — Add automatic context budget trigger.**  
+- [~] **V2-0308 — Add automatic context budget trigger.**  
   Acceptance: active context remains bounded as synthetic conversation grows to hundreds of turns.
 
 - [ ] **V2-0309 — Add context/cache tests.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0307 — Add compaction checkpoint model`.
+**Active task:** `V2-0308 — Add automatic context budget trigger`.
