@@ -50,6 +50,12 @@ public interface ISkillSource
 
 public sealed class BuiltInSkillSource : ISkillSource
 {
+    private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
+    {
+        "and", "or", "the", "a", "an", "for", "to", "of", "in", "on", "with",
+        "this", "that", "is", "are", "be", "as", "by", "from",
+        "và", "hoặc", "các", "cho", "của", "trong", "với", "là", "một", "những"
+    };
     private readonly global::H2AgentLab.LabSkill[] _skills;
 
     public BuiltInSkillSource(global::H2AgentLab.SkillCatalog catalog, string sourceId = "built-in")
@@ -271,12 +277,20 @@ public sealed class BuiltInSkillSource : ISkillSource
             }
 
             if (builder.Length > 1)
-                yield return builder.ToString();
+            {
+                var token = builder.ToString();
+                if (!StopWords.Contains(token))
+                    yield return token;
+            }
             builder.Clear();
         }
 
         if (builder.Length > 1)
-            yield return builder.ToString();
+        {
+            var token = builder.ToString();
+            if (!StopWords.Contains(token))
+                yield return token;
+        }
     }
 
     internal static string HashFile(string path)
