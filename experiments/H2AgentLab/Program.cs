@@ -53,6 +53,7 @@ public static class Program
         if (args.Contains("--mb-scheduler-runtime-test")) return MbSchedulerRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-permission-runtime-test")) return MbPermissionRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-evidence-runtime-test")) return MbEvidenceRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-verification-runtime-test")) return MbVerificationRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
