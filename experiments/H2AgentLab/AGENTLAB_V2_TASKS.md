@@ -161,11 +161,11 @@ Rules:
   Include risk, mutating/read-only, parallel capability, schema version and runtime executor reference.  
   Evidence: `Tools/ToolRegistry.cs` defines namespaces, descriptors, access/risk/parallel/schema metadata, executor references and versioned registry; architecture guard verifies normalization/versioning/duplicate protection. GitHub Actions run `35296169905` passed full build/regression/publish.
 
-- [~] **V2-0502 — Register existing v1 tools through registry adapters.**  
+- [x] **V2-0502 — Register existing v1 tools through registry adapters.**  
   No functional deletion yet.  
-  Adapter + architecture guard added; full CI verification in progress.
+  Evidence: `Tools/V1ToolRegistryAdapter.cs` projects every `AgentTools.Definitions` schema into v2 registry metadata while execution delegates back to `AgentTools.Execute`; architecture guard checks exact name-set equality and mutation metadata. GitHub Actions run `35296523430` passed full build/regression/publish.
 
-- [ ] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
+- [~] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
   No embedding dependency. Cache by registry version.
 
 - [ ] **V2-0504 — Expose `tool_search` as initial callable tool.**  
@@ -383,4 +383,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0502 — Register existing v1 tools through registry adapters`.
+**Active task:** `V2-0503 — Build lexical/BM25-style ToolSearchIndex`.
