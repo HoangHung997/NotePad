@@ -178,7 +178,8 @@ Rules:
   Evidence: per-task `DeferredToolDiscovery` tracks loaded schema identities and deterministic `ToolSchemaLoadRecord` batches; `ExecuteToolSearch` returns selected/newly-loaded identities and next-request schemas. Architecture guard verifies traceability and duplicate coalescing. GitHub Actions run `35298480630` passed full build/regression/publish.
 
 - [~] **V2-0506 — Add parallel read-only execution support.**  
-  Serialize overlapping mutations to same resource.
+  Serialize overlapping mutations to same resource.  
+  Scheduler + deterministic concurrency guard added; full CI verification in progress.
 
 - [ ] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
   Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.
