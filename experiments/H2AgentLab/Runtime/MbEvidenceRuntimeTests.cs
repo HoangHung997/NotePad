@@ -328,6 +328,9 @@ public static class MbEvidenceRuntimeTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!context.Calls.Any(x => x.Name == "fixture.mutate"))
+                return Task.FromResult<VerificationReport?>(null);
+
             var evidence = context.Evidence.Single();
             ObservedEvidenceId = evidence.ReferenceId;
             VerificationReport report = new(
