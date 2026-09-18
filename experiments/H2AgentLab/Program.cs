@@ -7,6 +7,7 @@ using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
 using H2AgentLab.Tools;
+using H2AgentLab.Verification;
 
 namespace H2AgentLab;
 
@@ -29,6 +30,7 @@ public static class Program
         if (args.Contains("--v2-context-cache-test")) return V2ContextCacheTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-orchestrator-test")) return V2OrchestratorTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-tool-registry-test")) return V2ToolRegistryTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-verification-test")) return V2VerificationTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-transport-contract-test")) return V2TransportContractTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-ollama-transport-test")) return V2OllamaTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
