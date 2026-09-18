@@ -206,7 +206,8 @@ Rules:
   Evidence: `Verification/IArtifactVerifier.cs` defines domain-neutral target/request/verifier/registry abstractions with criterion scoping; architecture guard passed in GitHub Actions run `35304979625`, together with full regression/publish.
 
 - [~] **V2-0604 — Add `AgentRepairController`.**  
-  Convert failed criteria into concise repair context; preserve already-passed criteria.
+  Convert failed criteria into concise repair context; preserve already-passed criteria.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
   Runtime/protocol recovery remains distinct from semantic repair.
