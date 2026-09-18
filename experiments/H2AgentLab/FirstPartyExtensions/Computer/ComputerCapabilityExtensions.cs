@@ -4,7 +4,7 @@ using H2AgentLab.Tools;
 
 namespace H2AgentLab.FirstPartyExtensions.Computer;
 
-internal sealed record ComputerToolCard(
+public sealed record ComputerToolCard(
     string Name,
     string Namespace,
     string Description,
