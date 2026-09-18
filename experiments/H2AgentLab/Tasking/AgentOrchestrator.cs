@@ -1,4 +1,7 @@
 using H2AgentLab.Context;
+using H2AgentLab.Runtime;
+using H2AgentLab.Metrics;
+using H2Notes.Core;
 using H2AgentLab.Verification;
 
 namespace H2AgentLab.Tasking;
@@ -37,21 +40,99 @@ public sealed class AgentOrchestrator
 {
     private readonly AgentFastPathRouter _router;
     private readonly Func<global::H2AgentLab.AgentRunner> _compatibilityRunnerFactory;
+    private readonly IAgentRuntimeFactory _runtimeFactory;
     private readonly AgentCapabilityRefreshCoordinator? _capabilityRefresh;
 
     public AgentOrchestrator(
         AgentFastPathRouter? router = null,
         AgentContextManager? contextManager = null,
         Func<global::H2AgentLab.AgentRunner>? compatibilityRunnerFactory = null,
-        AgentCapabilityRefreshCoordinator? capabilityRefresh = null)
+        AgentCapabilityRefreshCoordinator? capabilityRefresh = null,
+        IAgentRuntimeFactory? runtimeFactory = null)
     {
         _router = router ?? new AgentFastPathRouter();
         ContextManager = contextManager ?? new AgentContextManager();
         _compatibilityRunnerFactory = compatibilityRunnerFactory ?? (() => new global::H2AgentLab.AgentRunner());
+        _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory();
         _capabilityRefresh = capabilityRefresh;
     }
 
     public AgentContextManager ContextManager { get; }
+
+    public AgentRuntime CreateRuntime(
+        AiProfile profile,
+        string apiKey,
+        global::H2AgentLab.AgentTools tools,
+        AgentRunTelemetry telemetry)
+        => _runtimeFactory.Create(
+            profile,
+            apiKey,
+            tools,
+            ContextManager,
+            telemetry);
+
+    public async Task<AgentRuntimeResult> RunRuntimeAsync(
+        AgentOrchestrationSession session,
+        AgentRuntime runtime,
+        AgentRuntimeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(request);
+        var current = Session(session);
+        if (request.Contract.TaskId != current.Contract.TaskId)
+            throw new InvalidOperationException("Runtime request contract does not belong to this orchestration session.");
+
+        Execute(current, "AgentRuntime execution started.");
+        try
+        {
+            var result = await runtime.RunAsync(request, cancellationToken).ConfigureAwait(false);
+            Verify(current, "AgentRuntime returned; host completion state evaluated.");
+
+            if (result.VerificationHistory.Count > 0)
+            {
+                var latest = result.VerificationHistory[^1];
+                if (latest.Passed)
+                {
+                    CompleteVerified(
+                        current,
+                        [latest],
+                        "Latest deterministic verifier report passed.");
+                }
+                else
+                {
+                    Block(current, "Latest deterministic verifier report did not pass.");
+                }
+            }
+            else if (current.Contract.IsMutating)
+            {
+                Block(
+                    current,
+                    "Mutating runtime path has no deterministic verifier report yet. MB-42 owns verifier integration.");
+            }
+            else
+            {
+                Complete(
+                    current,
+                    new AgentVerificationOutcome(passed: false),
+                    "Read-only runtime task completed without mutation verification.");
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!current.StateMachine.IsTerminal)
+                Cancel(current, "AgentRuntime cancelled.");
+            throw;
+        }
+        catch
+        {
+            if (!current.StateMachine.IsTerminal)
+                Fail(current, "AgentRuntime failed.");
+            throw;
+        }
+    }
 
     public Task<CapabilityRefreshResult> RefreshCapabilitiesAtTaskBoundaryAsync(
         CancellationToken cancellationToken = default)
