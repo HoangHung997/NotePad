@@ -231,6 +231,8 @@ public sealed class PythonRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
         var root = json.RootElement;
         var runId = RequiredString(root, "runId");
         var run = _scripts.Evidence(runId);
+        foreach (var artifact in run.Artifacts)
+            _ = _scripts.Read(runId, artifact.Path);
 
         var artifacts = run.Artifacts
             .Select(x => new PythonArtifactExpectation(
