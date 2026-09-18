@@ -186,7 +186,8 @@ Rules:
   Evidence: `DeferredSkillSession` delegates validation/content to v1 `SkillCatalog`, records per-task SHA-256 versions, suppresses unchanged content and invalidates on source stamp change; skills remain deferred registry tools. GitHub Actions run `35299208295` passed full build/regression/publish.
 
 - [~] **V2-0508 — Tool-search regression/performance tests.**  
-  Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.
+  Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.  
+  Dedicated CI suite added; compile fix applied; full CI verification retry in progress.
 
 ---
 
