@@ -146,7 +146,8 @@ Rules:
   Evidence: deterministic `AgentFastPathRouter` classifies Direct/Retrieval/Action/ComplexAgent before heavy schema loading; Direct has schema mode None and zero namespaces, Retrieval is files-only, Action/Complex defer discovery. GitHub Actions run `35294624217` passed full build/regression/publish.
 
 - [~] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
-  Existing AgentRunner retained as compatibility path until migration completes.
+  Existing AgentRunner retained as compatibility path until migration completes.  
+  Orchestrator skeleton + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0407 — Add orchestrator deterministic tests.**  
   Cover direct/retrieval/action/repair/cancel/blocked transitions.
