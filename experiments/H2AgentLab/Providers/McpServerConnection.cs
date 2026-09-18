@@ -184,8 +184,7 @@ public sealed class McpServerConnection : IAsyncDisposable
     private static string Bound(string value, int max)
     {
         value ??= "";
-        value = value.Replace('', ' ').Replace('
-', ' ').Trim();
+        value = value.Replace((char)13, ' ').Replace((char)10, ' ').Trim();
         return value.Length <= max ? value : value[..max];
     }
 
@@ -375,8 +374,7 @@ public sealed class StdioMcpRpcTransport : IMcpRpcTransport
     private static string BoundError(string value)
     {
         value ??= "";
-        value = value.Replace('', ' ').Replace('
-', ' ').Trim();
+        value = value.Replace((char)13, ' ').Replace((char)10, ' ').Trim();
         return value.Length <= 800 ? value : value[..800];
     }
 
