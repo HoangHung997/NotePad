@@ -3,6 +3,7 @@
 > **Active implementation plan (17/09/2026): H2 Agent Lab 2.0.**  
 > Architecture/specification: [AGENTLAB_V2_SPEC.md](AGENTLAB_V2_SPEC.md)  
 > Authoritative sequential task tracker: [AGENTLAB_V2_TASKS.md](AGENTLAB_V2_TASKS.md)  
+> Normative MCP/Web/Office/Plugin requirements: [../../docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md](../../docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md)  
 > The v1 material below is retained as baseline/history. Do not treat it as the final v2 architecture. V2 is developed inside Agent Lab first; integration into H2 Notes is blocked until the acceptance gate passes and the user explicitly approves it.
 
 Ứng dụng AI thử nghiệm **độc lập với Codex**, dùng Ollama hoặc API tương thích OpenAI Chat Completions. Người dùng chốt hướng này ngày 16/09/2026. Không dùng tài khoản Codex, không đọc khóa hay lịch sử H2 Notes, chưa tích hợp vào H2 Notes.
