@@ -858,6 +858,48 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("tool_search schema does not require a query.");
         });
 
+        Test("Deferred schema loading is traceable and coalesces duplicates", () =>
+        {
+            var executor = new DelegatingToolExecutor(
+                "load-fixture",
+                (call, ct) => ValueTask.FromResult("ok"));
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(registry, executor);
+            var discovery = new DeferredToolDiscovery(registry);
+
+            var first = discovery.SearchAndLoad("read_file", 1);
+            var firstNames = first.CallableSchemas.Select(DeferredToolDiscovery.SchemaName).ToArray();
+            if (!first.Trace.SelectedNames.SequenceEqual(new[] { "read_file" })
+                || !first.Trace.NewlyLoadedNames.SequenceEqual(new[] { "read_file" })
+                || !firstNames.SequenceEqual(first.Trace.NewlyLoadedNames))
+                throw new InvalidOperationException("First discovered schema is not exactly traceable.");
+
+            var repeated = discovery.SearchAndLoad("read_file", 1);
+            if (!repeated.Trace.SelectedNames.SequenceEqual(new[] { "read_file" })
+                || repeated.Trace.NewlyLoadedNames.Count != 0
+                || repeated.CallableSchemas.Count != 0)
+                throw new InvalidOperationException("Repeated tool discovery resent a duplicate schema.");
+
+            var args = JsonSerializer.SerializeToElement(new
+            {
+                query = "click_control",
+                max_results = 1
+            });
+            var json = discovery.ExecuteToolSearch(new ToolCall("search-1", "tool_search", args));
+            using var result = JsonDocument.Parse(json);
+            if (!result.RootElement.GetProperty("newlyLoaded").EnumerateArray()
+                    .Any(x => x.GetString() == "click_control"))
+                throw new InvalidOperationException("Runtime tool_search did not load selected callable schema.");
+
+            if (discovery.LoadTrace.Count != 3
+                || !discovery.LoadTrace.Select(x => x.Sequence).SequenceEqual(new long[] { 0, 1, 2 })
+                || discovery.LoadTrace.Any(x => x.RegistryVersion != registry.Version))
+                throw new InvalidOperationException("Deferred schema load trace is incomplete or non-deterministic.");
+            if (discovery.LoadedSchemaNames.Count(x => x == "read_file") != 1
+                || discovery.LoadedSchemaNames.Count(x => x == "click_control") != 1)
+                throw new InvalidOperationException("Loaded schema identity set contains duplicates.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
