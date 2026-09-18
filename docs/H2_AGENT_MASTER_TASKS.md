@@ -712,7 +712,7 @@ Evidence: generic capability ranking is now explicitly lexical-only: `Capability
 
 ---
 
-## [ ] MB-71 — Simplify InstalledCapabilityIndex
+## [x] MB-71 — Simplify InstalledCapabilityIndex
 
 Decision:
 
@@ -734,6 +734,8 @@ Acceptance:
 
 - no correctness depends on a hard `Search("", 100)` inventory limit;
 - unrelated registry changes do not invalidate task semantics.
+
+Evidence: chose **B — derived live projection only**. `InstalledCapabilityIndex` no longer owns a cached `InstalledCapabilityRecord[] _records`; `Records` and `Search` project current authoritative `ToolRegistry`, canonical `SkillCatalog`, and provider metadata on demand. `Rebuild` remains only as a compatibility binder for callers holding a provider snapshot, while new `Bind(..., Func<IReadOnlyList<ProviderProvenance>>)` supports live provider state; `MissingCapabilityContinuation` binds once to its authoritative registry/catalog/provider accessor and no longer rebuilds an installed cache after plugin installation. To eliminate the historical `skills.Search("", 100)` correctness cap, canonical skills now expose an optional exact `IInstalledSkillMetadataSource.SnapshotMetadata()` seam: built-in, plugin and Calculator sources implement it, `SkillCatalog.SnapshotMetadata()` merges exact source snapshots without a search-result limit, and unsupported search-only sources fail closed rather than silently truncate inventory. `Capabilities/MbInstalledCapabilityProjectionTests.cs` proves registry/provider changes are reflected without rebuild while an unrelated tool does not alter the selected primary capability, proves a target skill placed after 150 entries remains discoverable even though the source's ordinary empty search returns only 100, proves unsupported exact snapshots fail visibly, and source-guards against `_records`, `skills.Search("", 100)`, or post-install cache rebuilds. Exact functional source commit `99ef51d3dc80132e7a8c9b03c30e30238b0bd2c9`, GitHub Actions run `35380649917`: MB-71 **4 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-70, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `2ae242ef89432d1700a6add3789f49698b240f21`; portable ZIP SHA256 `448611e4ebbaca3dd6efa1ba73d25acf590a9f4c07810c54088289241f3b1da3`.
 
 ---
 
