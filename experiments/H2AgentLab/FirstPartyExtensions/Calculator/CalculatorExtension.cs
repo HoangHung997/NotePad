@@ -106,7 +106,7 @@ public sealed class CalculatorExtension : IAgentExtension
     }
 }
 
-public sealed class CalculatorSkillSource : ISkillSource
+public sealed class CalculatorSkillSource : ISkillSource, IInstalledSkillMetadataSource
 {
     private const string Content =
         "# Calculator\nUse calculator.add for deterministic addition. Verify observed numeric output.";
@@ -133,8 +133,11 @@ public sealed class CalculatorSkillSource : ISkillSource
     {
         if (maxResults is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(maxResults));
-        return BuiltInSkillSource.Rank([Summary], query, maxResults);
+        return BuiltInSkillSource.Rank(SnapshotMetadata(), query, maxResults);
     }
+
+    public IReadOnlyList<SkillSummary> SnapshotMetadata()
+        => [Summary];
 
     public SkillContent Read(SkillIdentity identity)
     {
