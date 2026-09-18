@@ -284,6 +284,7 @@ public static class V2DesktopHostTests
                     desktopHostAvailable: true)
                 == InteractionAdapterKind.DesktopAutomation,
                 "Non-Office UI intent did not select DesktopHost.");
+            return Task.CompletedTask;
         });
 
         await Test("0910 dedicated desktop fixture verifies observe-act-observe resize safety cancel and denial", async () =>
