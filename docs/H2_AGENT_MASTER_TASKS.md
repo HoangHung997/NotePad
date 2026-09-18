@@ -96,7 +96,7 @@ Evidence: Agent Lab README now links the Master Spec/Tasks as canonical authorit
 
 # Stage B — Make the V2 machine actually boot
 
-## [~] MB-10 — Introduce the real AgentRuntime
+## [x] MB-10 — Introduce the real AgentRuntime
 
 Goal:
 
@@ -135,11 +135,11 @@ Acceptance:
 - runtime has no dependency on `AgentRunner`;
 - cancellation works.
 
-Implementation/evidence in progress: `Runtime/AgentRuntime.cs` owns bounded prompt/context assembly, deferred tool search/schema loading, ToolRegistry/Scheduler execution, provider-neutral continuation, verification feedback/repair continuation and final completion gate. `Runtime/MbAgentRuntimeTests.cs` adds deterministic discovery→tool→final, verifier repair, cancellation and no-AgentRunner guards. Full CI verification is in progress.
+Evidence: `Runtime/AgentRuntime.cs` owns bounded prompt/context assembly, deferred tool search/schema loading, ToolRegistry/Scheduler execution, provider-neutral continuation, verification feedback/repair continuation and final completion gate. `Runtime/MbAgentRuntimeTests.cs` proves discovery→tool→final, multi-round verifier repair, cancellation propagation and no `AgentRunner` dependency. GitHub Actions run `35333787066`: MB-10 **4 passed, 0 failed** and full regression/publish pipeline SUCCESS.
 
 ---
 
-## [ ] MB-11 — Wire AgentOrchestrator to AgentRuntime
+## [~] MB-11 — Wire AgentOrchestrator to AgentRuntime
 
 Goal:
 
