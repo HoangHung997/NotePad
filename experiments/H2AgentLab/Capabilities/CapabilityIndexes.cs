@@ -164,6 +164,10 @@ public sealed class InstalledCapabilityIndex
     }
 }
 
+/// <summary>
+/// Small replaceable ranking seam over compact catalog metadata. The default stays lexical;
+/// future specialized/semantic ranking can live outside core without changing catalog storage.
+/// </summary>
 public interface IAvailableCapabilitySearchStrategy
 {
     IReadOnlyList<AvailableCapabilityRecord> Search(
