@@ -303,7 +303,7 @@ public sealed class ProcessShellCapabilities : IDisposable
         };
         foreach (var argument in arguments)
         {
-            if (argument.IndexOf(' ') >= 0 || argument.Length > 8_000)
+            if (argument.IndexOf((char)0) >= 0 || argument.Length > 8_000)
                 throw new ArgumentException("Process argument is invalid or too long.", nameof(arguments));
             start.ArgumentList.Add(argument);
         }
