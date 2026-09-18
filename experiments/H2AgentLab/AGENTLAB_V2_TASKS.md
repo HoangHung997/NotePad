@@ -149,8 +149,9 @@ Rules:
   Existing AgentRunner retained as compatibility path until migration completes.  
   Evidence: `Tasking/AgentOrchestrator.cs` owns v2 contract/router/state/context boundaries, append-only contract updates and explicit v1 compatibility factory without modifying `AgentRunner`; architecture guard verifies the boundary. GitHub Actions run `35294966469` passed full build/regression/publish.
 
-- [~] **V2-0407 — Add orchestrator deterministic tests.**  
-  Cover direct/retrieval/action/repair/cancel/blocked transitions.
+- [x] **V2-0407 — Add orchestrator deterministic tests.**  
+  Cover direct/retrieval/action/repair/cancel/blocked transitions.  
+  Evidence: dedicated `Tasking/V2OrchestratorTests.cs` suite is wired through `Program.cs` and GitHub Actions; Direct/Retrieval/Action/Repair/Cancel/Blocked cases all passed in GitHub Actions run `35295323240`, together with full H2 Notes regression, Agent Lab build, v1 baseline, all v2 suites, Windows x64 publish and artifact upload.
 
 ---
 
@@ -380,4 +381,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0407 — Add orchestrator deterministic tests`.
+**Active task:** `V2-0501 — Add tool registry descriptors`.
