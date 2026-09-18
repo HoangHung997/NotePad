@@ -44,9 +44,9 @@ public sealed record ClosedWordSectionSnapshot(
     uint? PageWidthTwips,
     uint? PageHeightTwips,
     int? MarginTopTwips,
-    int? MarginRightTwips,
+    uint? MarginRightTwips,
     int? MarginBottomTwips,
-    int? MarginLeftTwips,
+    uint? MarginLeftTwips,
     IReadOnlyList<ClosedWordHeaderFooterReferenceSnapshot> HeaderReferences,
     IReadOnlyList<ClosedWordHeaderFooterReferenceSnapshot> FooterReferences);
 
