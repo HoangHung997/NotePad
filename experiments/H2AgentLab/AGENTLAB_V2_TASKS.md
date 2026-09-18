@@ -130,7 +130,8 @@ Rules:
   Evidence: immutable host-owned contract + verification/risk types in `Tasking/AgentTaskContract.cs`; architecture guard proves snapshot isolation, normalization and mutation classification. GitHub Actions run `35293190864` passed full H2 Notes + Agent Lab build/tests/publish.
 
 - [~] **V2-0402 — Add criterion/evidence types.**  
-  Acceptance criterion cannot be silently removed after task starts; evidence references are typed.
+  Acceptance criterion cannot be silently removed after task starts; evidence references are typed.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0403 — Add `AgentTaskState` state machine.**  
   Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.
