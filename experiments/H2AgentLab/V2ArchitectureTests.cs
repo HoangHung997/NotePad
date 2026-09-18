@@ -2,6 +2,7 @@ using H2AgentLab.Context;
 using H2AgentLab.Prompting;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
+using H2AgentLab.Tools;
 using H2Notes.Core;
 
 namespace H2AgentLab;
@@ -677,6 +678,65 @@ public static class V2ArchitectureTests
             using var compatibility = orchestrator.CreateCompatibilityRunner();
             if (compatibility.GetType() != typeof(AgentRunner))
                 throw new InvalidOperationException("Existing AgentRunner v1 compatibility path was not retained.");
+        });
+
+        Test("Tool registry descriptors preserve risk access parallel schema and executor metadata", () =>
+        {
+            var files = new ToolNamespace("files", "Workspace file tools.");
+            var executor = new DelegatingToolExecutor(
+                "fixture-executor",
+                (call, ct) => ValueTask.FromResult("ok:" + call.Name));
+            var schema = JsonSerializer.SerializeToElement(new
+            {
+                type = "function",
+                function = new
+                {
+                    name = "read_file",
+                    description = "Read one file.",
+                    parameters = new { type = "object" }
+                }
+            });
+            var descriptor = new ToolDescriptor(
+                "read_file",
+                files,
+                "Read one supported workspace file.",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                supportsParallel: true,
+                schemaVersion: "v1",
+                callableSchema: schema,
+                executor: executor);
+
+            var registry = new ToolRegistry();
+            registry.Register(descriptor);
+
+            if (registry.Version != 2)
+                throw new InvalidOperationException("Registry version did not advance for namespace + tool registration.");
+            if (!registry.TryGet("READ_FILE", out var resolved) || resolved != descriptor)
+                throw new InvalidOperationException("Tool lookup is not normalized/deterministic.");
+            if (resolved.IsMutating
+                || !resolved.SupportsParallel
+                || resolved.Risk != AgentToolRisk.Low
+                || resolved.SchemaVersion != "v1"
+                || resolved.Executor.ExecutorId != "fixture-executor")
+                throw new InvalidOperationException("Tool descriptor lost access/risk/parallel/schema/executor metadata.");
+            if (!registry.Namespaces.Select(x => x.Name).SequenceEqual(new[] { "files" })
+                || !registry.GetNamespace("files").Select(x => x.Name).SequenceEqual(new[] { "read_file" }))
+                throw new InvalidOperationException("Registry namespace projection is inconsistent.");
+
+            var version = registry.Version;
+            registry.RegisterNamespace(new ToolNamespace("files", "Workspace file tools."));
+            if (registry.Version != version)
+                throw new InvalidOperationException("Idempotent namespace registration changed registry version.");
+
+            try
+            {
+                registry.Register(descriptor);
+                throw new InvalidOperationException("Duplicate tool registration was accepted.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already registered", StringComparison.Ordinal))
+            {
+            }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
