@@ -48,9 +48,7 @@ public static class MbGenericToolPreferenceTests
                     Tool(
                         "model.escape.inspect",
                         "Inspect model elements and parameters with a generic escape hatch.",
-                        ToolInteractionFidelity.EscapeHatch,
-                        explicitOnly: true,
-                        explicitTerms: ["fallback"]),
+                        ToolInteractionFidelity.EscapeHatch),
                     200),
                 Result(
                     Tool(
@@ -115,10 +113,10 @@ public static class MbGenericToolPreferenceTests
                 "use custom transform for model geometry",
                 normal,
                 10);
-            Check(explicitRequest.Any(x =>
-                    x.Descriptor.Name == "model.custom.escape")
-                && explicitRequest[0].Descriptor.Name == "model.structured.inspect",
-                "Provider-declared explicit request did not expose escape hatch while retaining structured preference.");
+            Check(explicitRequest.Count == 2
+                && explicitRequest[0].Descriptor.Name == "model.custom.escape"
+                && explicitRequest[1].Descriptor.Name == "model.structured.inspect",
+                "Provider-declared explicit request did not explicitly select the escape hatch.");
             return Task.CompletedTask;
         });
 
@@ -161,8 +159,8 @@ public static class MbGenericToolPreferenceTests
             var fallback = InteractionAdapterPreference.Choose(
                 "inspect active model fallback",
                 adapters);
-            Check(fallback?.AdapterId == "model.typed",
-                "Explicitly available escape hatch displaced a better structured adapter.");
+            Check(fallback?.AdapterId == "model.escape",
+                "Provider-declared explicit adapter request did not select the escape hatch.");
             return Task.CompletedTask;
         });
 
