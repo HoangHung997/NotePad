@@ -96,6 +96,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-context-cache-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-context-cache-tests.txt')
 
+      - name: Run H2 Agent Lab v2 orchestrator tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-orchestrator'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-orchestrator-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-orchestrator-tests.txt')
+
       - name: Run H2 Agent Lab v2 transport contract tests
         shell: pwsh
         run: |
