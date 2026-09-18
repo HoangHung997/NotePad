@@ -32,11 +32,11 @@ public sealed class LabSessionContextAdapter
             if (!TryRole(journalEvent.Kind, out var role) || string.IsNullOrWhiteSpace(journalEvent.Text))
                 continue;
             turns.Add(new AgentContextTurn(
-                SourceId: $"session:{session.Id:N}:event:{index}",
-                Role: role,
-                Content: journalEvent.Text,
-                Sequence: index,
-                Relevance: 1));
+                sourceId: $"session:{session.Id:N}:event:{index}",
+                role: role,
+                content: journalEvent.Text,
+                sequence: index,
+                relevance: 1));
         }
 
         return _manager.Build(new AgentContextInput(
