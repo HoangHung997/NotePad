@@ -237,7 +237,8 @@ Rules:
   Paragraph/run/style/table/section/header/footer fields needed by verifier.  
   Evidence: `Documents/ClosedWordSnapshot.cs` captures deterministic body paragraph/run formatting, tables, sections/margins and header/footer relationships/content behind H2 Core safety validation; OpenXML fixture guard passed. GitHub Actions run `35308613906` passed full regression/publish.
 
-- [~] **V2-0705 — Add `ExcelVerifier` for closed files.**
+- [~] **V2-0705 — Add `ExcelVerifier` for closed files.**  
+  Closed snapshot verifier + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0706 — Add `WordVerifier` for closed files.**
 
