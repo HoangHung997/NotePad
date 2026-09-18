@@ -1,3 +1,6 @@
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using S = DocumentFormat.OpenXml.Spreadsheet;
 using System.Text.Json;
 using H2AgentLab.Context;
 using H2AgentLab.Documents;
@@ -1401,6 +1404,39 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Lab PDF preparation routing diverged from H2 Core.");
         });
 
+        Test("Closed XLSX snapshot captures deterministic formula style merge and hidden state", () =>
+        {
+            var bytes = CreateArchitectureWorkbookFixture();
+            var reader = new ClosedWorkbookSnapshotReader();
+            var first = reader.Read("fixture.xlsx", bytes);
+            var second = reader.Read("fixture.xlsx", bytes);
+
+            if (JsonSerializer.Serialize(first) != JsonSerializer.Serialize(second))
+                throw new InvalidOperationException("Closed workbook snapshot is not deterministic.");
+            if (first.Sheets.Count != 2
+                || first.Sheets[0].Name != "Data"
+                || first.Sheets[0].State != "Visible"
+                || first.Sheets[1].Name != "Hidden"
+                || first.Sheets[1].State != "Hidden")
+                throw new InvalidOperationException("Workbook sheet identity/hidden state snapshot is wrong.");
+
+            var data = first.Sheets[0];
+            var a1 = data.Cells.Single(x => x.Address == "A1");
+            var a2 = data.Cells.Single(x => x.Address == "A2");
+            if (a1.RawValue != "42"
+                || !a1.Bold
+                || !a1.Italic
+                || a1.FillPattern != "Solid"
+                || a1.FillForeground?.Contains("FFFF00", StringComparison.Ordinal) != true)
+                throw new InvalidOperationException("Workbook cell style/value snapshot is incomplete.");
+            if (a2.Formula != "SUM(A1,1)" || a2.RawValue != "43")
+                throw new InvalidOperationException("Workbook formula snapshot is incomplete.");
+            if (!data.MergedRanges.SequenceEqual(new[] { "A1:B1" })
+                || !data.HiddenRows.SequenceEqual(new uint[] { 2 })
+                || !data.HiddenColumns.SequenceEqual(new[] { "2" }))
+                throw new InvalidOperationException("Workbook merge/hidden row-column snapshot is incomplete.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
@@ -1427,6 +1463,98 @@ public static class V2ArchitectureTests
         await File.WriteAllLinesAsync(report, lines);
         Console.WriteLine(string.Join("\n", lines));
         return failed == 0 ? 0 : 1;
+    }
+
+    private static byte[] CreateArchitectureWorkbookFixture()
+    {
+        using var stream = new MemoryStream();
+        using (var document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook, true))
+        {
+            var workbookPart = document.AddWorkbookPart();
+            workbookPart.Workbook = new S.Workbook();
+
+            var stylesPart = workbookPart.AddNewPart<WorkbookStylesPart>();
+            stylesPart.Stylesheet = new S.Stylesheet(
+                new S.Fonts(
+                    new S.Font(),
+                    new S.Font(new S.Bold(), new S.Italic()))
+                { Count = 2 },
+                new S.Fills(
+                    new S.Fill(new S.PatternFill { PatternType = S.PatternValues.None }),
+                    new S.Fill(new S.PatternFill { PatternType = S.PatternValues.Gray125 }),
+                    new S.Fill(new S.PatternFill(
+                        new S.ForegroundColor { Rgb = new HexBinaryValue { Value = "FFFFFF00" } })
+                    { PatternType = S.PatternValues.Solid }))
+                { Count = 3 },
+                new S.Borders(new S.Border()) { Count = 1 },
+                new S.CellStyleFormats(new S.CellFormat()) { Count = 1 },
+                new S.CellFormats(
+                    new S.CellFormat(),
+                    new S.CellFormat
+                    {
+                        FontId = 1,
+                        FillId = 2,
+                        BorderId = 0,
+                        ApplyFont = true,
+                        ApplyFill = true
+                    })
+                { Count = 2 });
+            stylesPart.Stylesheet.Save();
+
+            var dataPart = workbookPart.AddNewPart<WorksheetPart>();
+            var row1 = new S.Row { RowIndex = 1 };
+            row1.Append(new S.Cell
+            {
+                CellReference = "A1",
+                CellValue = new S.CellValue("42"),
+                StyleIndex = 1
+            });
+            var row2 = new S.Row { RowIndex = 2, Hidden = true };
+            row2.Append(new S.Cell
+            {
+                CellReference = "A2",
+                CellFormula = new S.CellFormula("SUM(A1,1)"),
+                CellValue = new S.CellValue("43")
+            });
+            dataPart.Worksheet = new S.Worksheet(
+                new S.Columns(new S.Column { Min = 2, Max = 2, Hidden = true }),
+                new S.SheetData(row1, row2),
+                new S.MergeCells(new S.MergeCell { Reference = "A1:B1" }));
+            dataPart.Worksheet.Save();
+
+            var hiddenPart = workbookPart.AddNewPart<WorksheetPart>();
+            hiddenPart.Worksheet = new S.Worksheet(
+                new S.SheetData(
+                    new S.Row(
+                        new S.Cell
+                        {
+                            CellReference = "A1",
+                            DataType = S.CellValues.InlineString,
+                            InlineString = new S.InlineString(new S.Text("secret"))
+                        })
+                    { RowIndex = 1 }));
+            hiddenPart.Worksheet.Save();
+
+            var sheets = workbookPart.Workbook.AppendChild(new S.Sheets());
+            sheets.Append(
+                new S.Sheet
+                {
+                    Name = "Data",
+                    SheetId = 1,
+                    Id = workbookPart.GetIdOfPart(dataPart),
+                    State = S.SheetStateValues.Visible
+                },
+                new S.Sheet
+                {
+                    Name = "Hidden",
+                    SheetId = 2,
+                    Id = workbookPart.GetIdOfPart(hiddenPart),
+                    State = S.SheetStateValues.Hidden
+                });
+            workbookPart.Workbook.Save();
+        }
+
+        return stream.ToArray();
     }
 
     private sealed class FixtureArtifactVerifier : IArtifactVerifier
