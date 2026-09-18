@@ -821,6 +821,43 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Tool search cache did not invalidate on registry version change.");
         });
 
+        Test("Deferred tool discovery initially exposes only tool_search plus stable core", () =>
+        {
+            var executor = new DelegatingToolExecutor(
+                "initial-exposure-fixture",
+                (call, ct) => ValueTask.FromResult("ok"));
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(registry, executor);
+            var discovery = new DeferredToolDiscovery(registry);
+            var initial = discovery.BuildInitialExposure();
+
+            var callableNames = initial.CallableSchemas
+                .Select(DeferredToolDiscovery.SchemaName)
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+
+            if (!callableNames.SequenceEqual(new[] { "tool_search", "update_plan" }))
+                throw new InvalidOperationException(
+                    "Initial v2 tool exposure contains detailed schemas beyond tool_search + stable core: "
+                    + string.Join(", ", callableNames));
+            if (callableNames.Any(x => x is "read_file" or "run_python" or "inspect_window" or "click_control"))
+                throw new InvalidOperationException("Heavy file/Python/Desktop schema leaked into initial model tool surface.");
+
+            var namespaces = initial.Namespaces.Select(x => x.Name).ToArray();
+            foreach (var expected in new[] { "desktop", "files", "office", "python", "skills" })
+                if (!namespaces.Contains(expected, StringComparer.Ordinal))
+                    throw new InvalidOperationException($"Initial namespace descriptions omitted '{expected}'.");
+            if (initial.Namespaces.Any(x => string.IsNullOrWhiteSpace(x.Description)))
+                throw new InvalidOperationException("Initial namespace description is empty.");
+
+            var searchSchema = initial.CallableSchemas.Single(x =>
+                DeferredToolDiscovery.SchemaName(x) == DeferredToolDiscovery.SearchToolName);
+            var parameters = searchSchema.GetProperty("function").GetProperty("parameters");
+            if (!parameters.GetProperty("required").EnumerateArray()
+                    .Any(x => x.GetString() == "query"))
+                throw new InvalidOperationException("tool_search schema does not require a query.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
