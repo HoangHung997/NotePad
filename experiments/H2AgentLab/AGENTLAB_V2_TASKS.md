@@ -162,7 +162,8 @@ Rules:
   Evidence: `Tools/ToolRegistry.cs` defines namespaces, descriptors, access/risk/parallel/schema metadata, executor references and versioned registry; architecture guard verifies normalization/versioning/duplicate protection. GitHub Actions run `35296169905` passed full build/regression/publish.
 
 - [~] **V2-0502 — Register existing v1 tools through registry adapters.**  
-  No functional deletion yet.
+  No functional deletion yet.  
+  Adapter + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
   No embedding dependency. Cache by registry version.
