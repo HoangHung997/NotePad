@@ -93,9 +93,20 @@ public sealed class AgentOrchestratedRun
         ArgumentNullException.ThrowIfNull(telemetry);
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        // MB-11 deliberately keeps mutating completion blocked until MB-42 wires real domain
-        // verifiers into the normal runtime. AgentRuntime may execute approved tools, but the
-        // orchestrator will not mark a mutating task Completed without verifier evidence.
+        var criteria = readOnly
+            ? new[]
+            {
+                new AgentAcceptanceCriterion(
+                    "final-response",
+                    "Task reaches a host-owned final state.")
+            }
+            : new[]
+            {
+                new AgentAcceptanceCriterion(
+                    AgentRuntimeDomainVerifierRouter.MutationCriterionId,
+                    "The requested mutation is re-observed and passes a deterministic domain verifier.")
+            };
+
         var contract = new AgentTaskContract(
             Guid.NewGuid(),
             prompt.Trim(),
@@ -104,11 +115,13 @@ public sealed class AgentOrchestratedRun
             readOnly ? null : ["perform requested approved changes"],
             ["preserve unrelated user state"],
             ["concise final answer"],
-            [new AgentAcceptanceCriterion(
-                "final-response",
-                "Task reaches a host-owned final state; mutations still require deterministic verification.")],
+            criteria,
             readOnly ? AgentTaskRiskClass.ReadOnly : AgentTaskRiskClass.Medium,
-            new AgentVerificationPolicy(requireVerification: false));
+            new AgentVerificationPolicy(
+                requireVerification: !readOnly,
+                requiredVerifierIds: readOnly
+                    ? null
+                    : [AgentRuntimeDomainVerifierRouter.VerifierId]));
 
         var routing = new AgentTaskRoutingSignals(
             NeedsExternalRetrieval: false,
@@ -227,8 +240,8 @@ public sealed class AgentOrchestratedRun
                     trace,
                     output,
                     AgentTraceEventKind.Warning,
-                    "verification-required",
-                    "Tác vụ có thay đổi chưa được đánh dấu hoàn tất vì verifier v2 chưa được nối vào normal runtime.");
+                    "verification-blocked",
+                    "Tác vụ có thay đổi chưa được hoàn tất vì verifier miền chưa tạo được bằng chứng PASS cho thay đổi hiện tại.");
             }
 
             var diagnostics = AgentDiagnostics.FromContext(result.ContextSnapshot);
