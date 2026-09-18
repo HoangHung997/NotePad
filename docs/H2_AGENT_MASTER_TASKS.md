@@ -177,7 +177,7 @@ Acceptance:
 
 ---
 
-## [~] MB-12 — Wire the provider-neutral transport into the real loop
+## [x] MB-12 — Wire the provider-neutral transport into the real loop
 
 Goal:
 
@@ -198,11 +198,13 @@ Acceptance:
 - truncated/incomplete proposed tool calls do not execute;
 - switching provider does not change AgentRuntime.
 
+Evidence: `Transport/AgentTransportFactory.cs` routes accepted profiles to existing Ollama/Responses HTTP/Responses WebSocket/Chat-Completions transports while AgentRuntime remains provider-neutral. `MbProviderRuntimeTests` prove class routing, no provider HTTP in runtime/orchestrator/facade, tool-call identity + usage preservation, incomplete proposal rejection, and provider switching through one runtime architecture. GitHub Actions run `35343217692`: **5 passed, 0 failed**, full regression/transport/publish pipeline SUCCESS.
+
 ---
 
 # Stage C — Real bounded context and prompt path
 
-## [ ] MB-20 — Move V2 context into pre-request execution
+## [~] MB-20 — Move V2 context into pre-request execution
 
 Goal:
 
