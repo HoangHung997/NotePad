@@ -70,7 +70,7 @@ public sealed class CapabilityResolver
         var installed = _installed.Search(query, 12);
         if (installed.Count > 0)
         {
-            var candidates = installed.Select((x, index) => new CapabilityResolutionCandidate(
+            var installedCandidates = installed.Select((x, index) => new CapabilityResolutionCandidate(
                 CapabilityResolutionStatus.INSTALLED,
                 x.CapabilityId,
                 x.Description,
@@ -82,7 +82,7 @@ public sealed class CapabilityResolver
             return new(
                 CapabilityResolutionStatus.INSTALLED,
                 query,
-                candidates,
+                installedCandidates,
                 CatalogMetadataRefreshed: false,
                 PackageDownloaded: false,
                 InstallationAttempted: false);
