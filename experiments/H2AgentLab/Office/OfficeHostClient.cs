@@ -125,8 +125,7 @@ public sealed class OfficeHostClient : IDisposable
                 leaveOpen: true)
             {
                 AutoFlush = true,
-                NewLine = "
-"
+                NewLine = "\n"
             };
             using var reader = new StreamReader(
                 pipe,
