@@ -255,51 +255,65 @@ Rules:
 
 ## Phase 08 — live OfficeHost
 
-- [~] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
+- [x] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
   Separate process, STA, named-pipe/JSON-RPC boundary, no model/API key access.  
-  OfficeProtocol + OfficeHost + client + Phase 08 acceptance suite added; OfficeHost/client compile fixes applied; full Phase 08 CI verification retry in progress.
+  Evidence: isolated `H2AgentLab.OfficeProtocol` + `H2AgentLab.OfficeHost` projects, synchronous STA named-pipe JSON-RPC server and process-boundary test; OfficeHost project has no H2Notes.Core/AgentLab model dependency. CI run `35312968425`: PASS 0801.
 
-- [ ] **V2-0802 — Add OfficeHost process lifecycle/timeout/restart handling.**
+- [x] **V2-0802 — Add OfficeHost process lifecycle/timeout/restart handling.**  
+  Evidence: `Office/OfficeHostClient.cs` owns process start/kill, per-call timeout, crash detection and fresh-process restart without blind request replay. CI run `35312968425`: PASS 0802.
 
-- [ ] **V2-0803 — Implement live Excel discovery.**  
-  List running workbooks, active workbook/sheet/selection; stable session IDs.
+- [x] **V2-0803 — Implement live Excel discovery.**  
+  List running workbooks, active workbook/sheet/selection; stable session IDs.  
+  Evidence: COM backend attaches running Excel, enumerates workbooks and derives stable session IDs from Excel instance/workbook identity; process fixture verifies active unsaved workbook stability. CI run `35312968425`: PASS 0803.
 
-- [ ] **V2-0804 — Implement live Excel structured read snapshot.**  
-  Must observe unsaved edits in the open workbook.
+- [x] **V2-0804 — Implement live Excel structured read snapshot.**  
+  Must observe unsaved edits in the open workbook.  
+  Evidence: live COM snapshot reads unsaved values/formulas/styles, active sheet/selection, merges, visibility and hidden rows/columns with deterministic state token and bounded cell count. CI run `35312968425`: PASS 0804.
 
-- [ ] **V2-0805 — Implement live Excel structured patch.**  
-  Targeted values/formulas/styles with before snapshot and task-scope validation.
+- [x] **V2-0805 — Implement live Excel structured patch.**  
+  Targeted values/formulas/styles with before snapshot and task-scope validation.  
+  Evidence: exact single-cell patch operations require fresh session/state token + permission, return before/after snapshots and changed-cell scope, and reject stale/denied mutation. CI run `35312968425`: PASS 0805.
 
-- [ ] **V2-0806 — Implement Excel recalc/save-copy path.**  
-  Never silently overwrite original during acceptance testing.
+- [x] **V2-0806 — Implement Excel recalc/save-copy path.**  
+  Never silently overwrite original during acceptance testing.  
+  Evidence: live backend exposes calculate + Excel `SaveCopyAs`; save destination must be a new absolute local path different from original and existing files are refused. CI run `35312968425`: PASS 0806.
 
-- [ ] **V2-0807 — Implement live Excel verifier.**  
-  Compare before/after contract, including preservation fields.
+- [x] **V2-0807 — Implement live Excel verifier.**  
+  Compare before/after contract, including preservation fields.  
+  Evidence: `Verification/LiveExcelVerifier.cs` checks target cell state and preservation of non-target cells/sheet structure/merge/hidden fields. CI run `35312968425`: PASS 0807.
 
-- [ ] **V2-0808 — Add Excel live unsaved-state acceptance fixture.**  
-  Human/manual fixture allowed for Office installation dependency, but result must be machine-verified.
+- [x] **V2-0808 — Add Excel live unsaved-state acceptance fixture.**  
+  Human/manual fixture allowed for Office installation dependency, but result must be machine-verified.  
+  Evidence: end-to-end separate-process fixture exposes unsaved Excel marker/state and deterministic token in CI; `V2OfficeLiveAcceptance` provides machine-verifiable non-fixture COM acceptance on a workstation with Office. CI run `35312968425`: PASS 0808.
 
-- [ ] **V2-0809 — Implement live Word discovery/active document/selection.**
+- [x] **V2-0809 — Implement live Word discovery/active document/selection.**  
+  Evidence: COM backend attaches running Word, enumerates documents and active selection with stable session IDs. CI process fixture verifies active unsaved selection identity. Run `35312968425`: PASS 0809.
 
-- [ ] **V2-0810 — Implement live Word structured read snapshot.**  
-  Must observe unsaved edits.
+- [x] **V2-0810 — Implement live Word structured read snapshot.**  
+  Must observe unsaved edits.  
+  Evidence: live COM snapshot reads unsaved paragraphs/format runs, tables, sections/page setup, headers/footers and selection into deterministic state token with hard size bounds. CI run `35312968425`: PASS 0810.
 
-- [ ] **V2-0811 — Implement live Word text/format patch.**
+- [x] **V2-0811 — Implement live Word text/format patch.**  
+  Evidence: paragraph-scoped text/bold/italic/underline mutation requires permission + fresh state token and returns before/after evidence; stale state is rejected. CI run `35312968425`: PASS 0811.
 
-- [ ] **V2-0812 — Implement Word save-copy/export path.**
+- [x] **V2-0812 — Implement Word save-copy/export path.**  
+  Evidence: COM backend clones current formatted live document into a separate document, copies page/header/footer state, supports DOCX save/PDF export, and refuses overwrite/original destination. CI run `35312968425`: PASS 0812.
 
-- [ ] **V2-0813 — Implement live Word verifier.**
+- [x] **V2-0813 — Implement live Word verifier.**  
+  Evidence: `Verification/LiveWordVerifier.cs` checks target paragraphs and preserves non-target paragraphs, tables, sections, headers and footers. CI run `35312968425`: PASS 0813.
 
-- [ ] **V2-0814 — Add Word live unsaved-state acceptance fixture.**
+- [x] **V2-0814 — Add Word live unsaved-state acceptance fixture.**  
+  Evidence: separate-process fixture machine-verifies unsaved Word paragraph/selection/state token in CI; `V2OfficeLiveAcceptance` supports machine verification against a real open unsaved Word document on an Office workstation. CI run `35312968425`: PASS 0814.
 
-- [ ] **V2-0815 — OfficeHost safety/permission tests.**  
-  Wrong process/document/session, stale state, timeout, crash and user denial.
+- [x] **V2-0815 — OfficeHost safety/permission tests.**  
+  Wrong process/document/session, stale state, timeout, crash and user denial.  
+  Evidence: dedicated process-boundary acceptance suite rejects wrong session, stale state and denied mutation; timeout/crash kills the old host and next call starts a fresh STA host. CI run `35312968425`: PASS 0815; suite result 15 passed, 0 failed.
 
 ---
 
 ## Phase 09 — DesktopHost / computer use
 
-- [ ] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
+- [~] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
   Separate from UI/model/Python sandbox.
 
 - [ ] **V2-0902 — Implement safe app/window enumeration.**  
@@ -404,4 +418,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0801 — Create H2AgentLab.OfficeHost helper project`.
+**Active task:** `V2-0901 — Create H2AgentLab.DesktopHost helper project`.
