@@ -85,6 +85,9 @@ public static class MbContextRuntimeTests
                 "Latest tool journal evidence was not projected as bounded tool context.");
             Check(!combined.Contains(new string('Z', 3_500), StringComparison.Ordinal),
                 "Large raw tool output was replayed unbounded into model prompt.");
+            Check(combined.Contains("artifact:fixture:latest", StringComparison.Ordinal)
+                && combined.Contains("evidence:fixture:latest", StringComparison.Ordinal),
+                "Bounded artifact/evidence handles were lost from runtime context projection.");
 
             var adapter = new LabSessionContextAdapter();
             var session = new global::H2AgentLab.LabSession();
@@ -151,7 +154,8 @@ public static class MbContextRuntimeTests
         {
             session.Add(
                 "tool-result",
-                "TOOL-SUMMARY-LATEST " + new string('Z', 5_000));
+                "TOOL-SUMMARY-LATEST artifact=artifact:fixture:latest evidence=evidence:fixture:latest "
+                + new string('Z', 5_000));
         }
 
         var factory = new CapturingRuntimeFactory();
