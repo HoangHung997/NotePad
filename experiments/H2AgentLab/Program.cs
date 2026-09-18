@@ -42,6 +42,7 @@ public static class Program
         if (args.Contains("--v2-phase11-test")) return V2Phase11Tests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-extensibility-refinement-test")) return V2ExtensibilityRefinementTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-runtime-test")) return MbAgentRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-orchestrator-runtime-test")) return MbOrchestratorRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
