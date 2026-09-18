@@ -46,6 +46,7 @@ public sealed class AiChatWindow : Window
     public Task StopAiAsync() => _chat.StopAsync();
     public void CancelAi() => _chat.Cancel();
     public void RefreshAiConnections() => _chat.RefreshConnections();
+    public void RefreshFromModel() => _chat.RefreshFromModel();
     public void SetSaveStatus(string text) => _saveStatus.Text = text;
     public void Flush()
     {

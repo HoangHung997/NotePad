@@ -8,7 +8,7 @@ internal static class WorkspaceTests
     private static void Fails(Action action) { try { action(); } catch (Exception ex) when (ex is IOException or InvalidOperationException or InvalidDataException) { return; } throw new Exception("Expected safe failure"); }
     public static void Run(Action<string, Action> test)
     {
-        test("Workspace stores each project with rich text, chat, paths and ordinary notes", () =>
+        test("Workspace stores each project with rich text, chat, paths and ordinary notes while drafts stay local", () =>
         {
             var dir = Folder(); var store = new ProjectWorkspaceStore(dir); store.LoadOrImport(); var state = SheetStorage.Demo();
             var p = state.Notes[0].Projects[0]; p.NotesRich = RichDocument.Plain("Vietnamese rich note"); p.NotesRich.Format(0, 4, s => s with { Bold = true });
@@ -18,7 +18,7 @@ internal static class WorkspaceTests
             Check(Directory.GetFiles(Path.Combine(dir, "projects"), "*.h2project.json").Length == 5);
             Check(Directory.GetFiles(Path.Combine(dir, "notes"), "*.h2note.json").Length == 1);
             var read = new ProjectWorkspaceStore(dir).LoadOrImport(); var loaded = read.Notes[0].Projects[0];
-            Check(loaded.Id == p.Id && loaded.ReadNotes().StyleAt(0).Bold && loaded.Conversations[0].Messages.Count == 2 && loaded.Conversations[0].Draft == "draft");
+            Check(loaded.Id == p.Id && loaded.ReadNotes().StyleAt(0).Bold && loaded.Conversations[0].Messages.Count == 2 && loaded.Conversations[0].Draft == "");
             Check(loaded.Links[0].Target == "D:/drawing.dwg" && read.Notes.Count == 2);
         });
         test("Workspace migration preserves source bytes and immutable backup", () =>
@@ -28,13 +28,47 @@ internal static class WorkspaceTests
             Check(bytes.SequenceEqual(File.ReadAllBytes(legacy)) && state.Notes[0].Projects.Count == 5);
             Check(Directory.GetFiles(Path.Combine(store.Root, "backups"), "migration-*.json").Any());
         });
-        test("Workspace unchanged projects are not rewritten; rename retains identity", () =>
+        test("AI time context exposes real timestamps and never invents legacy dates", () =>
+        {
+            var now = DateTimeOffset.Now;
+            var board = new NoteRecord { Title = "Board", NoteKind = "project-hub" };
+            var project = new ProjectRecord
+            {
+                Name = "Timed project", CreatedAtUtc = now.UtcDateTime.AddHours(-3), UpdatedAtUtc = now.UtcDateTime.AddHours(-1)
+            };
+            project.ChecklistItems.Add(new TaskRecord
+            {
+                Text = "Timed task", IsCompleted = true,
+                CreatedAtUtc = now.UtcDateTime.AddHours(-2.5), UpdatedAtUtc = now.UtcDateTime.AddHours(-1.5), CompletedAtUtc = now.UtcDateTime.AddHours(-1.5)
+            });
+            var message = new AiMessage { Content = "Recorded turn", CreatedAt = now.UtcDateTime.AddMinutes(-30) };
+            project.Conversations.Add(new AiConversation { Title = "Timed chat", CreatedAtUtc = now.UtcDateTime.AddHours(-2), Messages = [message] });
+            board.Projects.Add(project);
+            var known = new NoteRecord { Title = "Known note", NoteKind = "general", Content = "known", CreatedAtUtc = now.UtcDateTime.AddHours(-2), UpdatedAtUtc = now.UtcDateTime.AddHours(-1) };
+            var legacy = new NoteRecord { Title = "Legacy note", NoteKind = "general", Content = "legacy" };
+            var state = new SheetState { Notes = [board, known, legacy] };
+
+            using var context = JsonDocument.Parse(AiProjectContext.Build(state, project, null, true));
+            var root = context.RootElement;
+            Check(root.GetProperty("timeContext").GetProperty("currentLocalTime").GetString()!.Length > 10);
+            Check(root.GetProperty("timeContext").GetProperty("dayParts").GetProperty("morning").GetString() == "05:00-11:59");
+            Check(root.GetProperty("tasks")[0].GetProperty("completedLocal").ValueKind == JsonValueKind.String);
+            Check(root.GetProperty("conversations")[0].GetProperty("messages")[0].GetProperty("createdLocal").ValueKind == JsonValueKind.String);
+            var notes = root.GetProperty("workspaceSources").GetProperty("notes").EnumerateArray().ToArray();
+            Check(notes.Single(n => n.GetProperty("title").GetString() == "Known note").GetProperty("createdLocal").ValueKind == JsonValueKind.String);
+            Check(notes.Single(n => n.GetProperty("title").GetString() == "Legacy note").GetProperty("createdLocal").ValueKind == JsonValueKind.Null);
+
+            var timedTurn = AiHistory.RequestTurns(project.Conversations[0]).Single();
+            Check(timedTurn.Content.Contains("createdLocal=") && timedTurn.Content.Contains("Recorded turn"));
+            var untimed = new AiConversation { Messages = [new AiMessage { Content = "Legacy turn" }] };
+            Check(AiHistory.RequestTurns(untimed).Single().Content == "Legacy turn");
+        });
+        test("Workspace rename keeps a stable GUID file path and project identity", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
-            var files = Directory.GetFiles(Path.Combine(store.Root, "projects")); var old = files.Single(f => f.Contains(state.Notes[0].Projects[0].Id.ToString("N")));
-            var unchanged = files.First(f => f != old); var date = File.GetLastWriteTimeUtc(unchanged);
+            var path = Directory.GetFiles(Path.Combine(store.Root, "projects")).Single(f => f.Contains(state.Notes[0].Projects[0].Id.ToString("N")));
             state.Notes[0].Projects[0].NameRich = RichDocument.Plain("Renamed / safely"); store.Save(state);
-            Check(!File.Exists(old) && File.GetLastWriteTimeUtc(unchanged) == date);
+            Check(File.Exists(path) && Directory.GetFiles(Path.Combine(store.Root, "projects")).Length == 5);
             Check(store.Read().Notes[0].Projects[0].DisplayName == "Renamed / safely");
         });
         test("Workspace transaction rollback restores previous complete generation", () =>
@@ -59,7 +93,7 @@ internal static class WorkspaceTests
             state.Notes[0].Projects[1].Id = state.Notes[0].Projects[0].Id; Fails(() => store.Save(state));
             Check(!File.Exists(store.FilePath));
         });
-        test("Workspace lock prevents two writers", () =>
+        test("Workspace instance lock prevents two copies on one PC", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); using var locked = store.AcquireLock(); Fails(() => { using var second = store.AcquireLock(); });
         });
@@ -75,6 +109,71 @@ internal static class WorkspaceTests
             var loaded = new ProjectWorkspaceStore(store.Root).LoadOrImport();
             Check(loaded.Notes[0].Projects[0].Id == project.Id && loaded.Notes[0].SelectedProjectId == project.Id);
             Check(loaded.Notes[0].Projects[0].NotesText == "Only this project changed" && File.GetLastWriteTimeUtc(cleanPath) == cleanTime);
+        });
+        test("Two NAS devices append AI runs to the same conversation without losing either run", () =>
+        {
+            var root = Folder(); var seedStore = new ProjectWorkspaceStore(root, writerId: "seed"); seedStore.LoadOrImport();
+            var seed = SheetStorage.Demo(); var projectId = seed.Notes[0].Projects[0].Id; var conversation = new AiConversation { Title = "Shared" };
+            seed.Notes[0].Projects[0].Conversations.Add(conversation); seedStore.Save(seed);
+
+            var storeA = new ProjectWorkspaceStore(root, writerId: "PC-A"); var stateA = storeA.LoadOrImport();
+            var storeB = new ProjectWorkspaceStore(root, writerId: "PC-B"); var stateB = storeB.LoadOrImport();
+            var convA = stateA.Notes[0].Projects[0].Conversations.Single();
+            var convB = stateB.Notes[0].Projects[0].Conversations.Single();
+            var runA = Guid.NewGuid(); var userA = new AiMessage { Role = "user", Content = "from A", CreatedAt = DateTime.UtcNow, AiRunId = runA, DeviceId = "PC-A" };
+            convA.Messages.Add(userA); convA.Messages.Add(new AiMessage { Role = "assistant", Content = "reply A", ParentId = userA.Id, CreatedAt = DateTime.UtcNow, AiRunId = runA, DeviceId = "PC-A" });
+            var runB = Guid.NewGuid(); var userB = new AiMessage { Role = "user", Content = "from B", CreatedAt = DateTime.UtcNow.AddMilliseconds(1), AiRunId = runB, DeviceId = "PC-B" };
+            convB.Messages.Add(userB); convB.Messages.Add(new AiMessage { Role = "assistant", Content = "reply B", ParentId = userB.Id, CreatedAt = DateTime.UtcNow.AddMilliseconds(2), AiRunId = runB, DeviceId = "PC-B" });
+
+            storeA.SaveIncremental(stateA, new HashSet<Guid> { projectId });
+            storeB.SaveIncremental(stateB, new HashSet<Guid> { projectId });
+            var final = new ProjectWorkspaceStore(root, writerId: "reader").LoadOrImport().Notes[0].Projects[0].Conversations.Single();
+            Check(final.Messages.Count == 4 && final.Messages.Select(m => m.Id).Distinct().Count() == 4);
+            Check(final.Messages.All(m => m.Sequence > 0) && final.Messages.Select(m => m.Sequence).Distinct().Count() == 4);
+            Check(final.Messages.Count(m => m.AiRunId == runA) == 2 && final.Messages.Count(m => m.AiRunId == runB) == 2);
+            Check(final.Messages.Single(m => m.Content == "reply A").ParentId == userA.Id && final.Messages.Single(m => m.Content == "reply B").ParentId == userB.Id);
+        });
+        test("Two NAS devices merge edits to different tasks and different fields of one task", () =>
+        {
+            var root = Folder(); var seedStore = new ProjectWorkspaceStore(root, writerId: "seed"); seedStore.LoadOrImport(); var seed = SheetStorage.Demo(); seedStore.Save(seed);
+            var projectId = seed.Notes[0].Projects[0].Id;
+            var storeA = new ProjectWorkspaceStore(root, writerId: "A"); var a = storeA.LoadOrImport();
+            var storeB = new ProjectWorkspaceStore(root, writerId: "B"); var b = storeB.LoadOrImport();
+            a.Notes[0].Projects[0].ChecklistItems[0].Comment = "comment from A";
+            b.Notes[0].Projects[0].ChecklistItems[1].IsCompleted = true;
+            b.Notes[0].Projects[0].ChecklistItems[0].IsCompleted = true;
+            storeA.SaveIncremental(a, new HashSet<Guid> { projectId });
+            storeB.SaveIncremental(b, new HashSet<Guid> { projectId });
+            var read = new ProjectWorkspaceStore(root).LoadOrImport().Notes[0].Projects[0];
+            Check(read.ChecklistItems[0].Comment == "comment from A" && read.ChecklistItems[0].IsCompleted);
+            Check(read.ChecklistItems[1].IsCompleted);
+        });
+        test("Same-field NAS conflict keeps current writer, records audit, and does not block the workspace", () =>
+        {
+            var root = Folder(); var seedStore = new ProjectWorkspaceStore(root, writerId: "seed"); seedStore.LoadOrImport(); var seed = SheetStorage.Demo(); seedStore.Save(seed);
+            var projectId = seed.Notes[0].Projects[0].Id;
+            var storeA = new ProjectWorkspaceStore(root, writerId: "A"); var a = storeA.LoadOrImport();
+            var storeB = new ProjectWorkspaceStore(root, writerId: "B"); var b = storeB.LoadOrImport();
+            a.Notes[0].Projects[0].ChecklistItems[0].Text = "writer A";
+            b.Notes[0].Projects[0].ChecklistItems[0].Text = "writer B";
+            storeA.SaveIncremental(a, new HashSet<Guid> { projectId });
+            storeB.SaveIncremental(b, new HashSet<Guid> { projectId });
+            var read = new ProjectWorkspaceStore(root).LoadOrImport().Notes[0].Projects[0];
+            Check(read.ChecklistItems[0].Text == "writer B");
+            Check(storeB.LastMergeConflicts.Count > 0 && Directory.Exists(Path.Combine(root, "conflicts")) && Directory.GetFiles(Path.Combine(root, "conflicts"), "*.json").Length > 0);
+        });
+        test("Remote refresh brings NAS changes into an open device without discarding local edits", () =>
+        {
+            var root = Folder(); var seedStore = new ProjectWorkspaceStore(root, writerId: "seed"); seedStore.LoadOrImport(); var seed = SheetStorage.Demo(); seedStore.Save(seed);
+            var projectId = seed.Notes[0].Projects[0].Id;
+            var storeA = new ProjectWorkspaceStore(root, writerId: "A"); var a = storeA.LoadOrImport();
+            var storeB = new ProjectWorkspaceStore(root, writerId: "B"); var b = storeB.LoadOrImport();
+            a.Notes[0].Projects[0].ChecklistItems[0].Comment = "local unsaved";
+            b.Notes[0].Projects[0].ChecklistItems.Add(new TaskRecord { Text = "remote new task" });
+            storeB.SaveIncremental(b, new HashSet<Guid> { projectId });
+            Check(storeA.RefreshFromDisk(a, new HashSet<Guid> { projectId }));
+            Check(a.Notes[0].Projects[0].ChecklistItems[0].Comment == "local unsaved");
+            Check(a.Notes[0].Projects[0].ChecklistItems.Any(t => t.Text == "remote new task"));
         });
         test("Workspace merge requires explicit conflict decisions and keep-both does not duplicate on repeat", () =>
         {

@@ -98,7 +98,7 @@ public sealed partial class AiChatPanel : UserControl
             var conversation = _conversation; var scope = _scope;
             if (conversation is null || scope is null || TopLevel.GetTopLevel(this) is not Window owner) return;
             if (!await Dialogs.Confirm(owner, "Xóa cuộc trao đổi", "Xóa lịch sử và bản nháp cuộc trao đổi này khỏi H2 Notes?\nKhông yêu cầu xóa bản lưu trên máy chủ AI.", "Xóa lịch sử này")) return;
-            await StopAsync(); scope.Conversations.Remove(conversation); Touch(scope);
+            await StopAsync(); _app.DeleteChatDraft(scope, conversation); scope.Conversations.Remove(conversation); Touch(scope);
             if (_scope == scope) { _conversation = scope.Conversations.LastOrDefault(); scope.SelectedConversationId = _conversation?.Id; LoadDraft(); RefreshHistory(); Render(); }
         };
         _profiles.SelectionChanged += (_, _) => { if (!_loading && _profiles.SelectedItem is AiProfile p) { if (_conversation is not null) { Cancel(); _conversation.ProfileId = p.Id; Touch(_scope); } UpdateConnectionStatus(); } };
@@ -115,8 +115,6 @@ public sealed partial class AiChatPanel : UserControl
         _scroll = new ScrollViewer { Content = _messages, HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
         _scroll.ScrollChanged += (_, e) =>
         {
-            // Resize/reparent changes wrapping. Stay at the latest message only if
-            // the reader was already there; never pull them away from old history.
             if (e.ExtentDelta != default || e.ViewportDelta != default)
             { if (_followLatest) ScrollToLatest(); }
             else if (e.OffsetDelta != default) _followLatest = _scroll.Extent.Height - _scroll.Viewport.Height - _scroll.Offset.Y < 40;
@@ -136,7 +134,12 @@ public sealed partial class AiChatPanel : UserControl
             ToolTip.SetTip(_send, tip); global::Avalonia.Automation.AutomationProperties.SetName(_send, tip);
             if (!_loading && _conversation is not null) { _conversation.MarkerOnlyMode = _markerMode.IsChecked == true; Touch(_scope); }
         };
-        _composer.TextChanged += (_, _) => { if (_loading || _scope is null) return; if (_conversation is null && string.IsNullOrEmpty(_composer.Text)) return; EnsureConversation().Draft = _composer.Text ?? ""; Touch(_scope); };
+        _composer.TextChanged += (_, _) =>
+        {
+            if (_loading || _scope is null) return;
+            if (_conversation is null && string.IsNullOrEmpty(_composer.Text)) return;
+            var conversation = EnsureConversation(); conversation.Draft = _composer.Text ?? ""; _app.SaveChatDraft(_scope, conversation);
+        };
         _send.Click += async (_, _) => await SendOrSave(); _stop.Click += (_, _) => Cancel();
         InitializeComposerInput();
         SizeChanged += (_, _) =>
@@ -161,6 +164,13 @@ public sealed partial class AiChatPanel : UserControl
         _loading = true; _composer.Text = ""; _loading = false; Render(); RefreshHistory();
     }
     public void RefreshConnections() { RefreshProfiles(); UpdateConnectionStatus(); }
+    public void RefreshFromModel()
+    {
+        if (_scope is null) return;
+        var id = _conversation?.Id;
+        _conversation = id is null ? _scope.Conversations.LastOrDefault() : _scope.Conversations.FirstOrDefault(c => c.Id == id) ?? _scope.Conversations.LastOrDefault();
+        RefreshHistory(); Render(); if (_followLatest) ScrollToLatest();
+    }
     public void SetCompact(bool compact) { _back.IsVisible = compact; _titleText.Text = compact ? "Hỏi AI · " + (_scope?.Title ?? "") : "Hỏi AI"; }
     public void SetDetached(bool detached) { _detached = detached; _header.IsVisible = !detached && _scope?.IsStandalone != true; }
     public void Cancel()
@@ -186,7 +196,8 @@ public sealed partial class AiChatPanel : UserControl
         Cancel(); _visibleMessages = 40; _scope = scope;
         if (scope is not null)
         {
-            var unfinished = scope.Conversations.SelectMany(c => c.Messages).Where(m => m.Status == "streaming").ToArray();
+            var unfinished = scope.Conversations.SelectMany(c => c.Messages)
+                .Where(m => m.Status == "streaming" && (string.IsNullOrWhiteSpace(m.DeviceId) || m.DeviceId == _app.DeviceId)).ToArray();
             foreach (var message in unfinished) message.Status = "interrupted";
             if (unfinished.Length > 0) Touch(scope);
         }
@@ -197,7 +208,11 @@ public sealed partial class AiChatPanel : UserControl
         _header.IsVisible = !_detached && scope?.IsStandalone != true;
         RefreshHistory(); RefreshProfiles(); Render(); ScrollToLatest();
     }
-    private void LoadDraft() { _loading = true; _composer.Text = _conversation?.Draft ?? ""; _markerMode.IsChecked = _conversation?.MarkerOnlyMode == true; _loading = false; RenderAttachments(); }
+    private void LoadDraft()
+    {
+        if (_scope is not null && _conversation is not null) _app.LoadChatDraft(_scope, _conversation);
+        _loading = true; _composer.Text = _conversation?.Draft ?? ""; _markerMode.IsChecked = _conversation?.MarkerOnlyMode == true; _loading = false; RenderAttachments();
+    }
     private void Touch(AiChatScope? scope) { if (scope?.Project is { } p) _app.MarkProjectDirty(p.Id); _app.ScheduleSave(); }
     private AiConversation EnsureConversation()
     {
@@ -294,12 +309,17 @@ public sealed partial class AiChatPanel : UserControl
         if (_markerMode.IsChecked != true) { await Send(); return; }
         var conversation = EnsureConversation(); var text = _composer.Text?.Trim() ?? "";
         SetTitle(conversation, text);
-        conversation.Messages.Add(new AiMessage { Role = "user", Content = text, CreatedAt = DateTime.UtcNow, IsTimelineMarker = true, Attachments = conversation.DraftAttachments.ToList() });
+        conversation.Messages.Add(new AiMessage { Role = "user", Content = text, CreatedAt = DateTime.UtcNow, IsTimelineMarker = true,
+            DeviceId = _app.DeviceId, Attachments = conversation.DraftAttachments.ToList() });
         ClearDraft(conversation); Touch(_scope); RefreshHistory(); Render(); ScrollToLatest(); _composer.Focus();
     }
     private static void SetTitle(AiConversation conversation, string text)
     { if (conversation.Messages.Count == 0) conversation.Title = text.Length > 42 ? text[..42] + "…" : text; }
-    private void ClearDraft(AiConversation conversation) { conversation.Draft = ""; conversation.DraftAttachments.Clear(); _loading = true; _composer.Text = ""; _loading = false; RenderAttachments(); }
+    private void ClearDraft(AiConversation conversation)
+    {
+        if (_scope is not null) _app.DeleteChatDraft(_scope, conversation);
+        conversation.Draft = ""; conversation.DraftAttachments.Clear(); _loading = true; _composer.Text = ""; _loading = false; RenderAttachments();
+    }
     private async Task Send()
     {
         if (_scope is null) return;
@@ -312,8 +332,9 @@ public sealed partial class AiChatPanel : UserControl
         var conversation = EnsureConversation(); var sentPermission = CurrentPermission;
         profile = CreateRequestProfile(profile);
         string context; IReadOnlyList<AiTurn> turns;
+        var runId = Guid.NewGuid();
         var user = new AiMessage { Role = "user", Content = prompt, Provider = profile.Name, Model = profile.Model, CreatedAt = DateTime.UtcNow,
-            Attachments = conversation.DraftAttachments.ToList() };
+            AiRunId = runId, DeviceId = _app.DeviceId, Attachments = conversation.DraftAttachments.ToList() };
         try { context = BuildProjectContext(); turns = AiProjectContext.Prepare(conversation, user, context); }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException) { _status.Text = ex.Message; return; }
         if (AiPdfProcessor.NeedsPreparation(turns, _app.LocalSettings.Ai.Pdf))
@@ -325,7 +346,8 @@ public sealed partial class AiChatPanel : UserControl
         conversation.ProfileId = profile.Id; SetTitle(conversation, prompt);
         user.Context = context;
         conversation.Messages.Add(user);
-        var answer = new AiMessage { Role = "assistant", ParentId = user.Id, Model = profile.Model, Provider = profile.Name, Status = "streaming", CreatedAt = DateTime.UtcNow };
+        var answer = new AiMessage { Role = "assistant", ParentId = user.Id, Model = profile.Model, Provider = profile.Name, Status = "streaming",
+            CreatedAt = DateTime.UtcNow, AiRunId = runId, DeviceId = _app.DeviceId };
         conversation.Messages.Add(answer); ClearDraft(conversation);
         RefreshHistory(); Render(); ScrollToLatest();
         var cts = new CancellationTokenSource(); _request = cts; _activeAnswer = answer; _streamFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -352,7 +374,6 @@ public sealed partial class AiChatPanel : UserControl
             {
                 if (part.Kind is AiStreamEventKind.Reasoning or AiStreamEventKind.ReasoningSummary)
                 {
-                    // Provider progress is transient; never place it in persisted messages or future prompts.
                     if (buffer.Length == 0)
                     {
                         var firstProgress = reasoning.Length == 0;

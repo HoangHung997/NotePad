@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using H2Notes.Avalonia.Controls;
@@ -29,6 +30,7 @@ internal static class ThinkingUiTests
             try
             {
                 var thinking = Named<Expander>(bubble, "MessageThinking");
+                var summary = Named<TextBlock>(bubble, "MessageThinkingSummary");
                 var scroll = (ScrollViewer)thinking.Content!;
                 void Layout() { for (var i = 0; i < 4; i++) { window.UpdateLayout(); Dispatcher.UIThread.RunJobs(); } }
                 void AtEnd()
@@ -46,12 +48,67 @@ internal static class ThinkingUiTests
                 AtEnd();
                 thinking.IsExpanded = false; Layout();
                 bubble.SetThinking(string.Join("\n", Enumerable.Range(161, 80).Select(i => $"Provider progress {i}: newest streaming line.")));
+                Layout();
+                Check(summary.Text!.Contains("Provider progress 240") && !summary.Text.Contains("Provider progress 161"),
+                    "Collapsed thinking did not replace its one-line summary with the newest provider line");
                 thinking.IsExpanded = true; AtEnd();
                 window.Width = 280; AtEnd();
                 message.Content = "Answer"; bubble.Refresh(); Layout();
                 Check(!thinking.IsVisible && ((SelectableTextBlock)scroll.Content!).Text == "", "Thinking remained after answer");
             }
             finally { window.Close(); }
+        });
+        test("Assistant Markdown renders natural structure, fenced tables and Unicode escapes", () =>
+        {
+            var markdown = "## \\uD83D\\uDCDD Tổng quan\n\n**Tchom** đã xong.\n\n- [x] Hợp đồng\n- [ ] Hoàn công\n\n| Dự án | Trạng thái |\n|---|---|\n| Tchom | Đã xong |\n\n> Diện tích đã được cập nhật.\n\n```text\nKrong 11,49 ha\n```\n\n```text\n| TT | Dự án | Diện tích |\n|---|---|---|\n| 1 | Ia Tchom 1 | 3 |\n| 2 | Sê San 4A | 12,51 |\n```";
+            var assistant = new AiMessage { Role = "assistant", Status = "complete", Content = markdown };
+            var bubble = new ChatMessageView(assistant);
+            var window = new Window { Content = bubble, Width = 480, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
+            try
+            {
+                var rendered = Named<MarkdownMessageView>(bubble, "MessageMarkdownBody");
+                Check(rendered.IsVisible && !bubble.Body.IsVisible && bubble.Body.Text == markdown, "Assistant Markdown source/render surface mismatch");
+                var heading = rendered.GetVisualDescendants().OfType<SelectableTextBlock>().Single(c => c.Name == "MarkdownHeading");
+                var headingText = string.Concat(heading.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text));
+                Check(heading.FontSize is > 13 and <= 18, "Chat heading is still oversized");
+                Check(headingText.Contains("📝") && !rendered.Markdown.Contains("\\uD83D", StringComparison.Ordinal), "Literal Unicode escape was not normalized for display");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownListItem") == 2, "Markdown checklist/list not rendered");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownTable") == 2, "Markdown or fenced table not rendered as a real table");
+                Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownQuote"), "Markdown quote not rendered");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownCode") == 1, "A fenced table stayed as code or ordinary code was lost");
+                Check(AiProjectContext.Instructions.Contains("bảng Markdown", StringComparison.Ordinal)
+                    && AiProjectContext.Instructions.Contains("không bọc bảng trong code fence", StringComparison.Ordinal),
+                    "Vision transcription guidance no longer preserves table structure");
+
+                var user = new ChatMessageView(new AiMessage { Role = "user", Status = "complete", Content = "**literal user text**" });
+                Check(user.Body.IsVisible && user.Body.Text == "**literal user text**", "User-authored text was unexpectedly reformatted");
+            }
+            finally { window.Close(); }
+        });
+        test("Composer Enter sends and Shift Enter stays available for a newline", () =>
+        {
+            var app = new H2Notes.Avalonia.App();
+            var project = new ProjectRecord { Name = "Keyboard fixture" };
+            var panel = new AiChatPanel(app); panel.SetProject(project);
+            var window = new Window { Content = panel, Width = 420, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
+            try
+            {
+                var input = Named<TextBox>(panel, "ChatComposer");
+                var marker = (CheckBox)typeof(AiChatPanel).GetField("_markerMode", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;
+                marker.IsChecked = true; input.Focus(); input.Text = "dòng chưa gửi"; input.CaretIndex = input.Text.Length;
+                var shift = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.Shift };
+                input.RaiseEvent(shift); Dispatcher.UIThread.RunJobs();
+                Check(input.AcceptsReturn && project.Conversations.SelectMany(c => c.Messages).Count() == 0,
+                    "Shift+Enter sent a message instead of remaining a multiline editor gesture");
+
+                input.Text = "gửi bằng Enter"; input.CaretIndex = input.Text.Length;
+                var enter = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.None };
+                input.RaiseEvent(enter);
+                PumpUntil(() => project.Conversations.SelectMany(c => c.Messages).Any());
+                var sent = project.Conversations.SelectMany(c => c.Messages).Single();
+                Check(enter.Handled && sent.IsTimelineMarker && sent.Content == "gửi bằng Enter", "Plain Enter did not send the composer message");
+            }
+            finally { panel.Cancel(); window.Close(); }
         });
         test("Provider thinking is expandable, ephemeral and hidden at first answer; Send no longer opens confirmation", () =>
         {

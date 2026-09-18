@@ -1,0 +1,274 @@
+name: Avalonia CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/nas-multi-device-sync
+    paths-ignore:
+      - 'bin/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Avalonia solution
+        run: dotnet restore .\H2Notes.Avalonia.slnx
+
+      - name: Build Avalonia solution
+        run: dotnet build .\H2Notes.Avalonia.slnx -c Release --no-restore
+
+      - name: Run H2 Notes tests
+        run: dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
+
+      - name: Restore H2 Agent Lab DesktopHost
+        run: dotnet restore .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj
+
+      - name: Build H2 Agent Lab DesktopHost
+        run: dotnet build .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj -c Release --no-restore
+
+      - name: Run H2 Agent Lab DesktopHost safety self-tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-desktop-host-self-test'
+          dotnet run --project .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj -c Release --no-build -- --self-test $out
+          Get-Content -LiteralPath (Join-Path $out 'desktop-host-self-tests.txt')
+
+      - name: Restore H2 Agent Lab OfficeHost
+        run: dotnet restore .\experiments\H2AgentLab.OfficeHost\H2AgentLab.OfficeHost.csproj
+
+      - name: Build H2 Agent Lab OfficeHost
+        run: dotnet build .\experiments\H2AgentLab.OfficeHost\H2AgentLab.OfficeHost.csproj -c Release --no-restore
+
+      - name: Restore H2 Agent Lab
+        run: dotnet restore .\experiments\H2AgentLab\H2AgentLab.csproj
+
+      - name: Build H2 Agent Lab
+        run: dotnet build .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-restore
+
+      - name: Run H2 Agent Lab v1 self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v1-self-test'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --self-test $out
+
+      - name: Run H2 Agent Lab v2 architecture guard
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-guard'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-guard-test $out
+
+      - name: Run H2 Agent Lab v2 metrics tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-metrics'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-metrics-test $out
+
+      - name: Run H2 Agent Lab initial A B baseline
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-baseline'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-baseline-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-initial-ab-baseline.md')
+
+      - name: Run H2 Agent Lab v2 session context tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-session-context'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-session-context-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-session-context-tests.txt')
+
+      - name: Run H2 Agent Lab v2 artifact store tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-artifact-store'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-artifact-store-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-artifact-store-tests.txt')
+
+      - name: Run H2 Agent Lab v2 compaction tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-compaction'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-compaction-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-compaction-tests.txt')
+
+      - name: Run H2 Agent Lab v2 context cache acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-context-cache'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-context-cache-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-context-cache-tests.txt')
+
+      - name: Run H2 Agent Lab v2 orchestrator tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-orchestrator'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-orchestrator-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-orchestrator-tests.txt')
+
+      - name: Run H2 Agent Lab v2 tool registry tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-tool-registry'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-tool-registry-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-tool-registry-tests.txt')
+
+      - name: Run H2 Agent Lab v2 verification gate tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-verification'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-verification-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-verification-tests.txt')
+
+      - name: Run H2 Agent Lab v2 closed file acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-closed-files'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-closed-file-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-closed-file-tests.txt')
+
+      - name: Run H2 Agent Lab v2 Phase 10 acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-phase10'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-phase10-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-phase10-tests.txt')
+
+      - name: Run H2 Agent Lab v2 Phase 11 acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-phase11'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-phase11-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-phase11-tests.txt')
+
+      - name: Run H2 Agent Lab v2 extensibility refinement tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-extensibility-refinement'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-extensibility-refinement-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-extensibility-refinement-tests.txt')
+
+      - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-desktop-host'
+          $desktopHostExe = (Resolve-Path '.\experiments\H2AgentLab.DesktopHost\bin\Release\net10.0-windows\H2AgentLab.DesktopHost.exe').Path
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-desktop-host-test $out $desktopHostExe
+          Get-Content -LiteralPath (Join-Path $out 'v2-desktop-host-tests.txt')
+
+      - name: Run H2 Agent Lab v2 OfficeHost acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-office-host'
+          $officeHostExe = (Resolve-Path '.\experiments\H2AgentLab.OfficeHost\bin\Release\net10.0-windows\H2AgentLab.OfficeHost.exe').Path
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-office-host-test $out $officeHostExe
+          Get-Content -LiteralPath (Join-Path $out 'v2-office-host-tests.txt')
+
+      - name: Run H2 Agent Lab v2 transport contract tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-transport-contract'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-transport-contract-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-transport-contract-tests.txt')
+
+      - name: Run H2 Agent Lab v2 Ollama transport tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-ollama-transport'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-ollama-transport-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-ollama-transport-tests.txt')
+
+      - name: Run H2 Agent Lab v2 Chat Completions transport tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-chat-transport'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-chat-transport-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-chat-completions-transport-tests.txt')
+
+      - name: Run H2 Agent Lab v2 OpenAI Responses HTTP transport tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-responses-transport'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-responses-transport-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-openai-responses-transport-tests.txt')
+
+      - name: Run H2 Agent Lab v2 OpenAI Responses WebSocket tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-responses-websocket'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-responses-websocket-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-responses-websocket-transport-tests.txt')
+
+      - name: Run H2 Agent Lab v2 provider transport resilience matrix
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-provider-resilience'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-provider-resilience-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-provider-transport-resilience-tests.txt')
+
+      - name: Publish self-contained Windows x64
+        run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
+
+      - name: Upload Avalonia portable build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: H2Notes-Avalonia-Portable-win-x64
+          path: artifacts/H2Notes-Avalonia-Portable/
+          if-no-files-found: warn
+
+      - name: Publish latest ZIP into repository bin folder
+        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        shell: pwsh
+        run: |
+          git fetch origin "${{ github.ref_name }}" --depth=1
+          $remoteHead = (git rev-parse "origin/${{ github.ref_name }}").Trim()
+          if ($remoteHead -ne '${{ github.sha }}') {
+            Write-Host "Branch advanced to $remoteHead while this run was executing; skip stale /bin publish for ${{ github.sha }}."
+            exit 0
+          }
+
+          New-Item -ItemType Directory -Force -Path .\bin | Out-Null
+          $zip = '.\bin\H2Notes-Avalonia-Portable-win-x64.zip'
+          if (Test-Path $zip) { Remove-Item -LiteralPath $zip -Force }
+          Compress-Archive -Path '.\artifacts\H2Notes-Avalonia-Portable\*' -DestinationPath $zip -CompressionLevel Optimal
+          $size = (Get-Item -LiteralPath $zip).Length
+          if ($size -ge 95MB) {
+            throw "Portable ZIP is $([math]::Round($size / 1MB, 1)) MB. Refusing to commit near GitHub's 100 MB file limit."
+          }
+          $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          @"
+          H2 Notes Avalonia Portable win-x64
+          Source branch: ${{ github.ref_name }}
+          Source commit: ${{ github.sha }}
+          Built UTC: $([DateTime]::UtcNow.ToString('O'))
+          ZIP bytes: $size
+          SHA256: $sha256
+          "@ | Set-Content -LiteralPath .\bin\LATEST.txt -Encoding UTF8
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f .\bin\H2Notes-Avalonia-Portable-win-x64.zip .\bin\LATEST.txt
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'Published ZIP is unchanged.'
+            exit 0
+          }
+          git commit -m 'Publish latest Avalonia portable build [skip ci]'
+          git push origin "HEAD:${{ github.ref_name }}"

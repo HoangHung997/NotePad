@@ -12,6 +12,11 @@ obj/
 *.pdb
 *.ilk
 
+# Root release folder is intentionally versioned so the latest portable build
+# can be downloaded directly from GitHub. Project-level bin/ folders stay ignored.
+!/bin/
+!/bin/**
+
 # Python cache
 __pycache__/
 *.pyc

@@ -15,7 +15,7 @@ public sealed class WorkspaceTransfer
     public int DestinationProjects => _destination.Notes.Sum(n => n.Projects.Count);
     public int SourceNotes => _source.Notes.Count(n => !n.IsBoard);
     public int DestinationNotes => _destination.Notes.Count(n => !n.IsBoard);
-    public bool MatchesSource(SheetState current) => Same(_source, current);
+    public bool MatchesSource(SheetState current) => Same(WithoutRevisions(_source), WithoutRevisions(current));
 
     public WorkspaceTransfer(SheetState source, SheetState destination)
     {
@@ -111,6 +111,23 @@ public sealed class WorkspaceTransfer
         result.ImportHistory = result.ImportHistory.Concat(_source.ImportHistory).DistinctBy(r => r.Sha256).ToList();
         ProjectWorkspaceStore.ValidateState(result);
         return result;
+    }
+
+    private static SheetState WithoutRevisions(SheetState value)
+    {
+        var copy = ProjectWorkspaceStore.Clone(value);
+        foreach (var note in copy.Notes)
+        {
+            note.Revision = 0;
+            foreach (var conversation in note.AiConversations) conversation.Revision = 0;
+            foreach (var project in note.Projects)
+            {
+                project.Revision = 0;
+                foreach (var task in project.ChecklistItems) task.Revision = 0;
+                foreach (var conversation in project.Conversations) conversation.Revision = 0;
+            }
+        }
+        return copy;
     }
 
     private static string Fingerprint<T>(T value) => ProjectWorkspaceStore.Hash(ProjectWorkspaceStore.Encode(value));

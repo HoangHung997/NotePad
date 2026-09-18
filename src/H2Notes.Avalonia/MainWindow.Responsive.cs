@@ -41,10 +41,10 @@ public partial class MainWindow
         _chat.ProjectActionsRequested += (project, actions) =>
         {
             if (_notesProject != project) throw new InvalidOperationException("Đã đổi dự án; hãy xem và áp dụng lại trong đúng dự án.");
-            foreach (var action in actions)
-                if (action.Kind == "append_note") NotesEditor.AppendText(action.Text);
-                else project.ChecklistItems.Add(new TaskRecord { Text = action.Text });
-            FlushNotes(); Sheet.Refresh(); UpdateSummary(); _app.MarkProjectDirty(project.Id); _app.ScheduleSave();
+            if (actions.Count != 0) throw new InvalidOperationException("Thay đổi AI phải được áp dụng trong Core trước khi làm mới giao diện.");
+            FlushNotes();
+            NotesEditor.Load(project.ReadNotes()); _loadedNotesSource = project.NotesRich; NotesEditor.MarkSaved();
+            Sheet.Refresh(); UpdateSummary(); _app.MarkProjectDirty(project.Id); _app.ScheduleSave();
         };
         _chat.ReadContext = () => { FlushNotes(); return NotesEditor.Editor.SelectionLength > 0 ? NotesEditor.Editor.SelectedText : _notesProject?.NotesText ?? ""; };
         _chat.PrepareProjectContext = () => { FlushNotes(); Sheet.FlushDraft(); };

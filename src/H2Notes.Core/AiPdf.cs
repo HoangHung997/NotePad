@@ -5,9 +5,17 @@ public enum AiPdfEngine { Direct, GotOcr, MinerU, Docling }
 // Machine-local settings only; never put runtime paths into project attachments.
 public sealed class AiPdfSettings
 {
+    private string _runtimeRoot = DefaultRuntimeRoot;
+    public static string DefaultRuntimeRoot => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "ocr-runtime"));
     public AiPdfEngine Engine { get; set; } = AiPdfEngine.Direct;
     public bool OcrImages { get; set; }
-    public string RuntimeRoot { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes", "ocr-runtime");
+    // Portable builds keep the complete OCR runtime beside the app. If an old machine-specific
+    // configured path no longer exists, Resolve falls back to the bundled runtime automatically.
+    public string RuntimeRoot
+    {
+        get => PortableOcrRuntime.Resolve(_runtimeRoot);
+        set => _runtimeRoot = string.IsNullOrWhiteSpace(value) ? DefaultRuntimeRoot : value;
+    }
     public int MaxPages { get; set; } = 100;
     public int TimeoutSeconds { get; set; } = 180;
 }
@@ -48,7 +56,9 @@ public static class AiPdf
             throw new InvalidOperationException("Tổng PDF và ảnh vượt 12 MB. Giảm tệp hoặc mở trao đổi mới; app không tự cắt dữ liệu.");
     }
 
-    internal static void ValidateRequest(AiProfile profile, IReadOnlyList<AiTurn> turns)
+    // Public so request builders/diagnostics/tests can validate an exact prepared request before
+    // transmission. It performs no network I/O and does not mutate the request.
+    public static void ValidateRequest(AiProfile profile, IReadOnlyList<AiTurn> turns)
     {
         ValidateBudget(turns);
         if (turns.Any(t => t.Files is { Count: > 0 }) && !AiModelCapabilities.SupportsNativePdf(profile))

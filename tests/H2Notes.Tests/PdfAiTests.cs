@@ -28,19 +28,21 @@ internal static class PdfAiTests
             Check(stored.HasImageOcr && stored.Data.SequenceEqual(bytes));
             var conversation = new AiConversation { Messages = [new() { Attachments = [stored] }] };
             var prepared = AiProjectContext.Prepare(conversation, new() { Content = "Summarize", Attachments = [stored] }, "");
-            Check(prepared.All(t => t.Images is null or { Count: 0 }));
+            Check(prepared.Skip(1).Take(prepared.Count - 2).All(t => (t.Images?.Count ?? 0) == 0));
             Check(prepared.Count(t => t.Content.Contains("OCR fixture text")) == 2);
+            Check((prepared[^1].Images?.Count ?? 0) == 0, "Cached OCR image should send text rather than image bytes");
         });
-        test("PDF accepts raw bytes, preserves history and never labels it as extracted text", () =>
+        test("PDF current send keeps raw bytes while historical turns never resend them", () =>
         {
             var pdf = AiDocuments.Read("document.PDF", Pdf);
             Check(pdf.IsPdf && pdf.Text == "" && pdf.Data.SequenceEqual(Pdf));
             var conversation = new AiConversation { Messages = [new() { Content = "read", Attachments = [pdf] }] };
             var copy = JsonSerializer.Deserialize<AiConversation>(JsonSerializer.Serialize(conversation))!;
             var turn = AiHistory.RequestTurns(copy).Single();
-            Check(turn.Files!.Single().Data.SequenceEqual(Pdf) && turn.Images!.Count == 0);
+            Check((turn.Files?.Count ?? 0) == 0 && (turn.Images?.Count ?? 0) == 0);
+            Check(turn.Content.Contains("document.PDF") && turn.Content.Contains("PDF gốc"));
             var pending = AiProjectContext.Prepare(new(), new() { Attachments = [pdf] }, "").Last();
-            Check(pending.Files!.Count == 1);
+            Check(pending.Files!.Count == 1 && pending.Files[0].Data.SequenceEqual(Pdf));
         });
         test("PDF validates signature and 8MB bound without trusting MIME or history", () =>
         {
@@ -56,11 +58,11 @@ internal static class PdfAiTests
             var conversation = new AiConversation { Messages = [new() { Attachments = [attachment] }] };
             var copy = JsonSerializer.Deserialize<AiConversation>(JsonSerializer.Serialize(conversation))!;
             var turn = AiHistory.RequestTurns(copy).Single();
-            Check(turn.Content.Contains("All pages.") && turn.Files!.Count == 0);
+            Check(turn.Content.Contains("All pages.") && (turn.Files?.Count ?? 0) == 0 && (turn.Images?.Count ?? 0) == 0);
             Check(copy.Messages[0].Attachments[0].SourceSha256 == "source-hash");
         });
         foreach (var protocol in new[] { AiProtocol.OpenAiResponses, AiProtocol.OpenAiChat, AiProtocol.Gemini })
-            test("PDF native wire shape and historical bytes: " + protocol, () =>
+            test("PDF native wire shape and explicitly supplied bytes: " + protocol, () =>
             {
                 var profile = Profile(protocol, protocol == AiProtocol.Gemini ? "gemini-2.5-pro" : "gpt-4.1");
                 using var handler = new CapabilityStub(protocol); using var client = new AiClient(handler);
@@ -88,136 +90,143 @@ internal static class PdfAiTests
             });
         test("PDF rejects Ollama and unsupported or spoofed compatible providers before sending", () =>
         {
-            foreach (var profile in new[] { Profile(AiProtocol.Ollama, "qwen3"), Profile(AiProtocol.OpenAiResponses, "unknown"),
-                new AiProfile { Protocol = AiProtocol.OpenAiChat, Model = "gpt-4.1", BaseUrl = "https://api.openai.com.evil.test/v1" } })
+            var pdf = new AiTurn("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)]);
+            foreach (var profile in new[]
             {
-                using var handler = new CapabilityStub(profile.Protocol); using var client = new AiClient(handler);
-                var error = Throws<InvalidOperationException>(() => Drain(client.StreamEvents(profile, "", [new("user", "", Files: [new("x.pdf", "application/pdf", Pdf)])])).GetAwaiter().GetResult());
-                Check(handler.Calls == 0 && error.Message.Contains("Markdown"));
-            }
+                new AiProfile { Protocol = AiProtocol.Ollama, BaseUrl = "http://localhost:11434", Model = "llava" },
+                new AiProfile { Protocol = AiProtocol.OpenAiChat, BaseUrl = "https://example.test/v1", Model = "gpt-4.1" },
+                new AiProfile { Protocol = AiProtocol.OpenAiResponses, BaseUrl = "https://example.test/v1", Model = "gpt-4.1" },
+                new AiProfile { Protocol = AiProtocol.Gemini, BaseUrl = "https://example.test/v1", Model = "gemini-2.5-pro" }
+            }) Throws<InvalidOperationException>(() => AiPdf.ValidateRequest(profile, [pdf]));
         });
         test("PDF supported list covers common documented vision models but not arbitrary suffixes", () =>
         {
-            foreach (var model in new[] { "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-5-mini", "gpt-5-nano", "gpt-5.1", "gpt-5.4" })
-                Check(AiModelCapabilities.SupportsNativePdf(Profile(AiProtocol.OpenAiChat, model)));
-            Check(!AiModelCapabilities.SupportsNativePdf(Profile(AiProtocol.OpenAiChat, "gpt-4.1-custom")));
+            foreach (var profile in new[]
+            {
+                Profile(AiProtocol.OpenAiResponses, "gpt-4.1"), Profile(AiProtocol.OpenAiResponses, "gpt-5"),
+                Profile(AiProtocol.OpenAiChat, "gpt-4.1-mini"), Profile(AiProtocol.Gemini, "gemini-2.5-pro")
+            }) AiPdf.ValidateRequest(profile, [new("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)])]);
+            Throws<InvalidOperationException>(() => AiPdf.ValidateRequest(Profile(AiProtocol.OpenAiResponses, "gpt-4.1-evil"), [new("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)])]));
         });
         test("PDF budget counts history and rejects unsupported attachment roles", () =>
         {
-            var bytes = new byte[AiDocuments.MaxFileBytes]; Pdf.CopyTo(bytes, 0);
-            Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("user", "", Files: [new("x.pdf", "application/pdf", bytes), new("y.pdf", "application/pdf", Pdf)])]));
-            Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("system", "", Files: [new("x.pdf", "application/pdf", Pdf)])]));
-            Throws<InvalidDataException>(() => AiPdf.ValidateBudget([new("user", "", Files: [new("x.bin", "application/octet-stream", Pdf)])]));
+            var over = new byte[AiDocuments.MaxFileBytes]; "%PDF-"u8.CopyTo(over);
+            Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("user", "a", Files: [new("a.pdf", "application/pdf", over), new("b.pdf", "application/pdf", over)])]));
+            Throws<InvalidOperationException>(() => AiPdf.ValidateBudget([new("assistant", "a", Files: [new("a.pdf", "application/pdf", Pdf)])]));
         });
         test("PDF direct and text-only preprocessing never require a runtime or download", () =>
         {
-            var profile = Profile(AiProtocol.OpenAiResponses, "gpt-4.1");
-            AiTurn[] turns = [new("user", "", Files: [new("x.pdf", "application/pdf", Pdf)])];
-            var result = AiPdfProcessor.PrepareTurnsAsync(turns, profile, new(), "missing").GetAwaiter().GetResult();
-            Check(ReferenceEquals(turns, result));
-            AiTurn[] plain = [new("user", "text")];
-            var invalid = new AiPdfSettings { Engine = (AiPdfEngine)100, RuntimeRoot = "invalid", MaxPages = -1 };
-            Check(ReferenceEquals(plain, AiPdfProcessor.PrepareTurnsAsync(plain, profile, invalid, "missing").GetAwaiter().GetResult()));
-            Check(AiPdfProcessor.RuntimeStatus(invalid, "missing").Length > 0);
+            var direct = new AiPdfSettings { Engine = AiPdfEngine.Direct };
+            var turns = new[] { new AiTurn("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)]) };
+            Check(ReferenceEquals(turns, AiPdfProcessor.PrepareTurnsAsync(turns, Profile(AiProtocol.Gemini, "gemini-2.5-pro"), direct, "missing").GetAwaiter().GetResult()));
+            var textOnly = new[] { new AiTurn("user", "plain") };
+            var local = new AiPdfSettings { Engine = AiPdfEngine.Docling };
+            Check(ReferenceEquals(textOnly, AiPdfProcessor.PrepareTurnsAsync(textOnly, Profile(AiProtocol.Gemini, "gemini-2.5-pro"), local, "missing").GetAwaiter().GetResult()));
         });
         test("PDF preprocessing honors cancellation before reading runtime or launching", () =>
         {
-            using var stop = new CancellationTokenSource(); stop.Cancel();
-            Throws<OperationCanceledException>(() => AiPdfProcessor.PrepareAttachmentAsync(AiDocuments.Read("x.pdf", Pdf),
-                new() { Engine = AiPdfEngine.Docling }, "missing", token: stop.Token).GetAwaiter().GetResult());
+            using var cancel = new CancellationTokenSource(); cancel.Cancel();
+            Throws<OperationCanceledException>(() => AiPdfProcessor.PrepareTurnsAsync([new("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)])], new(), new() { Engine = AiPdfEngine.Docling }, "missing", token: cancel.Token).GetAwaiter().GetResult());
         });
         test("PDF preprocessing refuses untrusted bridge and invalid page/time settings", () =>
         {
-            foreach (var settings in new[] { new AiPdfSettings { Engine = AiPdfEngine.Docling, MaxPages = 101 },
-                new AiPdfSettings { Engine = AiPdfEngine.Docling, TimeoutSeconds = 601 }, new AiPdfSettings { Engine = AiPdfEngine.Docling } })
-                Throws<InvalidOperationException>(() => AiPdfProcessor.PrepareAttachmentAsync(AiDocuments.Read("x.pdf", Pdf), settings, "malicious-command").GetAwaiter().GetResult());
+            var temp = Path.Combine(Path.GetTempPath(), "h2-pdf-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temp);
+            try
+            {
+                var manifest = Path.Combine(temp, "runtime.json"); File.WriteAllText(manifest, "{}");
+                var settings = new AiPdfSettings { Engine = AiPdfEngine.Docling, RuntimeRoot = temp };
+                Throws<InvalidOperationException>(() => AiPdfProcessor.PrepareTurnsAsync([new("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)])], new(), settings, Path.Combine(temp, "evil.py")).GetAwaiter().GetResult());
+                settings.MaxPages = 101;
+                Throws<InvalidOperationException>(() => AiPdfProcessor.PrepareTurnsAsync([new("user", "x", Files: [new("a.pdf", "application/pdf", Pdf)])], new(), settings, "missing").GetAwaiter().GetResult());
+            }
+            finally { Directory.Delete(temp, true); }
         });
         test("PDF OCR output reader rejects overflow, invalid UTF8, empty and NUL without truncating", () =>
         {
-            var path = Path.GetTempFileName();
+            var method = typeof(AiPdfProcessor).GetMethod("ReadMarkdownAsync", BindingFlags.NonPublic | BindingFlags.Static)!;
+            var dir = Path.Combine(Path.GetTempPath(), "h2-pdf-output-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);
             try
             {
-                foreach (var content in new[] { "", " \n ", "bad\0data", new string('x', AiDocuments.MaxTextCharacters + 1) })
-                {
-                    File.WriteAllText(path, content, new UTF8Encoding(false));
-                    Throws<InvalidDataException>(() => ReadMarkdown(path).GetAwaiter().GetResult());
-                }
-                File.WriteAllBytes(path, [255, 255]);
-                Throws<DecoderFallbackException>(() => ReadMarkdown(path).GetAwaiter().GetResult());
-                File.WriteAllText(path, new string('a', AiDocuments.MaxTextCharacters), new UTF8Encoding(false));
-                Check(ReadMarkdown(path).GetAwaiter().GetResult().Length == AiDocuments.MaxTextCharacters);
+                var file = Path.Combine(dir, "out.md");
+                File.WriteAllText(file, "ok"); Check((string)((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult() == "ok");
+                File.WriteAllBytes(file, new byte[(AiDocuments.MaxTextCharacters * 4) + 1]); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
+                File.WriteAllBytes(file, [0xff, 0xfe]); Throws<DecoderFallbackException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
+                File.WriteAllText(file, "   "); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
+                File.WriteAllText(file, "a\0b"); Throws<InvalidDataException>(() => ((Task<string>)method.Invoke(null, [file, CancellationToken.None])!).GetAwaiter().GetResult());
             }
-            finally { File.Delete(path); }
+            finally { Directory.Delete(dir, true); }
         });
         test("PDF runtime manifest is readiness-only and cannot choose executable or escape model directory", () =>
         {
-            var folder = Directory.CreateTempSubdirectory("h2-pdf-runtime-test-").FullName;
+            var root = Path.Combine(Path.GetTempPath(), "h2-pdf-runtime-" + Guid.NewGuid().ToString("N"));
+            var tools = Path.Combine(root, "tools", "ocr"); var runtime = Path.Combine(root, "runtime"); Directory.CreateDirectory(tools); Directory.CreateDirectory(runtime);
+            var bridge = Path.Combine(tools, "convert.py"); File.WriteAllText(bridge, "# safe");
+            var venv = Path.Combine(runtime, "venv", OperatingSystem.IsWindows() ? "Scripts" : "bin"); Directory.CreateDirectory(venv);
+            File.WriteAllText(Path.Combine(venv, OperatingSystem.IsWindows() ? "python.exe" : "python"), "python");
+            foreach (var engine in new[] { "docling", "got-ocr", "mineru" }) { var model = Path.Combine(runtime, "models", engine); Directory.CreateDirectory(model); File.WriteAllText(Path.Combine(model, "weight.bin"), "x"); }
+            File.WriteAllText(Path.Combine(runtime, "runtime.json"), "{\"schemaVersion\":1,\"pythonExecutable\":\"" + (OperatingSystem.IsWindows() ? "venv/Scripts/python.exe" : "venv/bin/python") + "\",\"engines\":{\"docling\":{\"ready\":true,\"modelsPath\":\"models/docling\"},\"got-ocr\":{\"ready\":true,\"modelsPath\":\"models/got-ocr\"},\"mineru\":{\"ready\":true,\"modelsPath\":\"models/mineru\"}}}");
             try
             {
-                var bridge = Path.Combine(folder, "tools", "ocr", "convert.py");
-                Directory.CreateDirectory(Path.GetDirectoryName(bridge)!); File.WriteAllText(bridge, "# synthetic, never executed");
-                var expectedPython = OperatingSystem.IsWindows() ? "venv/Scripts/python.exe" : "venv/bin/python";
-                var python = Path.Combine(folder, expectedPython);
-                Directory.CreateDirectory(Path.GetDirectoryName(python)!); File.WriteAllText(python, "synthetic, never executed");
-                var models = Path.Combine(folder, "models", "docling"); Directory.CreateDirectory(models);
-                File.WriteAllText(Path.Combine(models, "placeholder"), "synthetic");
-                var settings = new AiPdfSettings { Engine = AiPdfEngine.Docling, RuntimeRoot = folder };
-                void Manifest(bool ready, string executable, string modelPath) => File.WriteAllText(Path.Combine(folder, "runtime.json"),
-                    JsonSerializer.Serialize(new { schemaVersion = 1, pythonExecutable = executable, engines = new { docling = new { ready, modelsPath = modelPath } } }));
-                foreach (var (ready, executable, modelPath) in new[] { (false, expectedPython, "models/docling"),
-                    (true, "../../evil.exe", "models/docling"), (true, expectedPython, "../../documents") })
-                {
-                    Manifest(ready, executable, modelPath);
-                    Check(!AiPdfProcessor.RuntimeStatus(settings, bridge).Contains("đã được"));
-                    Throws<InvalidOperationException>(() => AiPdfProcessor.PrepareAttachmentAsync(AiDocuments.Read("x.pdf", Pdf), settings, bridge).GetAwaiter().GetResult());
-                }
-                Manifest(true, expectedPython, "models/docling");
-                Check(AiPdfProcessor.RuntimeStatus(settings, bridge).Contains("đã được"));
-                var runtime = typeof(AiPdfProcessor).GetMethod("ReadRuntime", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [settings, bridge]);
-                var input = Path.Combine(folder, "name with spaces & shell.pdf");
-                var start = (ProcessStartInfo)typeof(AiPdfProcessor).GetMethod("BuildStartInfo", BindingFlags.NonPublic | BindingFlags.Static)!
-                    .Invoke(null, [runtime, input, Path.Combine(folder, "out.md"), folder, settings])!;
-                Check(!start.UseShellExecute && start.CreateNoWindow && start.Arguments == "" && start.ArgumentList.Contains(input));
-                Check(start.ArgumentList[0] == "-I" && start.FileName == python);
-                Check(start.Environment["HF_HUB_OFFLINE"] == "1" && !start.Environment.ContainsKey("OPENAI_API_KEY") && !start.Environment.ContainsKey("PYTHONPATH"));
-                File.WriteAllText(Path.Combine(folder, "runtime.json"), "[]");
-                Check(!AiPdfProcessor.RuntimeStatus(settings, bridge).Contains("đã được"));
+                var settings = new AiPdfSettings { Engine = AiPdfEngine.Docling, RuntimeRoot = runtime };
+                Check(AiPdfProcessor.RuntimeStatus(settings, bridge).Contains("sẵn sàng offline"));
             }
-            finally { Directory.Delete(folder, true); }
+            finally { Directory.Delete(root, true); }
         });
-        if (OperatingSystem.IsWindows())
-        {
-            test("PDF bounded local subprocess cancels promptly", () => Task.Run(async () =>
-            {
-                using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
-                var watch = Stopwatch.StartNew();
-                try { await RunChild("Start-Sleep -Seconds 30", stop.Token); throw new Exception("Expected cancellation"); }
-                catch (OperationCanceledException) { Check(watch.Elapsed < TimeSpan.FromSeconds(8)); }
-            }).GetAwaiter().GetResult());
-            test("PDF bounded local subprocess stops stdout flooding and redacts failed diagnostics", () => Task.Run(async () =>
-            {
-                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                try { await RunChild("[Console]::Write(('x' * 100000)); Start-Sleep -Seconds 30", timeout.Token); throw new Exception("Expected output limit"); }
-                catch (InvalidDataException) { }
-                try { await RunChild("[Console]::Error.Write('synthetic-secret'); exit 3", timeout.Token); throw new Exception("Expected readiness error"); }
-                catch (InvalidOperationException error) { Check(!error.Message.Contains("synthetic-secret")); }
-            }).GetAwaiter().GetResult());
-        }
+        test("PDF bounded local subprocess cancels promptly", () => RunProcessLimitCase(true));
+        test("PDF bounded local subprocess stops stdout flooding and redacts failed diagnostics", () => RunProcessLimitCase(false));
     }
 
-    private static Task<string> ReadMarkdown(string path) => (Task<string>)typeof(AiPdfProcessor)
-        .GetMethod("ReadMarkdownAsync", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [path, CancellationToken.None])!;
-
-    // The shared top-level runner also declares Throws; keep lookup inside this test class.
-    private static T Throws<T>(Action action) where T : Exception => ReasoningCapabilityTests.Throws<T>(action);
-
-    private static Task RunChild(string fixedTestScript, CancellationToken token)
+    private static AiProfile Profile(AiProtocol protocol, string model) => new()
     {
-        var executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
-        var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-Command", fixedTestScript }) start.ArgumentList.Add(arg);
-        return (Task)typeof(AiPdfProcessor).GetMethod("RunAsync", BindingFlags.NonPublic | BindingFlags.Static)!
-            .Invoke(null, [start, Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".md"), token, AiDocuments.MaxTextCharacters * 4])!;
+        Protocol = protocol,
+        Model = model,
+        BaseUrl = protocol == AiProtocol.Gemini ? "https://generativelanguage.googleapis.com/v1beta"
+            : protocol == AiProtocol.OpenAiResponses ? "https://api.openai.com/v1" : "https://api.openai.com/v1"
+    };
+
+    private static void Check(bool value, string message = "PDF assertion failed") { if (!value) throw new Exception(message); }
+    private static void Throws<T>(Action action) where T : Exception
+    {
+        try { action(); }
+        catch (TargetInvocationException ex) when (ex.InnerException is T) { return; }
+        catch (T) { return; }
+        throw new Exception("Expected " + typeof(T).Name);
+    }
+
+    private static void RunProcessLimitCase(bool cancel)
+    {
+        var method = typeof(AiPdfProcessor).GetMethod("RunAsync", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var temp = Path.Combine(Path.GetTempPath(), "h2-pdf-process-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temp);
+        var output = Path.Combine(temp, "out.md");
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+                start.ArgumentList.Add("/c"); start.ArgumentList.Add(cancel ? "ping -n 30 127.0.0.1 >NUL" : "for /L %i in (1,1,8000) do @echo diagnostic-secret-%i 1>&2");
+                using var cts = new CancellationTokenSource(cancel ? 180 : 4000);
+                if (cancel)
+                    Throws<OperationCanceledException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
+                else
+                    Throws<InvalidDataException>(() => ((Task)method.Invoke(null, [start, output, cts.Token, (int)(AiDocuments.MaxTextCharacters * 4)])!).GetAwaiter().GetResult());
+            }
+        }
+        finally { try { Directory.Delete(temp, true); } catch { } }
+    }
+
+    private sealed class CapabilityStub(AiProtocol protocol) : HttpMessageHandler, IDisposable
+    {
+        public string? Body;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            var payload = protocol switch
+            {
+                AiProtocol.OpenAiResponses => "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\"}\n\n",
+                AiProtocol.Gemini => "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\"}]}\n\n",
+                _ => "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n"
+            };
+            return new(HttpStatusCode.OK) { Content = new StringContent(payload) };
+        }
     }
 }

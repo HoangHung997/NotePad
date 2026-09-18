@@ -98,6 +98,57 @@ internal static class AiTests
             Throws<InvalidOperationException>(() => client.SetOllamaLoaded(new() { Model = "minimax-m3:cloud" }, true).GetAwaiter().GetResult());
             Check(handler.Calls == 0);
         });
+        test("Shared AI memory survives devices and retrieves project/time evidence without model context growth", () =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "h2-ai-memory-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                var state = SheetStorage.Demo();
+                var project = state.Notes[0].Projects[0];
+                project.Name = "Krong Ia Taun"; project.NameRich = RichDocument.Plain("Krong Ia Taun");
+                project.Notes = "Diện tích dự án Krong được điều chỉnh từ 8,5 ha lên 11,49 ha.";
+                project.NotesRich = RichDocument.Plain(project.Notes);
+                project.UpdatedAtUtc = new DateTime(2026, 9, 17, 1, 0, 0, DateTimeKind.Utc);
+                project.Conversations.Add(new AiConversation { Messages = [new AiMessage
+                {
+                    Role = "user", Content = "Sáng nay bắt đầu làm hồ sơ hoàn công Krong.",
+                    CreatedAt = new DateTime(2026, 9, 17, 2, 15, 0, DateTimeKind.Utc), DeviceId = "PC-A"
+                }] });
+                new AiMemoryStore(root, "PC-A").SyncFromState(state);
+                Check(File.Exists(Path.Combine(root, "memory", "revision.json")));
+                Check(Directory.EnumerateFiles(Path.Combine(root, "memory"), "*.h2memory.json", SearchOption.AllDirectories).Any());
+
+                var pcB = new AiMemoryStore(root, "PC-B");
+                var localNow = new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.FromHours(7));
+                var facts = pcB.Query("diện tích Krong", project.Id, false, 20, localNow);
+                Check(facts.Records.Any(r => r.Text.Contains("11,49 ha", StringComparison.Ordinal)));
+                var morning = pcB.Query("sáng nay Krong làm gì", project.Id, false, 20, localNow);
+                Check(morning.Records.Any(r => r.Text.Contains("hồ sơ hoàn công Krong", StringComparison.Ordinal)));
+            }
+            finally { try { Directory.Delete(root, true); } catch { } }
+        });
+        test("Interactive AI context keeps recent turns and never resends historical image bytes", () =>
+        {
+            var conversation = new AiConversation();
+            for (var i = 0; i < 30; i++)
+            {
+                var message = new AiMessage { Role = i % 2 == 0 ? "user" : "assistant", Content = "turn-" + i, CreatedAt = DateTime.UtcNow.AddMinutes(i - 30) };
+                if (i == 25) message.Attachments.Add(new AiAttachment
+                {
+                    Name = "old.png", MimeType = "image/png", Data = [137, 80, 78, 71], Text = "OCR-CACHED-TABLE", PdfEngine = AiPdfEngine.GotOcr,
+                    Sha256 = "OLD", SourceSha256 = "OLD"
+                });
+                conversation.Messages.Add(message);
+            }
+            var pending = new AiMessage { Role = "user", Content = "new request" };
+            var turns = AiProjectContext.Prepare(conversation, pending, "{\"current\":true}");
+            Check(turns.Count == AiProjectContext.RecentConversationMessages + 2);
+            Check(turns.Skip(1).Take(AiProjectContext.RecentConversationMessages).All(t => (t.Images?.Count ?? 0) == 0 && (t.Files?.Count ?? 0) == 0));
+            Check(turns.Any(t => t.Content.Contains("OCR-CACHED-TABLE", StringComparison.Ordinal)));
+            Check(turns.All(t => !t.Content.Contains("turn-0", StringComparison.Ordinal)));
+            Check(turns[^1].Content.Contains("new request", StringComparison.Ordinal));
+        });
     }
     private static async Task<string> Collect(AiClient client, AiProfile profile, string key, AiTurn[] turns, CancellationToken token = default)
     { var text = new StringBuilder(); await foreach (var part in client.Stream(profile, key, turns, token)) text.Append(part); return text.ToString(); }

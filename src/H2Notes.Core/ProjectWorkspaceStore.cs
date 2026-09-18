@@ -4,31 +4,58 @@ using System.Text.Json;
 
 namespace H2Notes.Core;
 
-// The index is published last. A durable journal restores the previous generation
-// after an interrupted multi-file save; unchanged project files are never rewritten.
+// Schema 5 keeps the existing project/note JSON layout but changes the write protocol:
+// multiple devices may open the same NAS workspace, every commit takes only a short
+// workspace transaction lock, and remote changes are merged by stable entity IDs.
 public sealed class ProjectWorkspaceStore : INoteStorage
 {
-    public const int SchemaVersion = 4;
+    public const int SchemaVersion = 5;
     private int _sourceVersion = SchemaVersion;
     internal static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private Dictionary<string, string> _known = new(StringComparer.OrdinalIgnoreCase);
     private bool _loaded;
     private Dictionary<Guid, FileEntry> _entries = [];
     private readonly Action<int>? _checkpoint;
+    private SheetState? _baseState;
+
     public string Root { get; }
     public string FilePath => Path.Combine(Root, "workspace.h2index.json");
-    private string JournalPath => Path.Combine(Root, ".h2-transaction.json");
+    public string WriterId { get; }
+    public IReadOnlyList<WorkspaceMergeConflict> LastMergeConflicts { get; private set; } = Array.Empty<WorkspaceMergeConflict>();
 
-    public ProjectWorkspaceStore(string root, Action<int>? checkpoint = null)
+    private string JournalPath => Path.Combine(Root, ".h2-transaction.json");
+    private string CommitLockPath => Path.Combine(Root, ".h2-commit.lock");
+
+    public ProjectWorkspaceStore(string root, Action<int>? checkpoint = null, string? writerId = null)
     {
         Root = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
         _checkpoint = checkpoint;
+        WriterId = string.IsNullOrWhiteSpace(writerId) ? Environment.MachineName : writerId.Trim();
     }
 
+    // This lock is intentionally local to one Windows profile. It prevents two copies
+    // of H2 Notes on the same PC from editing the same workspace, while another PC may
+    // open the same NAS folder. Cross-device serialization happens only in AcquireCommitLock().
     public FileStream AcquireLock()
     {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes", "instance-locks");
+        Directory.CreateDirectory(folder);
+        var key = Hash(Encoding.UTF8.GetBytes(Root))[..32];
+        return new FileStream(Path.Combine(folder, key + ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+    }
+
+    private FileStream AcquireCommitLock()
+    {
         Directory.CreateDirectory(Root);
-        return new FileStream(Path.Combine(Root, ".h2-workspace.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+        IOException? last = null;
+        do
+        {
+            try { return new FileStream(CommitLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+            catch (IOException ex) { last = ex; Thread.Sleep(60); }
+        }
+        while (DateTime.UtcNow < deadline);
+        throw new IOException("Kho dữ liệu đang được thiết bị khác ghi. H2 Notes sẽ thử lại ở lần tự lưu sau.", last);
     }
 
     public SheetState LoadOrImport(string? legacyPath = null)
@@ -36,8 +63,11 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         Recover();
         if (File.Exists(FilePath)) return Read();
         if (FindDataFiles().Any()) throw new InvalidDataException("Có tệp dự án nhưng thiếu chỉ mục kho. Không tạo kho trống đè lên dữ liệu.");
-        _loaded = true; _known.Clear();
-        if (legacyPath is null || !File.Exists(legacyPath)) return new SheetState();
+
+        _loaded = true; _known.Clear(); _entries.Clear(); _sourceVersion = SchemaVersion;
+        var empty = new SheetState(); _baseState = Clone(empty);
+        if (legacyPath is null || !File.Exists(legacyPath)) return empty;
+
         var state = SheetStorage.Read(legacyPath);
         Directory.CreateDirectory(Path.Combine(Root, "backups"));
         File.Copy(legacyPath, Path.Combine(Root, "backups", "migration-" + Guid.NewGuid().ToString("N") + ".json"));
@@ -47,12 +77,202 @@ public sealed class ProjectWorkspaceStore : INoteStorage
 
     public SheetState Read()
     {
+        using var commit = AcquireCommitLock();
+        RecoverUnderLock();
+        var snapshot = ReadSnapshot();
+        ApplySnapshot(snapshot);
+        _baseState = Clone(snapshot.State);
+        _loaded = true;
+        return snapshot.State;
+    }
+
+    public bool RefreshFromDisk(SheetState liveState, IReadOnlySet<Guid> dirtyProjects)
+    {
+        if (!_loaded || !File.Exists(FilePath)) return false;
+        using var commit = AcquireCommitLock();
+        RecoverUnderLock();
+        var snapshot = ReadSnapshot();
+        if (_known.TryGetValue("workspace.h2index.json", out var knownIndex)
+            && snapshot.Fingerprints.TryGetValue("workspace.h2index.json", out var currentIndex)
+            && knownIndex == currentIndex) return false;
+
+        var baseline = _baseState is null ? Clone(snapshot.State) : Clone(_baseState);
+        LastMergeConflicts = WorkspaceConcurrency.MergeIntoLocal(baseline, liveState, snapshot.State, dirtyProjects, WriterId);
+        ApplySnapshot(snapshot);
+        // The new baseline is what is currently on the NAS. Local dirty edits remain in liveState
+        // and will be compared against this baseline on the next save.
+        _baseState = Clone(snapshot.State);
+        return true;
+    }
+
+    public void Save(SheetState state) => SaveIncremental(state, null);
+
+    public void SaveIncremental(SheetState state, IReadOnlySet<Guid>? changedProjects)
+    {
+        if (!_loaded) throw new InvalidOperationException("Đọc kho trước khi lưu để kiểm tra xung đột.");
+        ValidateState(state);
+
+        using var commit = AcquireCommitLock();
+        RecoverUnderLock();
+        var hasRemote = File.Exists(FilePath);
+        var remote = hasRemote ? ReadSnapshot() : WorkspaceSnapshot.Empty();
+        var baseline = _baseState is null ? Clone(remote.State) : Clone(_baseState);
+
+        LastMergeConflicts = hasRemote
+            ? WorkspaceConcurrency.MergeIntoLocal(baseline, state, remote.State, changedProjects, WriterId)
+            : Array.Empty<WorkspaceMergeConflict>();
+
+        _sourceVersion = hasRemote ? remote.SchemaVersion : SchemaVersion;
+        if (_sourceVersion != SchemaVersion) changedProjects = null; // one complete upgrade transaction
+
+        var package = BuildPackage(state, changedProjects, remote);
+        var changed = package.Data
+            .Where(p => p.Value is not null && (!remote.Fingerprints.TryGetValue(p.Key, out var hash) || hash != Hash(p.Value)))
+            .Select(p => p.Key).ToList();
+        var removed = remote.Fingerprints.Keys.Where(k => !package.Data.ContainsKey(k)).ToList();
+        if (changed.Count == 0 && removed.Count == 0)
+        {
+            ApplySnapshot(remote);
+            _baseState = Clone(remote.State);
+            return;
+        }
+
+        AssertSnapshotUnchanged(remote.Fingerprints);
+        var transactionId = Guid.NewGuid().ToString("N");
+        var backup = "backups/save-" + transactionId;
+        var entries = changed.Concat(removed).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(k => k == "workspace.h2index.json" ? 1 : 0)
+            .Select((file, i) => new JournalEntry(file, File.Exists(Resolve(file)), backup + "/" + i + ".bak")).ToList();
+
+        foreach (var entry in entries)
+        {
+            var target = Resolve(entry.File);
+            if (!remote.Fingerprints.ContainsKey(entry.File) && File.Exists(target))
+                throw new IOException("Không ghi đè tệp chưa thuộc chỉ mục: " + entry.File);
+            if (!entry.Existed) continue;
+            var saved = ResolveBackup(entry.Backup);
+            Directory.CreateDirectory(Path.GetDirectoryName(saved)!);
+            File.Copy(target, saved, false);
+        }
+
+        AssertSnapshotUnchanged(remote.Fingerprints);
+        AtomicWrite(JournalPath, Encode(new SaveJournal { Entries = entries }));
+        try
+        {
+            var count = 0;
+            foreach (var entry in entries)
+            {
+                var target = Resolve(entry.File);
+                if (package.Data.TryGetValue(entry.File, out var bytes) && bytes is not null) AtomicWrite(target, bytes);
+                else File.Delete(target);
+                _checkpoint?.Invoke(++count);
+            }
+            File.Delete(JournalPath);
+            if (LastMergeConflicts.Count > 0) WriteConflictAudit(LastMergeConflicts);
+
+            var final = ReadSnapshot();
+            ApplySnapshot(final);
+            _baseState = Clone(final.State);
+            _sourceVersion = SchemaVersion;
+        }
+        catch
+        {
+            RecoverUnderLock();
+            throw;
+        }
+    }
+
+    private WritePackage BuildPackage(SheetState state, IReadOnlySet<Guid>? changedProjects, WorkspaceSnapshot remote)
+    {
+        Directory.CreateDirectory(Root);
+        var data = new Dictionary<string, byte[]?>(StringComparer.OrdinalIgnoreCase);
+        var index = new WorkspaceIndex
+        {
+            State = new SheetState
+            {
+                SheetSchemaVersion = state.SheetSchemaVersion,
+                SheetPreferences = state.SheetPreferences,
+                ImportHistory = state.ImportHistory,
+                // Desktop session is stored locally by the Avalonia app. Never let two PCs
+                // overwrite each other's open-window state through the shared NAS index.
+                DesktopSession = null,
+                Extra = state.Extra
+            }
+        };
+
+        foreach (var note in state.Notes)
+        {
+            if (note.IsBoard)
+            {
+                var shell = SharedNote(note, includeProjects: false);
+                index.State.Notes.Add(shell);
+                foreach (var project in note.Projects)
+                {
+                    if (changedProjects is not null && !changedProjects.Contains(project.Id)
+                        && remote.Entries.TryGetValue(project.Id, out var cached)
+                        && cached.BoardId == note.Id && cached.Kind == "project" && remote.SchemaVersion == SchemaVersion)
+                    {
+                        data.Add(cached.File, null); index.Files.Add(cached); continue;
+                    }
+
+                    var name = "projects/" + project.Id.ToString("N") + ".h2project.json";
+                    var bytes = Encode(new ProjectFile { BoardId = note.Id, Project = SharedProject(project) });
+                    data.Add(name, bytes);
+                    index.Files.Add(new(project.Id, note.Id, "project", name, Hash(bytes)));
+                }
+            }
+            else
+            {
+                var name = "notes/" + note.Id.ToString("N") + ".h2note.json";
+                var bytes = Encode(new GeneralNoteFile { Note = SharedNote(note, includeProjects: true) });
+                data.Add(name, bytes);
+                index.Files.Add(new(note.Id, null, "note", name, Hash(bytes)));
+            }
+        }
+
+        data.Add("workspace.h2index.json", Encode(index));
+        return new(data, index);
+    }
+
+    private static ProjectRecord SharedProject(ProjectRecord project)
+    {
+        var clone = Clone(project);
+        ClearDrafts(clone.Conversations);
+        return clone;
+    }
+
+    private static NoteRecord SharedNote(NoteRecord note, bool includeProjects)
+    {
+        var clone = Clone(note);
+        if (!includeProjects) clone.Projects = [];
+        ClearDrafts(clone.AiConversations);
+        foreach (var project in clone.Projects) ClearDrafts(project.Conversations);
+        return clone;
+    }
+
+    private static void ClearDrafts(IEnumerable<AiConversation> conversations)
+    {
+        foreach (var conversation in conversations)
+        {
+            conversation.Draft = "";
+            conversation.DraftAttachments.Clear();
+        }
+    }
+
+    private WorkspaceSnapshot ReadSnapshot()
+    {
         var indexBytes = File.ReadAllBytes(FilePath);
         var index = Decode<WorkspaceIndex>(indexBytes);
-        if (index.SchemaVersion is not 2 and not 3 and not SchemaVersion) throw new InvalidDataException("Kho thuộc phiên bản không được hỗ trợ. Không ghi đè.");
+        if (index.SchemaVersion is not 2 and not 3 and not 4 and not SchemaVersion)
+            throw new InvalidDataException("Kho thuộc phiên bản không được hỗ trợ. Không ghi đè.");
         if (index.State is null || index.Files is null) throw new InvalidDataException("Chỉ mục kho không đầy đủ.");
+
         var state = index.State;
-        var fingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["workspace.h2index.json"] = Hash(indexBytes) };
+        foreach (var board in state.Notes.Where(n => n.IsBoard)) board.Projects.Clear();
+        var fingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["workspace.h2index.json"] = Hash(indexBytes)
+        };
         var ids = new HashSet<Guid>();
         foreach (var entry in index.Files)
         {
@@ -80,108 +300,40 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             else throw new InvalidDataException("Loại tệp trong kho không được hỗ trợ.");
         }
         ValidateState(state);
-        _known = fingerprints; _entries = index.Files.ToDictionary(e => e.Id); _loaded = true; _sourceVersion = index.SchemaVersion;
-        return state;
+        return new(state, fingerprints, index.Files.ToDictionary(e => e.Id), index.SchemaVersion);
     }
 
-    public void Save(SheetState state)
-        => SaveIncremental(state, null);
-
-    public void SaveIncremental(SheetState state, IReadOnlySet<Guid>? changedProjects)
+    private void ApplySnapshot(WorkspaceSnapshot snapshot)
     {
-        if (!_loaded) throw new InvalidOperationException("Đọc kho trước khi lưu để kiểm tra xung đột.");
-        ValidateState(state);
-        // Upgrade all files in the same backed-up transaction. Older clients must
-        // reject v3 rather than sending new local-only markers as normal chat turns.
-        if (_sourceVersion != SchemaVersion) changedProjects = null;
-        AssertUnchanged();
-        Directory.CreateDirectory(Root);
-        var data = new Dictionary<string, byte[]?>(StringComparer.OrdinalIgnoreCase);
-        var index = new WorkspaceIndex { State = new SheetState { SheetSchemaVersion = state.SheetSchemaVersion,
-            SheetPreferences = state.SheetPreferences, ImportHistory = state.ImportHistory, DesktopSession = state.DesktopSession, Extra = state.Extra } };
-        foreach (var note in state.Notes)
-        {
-            if (note.IsBoard)
-            {
-                index.State.Notes.Add(note.IndexShell());
-                foreach (var project in note.Projects)
-                {
-                    if (changedProjects is not null && !changedProjects.Contains(project.Id) && _entries.TryGetValue(project.Id, out var cached)
-                        && cached.BoardId == note.Id && cached.Kind == "project")
-                    { data.Add(cached.File, null); index.Files.Add(cached); continue; }
-                    var name = "projects/" + SafeName(project.DisplayName, project.Id) + ".h2project.json";
-                    var bytes = Encode(new ProjectFile { BoardId = note.Id, Project = project });
-                    data.Add(name, bytes); index.Files.Add(new(project.Id, note.Id, "project", name, Hash(bytes)));
-                }
-            }
-            else
-            {
-                var name = "notes/" + SafeName(note.Title, note.Id) + ".h2note.json";
-                var bytes = Encode(new GeneralNoteFile { Note = note });
-                data.Add(name, bytes); index.Files.Add(new(note.Id, null, "note", name, Hash(bytes)));
-            }
-        }
-        data.Add("workspace.h2index.json", Encode(index));
-        var changed = data.Where(p => p.Value is not null && (!_known.TryGetValue(p.Key, out var hash) || hash != Hash(p.Value))).Select(p => p.Key).ToList();
-        var removed = _known.Keys.Where(k => !data.ContainsKey(k)).ToList();
-        if (changed.Count == 0 && removed.Count == 0) return;
-        var transactionId = Guid.NewGuid().ToString("N");
-        var backup = "backups/save-" + transactionId;
-        var entries = changed.Concat(removed).Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(k => k == "workspace.h2index.json" ? 1 : 0)
-            .Select((file, i) => new JournalEntry(file, File.Exists(Resolve(file)), backup + "/" + i + ".bak")).ToList();
-        foreach (var entry in entries)
-        {
-            var target = Resolve(entry.File);
-            if (!_known.ContainsKey(entry.File) && File.Exists(target))
-                throw new IOException("Không ghi đè tệp chưa thuộc chỉ mục: " + entry.File);
-            if (entry.Existed)
-            {
-                var saved = ResolveBackup(entry.Backup);
-                Directory.CreateDirectory(Path.GetDirectoryName(saved)!); File.Copy(target, saved, false);
-            }
-        }
-        var journal = new SaveJournal { Entries = entries };
-        AssertUnchanged();
-        AtomicWrite(JournalPath, Encode(journal));
-        try
-        {
-            var count = 0;
-            foreach (var entry in entries)
-            {
-                var target = Resolve(entry.File);
-                if (data.TryGetValue(entry.File, out var bytes) && bytes is not null) AtomicWrite(target, bytes);
-                else File.Delete(target);
-                _checkpoint?.Invoke(++count);
-            }
-            File.Delete(JournalPath);
-            _known = data.ToDictionary(p => p.Key, p => p.Value is null ? _known[p.Key] : Hash(p.Value), StringComparer.OrdinalIgnoreCase);
-            _entries = index.Files.ToDictionary(e => e.Id);
-            _sourceVersion = SchemaVersion;
-        }
-        catch
-        {
-            Recover();
-            throw;
-        }
+        _known = snapshot.Fingerprints;
+        _entries = snapshot.Entries;
+        _sourceVersion = snapshot.SchemaVersion;
+        _loaded = true;
     }
 
-    private void AssertUnchanged()
+    private void AssertSnapshotUnchanged(Dictionary<string, string> fingerprints)
     {
-        foreach (var pair in _known)
+        foreach (var pair in fingerprints)
         {
             var path = Resolve(pair.Key);
             if (!File.Exists(path) || Hash(File.ReadAllBytes(path)) != pair.Value)
-                throw new IOException("Dữ liệu đã thay đổi bên ngoài app. Dừng lưu để tránh ghi đè: " + pair.Key);
+                throw new IOException("Dữ liệu bị thay đổi ngoài giao thức đồng bộ trong lúc lưu: " + pair.Key);
         }
-        if (_known.Count == 0 && File.Exists(FilePath)) throw new IOException("Kho mới được tạo bởi tiến trình khác. Hãy mở lại.");
+        if (fingerprints.Count == 0 && File.Exists(FilePath))
+            throw new IOException("Kho vừa được tạo bởi thiết bị khác. Sẽ đồng bộ ở lần lưu kế tiếp.");
     }
 
     public void Recover()
     {
+        Directory.CreateDirectory(Root);
+        using var commit = AcquireCommitLock();
+        RecoverUnderLock();
+    }
+
+    private void RecoverUnderLock()
+    {
         if (!File.Exists(JournalPath)) return;
         var journal = Decode<SaveJournal>(File.ReadAllBytes(JournalPath));
-        // Validate the complete recovery plan before touching any target.
         foreach (var entry in journal.Entries)
         {
             _ = Resolve(entry.File);
@@ -194,6 +346,14 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             else File.Delete(Resolve(entry.File));
         }
         File.Delete(JournalPath);
+    }
+
+    private void WriteConflictAudit(IReadOnlyList<WorkspaceMergeConflict> conflicts)
+    {
+        var folder = Path.Combine(Root, "conflicts");
+        Directory.CreateDirectory(folder);
+        var path = Path.Combine(folder, DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N") + ".json");
+        AtomicWrite(path, Encode(conflicts));
     }
 
     public LegacyImportRecord ImportCopies(SheetState current, LegacyImportPreview preview)
@@ -230,16 +390,19 @@ public sealed class ProjectWorkspaceStore : INoteStorage
 
     private string Resolve(string relative)
     {
-        if (relative != "workspace.h2index.json" && !(relative.StartsWith("projects/", StringComparison.Ordinal) && relative.EndsWith(".h2project.json", StringComparison.Ordinal))
+        if (relative != "workspace.h2index.json"
+            && !(relative.StartsWith("projects/", StringComparison.Ordinal) && relative.EndsWith(".h2project.json", StringComparison.Ordinal))
             && !(relative.StartsWith("notes/", StringComparison.Ordinal) && relative.EndsWith(".h2note.json", StringComparison.Ordinal)))
             throw new InvalidDataException("Đường dẫn tệp kho không hợp lệ.");
         return ResolveSafe(relative);
     }
+
     private string ResolveBackup(string relative)
     {
         if (!relative.StartsWith("backups/", StringComparison.Ordinal)) throw new InvalidDataException("Đường dẫn backup không hợp lệ.");
         return ResolveSafe(relative);
     }
+
     private string ResolveSafe(string relative)
     {
         if (Path.IsPathRooted(relative) || relative.Contains('\\') || relative.Contains(':') || relative.Split('/').Any(p => p is ".." or "." or ""))
@@ -249,20 +412,26 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         for (var check = full; check is not null && check.Length >= Root.Length; check = Path.GetDirectoryName(check)) RejectReparse(check);
         return full;
     }
+
     public static void RejectReparse(string path)
     {
         if ((File.Exists(path) || Directory.Exists(path)) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
             throw new IOException("Không dùng liên kết thư mục/tệp làm kho dữ liệu: " + path);
     }
+
     public static void ValidateDestination(string source, string target)
     {
         var a = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar);
         var b = Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar);
-        if (a.Equals(b, StringComparison.OrdinalIgnoreCase) || (a + Path.DirectorySeparatorChar).StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+        if (a.Equals(b, StringComparison.OrdinalIgnoreCase)
+            || (a + Path.DirectorySeparatorChar).StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || (b + Path.DirectorySeparatorChar).StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Không chuyển vào chính kho đang dùng hoặc thư mục lồng nhau.");
         for (var path = b; path is not null; path = Path.GetDirectoryName(path)) RejectReparse(path);
     }
+
+    // Retained for compatibility with old imports/tests. Schema 5 uses the GUID-only
+    // file name above so renaming a project no longer becomes delete + create on NAS.
     public static string SafeName(string name, Guid id)
     {
         var invalid = Path.GetInvalidFileNameChars().Concat("<>:\"/\\|?*").ToHashSet();
@@ -272,6 +441,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         if (string.IsNullOrWhiteSpace(value)) value = "Du an";
         return value + "--" + id.ToString("N");
     }
+
     public static void ValidateState(SheetState state)
     {
         if (state.Notes is null || state.Notes.Any(n => n.Projects is null || n.Content is null)) throw new InvalidDataException("Dữ liệu ghi chú không đầy đủ.");
@@ -302,30 +472,45 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             }
         }
     }
-    public static T Clone<T>(T value) => Decode<T>(Encode(value));
+
+    public static T Clone<T>(T value)
+    {
+        if (value is null) return value!;
+        return Decode<T>(Encode(value));
+    }
+
     internal static byte[] Encode<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, Json);
     internal static T Decode<T>(byte[] bytes) => JsonSerializer.Deserialize<T>(bytes, Json) ?? throw new InvalidDataException("File JSON rỗng.");
     internal static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+
     public static void AtomicWrite(string target, byte[] bytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         var temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes); stream.Flush(true); }
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            { stream.Write(bytes); stream.Flush(true); }
             File.Move(temporary, target, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
     private sealed class WorkspaceIndex
     {
         public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion;
         public SheetState State { get; set; } = new();
         public List<FileEntry> Files { get; set; } = [];
     }
+
     private sealed record FileEntry(Guid Id, Guid? BoardId, string Kind, string File, string Hash);
     private sealed class ProjectFile { public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion; public Guid BoardId { get; set; } public ProjectRecord Project { get; set; } = null!; }
     private sealed class GeneralNoteFile { public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion; public NoteRecord Note { get; set; } = null!; }
     private sealed class SaveJournal { public List<JournalEntry> Entries { get; set; } = []; }
     private sealed record JournalEntry(string File, bool Existed, string Backup);
+    private sealed record WritePackage(Dictionary<string, byte[]?> Data, WorkspaceIndex Index);
+    private sealed record WorkspaceSnapshot(SheetState State, Dictionary<string, string> Fingerprints, Dictionary<Guid, FileEntry> Entries, int SchemaVersion)
+    {
+        public static WorkspaceSnapshot Empty() => new(new SheetState(), new(StringComparer.OrdinalIgnoreCase), [], ProjectWorkspaceStore.SchemaVersion);
+    }
 }

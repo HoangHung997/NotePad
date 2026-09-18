@@ -11,10 +11,20 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageReference Include="Markdig" Version="0.37.0" />
     <ProjectReference Include="../H2Notes.Core/H2Notes.Core.csproj" />
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="PORTABLE-README.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/install.py" Link="tools/ocr/install.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/smoke.py" Link="tools/ocr/smoke.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/build-portable-runtime.ps1" Link="tools/ocr/build-portable-runtime.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/models.lock.json" Link="tools/ocr/models.lock.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/requirements.in" Link="tools/ocr/requirements.in" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/requirements-mineru.in" Link="tools/ocr/requirements-mineru.in" CopyToOutputDirectory="PreserveNewest" />
+    <!-- If a verified portable runtime has been prepared under tools/ocr/runtime, publish it beside the app. -->
+    <None Include="../../tools/ocr/runtime/**/*" Link="ocr-runtime/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../tools/ocr/runtime/runtime.json')" />
     <AvaloniaResource Include="../../assets/branding/h2-notes-app-icon-v1.ico" Link="Assets/app.ico" />
     <AvaloniaResource Include="../../assets/branding/h2-notes-app-icon-v1.png" Link="Assets/app.png" />
   </ItemGroup>

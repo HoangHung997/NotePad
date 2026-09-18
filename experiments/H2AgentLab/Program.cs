@@ -1,6 +1,18 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using H2AgentLab.Context;
+using H2AgentLab.Documents;
+using H2AgentLab.Desktop;
+using H2AgentLab.Metrics;
+using H2AgentLab.Office;
+using H2AgentLab.Phase10;
+using H2AgentLab.Phase11;
+using H2AgentLab.Session;
+using H2AgentLab.Tasking;
+using H2AgentLab.Transport;
+using H2AgentLab.Tools;
+using H2AgentLab.Verification;
 
 namespace H2AgentLab;
 
@@ -14,6 +26,44 @@ public static class Program
         if (args.Contains("--computer-worker")) return ComputerTools.Worker();
         if (args.Contains("--self-test")) return LabTests.Run(args).GetAwaiter().GetResult();
         if (args.Contains("--skills-test")) return SkillTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-guard-test")) return V2ArchitectureTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-metrics-test")) return V2MetricsTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-baseline-test")) return V2BaselineTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-session-context-test")) return V2SessionContextTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-artifact-store-test")) return V2ArtifactStoreTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-compaction-test")) return V2CompactionTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-context-cache-test")) return V2ContextCacheTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-orchestrator-test")) return V2OrchestratorTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-tool-registry-test")) return V2ToolRegistryTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-verification-test")) return V2VerificationTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-closed-file-test")) return V2ClosedFileTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-phase10-test")) return V2Phase10Tests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-phase11-test")) return V2Phase11Tests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-extensibility-refinement-test")) return V2ExtensibilityRefinementTests.Run(args[^1]).GetAwaiter().GetResult();
+        var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
+        if (desktopTest >= 0)
+        {
+            if (desktopTest + 2 >= args.Length) throw new ArgumentException("--v2-desktop-host-test requires <output-directory> <desktop-host-exe>.");
+            return V2DesktopHostTests.Run(args[desktopTest + 1], args[desktopTest + 2]).GetAwaiter().GetResult();
+        }
+        var officeTest = Array.IndexOf(args, "--v2-office-host-test");
+        if (officeTest >= 0)
+        {
+            if (officeTest + 2 >= args.Length) throw new ArgumentException("--v2-office-host-test requires <output-directory> <office-host-exe>.");
+            return V2OfficeHostTests.Run(args[officeTest + 1], args[officeTest + 2]).GetAwaiter().GetResult();
+        }
+        var officeLive = Array.IndexOf(args, "--v2-office-live-acceptance");
+        if (officeLive >= 0)
+        {
+            if (officeLive + 2 >= args.Length) throw new ArgumentException("--v2-office-live-acceptance requires <output-directory> <office-host-exe>.");
+            return V2OfficeLiveAcceptance.Run(args[officeLive + 1], args[officeLive + 2]).GetAwaiter().GetResult();
+        }
+        if (args.Contains("--v2-transport-contract-test")) return V2TransportContractTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-ollama-transport-test")) return V2OllamaTransportTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-responses-transport-test")) return V2OpenAiResponsesTransportTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-responses-websocket-test")) return V2ResponsesWebSocketTransportTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-provider-resilience-test")) return V2ProviderTransportResilienceTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--portability-test")) return PortabilityTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--verify-install")) return LabEnvironment.Verify(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--recovery-test")) return RecoveryTests.Run(args[^1]).GetAwaiter().GetResult();
