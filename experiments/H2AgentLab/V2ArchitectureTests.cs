@@ -1528,6 +1528,58 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Closed Excel verifier missed unrelated formula/hidden-state regression.");
         });
 
+        Test("WordVerifier validates target paragraph state and rejects unrelated header/table regressions", () =>
+        {
+            var before = new ClosedWordSnapshotReader().Read(
+                "fixture.docx",
+                CreateArchitectureWordFixture());
+            var sourceParagraph = before.BodyParagraphs.Single();
+            var changedRuns = sourceParagraph.Runs
+                .Select(x => x.Index == 1 ? x with { Text = "WORLD", Italic = false } : x)
+                .ToArray();
+            var expectedParagraph = sourceParagraph with
+            {
+                Text = "Hello WORLD",
+                Runs = changedRuns
+            };
+            var after = before with
+            {
+                Sha256 = new string('e', 64),
+                BodyParagraphs = [expectedParagraph]
+            };
+            var expectation = new WordVerificationExpectation(
+                expectedBodyParagraphs:
+                [new WordExpectedBodyParagraph(0, expectedParagraph)]);
+
+            var pass = WordVerifier.Verify(before, after, expectation);
+            if (!pass.Passed
+                || pass.Criteria.Any(x => x.Status != VerificationCriterionStatus.Passed))
+                throw new InvalidOperationException("Expected closed Word edit did not pass verification.");
+
+            var header = after.Headers.Single();
+            var headerParagraph = header.Paragraphs.Single();
+            var badHeaderParagraph = headerParagraph with
+            {
+                Text = "Header changed",
+                Runs =
+                [
+                    headerParagraph.Runs.Single() with { Text = "Header changed" }
+                ]
+            };
+            var badHeader = header with { Paragraphs = [badHeaderParagraph] };
+            var badTable = after.Tables.Single() with { Rows = Array.Empty<ClosedWordTableRowSnapshot>() };
+            var bad = after with
+            {
+                Headers = [badHeader],
+                Tables = [badTable]
+            };
+
+            var failed = WordVerifier.Verify(before, bad, expectation);
+            if (failed.Passed
+                || !failed.Failures.Any(x => x.CriterionId == WordVerifier.StructureCriterionId))
+                throw new InvalidOperationException("Closed Word verifier missed unrelated header/table regression.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
