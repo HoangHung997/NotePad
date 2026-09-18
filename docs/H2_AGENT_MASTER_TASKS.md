@@ -739,7 +739,7 @@ Evidence: chose **B — derived live projection only**. `InstalledCapabilityInde
 
 ---
 
-## [ ] MB-72 — Simplify AvailableCapabilityIndex
+## [x] MB-72 — Simplify AvailableCapabilityIndex
 
 Goal:
 
@@ -756,6 +756,8 @@ Acceptance:
 
 - remote metadata search works for current acceptance scale;
 - architecture leaves room for future semantic search extension.
+
+Evidence: `AvailableCapabilityIndex` is now a small derived/search projection instead of an authoritative remote catalog store. It binds to a live `Func<IReadOnlyList<AvailableCapabilityRecord>>` view (normally `CatalogSourceManager.CachedView().Entries`), normalizes/validates only compact metadata at search time, and keeps `Rebuild(...)` solely as a compatibility binder for fixed test/legacy snapshots. `CapabilityResolver` binds the available view to `CatalogSourceManager` and no longer copies refreshed metadata back into the index with `_available.Rebuild(...)`; authoritative remote metadata remains in catalog source caches. The default search stays lightweight deterministic lexical ranking, while `IAvailableCapabilitySearchStrategy` / `LexicalAvailableCapabilitySearchStrategy` provide a narrow replaceable ranking seam for a future specialized/semantic search extension without changing catalog storage or adding a vector database now. `Capabilities/MbAvailableCapabilitySearchTests.cs` proves live catalog changes appear without rebuilding the index, compact lexical search finds a target across 501 catalog records without historical small-candidate truncation, a custom search strategy can replace ranking through the seam, and source guards confirm the available index has no authoritative `AvailableCapabilityRecord[] _records`, the resolver does not duplicate refreshed catalog metadata into it, `CatalogSourceManager` remains the metadata cache owner, and no vector infrastructure was introduced. Exact functional source commit `16a08dbfd70108ba7721dafb95ccff87b175033e`, GitHub Actions run `35381899950`: MB-72 **4 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-71, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `497fec7dee1ed6d4ed33aee0c7e8b92d69f1f7d0`; portable ZIP SHA256 `72983c6c26c5b705af4a576d9cf8180f0f4ded3063fc85bc0f88f20e30120c5d`.
 
 ---
 
