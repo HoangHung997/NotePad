@@ -341,8 +341,7 @@ public sealed class ProcessShellCapabilities : IDisposable
         }
 
         if (!reader.EndOfStream)
-            builder.Append("
-[truncated]");
+            builder.Append((char)10).Append("[truncated]");
         return builder.ToString();
     }
 
