@@ -42,6 +42,16 @@ public sealed class DelegatingToolExecutor : IAgentToolExecutor
         => _execute(call, cancellationToken);
 }
 
+public sealed record ToolProvenance(
+    string ProviderId,
+    string ProviderVersion,
+    string? ServerId,
+    string ToolVersion);
+
+public sealed record ToolResourceScope(
+    string ScopeId,
+    string ResourcePattern);
+
 public sealed record ToolNamespace
 {
     public ToolNamespace(string name, string description)
@@ -84,7 +94,11 @@ public sealed record ToolDescriptor
         bool supportsParallel,
         string schemaVersion,
         JsonElement callableSchema,
-        IAgentToolExecutor executor)
+        IAgentToolExecutor executor,
+        ToolProvenance? provenance = null,
+        ToolResourceScope? resourceScope = null,
+        string? serializationKey = null,
+        bool canProvideVerificationEvidence = false)
     {
         Name = ToolNamespace.NormalizeId(name, nameof(name));
         Namespace = toolNamespace ?? throw new ArgumentNullException(nameof(toolNamespace));
@@ -99,6 +113,12 @@ public sealed record ToolDescriptor
             throw new ArgumentException("Callable schema must be a JSON object.", nameof(callableSchema));
         CallableSchema = callableSchema.Clone();
         Executor = executor ?? throw new ArgumentNullException(nameof(executor));
+        Provenance = provenance;
+        ResourceScope = resourceScope;
+        SerializationKey = string.IsNullOrWhiteSpace(serializationKey)
+            ? null
+            : ToolNamespace.NormalizeId(serializationKey, nameof(serializationKey));
+        CanProvideVerificationEvidence = canProvideVerificationEvidence;
     }
 
     public string Name { get; }
@@ -110,6 +130,10 @@ public sealed record ToolDescriptor
     public string SchemaVersion { get; }
     public JsonElement CallableSchema { get; }
     public IAgentToolExecutor Executor { get; }
+    public ToolProvenance? Provenance { get; }
+    public ToolResourceScope? ResourceScope { get; }
+    public string? SerializationKey { get; }
+    public bool CanProvideVerificationEvidence { get; }
     public bool IsMutating => Access == AgentToolAccess.Mutating;
 }
 
@@ -156,5 +180,27 @@ public sealed class ToolRegistry
             .Where(x => x.Namespace.Name == normalized)
             .OrderBy(x => x.Name, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    public int UnregisterWhere(Func<ToolDescriptor, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        var names = _tools.Values
+            .Where(predicate)
+            .Select(x => x.Name)
+            .ToArray();
+        foreach (var name in names)
+            _tools.Remove(name);
+
+        if (names.Length > 0)
+        {
+            var usedNamespaces = _tools.Values
+                .Select(x => x.Namespace.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var key in _namespaces.Keys.Where(x => !usedNamespaces.Contains(x)).ToArray())
+                _namespaces.Remove(key);
+            _version++;
+        }
+        return names.Length;
     }
 }
