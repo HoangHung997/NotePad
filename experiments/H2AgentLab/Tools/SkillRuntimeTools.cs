@@ -44,16 +44,16 @@ public sealed class SkillRuntimeToolExecutor : IAgentToolExecutor
         var skills = _catalog.Search(query, 100)
             .Select(x => new
             {
-                x.Name,
-                x.Description,
+                name = x.Name,
+                description = x.Description,
                 sourceKind = x.Identity.SourceKind.ToString(),
-                x.Identity.SourceId,
-                x.Identity.PluginId,
-                x.Identity.PluginVersion,
-                x.Identity.SkillId,
-                x.Identity.Sha256,
-                x.Availability,
-                x.Trust
+                sourceId = x.Identity.SourceId,
+                pluginId = x.Identity.PluginId,
+                pluginVersion = x.Identity.PluginVersion,
+                skillId = x.Identity.SkillId,
+                sha256 = x.Identity.Sha256,
+                availability = x.Availability,
+                trust = x.Trust
             })
             .ToArray();
 
