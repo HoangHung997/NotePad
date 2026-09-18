@@ -224,9 +224,9 @@ internal static class CapabilityRanking
     private static double Score(string query, string name, string description)
     {
         if (string.IsNullOrWhiteSpace(query)) return 1;
-        var queryTerms = SemanticTerms(query).Distinct(StringComparer.Ordinal).ToArray();
-        var nameTerms = SemanticTerms(name).ToHashSet(StringComparer.Ordinal);
-        var descriptionTerms = SemanticTerms(description).ToHashSet(StringComparer.Ordinal);
+        var queryTerms = LexicalTerms(query).Distinct(StringComparer.Ordinal).ToArray();
+        var nameTerms = LexicalTerms(name).ToHashSet(StringComparer.Ordinal);
+        var descriptionTerms = LexicalTerms(description).ToHashSet(StringComparer.Ordinal);
         var score = 0d;
         foreach (var term in queryTerms)
         {
@@ -236,10 +236,11 @@ internal static class CapabilityRanking
         return score;
     }
 
-    internal static IEnumerable<string> SemanticTerms(string value)
+    internal static IEnumerable<string> LexicalTerms(string value)
     {
-        // Generic capability search stays domain-neutral. Meaning belongs in model reasoning,
-        // skill/tool descriptions, or an optional specialized search extension—not a synonym table.
+        // Core ranking is intentionally lexical only. It must not expand domain concepts.
+        // Meaning belongs in model reasoning, realistic tool/skill/plugin descriptions,
+        // or an optional specialized search extension outside capability core.
         return H2AgentLab.Skills.BuiltInSkillSource.Tokens(value);
     }
 }
