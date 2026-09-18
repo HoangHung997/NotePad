@@ -1,4 +1,5 @@
 using H2AgentLab.Context;
+using H2AgentLab.Verification;
 
 namespace H2AgentLab.Tasking;
 
@@ -80,6 +81,16 @@ public sealed class AgentOrchestrator
         AgentVerificationOutcome outcome,
         string? reason = null)
         => Machine(session).Complete(Session(session).Contract, outcome, reason);
+
+    public AgentTaskTransition CompleteVerified(
+        AgentOrchestrationSession session,
+        IEnumerable<VerificationReport> reports,
+        string? reason = null)
+    {
+        var current = Session(session);
+        var outcome = VerificationCompletionGate.Evaluate(current.Contract, reports);
+        return Machine(current).Complete(current.Contract, outcome, reason);
+    }
 
     public AgentTaskTransition Block(AgentOrchestrationSession session, string? reason = null)
         => Machine(session).TransitionTo(AgentTaskState.Blocked, reason);
