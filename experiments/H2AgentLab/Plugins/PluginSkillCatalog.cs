@@ -1,0 +1,150 @@
+namespace H2AgentLab.Plugins;
+
+public sealed record PluginSkillSummary(
+    string PluginId,
+    string PluginVersion,
+    string SkillId,
+    string Description,
+    string Sha256);
+
+public sealed record PluginSkillContent(
+    PluginSkillSummary Summary,
+    string Content,
+    int LoadCount);
+
+public sealed class PluginSkillCatalog
+{
+    private readonly PluginManager _plugins;
+    private readonly Dictionary<string, (string Content, int LoadCount)> _cache = new(StringComparer.Ordinal);
+
+    public PluginSkillCatalog(PluginManager plugins)
+    {
+        _plugins = plugins ?? throw new ArgumentNullException(nameof(plugins));
+    }
+
+    public IReadOnlyList<PluginSkillSummary> Discover(string query)
+    {
+        query ??= "";
+        var result = new List<PluginSkillSummary>();
+
+        foreach (var (manifest, root) in _plugins.ActivePlugins())
+        {
+            foreach (var skillId in manifest.Skills)
+            {
+                var path = Path.Combine(root, "skills", skillId, "SKILL.md");
+                if (!File.Exists(path))
+                    continue;
+
+                var bytes = File.ReadAllBytes(path);
+                if (bytes.Length > 80_000)
+                    throw new IOException($"Plugin skill '{skillId}' exceeds 80 KB.");
+
+                var text = System.Text.Encoding.UTF8.GetString(bytes);
+                var description = ExtractDescription(text);
+                if (query.Length > 0
+                    && !(skillId + " " + description + " " + manifest.Id)
+                        .Contains(query, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                result.Add(new PluginSkillSummary(
+                    manifest.Id,
+                    manifest.Version,
+                    skillId,
+                    description,
+                    global::H2AgentLab.SafeWorkspace.Hash(bytes).ToLowerInvariant()));
+            }
+        }
+
+        return result
+            .OrderBy(x => x.PluginId, StringComparer.Ordinal)
+            .ThenBy(x => x.SkillId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public PluginSkillContent Read(
+        string pluginId,
+        string skillId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(skillId);
+
+        var active = _plugins.GetActive(pluginId)
+            ?? throw new KeyNotFoundException($"Plugin '{pluginId}' is not active.");
+        var manifest = active.Value.Manifest;
+        if (!manifest.Skills.Contains(skillId, StringComparer.Ordinal))
+            throw new KeyNotFoundException(
+                $"Skill '{skillId}' is not declared by active plugin '{pluginId}'.");
+
+        var path = Path.Combine(
+            active.Value.VersionRoot,
+            "skills",
+            skillId,
+            "SKILL.md");
+        if (!File.Exists(path))
+            throw new FileNotFoundException("Plugin skill file is missing.", path);
+        var bytes = File.ReadAllBytes(path);
+        if (bytes.Length > 80_000)
+            throw new IOException($"Plugin skill '{skillId}' exceeds 80 KB.");
+
+        var sha = global::H2AgentLab.SafeWorkspace.Hash(bytes).ToLowerInvariant();
+        var summary = new PluginSkillSummary(
+            manifest.Id,
+            manifest.Version,
+            skillId,
+            ExtractDescription(System.Text.Encoding.UTF8.GetString(bytes)),
+            sha);
+        var key = string.Join(
+            "|",
+            summary.PluginId,
+            summary.PluginVersion,
+            summary.SkillId,
+            summary.Sha256);
+
+        if (_cache.TryGetValue(key, out var cached))
+            return new PluginSkillContent(summary, cached.Content, cached.LoadCount);
+
+        var content = System.Text.Encoding.UTF8.GetString(bytes);
+        var loadCount = 1;
+        _cache[key] = (content, loadCount);
+        return new PluginSkillContent(summary, content, loadCount);
+    }
+
+    public void InvalidatePlugin(string pluginId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        var prefix = pluginId + "|";
+        foreach (var key in _cache.Keys.Where(x => x.StartsWith(prefix, StringComparison.Ordinal)).ToArray())
+            _cache.Remove(key);
+    }
+
+    private static string ExtractDescription(string content)
+    {
+        if (content.StartsWith("---", StringComparison.Ordinal))
+        {
+            var end = content.IndexOf("
+---", 3, StringComparison.Ordinal);
+            if (end > 0)
+            {
+                var header = content[..end];
+                var line = header.Split('
+')
+                    .Select(x => x.Trim())
+                    .FirstOrDefault(x => x.StartsWith("description:", StringComparison.OrdinalIgnoreCase));
+                if (line is not null)
+                {
+                    var value = line[(line.IndexOf(':') + 1)..].Trim().Trim('"', ''');
+                    if (value.Length > 0)
+                        return value.Length <= 1_000 ? value : value[..1_000];
+                }
+            }
+        }
+
+        var first = content.Split('
+')
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => x.Length > 0 && !x.StartsWith("#", StringComparison.Ordinal));
+        return string.IsNullOrWhiteSpace(first)
+            ? "Plugin skill"
+            : first.Length <= 1_000 ? first : first[..1_000];
+    }
+}
