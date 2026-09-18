@@ -37,6 +37,19 @@ jobs:
       - name: Run H2 Notes tests
         run: dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
 
+      - name: Restore H2 Agent Lab DesktopHost
+        run: dotnet restore .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj
+
+      - name: Build H2 Agent Lab DesktopHost
+        run: dotnet build .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj -c Release --no-restore
+
+      - name: Run H2 Agent Lab DesktopHost safety self-tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-desktop-host-self-test'
+          dotnet run --project .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj -c Release --no-build -- --self-test $out
+          Get-Content -LiteralPath (Join-Path $out 'desktop-host-self-tests.txt')
+
       - name: Restore H2 Agent Lab OfficeHost
         run: dotnet restore .\experiments\H2AgentLab.OfficeHost\H2AgentLab.OfficeHost.csproj
 
@@ -129,6 +142,14 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-closed-files'
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-closed-file-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-closed-file-tests.txt')
+
+      - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-desktop-host'
+          $desktopHostExe = (Resolve-Path '.\experiments\H2AgentLab.DesktopHost\bin\Release\net10.0-windows\H2AgentLab.DesktopHost.exe').Path
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-desktop-host-test $out $desktopHostExe
+          Get-Content -LiteralPath (Join-Path $out 'v2-desktop-host-tests.txt')
 
       - name: Run H2 Agent Lab v2 OfficeHost acceptance tests
         shell: pwsh
