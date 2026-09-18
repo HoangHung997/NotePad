@@ -126,6 +126,12 @@ public sealed class AgentOrchestrator
                 Cancel(current, "AgentRuntime cancelled.");
             throw;
         }
+        catch (AgentVerificationRequiredException ex)
+        {
+            if (!current.StateMachine.IsTerminal)
+                Block(current, ex.Message);
+            throw;
+        }
         catch
         {
             if (!current.StateMachine.IsTerminal)
