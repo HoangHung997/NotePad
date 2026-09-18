@@ -139,6 +139,8 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
             sourceArtifactId = run.Artifacts.Single(x => x.Path == artifact).ArtifactId,
             sourceArtifactEvidence = run.Artifacts.Single(x => x.Path == artifact).EvidenceId
         };
+    }
+
     public ScriptRunEvidence Evidence(string id)
     {
         var run = Load(id);
@@ -190,7 +192,5 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
         var material = System.Text.Encoding.UTF8.GetBytes(
             path.Replace('\\', '/') + "\n" + sha256.ToLowerInvariant());
         return SafeWorkspace.Hash(material)[..20];
-    }
-
     }
 }
