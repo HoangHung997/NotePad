@@ -40,6 +40,9 @@ public static class DocumentToolPreference
             var ordered = group
                 .Select(x => x.Result)
                 .OrderByDescending(x => IsExactToolRequest(query, x.Descriptor))
+                .ThenByDescending(x => IsExplicitPreferenceRequest(
+                    query,
+                    x.Descriptor.Preference!))
                 .ThenBy(x => FidelityRank(
                     x.Descriptor.Preference!.InteractionFidelity))
                 .ThenByDescending(x => x.Score)
@@ -61,6 +64,12 @@ public static class DocumentToolPreference
         => preference is null
             || !preference.ExplicitRequestOnly
             || preference.MatchesExplicitRequest(query);
+
+    private static bool IsExplicitPreferenceRequest(
+        string query,
+        ToolPreferenceMetadata preference)
+        => preference.ExplicitRequestOnly
+            && preference.MatchesExplicitRequest(query);
 
     private static bool IsExactToolRequest(
         string query,
