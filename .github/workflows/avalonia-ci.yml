@@ -318,6 +318,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-first-party-extension-cards-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-first-party-extension-cards-tests.txt')
 
+      - name: Run H2 Agent MB-70 domain-neutral capability search tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-domain-neutral-capability-search'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-domain-neutral-capability-search-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-domain-neutral-capability-search-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
