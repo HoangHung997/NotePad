@@ -157,7 +157,7 @@ Rules:
 
 ## Phase 05 — tool registry and deferred tool discovery
 
-- [ ] **V2-0501 — Define tool descriptor/namespace/registry types.**  
+- [~] **V2-0501 — Define tool descriptor/namespace/registry types.**  
   Include risk, mutating/read-only, parallel capability, schema version and runtime executor reference.
 
 - [ ] **V2-0502 — Register existing v1 tools through registry adapters.**  
@@ -381,4 +381,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0501 — Add tool registry descriptors`.
+**Active task:** `V2-0501 — Define tool descriptor/namespace/registry types`.
