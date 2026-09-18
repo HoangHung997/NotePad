@@ -1,6 +1,10 @@
+> **HISTORICAL / SUPERSEDED — DO NOT CONTINUE THIS TRACKER.**  
+> The in-flight V2 work was completed and frozen. All new Agent work starts from `docs/H2_AGENT_MASTER_TASKS.md` at MB-00/MB-01 onward.  
+> This file remains only for historical evidence; do not add new execution tasks here.
+
 # H2 Agent Lab 2.0 — implementation task tracker
 
-This file is the **authoritative execution checklist** for `AGENTLAB_V2_SPEC.md`.
+This file is a **historical execution record** for the superseded `AGENTLAB_V2_SPEC.md`. The Master tracker is authoritative for all new work.
 
 Rules:
 
