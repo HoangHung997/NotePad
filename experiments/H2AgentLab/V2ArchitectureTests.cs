@@ -900,6 +900,127 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Loaded schema identity set contains duplicates.");
         });
 
+        Test("Tool execution scheduler parallelizes safe reads and serializes overlapping mutations", () =>
+        {
+            static JsonElement Schema(string name) => JsonSerializer.SerializeToElement(new
+            {
+                type = "function",
+                function = new
+                {
+                    name,
+                    description = "scheduler fixture",
+                    parameters = new { type = "object" }
+                }
+            });
+
+            static void RaiseMax(ref int max, int value)
+            {
+                int observed;
+                do
+                {
+                    observed = Volatile.Read(ref max);
+                    if (observed >= value) return;
+                }
+                while (Interlocked.CompareExchange(ref max, value, observed) != observed);
+            }
+
+            var readActive = 0;
+            var readMax = 0;
+            var twoReadsEntered = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var readExecutor = new DelegatingToolExecutor(
+                "parallel-read-fixture",
+                async (call, ct) =>
+                {
+                    var active = Interlocked.Increment(ref readActive);
+                    RaiseMax(ref readMax, active);
+                    if (active >= 2) twoReadsEntered.TrySetResult(true);
+                    await Task.WhenAny(twoReadsEntered.Task, Task.Delay(1_000, ct));
+                    Interlocked.Decrement(ref readActive);
+                    return call.Id;
+                });
+            var readDescriptor = new ToolDescriptor(
+                "read_probe",
+                new ToolNamespace("fixture", "Scheduler fixture."),
+                "Parallel read probe.",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                supportsParallel: true,
+                "v1",
+                Schema("read_probe"),
+                readExecutor);
+
+            using (var scheduler = new ToolExecutionScheduler())
+            {
+                var emptyArgs = JsonSerializer.SerializeToElement(new { });
+                var results = scheduler.ExecuteBatchAsync(
+                    [
+                        new ToolExecutionRequest(readDescriptor, new ToolCall("r1", "read_probe", emptyArgs)),
+                        new ToolExecutionRequest(readDescriptor, new ToolCall("r2", "read_probe", emptyArgs))
+                    ],
+                    CancellationToken.None).GetAwaiter().GetResult();
+
+                if (readMax < 2 || !results.Select(x => x.Output).SequenceEqual(new[] { "r1", "r2" }))
+                    throw new InvalidOperationException("Parallel-safe read calls did not overlap or preserve result order.");
+            }
+
+            var mutationActive = 0;
+            var mutationMax = 0;
+            var mutationExecutor = new DelegatingToolExecutor(
+                "mutation-fixture",
+                async (call, ct) =>
+                {
+                    var active = Interlocked.Increment(ref mutationActive);
+                    RaiseMax(ref mutationMax, active);
+                    await Task.Delay(60, ct);
+                    Interlocked.Decrement(ref mutationActive);
+                    return call.Id;
+                });
+            var mutationDescriptor = new ToolDescriptor(
+                "mutate_probe",
+                new ToolNamespace("fixture", "Scheduler fixture."),
+                "Mutation probe.",
+                AgentToolRisk.Medium,
+                AgentToolAccess.Mutating,
+                supportsParallel: true,
+                "v1",
+                Schema("mutate_probe"),
+                mutationExecutor);
+
+            using (var scheduler = new ToolExecutionScheduler())
+            {
+                var emptyArgs = JsonSerializer.SerializeToElement(new { });
+                _ = scheduler.ExecuteBatchAsync(
+                    [
+                        new ToolExecutionRequest(
+                            mutationDescriptor,
+                            new ToolCall("m1", "mutate_probe", emptyArgs),
+                            "file:/same"),
+                        new ToolExecutionRequest(
+                            mutationDescriptor,
+                            new ToolCall("m2", "mutate_probe", emptyArgs),
+                            "file:/same")
+                    ],
+                    CancellationToken.None).GetAwaiter().GetResult();
+
+                if (mutationMax != 1)
+                    throw new InvalidOperationException("Overlapping mutations to the same resource executed concurrently.");
+
+                try
+                {
+                    _ = scheduler.ExecuteBatchAsync(
+                        [new ToolExecutionRequest(
+                            mutationDescriptor,
+                            new ToolCall("m3", "mutate_probe", emptyArgs))],
+                        CancellationToken.None).GetAwaiter().GetResult();
+                    throw new InvalidOperationException("Mutating call without resource identity was accepted.");
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("requires a resource key", StringComparison.Ordinal))
+                {
+                }
+            }
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
