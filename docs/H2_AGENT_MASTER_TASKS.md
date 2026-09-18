@@ -663,7 +663,7 @@ Evidence: `GeneralComputerCapabilityCatalog` no longer contains any computer too
 
 ---
 
-## [ ] MB-63 — Keep first-party extension implementations
+## [x] MB-63 — Keep first-party extension implementations
 
 Preserve and adapt:
 
@@ -681,6 +681,8 @@ Goal:
 They become reference cards on the extension bus.
 
 Do not delete working capability merely because it is no longer “core”.
+
+Evidence: the working first-party implementations were preserved and adapted as reference cards on the MB-60 extension bus instead of being rewritten or deleted. Existing MB-62 cards remain the Desktop (`DesktopComputerExtension`), FileSystem (`FileSystemComputerExtension`) and Process/Shell (`ProcessShellComputerExtension`) references. New thin cards reuse existing seams: `OfficeFirstPartyExtension` delegates to `StructuredOfficeCapabilityCatalog`; `WebFirstPartyExtension` registers the existing `WebResearchHost`; `AutoCadFirstPartyExtension` delegates to `AutoCadProviderPolicy.BuildDescriptors`; `McpFirstPartyExtension` registers the existing `McpToolProvider`; and `PythonSandboxFirstPartyExtension` projects only the preserved v1 Python namespace through `V1ToolRegistryAdapter` while keeping the supplied executor path to `AgentTools -> ScriptWorkspace -> WindowsPythonSandbox`. `CapabilityProviderToolRegistryAdapter` and the new generic `CapabilityProviderManager.LoadProviderToolsAsync` allow any registered `ICapabilityProvider` (including Web and MCP) to lazily project selected schemas into ToolRegistry; the existing `LoadMcpToolsAsync` API remains as a compatibility wrapper. `Extensions/MbFirstPartyExtensionCardsTests.cs` proves all eight requested families have cards on one bus, Web/MCP lazily load and execute through the provider-neutral adapter, the Python card preserves its compatibility executor plus AppContainer/no-network security profile, real AgentRuntime discovers/executes an AutoCAD card through ordinary ToolRegistry flow, and source guards confirm the original Office/Web/Desktop/AutoCAD/MCP/FileSystem/Process-Shell/Python implementation files still exist while AgentRuntime contains no first-party application references. Exact functional source commit `8fc65a1c0d3881cee75298e09e8ecd8ab1f5e2ae`, GitHub Actions run `35378292318`: MB-63 **5 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-62, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `38731020ae2257b850d0910536acd1453b72d068`; portable ZIP SHA256 `a70fc54d4dcf4ec8c6ffb2d002bfc2795de9c72847ceb5d9c5fc0ebc13e065dc`.
 
 ---
 
