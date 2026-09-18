@@ -356,7 +356,8 @@ Rules:
 
 ## Phase 10 — Python/runtime migration, MCP providers and extensibility foundations
 
-- [~] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**
+- [~] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**  
+  Phase 10 implementation (Python/MCP/computer/plugin layers) + dedicated 15-case acceptance suite added; compile-fix retry in progress.
 
 - [ ] **V2-1002 — Preserve WindowsPythonSandbox security regression suite.**
 
