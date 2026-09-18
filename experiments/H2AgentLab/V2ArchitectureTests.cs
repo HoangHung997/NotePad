@@ -646,6 +646,39 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Direct route exposed Office/Desktop/Python schemas.");
         });
 
+        Test("AgentOrchestrator skeleton preserves v1 compatibility path and host boundaries", () =>
+        {
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Explain grounded fixture state",
+                "workspace:/fixture",
+                null,
+                null,
+                null,
+                null,
+                [new AgentAcceptanceCriterion("answered", "Requested explanation is returned.")],
+                AgentTaskRiskClass.ReadOnly,
+                new AgentVerificationPolicy(requireVerification: false));
+
+            var orchestrator = new AgentOrchestrator();
+            var session = orchestrator.Receive(contract);
+
+            if (session.Contract.TaskId != contract.TaskId
+                || session.StateMachine.State != AgentTaskState.Received
+                || session.Route.RouteClass != AgentTaskRouteClass.Direct
+                || orchestrator.ContextManager is null)
+                throw new InvalidOperationException("Orchestrator did not preserve contract/route/state/context boundaries.");
+
+            orchestrator.Ground(session, "fixture grounded");
+            orchestrator.Plan(session, "simple plan");
+            if (session.StateMachine.State != AgentTaskState.Planned)
+                throw new InvalidOperationException("Orchestrator did not advance through host-owned state transitions.");
+
+            using var compatibility = orchestrator.CreateCompatibilityRunner();
+            if (compatibility.GetType() != typeof(AgentRunner))
+                throw new InvalidOperationException("Existing AgentRunner v1 compatibility path was not retained.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
