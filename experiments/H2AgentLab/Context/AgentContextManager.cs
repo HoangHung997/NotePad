@@ -124,12 +124,21 @@ public sealed record AgentContextUsage(
     bool CurrentStateTruncated,
     bool CompactedHistoryTruncated);
 
+public sealed record AgentContextPressure(
+    bool RequiresCompaction,
+    long CandidateCharacters,
+    int ActiveCharacters,
+    IReadOnlyList<string> Reasons);
+
 public sealed record AgentContextSnapshot(
     AgentPromptRuntimeContext RuntimeContext,
     AgentContextBudget Budget,
     AgentContextUsage Usage,
     IReadOnlyList<string> RecentTurnSourceIds,
-    IReadOnlyList<string> ToolSummarySourceIds);
+    IReadOnlyList<string> ToolSummarySourceIds)
+{
+    public AgentContextPressure Pressure { get; init; } = new(false, 0, 0, Array.Empty<string>());
+}
 
 /// <summary>
 /// Produces bounded dynamic context without touching the frozen v1 session prompt path. Priority is
@@ -151,6 +160,7 @@ public sealed class AgentContextManager
     public AgentContextSnapshot Build(AgentContextInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        var candidateCharacters = EstimateCandidateCharacters(input);
         var remaining = _budget.MaxTotalCharacters;
 
         var taskSource = Normalize(input.TaskContract);
@@ -194,6 +204,16 @@ public sealed class AgentContextManager
             CurrentStateTruncated: currentTruncated,
             CompactedHistoryTruncated: compactedTruncated);
 
+        var reasons = new List<string>();
+        if (candidateCharacters > _budget.MaxTotalCharacters) reasons.Add("total-budget-pressure");
+        if (taskTruncated) reasons.Add("task-contract-truncated");
+        if (currentTruncated) reasons.Add("current-state-truncated");
+        if (recent.EligibleCount > recent.SourceIds.Count) reasons.Add("recent-turns-dropped");
+        if (recent.ItemTruncated) reasons.Add("recent-turn-item-truncated");
+        if (tools.EligibleCount > tools.SourceIds.Count) reasons.Add("tool-summaries-dropped");
+        if (tools.ItemTruncated) reasons.Add("tool-summary-item-truncated");
+        if (compactedTruncated) reasons.Add("compacted-history-truncated");
+
         return new AgentContextSnapshot(
             new AgentPromptRuntimeContext(
                 TaskContract: EmptyToNull(task),
@@ -202,7 +222,14 @@ public sealed class AgentContextManager
             _budget,
             usage,
             recent.SourceIds,
-            tools.SourceIds);
+            tools.SourceIds)
+        {
+            Pressure = new AgentContextPressure(
+                RequiresCompaction: reasons.Count > 0,
+                CandidateCharacters: candidateCharacters,
+                ActiveCharacters: total,
+                Reasons: reasons.ToArray())
+        };
     }
 
     private string AddScalarSection(
@@ -298,23 +325,25 @@ public sealed class AgentContextManager
     {
         var header = "## " + heading + "\n";
         if (limit <= header.Length || ranked.Count == 0)
-            return new("", [], eligibleCount, 0);
+            return new("", [], eligibleCount, 0, false);
 
         var available = limit - header.Length;
         var selected = new List<(T Item, string Line)>();
+        var itemTruncated = false;
         foreach (var item in ranked)
         {
             var itemPrefix = prefix(item);
             var separator = selected.Count == 0 ? 0 : 1;
             if (available <= separator + itemPrefix.Length) continue;
             var contentLimit = Math.Min(_budget.MaxCharactersPerItem, available - separator - itemPrefix.Length);
-            var clipped = Clip(Normalize(text(item)), contentLimit, out _);
+            var clipped = Clip(Normalize(text(item)), contentLimit, out var clippedItem);
+            itemTruncated |= clippedItem;
             if (clipped.Length == 0) continue;
             var line = itemPrefix + clipped;
             selected.Add((item, line));
             available -= separator + line.Length;
         }
-        if (selected.Count == 0) return new("", [], eligibleCount, 0);
+        if (selected.Count == 0) return new("", [], eligibleCount, 0, false);
 
         selected.Sort((a, b) =>
         {
@@ -323,8 +352,25 @@ public sealed class AgentContextManager
         });
         var body = string.Join('\n', selected.Select(x => x.Line));
         var output = header + body;
-        return new(output, selected.Select(x => sourceId(x.Item)).ToArray(), eligibleCount, output.Length);
+        return new(output, selected.Select(x => sourceId(x.Item)).ToArray(), eligibleCount, output.Length, itemTruncated);
     }
+
+    private static long EstimateCandidateCharacters(AgentContextInput input)
+    {
+        long total = Normalize(input.TaskContract).Length
+            + Normalize(input.CurrentState).Length
+            + Normalize(input.CompactedHistory).Length;
+        foreach (var turn in input.RecentTurns ?? [])
+            if (turn.Relevance > 0 && !string.IsNullOrWhiteSpace(turn.Content))
+                total = SaturatingAdd(total, Normalize(turn.Content).Length);
+        foreach (var tool in input.ToolSummaries ?? [])
+            if (tool.Relevance > 0 && !string.IsNullOrWhiteSpace(tool.Summary))
+                total = SaturatingAdd(total, Normalize(tool.Summary).Length);
+        return total;
+    }
+
+    private static long SaturatingAdd(long value, int addition)
+        => value > long.MaxValue - addition ? long.MaxValue : value + addition;
 
     private static int AvailableForNextSection(StringBuilder working, int remaining)
     {
@@ -372,5 +418,6 @@ public sealed class AgentContextManager
         string Text,
         IReadOnlyList<string> SourceIds,
         int EligibleCount,
-        int EmittedCharacters);
+        int EmittedCharacters,
+        bool ItemTruncated);
 }
