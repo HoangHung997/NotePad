@@ -290,6 +290,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-progressive-skill-loading-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-progressive-skill-loading-tests.txt')
 
+      - name: Run H2 Agent MB-60 extension registration tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-extension-registration'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-extension-registration-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-extension-registration-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
