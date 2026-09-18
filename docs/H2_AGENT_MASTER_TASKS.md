@@ -370,6 +370,8 @@ Evidence: `Runtime/AgentRuntime.cs` routes normal runtime calls through `ToolExe
 
 ## [~] MB-40 — Centralize normal runtime permission enforcement
 
+Implementation note: centralized runtime permission policy + real-runtime MB-40 acceptance suite are implemented; full regression CI retry is in progress.
+
 Goal:
 
 Permission is host policy around ToolRegistry execution, not scattered special cases.
