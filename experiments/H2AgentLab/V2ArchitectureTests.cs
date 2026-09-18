@@ -487,7 +487,16 @@ public static class V2ArchitectureTests
             machine.TransitionTo(AgentTaskState.Repairing, "verification failed");
             machine.TransitionTo(AgentTaskState.Executing, "repair attempt");
             machine.TransitionTo(AgentTaskState.Verifying, "re-verify");
-            machine.TransitionTo(AgentTaskState.Completed, "verification passed");
+            var readOnlyCompletionContract = new AgentTaskContract(
+                Guid.NewGuid(), "Read-only lifecycle fixture", "workspace:/fixture",
+                null, null, null, null,
+                [new AgentAcceptanceCriterion("observed", "Requested state was observed.")],
+                AgentTaskRiskClass.ReadOnly,
+                new AgentVerificationPolicy(requireVerification: false));
+            machine.Complete(
+                readOnlyCompletionContract,
+                new AgentVerificationOutcome(passed: false),
+                "read-only completion");
 
             if (!machine.IsTerminal || machine.State != AgentTaskState.Completed)
                 throw new InvalidOperationException("Verified task did not reach terminal Completed state.");
@@ -518,6 +527,66 @@ public static class V2ArchitectureTests
             catch (InvalidOperationException ex) when (ex.Message.Contains("Illegal task transition", StringComparison.Ordinal))
             {
             }
+        });
+
+        Test("Mutating task cannot complete without verification", () =>
+        {
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Modify the fixture",
+                "workspace:/fixture",
+                ["input.txt"],
+                ["change target"],
+                ["preserve unrelated content"],
+                ["updated artifact"],
+                [new AgentAcceptanceCriterion("builds", "Updated artifact passes build verification.")],
+                AgentTaskRiskClass.Medium,
+                new AgentVerificationPolicy(
+                    requireVerification: true,
+                    allowNotMechanicallyVerifiable: false,
+                    requiredVerifierIds: ["build"]));
+
+            var machine = new AgentTaskStateMachine();
+            machine.TransitionTo(AgentTaskState.Grounded);
+            machine.TransitionTo(AgentTaskState.Planned);
+            machine.TransitionTo(AgentTaskState.Executing);
+
+            try
+            {
+                machine.TransitionTo(AgentTaskState.Completed);
+                throw new InvalidOperationException("Mutating task completed directly from Executing.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("verification gate", StringComparison.OrdinalIgnoreCase))
+            {
+            }
+
+            machine.TransitionTo(AgentTaskState.Verifying);
+
+            try
+            {
+                machine.Complete(contract, new AgentVerificationOutcome(passed: false));
+                throw new InvalidOperationException("Mutating task completed after failed verification.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("cannot complete without successful verification", StringComparison.Ordinal))
+            {
+            }
+
+            try
+            {
+                machine.Complete(contract, new AgentVerificationOutcome(passed: true));
+                throw new InvalidOperationException("Mutating task completed without its required verifier.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("missing required verifier", StringComparison.Ordinal))
+            {
+            }
+
+            machine.Complete(
+                contract,
+                new AgentVerificationOutcome(passed: true, verifierIds: ["build"]),
+                "required verifier passed");
+
+            if (machine.State != AgentTaskState.Completed || !machine.IsTerminal)
+                throw new InvalidOperationException("Verified mutating task did not complete.");
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
