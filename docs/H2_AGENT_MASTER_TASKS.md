@@ -270,7 +270,7 @@ Evidence: `Runtime/MbPromptCacheRuntimeTests.cs` runs against normal `AgentOrche
 
 # Stage D — Make ToolRegistry the only normal callable path
 
-## [~] MB-30 — Replace full AgentTools.Definitions exposure
+## [x] MB-30 — Replace full AgentTools.Definitions exposure
 
 Goal:
 
@@ -288,9 +288,11 @@ Acceptance:
 - heavy Office/Desktop/Python schemas are absent initially;
 - full `AgentTools.Definitions` is not serialized into normal V2 model requests.
 
+Evidence: `Runtime/MbInitialToolExposureTests.cs` constructs the real V1-backed ToolRegistry and captures the normal AgentRuntime start request. GitHub Actions run `35351271410` reported **2 passed, 0 failed**: first request exposes only `tool_search` plus optional `update_plan`, excludes Python/Office/Desktop detailed schemas, is materially smaller than the full v1 definitions payload, and normal runtime/orchestrated source does not serialize `AgentTools.Definitions`.
+
 ---
 
-## [ ] MB-31 — Execute tool calls through ToolRegistry
+## [~] MB-31 — Execute tool calls through ToolRegistry
 
 Goal:
 
