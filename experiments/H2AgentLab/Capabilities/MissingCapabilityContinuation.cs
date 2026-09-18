@@ -88,8 +88,7 @@ public sealed class MissingCapabilityContinuation
 
         var candidate = resolution.Candidates.FirstOrDefault(x =>
             x.Status == CapabilityResolutionStatus.AVAILABLE
-            && x.AvailablePackage is not null
-            && !string.IsNullOrWhiteSpace(x.SkillId))
+            && x.AvailablePackage is not null)
             ?? throw new InvalidOperationException(
                 resolution.Status switch
                 {
@@ -97,14 +96,14 @@ public sealed class MissingCapabilityContinuation
                         "Required capability exists but host install policy blocks it.",
                     CapabilityResolutionStatus.INCOMPATIBLE =>
                         "Required capability exists but is incompatible with this Agent version.",
-                    _ => "No installable skill capability can satisfy the original task."
+                    _ => "No installable capability package can satisfy the original task."
                 });
 
         var package = candidate.AvailablePackage!;
         trace.Add(
             AgentTraceEventKind.Phase,
             "capability-missing",
-            $"Capability '{candidate.SkillId}' is not installed; task execution paused for host-managed resolution.");
+            $"Capability package '{candidate.CapabilityId}' is not installed; task execution paused for host-managed resolution.");
         trace.Add(
             AgentTraceEventKind.Phase,
             "catalog-candidate",
