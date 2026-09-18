@@ -332,6 +332,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-installed-capability-projection-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-installed-capability-projection-tests.txt')
 
+      - name: Run H2 Agent MB-72 available capability search tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-available-capability-search'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-available-capability-search-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-available-capability-search-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
