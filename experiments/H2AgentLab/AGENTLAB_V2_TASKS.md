@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0309 — Add context/cache tests`.
+**Active task:** `V2-0309 — Add context/cache tests` (full CI verification in progress).
