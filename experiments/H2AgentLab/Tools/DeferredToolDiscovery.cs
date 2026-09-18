@@ -8,9 +8,20 @@ public sealed record InitialToolExposure(
     IReadOnlyList<JsonElement> CallableSchemas,
     IReadOnlyList<ToolNamespaceSummary> Namespaces);
 
+public sealed record ToolSchemaLoadRecord(
+    long Sequence,
+    long RegistryVersion,
+    string Query,
+    IReadOnlyList<string> SelectedNames,
+    IReadOnlyList<string> NewlyLoadedNames);
+
+public sealed record ToolSchemaLoadBatch(
+    IReadOnlyList<JsonElement> CallableSchemas,
+    ToolSchemaLoadRecord Trace);
+
 /// <summary>
 /// Creates the deliberately small first-turn tool surface. Detailed schemas stay in ToolRegistry
-/// until lexical discovery selects them.
+/// until lexical discovery selects them. One instance represents one task/session load state.
 /// </summary>
 public sealed class DeferredToolDiscovery
 {
@@ -18,12 +29,25 @@ public sealed class DeferredToolDiscovery
 
     private readonly ToolRegistry _registry;
     private readonly ToolSearchIndex _search;
+    private readonly HashSet<string> _loaded = new(StringComparer.Ordinal)
+    {
+        SearchToolName
+    };
+    private readonly List<ToolSchemaLoadRecord> _trace = [];
 
     public DeferredToolDiscovery(ToolRegistry registry, ToolSearchIndex? search = null)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _search = search ?? new ToolSearchIndex(registry);
+        if (_registry.TryGet("update_plan", out _))
+            _loaded.Add("update_plan");
     }
+
+    public IReadOnlyList<string> LoadedSchemaNames
+        => _loaded.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+    public IReadOnlyList<ToolSchemaLoadRecord> LoadTrace
+        => _trace.ToArray();
 
     public InitialToolExposure BuildInitialExposure()
     {
@@ -46,6 +70,72 @@ public sealed class DeferredToolDiscovery
 
     public IReadOnlyList<ToolSearchResult> Search(string query, int maxResults = 8)
         => _search.Search(query, maxResults);
+
+    public ToolSchemaLoadBatch SearchAndLoad(string query, int maxResults = 8)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        var selected = _search.Search(query, maxResults);
+        var selectedNames = selected.Select(x => x.Descriptor.Name).ToArray();
+
+        var schemas = new List<JsonElement>();
+        var newlyLoaded = new List<string>();
+        foreach (var result in selected)
+        {
+            if (!_loaded.Add(result.Descriptor.Name))
+                continue;
+            schemas.Add(result.Descriptor.CallableSchema.Clone());
+            newlyLoaded.Add(result.Descriptor.Name);
+        }
+
+        var trace = new ToolSchemaLoadRecord(
+            Sequence: _trace.Count,
+            RegistryVersion: _registry.Version,
+            Query: query.Trim(),
+            SelectedNames: Array.AsReadOnly(selectedNames),
+            NewlyLoadedNames: Array.AsReadOnly(newlyLoaded.ToArray()));
+        _trace.Add(trace);
+
+        return new ToolSchemaLoadBatch(
+            schemas.Select(x => x.Clone()).ToArray(),
+            trace);
+    }
+
+    /// <summary>
+    /// Runtime handler for the initial tool_search callable. It records exactly what was selected
+    /// and newly loaded; the host supplies CallableSchemas on the next model request.
+    /// </summary>
+    public string ExecuteToolSearch(global::H2AgentLab.ToolCall call)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        if (!string.Equals(call.Name, SearchToolName, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Expected '{SearchToolName}', got '{call.Name}'.");
+        if (call.Arguments.ValueKind != JsonValueKind.Object
+            || !call.Arguments.TryGetProperty("query", out var queryNode)
+            || queryNode.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(queryNode.GetString()))
+            throw new ArgumentException("tool_search requires a non-empty string query.");
+
+        var maxResults = 8;
+        if (call.Arguments.TryGetProperty("max_results", out var maxNode))
+        {
+            if (maxNode.ValueKind == JsonValueKind.Number && maxNode.TryGetInt32(out var number))
+                maxResults = number;
+            else if (maxNode.ValueKind == JsonValueKind.String
+                && int.TryParse(maxNode.GetString(), out number))
+                maxResults = number;
+            else
+                throw new ArgumentException("tool_search max_results must be an integer.");
+        }
+
+        var batch = SearchAndLoad(queryNode.GetString()!, maxResults);
+        return JsonSerializer.Serialize(new
+        {
+            registryVersion = batch.Trace.RegistryVersion,
+            selected = batch.Trace.SelectedNames,
+            newlyLoaded = batch.Trace.NewlyLoadedNames,
+            nextRequestSchemas = batch.CallableSchemas.Select(SchemaName).ToArray()
+        });
+    }
 
     public static JsonElement BuildToolSearchSchema()
         => JsonSerializer.SerializeToElement(new
