@@ -609,7 +609,7 @@ Evidence: `Extensions/AgentExtension.cs` now defines one application-neutral `IA
 
 ---
 
-## [ ] MB-61 — Remove app-specific ranking from generic core
+## [x] MB-61 — Remove app-specific ranking from generic core
 
 Review:
 
@@ -631,6 +631,8 @@ structured typed interface
 Acceptance:
 
 Adding a new structured Revit-like provider would not require editing a Word/Excel switch in Agent core.
+
+Evidence: `ToolDescriptor` now accepts optional `ToolPreferenceMetadata` containing an application-neutral `capabilityFamily`, `ToolInteractionFidelity` (`Structured`, `Accessibility`, `Visual`, `EscapeHatch`), and optional provider-declared explicit-request terms. `DocumentToolPreference` is retained only as a compatibility class name; its implementation contains no Word/Excel/Office/Python/AutoCAD/Revit knowledge and reorders only equivalent provider-declared capability-family candidates. `InteractionAdapterPreference` now chooses generic `InteractionAdapterCandidate` instances from the same metadata model, preserving `structured typed > accessibility/UIA > screenshot/pixel > escape hatch` while allowing an extension/provider to explicitly expose an escape hatch when the user's request matches its own metadata. `DeferredToolDiscovery` no longer contains the special `run_python` filter; compatibility providers declare their own preference metadata in `V1ToolRegistryAdapter`, while `StructuredOfficeCapabilityCatalog` declares itself structured outside generic core. The legacy Desktop regression and architecture guard were migrated to generic candidate fixtures instead of application switches, and `PythonFallbackRouter` no longer depends on application-intent parsing in `DocumentToolPreference`. `Tools/MbGenericToolPreferenceTests.cs` proves generic fidelity ordering, provider-declared explicit-only behavior, application-neutral adapter choice, compatibility metadata declaration, and a new Revit-like structured provider ranking correctly through normal `DeferredToolDiscovery` without any Revit/application token in Agent core preference files. Exact functional source commit `9b739f45f2ded72340bb42a3c06fbff0f35c4d58`, GitHub Actions run `35376102751`: MB-61 **4 passed, 0 failed**; architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-60, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `de5a271d7fe69b2b565dcb47ad8e8ac23748ca7e`; portable ZIP SHA256 `efa402d6b8039a67b503f617d17c352378e4dccb7b29759b3969d60832034d9a`.
 
 ---
 
