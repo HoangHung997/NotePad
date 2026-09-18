@@ -62,6 +62,19 @@ public interface IAgentRuntimeVerifier
         CancellationToken cancellationToken);
 }
 
+public sealed class AgentVerificationRequiredException : InvalidOperationException
+{
+    public AgentVerificationRequiredException(string message)
+        : base(message)
+    {
+    }
+
+    public AgentVerificationRequiredException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>
 /// Provider-neutral model/tool engine. It owns one complete model turn: bounded prompt assembly,
 /// deferred schema exposure, typed tool execution/continuation, verification feedback, bounded repair
@@ -542,13 +555,20 @@ public sealed class AgentRuntime : IAsyncDisposable
             return;
 
         if (latestVerification is null)
-            throw new InvalidOperationException(
+            throw new AgentVerificationRequiredException(
                 "Task requires verification, but no verifier report exists before final completion.");
 
         var outcome = VerificationCompletionGate.Evaluate(
             contract,
             [latestVerification]);
-        AgentTaskCompletionGate.EnsureCanComplete(contract, outcome);
+        try
+        {
+            AgentTaskCompletionGate.EnsureCanComplete(contract, outcome);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new AgentVerificationRequiredException(ex.Message, ex);
+        }
     }
 
     private static AgentToolDefinition ToTransportTool(JsonElement callableSchema)
