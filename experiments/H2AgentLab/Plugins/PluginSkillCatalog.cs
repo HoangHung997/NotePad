@@ -35,14 +35,9 @@ public sealed class PluginSkillCatalog
                 if (!File.Exists(path))
                     continue;
 
-                var bytes = File.ReadAllBytes(path);
-                if (bytes.Length > 80_000)
-                    throw new IOException($"Plugin skill '{skillId}' exceeds 80 KB.");
-
-                var text = System.Text.Encoding.UTF8.GetString(bytes);
-                var description = ExtractDescription(text);
+                var metadata = ReadDiscoveryMetadata(path, skillId);
                 if (query.Length > 0
-                    && !(skillId + " " + description + " " + manifest.Id)
+                    && !(skillId + " " + metadata.Description + " " + manifest.Id)
                         .Contains(query, StringComparison.OrdinalIgnoreCase))
                     continue;
 
@@ -50,8 +45,8 @@ public sealed class PluginSkillCatalog
                     manifest.Id,
                     manifest.Version,
                     skillId,
-                    description,
-                    global::H2AgentLab.SafeWorkspace.Hash(bytes).ToLowerInvariant()));
+                    metadata.Description,
+                    metadata.Sha256));
             }
         }
 
@@ -115,6 +110,50 @@ public sealed class PluginSkillCatalog
         var prefix = pluginId + "|";
         foreach (var key in _cache.Keys.Where(x => x.StartsWith(prefix, StringComparison.Ordinal)).ToArray())
             _cache.Remove(key);
+    }
+
+    private static (string Description, string Sha256) ReadDiscoveryMetadata(
+        string path,
+        string skillId)
+    {
+        var info = new FileInfo(path);
+        if (!info.Exists)
+            throw new FileNotFoundException("Plugin skill file is missing.", path);
+        if (info.Length > 80_000)
+            throw new IOException($"Plugin skill '{skillId}' exceeds 80 KB.");
+
+        string header;
+        using (var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            4 * 1024,
+            FileOptions.SequentialScan))
+        using (var reader = new StreamReader(
+            stream,
+            new System.Text.UTF8Encoding(false, true),
+            detectEncodingFromByteOrderMarks: true,
+            bufferSize: 4 * 1024,
+            leaveOpen: false))
+        {
+            var builder = new System.Text.StringBuilder();
+            var lineCount = 0;
+            while (!reader.EndOfStream && builder.Length <= 16_000 && lineCount++ < 200)
+            {
+                var line = reader.ReadLine() ?? "";
+                builder.Append(line).Append((char)10);
+                if (lineCount > 1 && line.Trim() == "---")
+                    break;
+            }
+            header = builder.ToString();
+        }
+
+        var description = ExtractDescription(header);
+        using var hashStream = File.OpenRead(path);
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(hashStream)).ToLowerInvariant();
+        return (description, hash);
     }
 
     private static string ExtractDescription(string content)
