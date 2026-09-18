@@ -247,15 +247,15 @@ Rules:
   Python remains escape hatch for unsupported transforms.  
   Evidence: `Tools/DocumentToolPreference.cs` is applied inside `DeferredToolDiscovery.Search/SearchAndLoad`; structured Office/file tools outrank Python for document intent while explicit Python/custom-transform intent is preserved. GitHub Actions run `35309660295` passed full regression/publish.
 
-- [~] **V2-0708 — Closed-file acceptance tests.**  
+- [x] **V2-0708 — Closed-file acceptance tests.**  
   Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.  
-  Dedicated closed-file CI suite added; Word logical header/footer slot fix applied; full Phase 07 verification retry in progress.
+  Evidence: dedicated `Documents/V2ClosedFileTests.cs` builds real XLSX/DOCX fixtures and verifies formulas, bold/italic, solid fills, merges, hidden row/column/sheet state, tables, sections, headers/footers, H2 Core extraction reuse, deterministic snapshots and negative preservation regressions. Word verification compares package-local relationships through logical section/type slots. GitHub Actions run `35310362232` passed the dedicated closed-file suite plus full H2 Notes regression, Agent Lab build, v1 baseline, all v2 suites, Windows x64 publish and artifact upload.
 
 ---
 
 ## Phase 08 — live OfficeHost
 
-- [ ] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
+- [~] **V2-0801 — Create `H2AgentLab.OfficeHost` helper project.**  
   Separate process, STA, named-pipe/JSON-RPC boundary, no model/API key access.
 
 - [ ] **V2-0802 — Add OfficeHost process lifecycle/timeout/restart handling.**
@@ -403,4 +403,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0708 — Closed-file acceptance tests`.
+**Active task:** `V2-0801 — Create H2AgentLab.OfficeHost helper project`.
