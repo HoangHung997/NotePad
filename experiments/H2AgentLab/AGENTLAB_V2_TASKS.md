@@ -249,7 +249,7 @@ Rules:
 
 - [~] **V2-0708 — Closed-file acceptance tests.**  
   Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.  
-  Dedicated closed-file CI suite added; full Phase 07 verification in progress.
+  Dedicated closed-file CI suite added; Word logical header/footer slot fix applied; full Phase 07 verification retry in progress.
 
 ---
 
