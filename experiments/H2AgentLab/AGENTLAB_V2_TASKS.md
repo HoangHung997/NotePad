@@ -165,11 +165,11 @@ Rules:
   No functional deletion yet.  
   Evidence: `Tools/V1ToolRegistryAdapter.cs` projects every `AgentTools.Definitions` schema into v2 registry metadata while execution delegates back to `AgentTools.Execute`; architecture guard checks exact name-set equality and mutation metadata. GitHub Actions run `35296523430` passed full build/regression/publish.
 
-- [~] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
+- [x] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
   No embedding dependency. Cache by registry version.  
-  Implementation + architecture guard added; root-cause Unicode tokenizer escaping fixed after guard failure; full CI retry in progress.
+  Evidence: `Tools/ToolSearchIndex.cs` provides deterministic Unicode lexical/BM25 ranking, exact-name boost and registry-version cache invalidation; architecture guard covers ranking, unchanged-cache reuse and invalidation. GitHub Actions run `35297813401` passed full build/regression/publish.
 
-- [ ] **V2-0504 — Expose `tool_search` as initial callable tool.**  
+- [~] **V2-0504 — Expose `tool_search` as initial callable tool.**  
   Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.
 
 - [ ] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
@@ -384,4 +384,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0503 — Build lexical/BM25-style ToolSearchIndex`.
+**Active task:** `V2-0504 — Expose tool_search as initial callable tool`.
