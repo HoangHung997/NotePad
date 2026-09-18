@@ -759,3 +759,407 @@ ever-growing prompt
 + model self-review
 = slow one-shot assistant
 ```
+
+
+---
+
+## 20. Dynamic Plugin / Skill Catalog and update system
+
+H2 Agent must not hard-code its complete future capability set into the application binary.
+
+The system needs an installable/updateable extension layer so new tools, MCP providers, native adapters, skills, workflows, templates and verifiers can be added later without rebuilding the full H2 application.
+
+### 20.1 Package concepts
+
+Keep these concepts separate:
+
+```text
+Tool
+  = one callable capability/action
+
+Skill
+  = reusable instructions/workflow telling the agent when/how to combine tools
+
+Plugin
+  = installable package that may contain:
+      tools / MCP configuration
+      skills
+      native helper metadata
+      verifier definitions
+      resources/templates
+      optional lifecycle hooks
+```
+
+A skill is not a replacement for a tool.
+A tool performs an action.
+A skill teaches the agent how to use available capabilities for a recognizable user goal.
+
+### 20.2 H2 Plugin Manifest
+
+Every installable extension should have a bounded machine-readable manifest similar in spirit to:
+
+```json
+{
+  "id": "h2.autocad.productivity",
+  "name": "AutoCAD Productivity",
+  "version": "1.4.0",
+  "minAgentVersion": "2.0.0",
+  "publisher": "example",
+  "packageHash": "sha256:...",
+  "capabilities": [
+    "autocad.find_blocks",
+    "autocad.read_attributes",
+    "autocad.update_attribute"
+  ],
+  "skills": [
+    "quantity-takeoff",
+    "block-audit"
+  ],
+  "providers": [
+    "mcp",
+    "native-host"
+  ],
+  "permissions": [
+    "autocad.read",
+    "autocad.write"
+  ]
+}
+```
+
+Exact schema may differ.
+
+### 20.3 Plugin Catalog / Repository
+
+H2 needs a catalog abstraction with one or more configured sources.
+
+Possible sources:
+
+```text
+Official H2 catalog
+Team/private catalog
+Git repository catalog
+Local folder catalog
+Enterprise/internal catalog
+```
+
+Each catalog entry should expose only compact discovery metadata first:
+
+```text
+plugin id
+name
+version
+summary
+publisher
+capability keywords
+skill keywords
+compatibility
+trust/signature state
+package hash
+download location
+```
+
+Do not download or inject the full package simply because it exists in a catalog.
+
+### 20.4 Search-before-install behavior
+
+When the current ToolRegistry cannot satisfy the task, the agent may search available catalogs.
+
+Example:
+
+```text
+User:
+"Audit all dynamic block attributes in AutoCAD and export to Excel."
+
+Current registry:
+no specialized dynamic-block audit skill
+
+Agent:
+  -> search installed tools
+  -> search plugin catalog metadata
+  -> find h2.autocad.dynamic-block-audit
+  -> inspect manifest + permissions + compatibility
+  -> request/install according to policy
+  -> load package
+  -> discover its tools/skills
+  -> continue the original task
+```
+
+The agent must not blindly install the first search result.
+
+### 20.5 Installation policy
+
+Installation is a host decision, not a model-only decision.
+
+Policy should support modes such as:
+
+```text
+Disabled
+Allow trusted official packages
+Ask before new publisher/package
+Allow organization-approved catalog
+Developer mode for local packages
+```
+
+A model may propose installation, but the host verifies policy, trust, integrity and compatibility.
+
+### 20.6 Integrity and trust
+
+Before activation, verify at minimum:
+
+- package ID/version;
+- cryptographic package hash;
+- publisher/source identity where available;
+- supported Agent version;
+- declared capabilities;
+- requested permissions;
+- native executable/helper presence;
+- duplicate/conflicting tool names;
+- forbidden paths or traversal;
+- unsupported lifecycle hooks;
+- manifest/schema validity.
+
+Downloaded code must never execute merely because the model discovered it.
+
+Untrusted native binaries/scripts require explicit policy/approval and isolation appropriate to their capability.
+
+### 20.7 Staged activation
+
+Installation/update should be staged:
+
+```text
+download
+ -> verify hash/signature/manifest
+ -> unpack to versioned staging directory
+ -> validate tools/skills
+ -> run package self-test / compatibility probe
+ -> register package
+ -> atomically activate version
+```
+
+A failed install/update must leave the previous working version intact.
+
+### 20.8 Versioned local package store
+
+Use a versioned local cache/store, conceptually:
+
+```text
+plugins/
+  h2.autocad.productivity/
+    1.3.0/
+    1.4.0/
+    active.json
+
+skills/
+  cache/index...
+```
+
+Do not overwrite the currently active version in-place during update.
+
+Keep enough metadata to rollback.
+
+### 20.9 Update discovery
+
+H2 should periodically or on-demand query only catalog metadata for newer compatible versions.
+
+Example:
+
+```text
+installed: h2.autocad.productivity 1.3.0
+catalog:   h2.autocad.productivity 1.4.0
+               |
+               -> inspect changelog / permissions / capability delta
+               -> validate policy
+               -> staged download/update
+```
+
+A new version that requests broader permissions must not silently inherit approval from an older narrower version.
+
+### 20.10 Capability index
+
+Installed package metadata feeds a rebuildable local capability index.
+
+The index maps:
+
+```text
+intent / keywords / namespaces
+  -> plugin
+  -> skill
+  -> tool descriptors
+```
+
+Example:
+
+```text
+"AutoCAD dynamic block attributes"
+ -> plugin h2.autocad.productivity
+ -> skill dynamic-block-audit
+ -> tools:
+      autocad.find_dynamic_blocks
+      autocad.read_dynamic_properties
+      autocad.read_attributes
+      autocad.verify_entities
+```
+
+The model sees compact search results first.
+Detailed schemas and SKILL instructions are loaded only when selected.
+
+### 20.11 Skill loading must remain progressive
+
+Skills should follow the same bounded-context principle already used by Agent Lab.
+
+Do not inject all installed `SKILL.md` files into every prompt.
+
+Use:
+
+```text
+skill catalog metadata
+ -> skill search
+ -> selected skill summary
+ -> load SKILL.md only when needed
+ -> remember skill id/version/hash within the task
+ -> do not reread unchanged skill every turn
+```
+
+If a plugin update changes a skill hash/version, invalidate the cached skill content deterministically.
+
+### 20.12 Tools and skills may update independently
+
+A plugin may ship:
+
+- new tools;
+- new skill instructions;
+- revised verifier behavior;
+- new templates;
+- compatibility fixes.
+
+The agent must record exact package/skill/tool versions in task evidence so a completed run can be reproduced/audited.
+
+Example evidence:
+
+```text
+plugin: h2.autocad.productivity@1.4.0
+skill: dynamic-block-audit@sha256:...
+tool: autocad.read_attributes schema v3
+```
+
+### 20.13 Hot registration without restarting the entire H2 app
+
+Where safe, newly activated plugins should be registered into the ToolRegistry dynamically.
+
+The active task may refresh capability metadata at a controlled boundary.
+
+Do not mutate the tool surface in the middle of an in-flight tool call.
+
+Native-host changes that require process restart may restart only the relevant helper/plugin host rather than the full H2 UI when possible.
+
+### 20.14 Rollback / quarantine
+
+If a new package causes:
+
+- crashes;
+- invalid schemas;
+- verifier regressions;
+- permission violations;
+- repeated tool failures;
+- compatibility breakage;
+
+H2 must be able to:
+
+```text
+disable package
+rollback to previous version
+quarantine bad version
+retain diagnostics
+continue with remaining capabilities
+```
+
+### 20.15 Catalog security rule
+
+Catalog discovery is not trust.
+
+Search results from Internet/Git repositories must not automatically become executable capability.
+
+The path is:
+
+```text
+discover metadata
+ -> validate source
+ -> validate manifest
+ -> validate package integrity
+ -> apply policy/approval
+ -> stage
+ -> self-test
+ -> activate
+```
+
+### 20.16 Example long-term flow
+
+```text
+User gives unfamiliar specialized task
+        |
+        v
+Agent searches installed ToolRegistry
+        |
+        +-- capability exists -> use it
+        |
+        +-- capability insufficient
+              |
+              v
+        search Plugin/Skill Catalog
+              |
+              v
+        find candidate extension
+              |
+              v
+        host checks:
+          compatibility
+          trust
+          permissions
+          package hash
+              |
+              v
+        install/update if policy allows
+              |
+              v
+        rebuild local capability index
+              |
+              v
+        tool_search selects relevant tools
+              |
+              v
+        load selected SKILL.md
+              |
+              v
+        Agent continues original task
+```
+
+This is the intended extensibility model for H2 Agent.
+
+---
+
+## 21. Architectural target for extensibility
+
+The long-term architecture should support:
+
+```text
+AgentOrchestrator
+     |
+     +-- ToolSearchIndex
+     +-- SkillSearchIndex
+     +-- PluginCatalog
+     +-- PluginManager
+     +-- PermissionPolicy
+     +-- Verification
+     |
+     +-- Dynamic ToolRegistry
+            |
+            +-- built-in tools
+            +-- installed plugins
+            +-- MCP providers
+            +-- OfficeHost
+            +-- AutoCADHost
+            +-- WebResearchHost
+            +-- DesktopHost
+```
+
+The product should be able to gain new specialist capabilities later without redesigning the agent core.
