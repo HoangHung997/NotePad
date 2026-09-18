@@ -134,6 +134,25 @@ public sealed class WebResearchHost : ICapabilityProvider
     public ProviderProvenance Provenance { get; }
     public ProviderHealthState Health => _health;
 
+    public Task<IReadOnlyList<WebSearchHit>> SearchAsync(
+        string query,
+        int maxResults,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        if (maxResults is < 1 or > 20)
+            throw new ArgumentOutOfRangeException(nameof(maxResults));
+        return _backend.SearchAsync(query, maxResults, cancellationToken);
+    }
+
+    public Task<WebFetchedDocument> FetchAsync(
+        string url,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureReady();
+        return _backend.FetchAsync(url, cancellationToken);
+    }
+
     public Task ConnectAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
