@@ -1220,6 +1220,65 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("AgentRepairController emits concise failed-criterion context and preserves passed criteria", () =>
+        {
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Repair fixture",
+                "workspace:/fixture",
+                null,
+                ["repair output"],
+                null,
+                ["artifact"],
+                [
+                    new AgentAcceptanceCriterion("c1", "Keep title unchanged."),
+                    new AgentAcceptanceCriterion("c2", "Set Tasks!A4 italic=false."),
+                    new AgentAcceptanceCriterion("c3", "Preserve formulas.")
+                ],
+                AgentTaskRiskClass.Low,
+                new AgentVerificationPolicy(requireVerification: true));
+
+            var report = new VerificationReport(
+                "fixture-verifier",
+                [
+                    new VerificationCriterionResult("c1", VerificationCriterionStatus.Passed, ["snap:c1"]),
+                    new VerificationCriterionResult(
+                        "c2",
+                        VerificationCriterionStatus.Failed,
+                        ["snap:c2"],
+                        new VerificationFailure(
+                            "c2",
+                            "Tasks!A4 italic changed true -> false.",
+                            ["before:c2", "after:c2"])),
+                    new VerificationCriterionResult("c3", VerificationCriterionStatus.Passed, ["snap:c3"])
+                ]);
+
+            var repair = new AgentRepairController().Build(contract, report);
+            if (!repair.FailedCriterionIds.SequenceEqual(new[] { "c2" })
+                || !repair.PassedCriterionIds.SequenceEqual(new[] { "c1", "c3" }))
+                throw new InvalidOperationException("Repair controller lost failed/passed criterion identity.");
+            if (!repair.PromptContext.Contains("FAILED c2", StringComparison.Ordinal)
+                || !repair.PromptContext.Contains("Tasks!A4 italic changed true -> false.", StringComparison.Ordinal)
+                || !repair.PromptContext.Contains("Preserve passed criteria: c1, c3", StringComparison.Ordinal)
+                || repair.PromptContext.Contains("full transcript", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Repair context is missing concise failure/preservation guidance.");
+            if (repair.PromptContext.Length > AgentRepairController.MaxRepairContextCharacters)
+                throw new InvalidOperationException("Repair context exceeded its hard bound.");
+
+            try
+            {
+                _ = new AgentRepairController().Build(
+                    contract,
+                    new VerificationReport(
+                        "fixture-verifier",
+                        [new VerificationCriterionResult("c1", VerificationCriterionStatus.Passed)]));
+                throw new InvalidOperationException("Repair context was created without any failed criterion.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("at least one failed criterion", StringComparison.Ordinal))
+            {
+            }
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
