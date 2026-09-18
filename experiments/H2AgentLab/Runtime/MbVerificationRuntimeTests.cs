@@ -371,7 +371,7 @@ public static class MbVerificationRuntimeTests
                 "fixture",
                 "1.0.0"),
             resourceScope: new ToolResourceScope(scope, scope),
-            serializationKey: scope,
+            serializationKey: "mb42-fixture",
             canProvideVerificationEvidence: true);
 
     private static WordLiveSnapshot WordSnapshot(
