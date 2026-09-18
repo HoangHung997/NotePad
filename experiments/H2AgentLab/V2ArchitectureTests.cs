@@ -1580,16 +1580,21 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Closed Word verifier missed unrelated header/table regression.");
         });
 
-        Test("Document tool preference keeps structured Office tools ahead of Python escape hatch", () =>
+        Test("Generic tool preference uses provider metadata instead of application switches", () =>
         {
             var executor = new DelegatingToolExecutor(
-                "doc-preference-fixture",
+                "preference-fixture",
                 (call, ct) => ValueTask.FromResult("ok"));
-            ToolDescriptor Descriptor(string name, string ns, string description)
+
+            ToolDescriptor Descriptor(
+                string name,
+                ToolInteractionFidelity fidelity,
+                bool explicitOnly = false,
+                IReadOnlyList<string>? explicitTerms = null)
                 => new(
                     name,
-                    new ToolNamespace(ns, ns + " namespace"),
-                    description,
+                    new ToolNamespace("content", "Content interaction namespace."),
+                    "Interact with active content through a provider-declared adapter.",
                     AgentToolRisk.Low,
                     AgentToolAccess.ReadOnly,
                     supportsParallel: true,
@@ -1600,35 +1605,49 @@ public static class V2ArchitectureTests
                         function = new
                         {
                             name,
-                            description,
+                            description = "Content interaction fixture.",
                             parameters = new { type = "object" }
                         }
                     }),
-                    executor);
+                    executor,
+                    preference: new ToolPreferenceMetadata(
+                        "active-content",
+                        fidelity,
+                        explicitOnly,
+                        explicitTerms));
 
-            var python = new ToolSearchResult(
-                Descriptor("run_python", "python", "Execute arbitrary Python for custom transformations."),
+            var escape = new ToolSearchResult(
+                Descriptor(
+                    "content.escape",
+                    ToolInteractionFidelity.EscapeHatch,
+                    explicitOnly: true,
+                    explicitTerms: ["custom", "script"]),
                 Score: 100,
-                MatchedTerms: ["document"]);
-            var word = new ToolSearchResult(
-                Descriptor("word_paragraphs", "office", "Read structured Word paragraphs."),
+                MatchedTerms: ["content"]);
+            var structured = new ToolSearchResult(
+                Descriptor(
+                    "content.structured",
+                    ToolInteractionFidelity.Structured),
                 Score: 1,
-                MatchedTerms: ["document"]);
+                MatchedTerms: ["content"]);
 
             var preferred = DocumentToolPreference.Apply(
-                "inspect Word document paragraphs",
-                [python, word],
+                "inspect active content",
+                [escape, structured],
                 2);
-            if (preferred[0].Descriptor.Name != "word_paragraphs"
-                || preferred[1].Descriptor.Name != "run_python")
-                throw new InvalidOperationException("Structured Word tool was not preferred over Python escape hatch.");
+            if (preferred.Count != 1
+                || preferred[0].Descriptor.Name != "content.structured")
+                throw new InvalidOperationException(
+                    "Structured provider metadata was not preferred while explicit escape hatch remained hidden.");
 
-            var explicitPython = DocumentToolPreference.Apply(
-                "use python code for custom transform of this Word document",
-                [python, word],
+            var explicitEscape = DocumentToolPreference.Apply(
+                "use custom script for active content",
+                [escape, structured],
                 2);
-            if (explicitPython[0].Descriptor.Name != "run_python")
-                throw new InvalidOperationException("Explicit Python intent was incorrectly demoted.");
+            if (explicitEscape[0].Descriptor.Name != "content.escape"
+                || explicitEscape[1].Descriptor.Name != "content.structured")
+                throw new InvalidOperationException(
+                    "Provider-declared explicit escape hatch was not selected without application-specific core logic.");
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
