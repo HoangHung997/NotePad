@@ -129,11 +129,11 @@ Rules:
   Fields: goal, scope, inputs, required changes, preserve constraints, outputs, acceptance criteria, risk class, verification policy.  
   Evidence: immutable host-owned contract + verification/risk types in `Tasking/AgentTaskContract.cs`; architecture guard proves snapshot isolation, normalization and mutation classification. GitHub Actions run `35293190864` passed full H2 Notes + Agent Lab build/tests/publish.
 
-- [~] **V2-0402 — Add criterion/evidence types.**  
+- [x] **V2-0402 — Add criterion/evidence types.**  
   Acceptance criterion cannot be silently removed after task starts; evidence references are typed.  
-  Implementation + architecture guard added; full CI verification in progress.
+  Evidence: stable criterion IDs, typed durable evidence references and append-only criterion expansion/evidence APIs in `Tasking/AgentAcceptanceEvidence.cs` + `AgentTaskContract.cs`; architecture guard covers evidence typing, snapshot immutability and redefinition rejection. GitHub Actions run `35293534110` passed full build/regression/publish.
 
-- [ ] **V2-0403 — Add `AgentTaskState` state machine.**  
+- [~] **V2-0403 — Add `AgentTaskState` state machine.**  
   Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.
 
 - [ ] **V2-0404 — Enforce no mutation completion without verification.**  
@@ -376,4 +376,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0402 — Add criterion/evidence types`.
+**Active task:** `V2-0403 — Add AgentTaskState state machine`.
