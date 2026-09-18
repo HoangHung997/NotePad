@@ -39,11 +39,12 @@ public sealed class LabSessionContextAdapter
                 1));
         }
 
+        var summaries = toolSummaries ?? DeriveToolSummaries(session);
         return new AgentContextInput(
             TaskContract: taskContract,
             CurrentState: currentState,
             RecentTurns: turns,
-            ToolSummaries: toolSummaries,
+            ToolSummaries: summaries,
             CompactedHistory: compactedHistory);
     }
 
@@ -59,6 +60,27 @@ public sealed class LabSessionContextAdapter
             currentState,
             toolSummaries,
             compactedHistory));
+
+    private static IReadOnlyList<AgentContextToolSummary> DeriveToolSummaries(LabSession session)
+    {
+        var summaries = new List<AgentContextToolSummary>();
+        for (var index = 0; index < session.Events.Count; index++)
+        {
+            var journalEvent = session.Events[index];
+            if (string.IsNullOrWhiteSpace(journalEvent.Text)
+                || string.IsNullOrWhiteSpace(journalEvent.Kind)
+                || !journalEvent.Kind.StartsWith("tool", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            summaries.Add(new AgentContextToolSummary(
+                $"session:{session.Id:N}:tool:{index}",
+                journalEvent.Kind.Trim(),
+                journalEvent.Text,
+                index,
+                1));
+        }
+        return summaries;
+    }
 
     private static bool TryRole(string? kind, out AgentTransportMessageRole role)
     {
