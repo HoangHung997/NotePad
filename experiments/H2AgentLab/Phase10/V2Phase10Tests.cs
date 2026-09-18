@@ -826,12 +826,14 @@ public static class V2Phase10Tests
             WriteZip(
                 zip,
                 "skills/audit/SKILL.md",
-                "---
-name: audit
-description: Fixture audit skill
----
-
-" + skillBody);
+                string.Join(
+                    ((char)10).ToString(),
+                    "---",
+                    "name: audit",
+                    "description: Fixture audit skill",
+                    "---",
+                    "",
+                    skillBody));
             WriteZip(
                 zip,
                 "selftest.json",
