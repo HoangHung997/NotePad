@@ -3,6 +3,7 @@ using H2AgentLab.Context;
 using H2AgentLab.Metrics;
 using H2AgentLab.Prompting;
 using H2AgentLab.Runtime;
+using H2AgentLab.Session;
 using H2AgentLab.Verification;
 
 namespace H2AgentLab.Tasking;
@@ -130,6 +131,27 @@ public sealed class AgentOrchestratedRun
                 "workspace=" + labSession.Workspace
                 + "; readOnly=" + readOnly
                 + "; route=" + session.Route.RouteClass);
+
+        var compaction = new RuntimeCompactionCoordinator(
+            tools.StateRoot,
+            _orchestrator.ContextManager).Prepare(
+                labSession,
+                contextInput);
+        contextInput = compaction.Context;
+
+        if (!string.IsNullOrWhiteSpace(compaction.CheckpointId))
+        {
+            Emit(
+                trace,
+                output,
+                AgentTraceEventKind.Evidence,
+                compaction.CreatedCheckpoint ? "context-compacted" : "context-checkpoint-reused",
+                "Bounded historical checkpoint="
+                + compaction.CheckpointId
+                + "; coveredThrough="
+                + compaction.CoveredThroughSequence
+                + ".");
+        }
 
         var request = new AgentRuntimeRequest(
             contract,
