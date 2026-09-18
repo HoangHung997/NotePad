@@ -349,7 +349,7 @@ Evidence: `Runtime/MbDeferredToolLoadingTests.cs` exercises the real runtime plu
 
 ---
 
-## [~] MB-33 — Wire ToolExecutionScheduler into real calls
+## [x] MB-33 — Wire ToolExecutionScheduler into real calls
 
 Goal:
 
@@ -362,11 +362,13 @@ Acceptance:
 - mutating call without resource identity fails closed;
 - cancellation propagates.
 
+Evidence: `Runtime/AgentRuntime.cs` routes normal runtime calls through `ToolExecutionScheduler`; `Runtime/MbSchedulerRuntimeTests.cs` proves parallel-safe reads overlap, same-resource mutations serialize, unscoped mutation fails before executor, and cancellation reaches both executor and transport. Workflow source commit `c8881fc47ca07bc828ea64b345b4f4509958e9b7` completed through the final publish step, producing bot publish commit `cf04040de47d8c3d0847bc571731986decd26e4b` after the MB-33 CI step.
+
 ---
 
 # Stage E — Permission / evidence / verification becomes part of the loop
 
-## [ ] MB-40 — Centralize normal runtime permission enforcement
+## [~] MB-40 — Centralize normal runtime permission enforcement
 
 Goal:
 
