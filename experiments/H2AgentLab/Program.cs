@@ -64,6 +64,7 @@ public static class Program
         if (args.Contains("--mb-computer-extension-registration-test")) return H2AgentLab.Computer.MbComputerExtensionRegistrationTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-first-party-extension-cards-test")) return H2AgentLab.Extensions.MbFirstPartyExtensionCardsTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-domain-neutral-capability-search-test")) return H2AgentLab.Capabilities.MbDomainNeutralCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-available-capability-projection-test")) return H2AgentLab.Capabilities.MbAvailableCapabilityProjectionTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-available-capability-search-test")) return H2AgentLab.Capabilities.MbAvailableCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-installed-capability-projection-test")) return H2AgentLab.Capabilities.MbInstalledCapabilityProjectionTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-available-capability-search-test")) return H2AgentLab.Capabilities.MbAvailableCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
