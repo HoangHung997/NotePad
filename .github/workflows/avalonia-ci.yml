@@ -157,6 +157,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-phase11-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-phase11-tests.txt')
 
+      - name: Run H2 Agent Lab v2 extensibility refinement tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-extensibility-refinement'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-extensibility-refinement-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-extensibility-refinement-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
