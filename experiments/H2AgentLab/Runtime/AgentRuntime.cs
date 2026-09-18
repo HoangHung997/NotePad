@@ -335,11 +335,16 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            var resourceKey = ResourceKey(descriptor);
+            if (descriptor.IsMutating && string.IsNullOrWhiteSpace(resourceKey))
+                throw new InvalidOperationException(
+                    $"Mutating tool '{descriptor.Name}' requires a resource key.");
+
             var permissionRequest = new AgentRuntimePermissionRequest(
                 contract,
                 descriptor,
                 call,
-                ResourceKey(descriptor));
+                resourceKey);
             var permission = await _permissionPolicy.AuthorizeAsync(
                 permissionRequest,
                 cancellationToken).ConfigureAwait(false);
