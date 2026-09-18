@@ -164,21 +164,62 @@ public sealed class InstalledCapabilityIndex
     }
 }
 
+public interface IAvailableCapabilitySearchStrategy
+{
+    IReadOnlyList<AvailableCapabilityRecord> Search(
+        IEnumerable<AvailableCapabilityRecord> records,
+        string query,
+        int maxResults);
+}
+
+public sealed class LexicalAvailableCapabilitySearchStrategy
+    : IAvailableCapabilitySearchStrategy
+{
+    public IReadOnlyList<AvailableCapabilityRecord> Search(
+        IEnumerable<AvailableCapabilityRecord> records,
+        string query,
+        int maxResults)
+        => CapabilityRanking.RankAvailable(
+            records,
+            query,
+            maxResults);
+}
+
 public sealed class AvailableCapabilityIndex
 {
-    private AvailableCapabilityRecord[] _records = [];
+    private Func<IReadOnlyList<AvailableCapabilityRecord>> _records
+        = static () => Array.Empty<AvailableCapabilityRecord>();
+    private readonly IAvailableCapabilitySearchStrategy _searchStrategy;
 
-    public IReadOnlyList<AvailableCapabilityRecord> Records => _records;
+    public AvailableCapabilityIndex(
+        IAvailableCapabilitySearchStrategy? searchStrategy = null)
+    {
+        _searchStrategy = searchStrategy
+            ?? new LexicalAvailableCapabilitySearchStrategy();
+    }
 
+    /// <summary>
+    /// Derived view only. Authoritative remote metadata remains in CatalogSourceManager/source caches.
+    /// </summary>
+    public IReadOnlyList<AvailableCapabilityRecord> Records
+        => Snapshot();
+
+    public void Bind(
+        Func<IReadOnlyList<AvailableCapabilityRecord>> records)
+    {
+        _records = records
+            ?? throw new ArgumentNullException(nameof(records));
+    }
+
+    /// <summary>
+    /// Compatibility binder for existing callers/tests with a fixed metadata snapshot.
+    /// It does not turn this class into an authoritative catalog store.
+    /// </summary>
     public void Rebuild(IEnumerable<AvailableCapabilityRecord> records)
     {
         ArgumentNullException.ThrowIfNull(records);
-        _records = records
-            .Select(ValidateCompact)
-            .OrderBy(x => x.PluginId, StringComparer.Ordinal)
-            .ThenByDescending(x => Version.Parse(x.PluginVersion))
-            .ThenByDescending(x => x.SourcePriority)
-            .ToArray();
+        var snapshot = Normalize(records);
+        Bind(() => snapshot);
     }
 
     public IReadOnlyList<AvailableCapabilityRecord> Search(
@@ -187,17 +228,37 @@ public sealed class AvailableCapabilityIndex
     {
         if (maxResults is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(maxResults));
-        return CapabilityRanking.RankAvailable(_records, query, maxResults);
+
+        return _searchStrategy.Search(
+            Snapshot(),
+            query,
+            maxResults);
     }
 
-    private static AvailableCapabilityRecord ValidateCompact(AvailableCapabilityRecord record)
+    private AvailableCapabilityRecord[] Snapshot()
+        => Normalize(_records());
+
+    private static AvailableCapabilityRecord[] Normalize(
+        IEnumerable<AvailableCapabilityRecord> records)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        return records
+            .Select(ValidateCompact)
+            .OrderBy(x => x.PluginId, StringComparer.Ordinal)
+            .ThenByDescending(x => Version.Parse(x.PluginVersion))
+            .ThenByDescending(x => x.SourcePriority)
+            .ToArray();
+    }
+
+    private static AvailableCapabilityRecord ValidateCompact(
+        AvailableCapabilityRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
         if (record.ToolSummaries.Any(x => x.Length > 1_000)
             || record.Skills.Any(x => x.Description.Length > 1_500)
             || record.Skills.Any(x => x.Description.Contains("# ", StringComparison.Ordinal)
                 && x.Description.Length > 500))
-            throw new InvalidDataException("Available capability index contains oversized/full content instead of compact metadata.");
+            throw new InvalidDataException("Available capability search contains oversized/full content instead of compact metadata.");
         if (record.PackageLocation.Length > 2_048)
             throw new InvalidDataException("Available package location is too long.");
         return record;
