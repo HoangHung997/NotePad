@@ -412,7 +412,7 @@ Evidence: `Runtime/AgentRuntimeEvidence.cs` stores important/large tool output i
 
 ---
 
-## [~] MB-42 — Integrate verification into normal mutating tasks
+## [x] MB-42 — Integrate verification into normal mutating tasks
 
 Goal:
 
@@ -437,9 +437,11 @@ Acceptance:
 - tool success alone cannot complete mutation;
 - at least file, Python, and one structured application verifier operate in the real runtime.
 
+Evidence: normal mutating UI tasks now require the host-owned `runtime.mutation-verified` criterion and `runtime-domain-router`; `AgentRuntimeDomainVerifierRouter` runs after real tool execution using host-only raw outputs while model context receives bounded evidence projections. `FileRuntimeDomainVerifier` re-reads workspace bytes and uses `FileScopeVerifier`; `PythonRuntimeDomainVerifier` reloads durable run evidence, re-reads every recorded output artifact so hashes are checked against actual bytes, then uses `PythonResultVerifier`; structured Word mutations are checked with `LiveWordVerifier`. Missing verification becomes a typed host block instead of model-declared completion or an unhandled UI failure. Exact source commit `cb8821f2c1e7f68ddac076b5add874a18edcbbed`, GitHub Actions run `35364524079`: MB-42 **4 passed, 0 failed**; all preceding MB suites, DesktopHost, OfficeHost, provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `2bf48744b00445e55a6ae8124b86849fe274f888`; portable ZIP SHA256 `ac3d1002ed1999aec6667c896fbcaab72608411cfb32612460fc513340ade1fc`.
+
 ---
 
-## [ ] MB-43 — Integrate bounded repair loop
+## [~] MB-43 — Integrate bounded repair loop
 
 Goal:
 
