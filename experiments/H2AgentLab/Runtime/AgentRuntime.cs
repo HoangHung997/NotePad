@@ -271,8 +271,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var trace = _discovery.LoadTrace.Last();
                 foreach (var name in trace.NewlyLoadedNames)
                 {
-                    if (_registry.TryGet(name, out var descriptor))
-                        newlyLoadedSchemas.Add(ToTransportTool(descriptor.CallableSchema));
+                    if (_registry.TryGet(name, out var loadedDescriptor))
+                        newlyLoadedSchemas.Add(ToTransportTool(loadedDescriptor.CallableSchema));
                 }
 
                 results[i] = new AgentToolResult(
