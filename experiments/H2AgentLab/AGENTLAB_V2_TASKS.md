@@ -169,11 +169,11 @@ Rules:
   No embedding dependency. Cache by registry version.  
   Evidence: `Tools/ToolSearchIndex.cs` provides deterministic Unicode lexical/BM25 ranking, exact-name boost and registry-version cache invalidation; architecture guard covers ranking, unchanged-cache reuse and invalidation. GitHub Actions run `35297813401` passed full build/regression/publish.
 
-- [~] **V2-0504 — Expose `tool_search` as initial callable tool.**  
+- [x] **V2-0504 — Expose `tool_search` as initial callable tool.**  
   Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.  
-  Initial exposure implementation + architecture guard added; full CI verification in progress.
+  Evidence: `DeferredToolDiscovery.BuildInitialExposure` exposes only `tool_search` + optional stable `update_plan`, while namespace descriptions advertise deferred capabilities. Architecture guard proves file/Python/Desktop schemas do not leak initially. GitHub Actions run `35298186826` passed full build/regression/publish.
 
-- [ ] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
+- [~] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
   Acceptance: exact selected schemas are traceable; duplicates coalesced.
 
 - [ ] **V2-0506 — Add parallel read-only execution support.**  
@@ -385,4 +385,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0504 — Expose tool_search as initial callable tool`.
+**Active task:** `V2-0505 — Load discovered tool schemas for subsequent model call`.
