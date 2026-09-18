@@ -372,8 +372,8 @@ public sealed class WebResearchHost : ICapabilityProvider
         if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
         {
             var html = Encoding.UTF8.GetString(bytes);
-            text = Regex.Replace(html, @"<script[\s\S]*?</script>", " ", RegexOptions.IgnoreCase);
-            text = Regex.Replace(text, @"<style[\s\S]*?</style>", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(html, "<script[^>]*>.*?</script>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            text = Regex.Replace(text, "<style[^>]*>.*?</style>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             text = Regex.Replace(text, "<[^>]+>", " ");
             text = WebUtility.HtmlDecode(text);
         }
@@ -388,10 +388,31 @@ public sealed class WebResearchHost : ICapabilityProvider
             return "";
         }
 
-        text = Regex.Replace(text, @"\s+", " ").Trim();
+        text = CollapseWhitespace(text);
         return text.Length <= maxCharacters
             ? text
             : text[..maxCharacters] + "…[truncated]";
+    }
+
+    private static string CollapseWhitespace(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        var pendingSpace = false;
+        foreach (var ch in value)
+        {
+            if (char.IsWhiteSpace(ch))
+            {
+                pendingSpace = builder.Length > 0;
+                continue;
+            }
+            if (pendingSpace)
+            {
+                builder.Append(' ');
+                pendingSpace = false;
+            }
+            builder.Append(ch);
+        }
+        return builder.ToString().Trim();
     }
 
     private static string RequiredString(
