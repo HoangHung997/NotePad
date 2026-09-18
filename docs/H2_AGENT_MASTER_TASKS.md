@@ -583,7 +583,7 @@ Evidence: `SkillRuntimeToolExecutor` now provides the normal read-only runtime b
 
 # Stage G — Extension bus and first-party cards
 
-## [ ] MB-60 — Define one simple extension registration boundary
+## [x] MB-60 — Define one simple extension registration boundary
 
 Goal:
 
@@ -604,6 +604,8 @@ Create a deterministic fake `CalculatorExtension` or equivalent outside core.
 Install/register it.
 
 Agent uses it through ToolRegistry without changes to AgentRuntime.
+
+Evidence: `Extensions/AgentExtension.cs` now defines one application-neutral `IAgentExtension` / `AgentExtensionRegistry` boundary backed by the existing authoritative `ToolRegistry`, canonical `Skills.SkillCatalog`, `ArtifactVerifierRegistry`, and `CapabilityProviderManager`. Extensions may register tool descriptors, one or more skill sources, verifiers, provider lifecycle implementations and normalized optional metadata without adding application-family branches to AgentRuntime. A deterministic `FirstPartyExtensions/Calculator/CalculatorExtension.cs` fixture lives outside Runtime/core-specific code and registers `calculator.add`, `calculator-basics`, `CalculatorArtifactVerifier`, `CalculatorCapabilityProvider`, and extension metadata through that single boundary. `Extensions/MbExtensionRegistrationTests.cs` proves all five surfaces register through host-owned registries, provider connect lifecycle and verifier dispatch remain host-owned, real `AgentRuntime` discovers/loads/executes `calculator.add` through ordinary `tool_search -> ToolRegistry` flow, and source guards prove AgentRuntime and the generic extension boundary contain no Calculator-specific logic. Exact functional source commit `4aa2d5b99d28b50d7ee4d1d4b042288ce89fd298`, GitHub Actions run `35374132540`: MB-60 **4 passed, 0 failed**; H2 Notes, Phase 10/11/extensibility, MB-10 through MB-52, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `233353de5062c5a10214f4990e3362e9dc16eb67`; portable ZIP SHA256 `49f9c5cf4517ee23c1dcc463a9d0a98b9186344dcaeb09e8f1b93f8ae15670cb`.
 
 ---
 
