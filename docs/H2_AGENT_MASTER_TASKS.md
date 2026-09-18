@@ -206,6 +206,8 @@ Evidence: `Transport/AgentTransportFactory.cs` routes accepted profiles to exist
 
 ## [~] MB-20 — Move V2 context into pre-request execution
 
+Implementation note: normal AgentRuntime request path now uses LabSessionContextAdapter.BuildInput, bounded recent turns and derived tool summaries; dedicated 10/100/1000-turn acceptance test is wired and CI verification is in progress.
+
 Goal:
 
 Make bounded context real, not diagnostic-only.
