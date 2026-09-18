@@ -146,13 +146,19 @@ public static class MbInstalledCapabilityProjectionTests
                     "H2AgentLab",
                     "Skills",
                     "UnifiedSkillCatalog.cs"));
-            var continuationSource = File.ReadAllText(
+            var retiredContinuation = Path.Combine(
+                repo,
+                "experiments",
+                "H2AgentLab",
+                "Capabilities",
+                "MissingCapabilityContinuation.cs");
+            var catalogRuntimeSource = File.ReadAllText(
                 Path.Combine(
                     repo,
                     "experiments",
                     "H2AgentLab",
-                    "Capabilities",
-                    "MissingCapabilityContinuation.cs"));
+                    "Catalog",
+                    "CatalogRuntimeTools.cs"));
 
             Check(!indexSource.Contains(
                     "private InstalledCapabilityRecord[] _records",
@@ -173,13 +179,14 @@ public static class MbInstalledCapabilityProjectionTests
                     StringComparison.Ordinal),
                 "Canonical SkillCatalog has no exact installed metadata snapshot seam.");
 
-            Check(continuationSource.Contains(
-                    "_installed.Bind(_registry, _skills, _providers);",
-                    StringComparison.Ordinal)
-                && !continuationSource.Contains(
+            Check(!File.Exists(retiredContinuation)
+                && !catalogRuntimeSource.Contains(
                     "_installed.Rebuild(",
+                    StringComparison.Ordinal)
+                && !catalogRuntimeSource.Contains(
+                    "MissingCapabilityContinuation",
                     StringComparison.Ordinal),
-                "Missing capability continuation still depends on rebuilding a stale installed cache after mutation.");
+                "Retired continuation or stale installed-cache rebuild returned to the ordinary catalog runtime path.");
             return Task.CompletedTask;
         });
 
