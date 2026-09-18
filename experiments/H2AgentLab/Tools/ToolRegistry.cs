@@ -48,6 +48,61 @@ public sealed record ToolProvenance(
     string? ServerId,
     string ToolVersion);
 
+public enum ToolInteractionFidelity
+{
+    Structured = 0,
+    Accessibility = 1,
+    Visual = 2,
+    EscapeHatch = 3,
+    Unspecified = 4
+}
+
+public sealed record ToolPreferenceMetadata
+{
+    public ToolPreferenceMetadata(
+        string capabilityFamily,
+        ToolInteractionFidelity interactionFidelity,
+        bool explicitRequestOnly = false,
+        IEnumerable<string>? explicitRequestTerms = null)
+    {
+        CapabilityFamily = ToolNamespace.NormalizeId(
+            capabilityFamily,
+            nameof(capabilityFamily));
+        if (!Enum.IsDefined(interactionFidelity))
+            throw new ArgumentOutOfRangeException(nameof(interactionFidelity));
+        InteractionFidelity = interactionFidelity;
+        ExplicitRequestOnly = explicitRequestOnly;
+
+        var terms = (explicitRequestTerms ?? Array.Empty<string>())
+            .Select(x => (x ?? "").Trim().ToLowerInvariant())
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (terms.Any(x => x.Length > 128 || x.Any(char.IsControl)))
+            throw new ArgumentException(
+                "Explicit request terms must be <=128 characters and contain no control characters.",
+                nameof(explicitRequestTerms));
+        if (explicitRequestOnly && terms.Length == 0)
+            throw new ArgumentException(
+                "Explicit-only preference metadata requires at least one request term.",
+                nameof(explicitRequestTerms));
+        ExplicitRequestTerms = Array.AsReadOnly(terms);
+    }
+
+    public string CapabilityFamily { get; }
+    public ToolInteractionFidelity InteractionFidelity { get; }
+    public bool ExplicitRequestOnly { get; }
+    public IReadOnlyList<string> ExplicitRequestTerms { get; }
+
+    public bool MatchesExplicitRequest(string query)
+    {
+        query ??= "";
+        var normalized = query.ToLowerInvariant();
+        return ExplicitRequestTerms.Any(term =>
+            normalized.Contains(term, StringComparison.Ordinal));
+    }
+}
+
 public sealed record ToolResourceScope(
     string ScopeId,
     string ResourcePattern);
@@ -98,7 +153,8 @@ public sealed record ToolDescriptor
         ToolProvenance? provenance = null,
         ToolResourceScope? resourceScope = null,
         string? serializationKey = null,
-        bool canProvideVerificationEvidence = false)
+        bool canProvideVerificationEvidence = false,
+        ToolPreferenceMetadata? preference = null)
     {
         Name = ToolNamespace.NormalizeId(name, nameof(name));
         Namespace = toolNamespace ?? throw new ArgumentNullException(nameof(toolNamespace));
@@ -119,6 +175,7 @@ public sealed record ToolDescriptor
             ? null
             : ToolNamespace.NormalizeId(serializationKey, nameof(serializationKey));
         CanProvideVerificationEvidence = canProvideVerificationEvidence;
+        Preference = preference;
     }
 
     public string Name { get; }
@@ -134,6 +191,7 @@ public sealed record ToolDescriptor
     public ToolResourceScope? ResourceScope { get; }
     public string? SerializationKey { get; }
     public bool CanProvideVerificationEvidence { get; }
+    public ToolPreferenceMetadata? Preference { get; }
     public bool IsMutating => Access == AgentToolAccess.Mutating;
 }
 
