@@ -199,7 +199,7 @@ Rules:
 
 - [~] **V2-0602 — Add file/hash/scope verifier.**  
   Check exact changed files, expected hashes and unintended output.  
-  Implementation + architecture guard added; full CI verification in progress.
+  Implementation + architecture guard added; compile fix applied; full CI verification retry in progress.
 
 - [ ] **V2-0603 — Add generic artifact verifier contract.**  
   Allows domain verifiers without coupling orchestrator to Excel/Word.
