@@ -204,9 +204,9 @@ Evidence: `Transport/AgentTransportFactory.cs` routes accepted profiles to exist
 
 # Stage C — Real bounded context and prompt path
 
-## [~] MB-20 — Move V2 context into pre-request execution
+## [x] MB-20 — Move V2 context into pre-request execution
 
-Implementation note: normal AgentRuntime request path now uses LabSessionContextAdapter.BuildInput, bounded recent turns and derived tool summaries; dedicated 10/100/1000-turn acceptance test is wired and CI verification is in progress.
+Evidence: normal AgentRuntime request path uses `LabSessionContextAdapter.BuildInput`, bounded recent turns/tool summaries and artifact/evidence handles; `MbContextRuntimeTests` proves 10/100/1000-turn boundedness, recent-state retention, no linear replay and no legacy `LabSession.Context()` call. GitHub Actions run `35347262818`: MB-20 **3 passed, 0 failed**; all preceding regression suites were green.
 
 Goal:
 
@@ -233,11 +233,13 @@ Acceptance:
 
 ---
 
-## [ ] MB-21 — Wire CompactionManager into runtime pressure
+## [~] MB-21 — Wire CompactionManager into runtime pressure
 
 Goal:
 
 Use compaction automatically when context pressure requires it.
+
+Implementation note: `RuntimeCompactionCoordinator` is wired into normal `AgentOrchestratedRun`; checkpoint creation/reuse/chaining tests are 2/3 green in run `35347262818`. Final typed-trace assertion fix is being re-verified.
 
 Acceptance:
 
