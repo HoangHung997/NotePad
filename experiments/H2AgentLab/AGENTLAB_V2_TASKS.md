@@ -213,15 +213,15 @@ Rules:
   Runtime/protocol recovery remains distinct from semantic repair.  
   Evidence: `Verification/VerificationRecoveryCoordinator.cs` wraps existing `RecoverySupervisor` below semantic verification and keeps runtime recovery state independent from verifier failures; architecture guard passed in GitHub Actions run `35305569774`, together with full regression/publish.
 
-- [~] **V2-0606 — Add verification-gate tests.**  
+- [x] **V2-0606 — Add verification-gate tests.**  
   Model saying “done” must not pass if verifier fails.  
-  Verification completion gate + dedicated CI suite added; full Phase 06 CI verification in progress.
+  Evidence: `Verification/VerificationCompletionGate.cs` derives completion from verifier reports, `AgentOrchestrator.CompleteVerified` keeps failed tasks in Verifying, and dedicated `Verification/V2VerificationTests.cs` covers failed/missing/not-verified criteria, all-pass completion, file-scope failures, repair preservation and runtime-vs-semantic recovery separation. GitHub Actions run `35305906715` passed the dedicated verification suite plus full H2 Notes regression, Agent Lab build, v1 baseline, every v2 suite, Windows x64 publish and artifact upload.
 
 ---
 
 ## Phase 07 — document/file tools and H2 Notes reuse
 
-- [ ] **V2-0701 — Wrap `AiDocuments` as Lab document-inspection service.**  
+- [~] **V2-0701 — Wrap `AiDocuments` as Lab document-inspection service.**  
   Reuse H2 Core safety/size/hash/Office extraction rather than duplicate readers.
 
 - [ ] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
@@ -395,4 +395,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0606 — Add verification-gate tests`.
+**Active task:** `V2-0701 — Wrap AiDocuments as Lab document-inspection service`.
