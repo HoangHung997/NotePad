@@ -194,7 +194,8 @@ Rules:
 ## Phase 06 — verification framework
 
 - [~] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
-  Machine-readable pass/fail per criterion with evidence IDs.
+  Machine-readable pass/fail per criterion with evidence IDs.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0602 — Add file/hash/scope verifier.**  
   Check exact changed files, expected hashes and unintended output.
