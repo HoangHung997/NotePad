@@ -1,3 +1,12 @@
+> **HISTORICAL PROPOSAL.**
+>
+> The future AI-first H2 product architecture is now defined by:
+>
+> - `docs/H2_PRODUCT_MASTER_SPEC.md`
+> - `docs/H2_PRODUCT_MASTER_TASKS.md`
+>
+> Keep this file only as earlier design context; do not implement it independently when it conflicts with the master specification.
+
 # Project-aware AI assistant (discussion, not implemented)
 
 Status: proposal following the user's 2026-09-15 feedback. This icon/resize change
