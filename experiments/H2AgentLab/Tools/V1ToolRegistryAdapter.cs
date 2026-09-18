@@ -34,7 +34,8 @@ public static class V1ToolRegistryAdapter
         AgentToolRisk Risk,
         AgentToolAccess Access,
         bool Parallel,
-        bool Evidence = false);
+        bool Evidence = false,
+        ToolPreferenceMetadata? Preference = null);
 
     private static readonly IReadOnlyDictionary<string, Metadata> MetadataByName =
         new Dictionary<string, Metadata>(StringComparer.Ordinal)
@@ -43,7 +44,24 @@ public static class V1ToolRegistryAdapter
             ["read_skill"] = new("skills", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
             ["update_plan"] = new("core", AgentToolRisk.Low, AgentToolAccess.Mutating, false),
 
-            ["run_python"] = new("python", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
+            ["run_python"] = new(
+                "python",
+                AgentToolRisk.Medium,
+                AgentToolAccess.Mutating,
+                false,
+                Preference: new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.EscapeHatch,
+                    explicitRequestOnly: true,
+                    explicitRequestTerms:
+                    [
+                        "python",
+                        "script",
+                        "custom transform",
+                        "unsupported transform",
+                        "arbitrary transform",
+                        "code"
+                    ])),
             ["inspect_artifact"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
             ["read_run"] = new("python", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
             ["view_artifact"] = new("python", AgentToolRisk.Low, AgentToolAccess.Mutating, false),
@@ -51,17 +69,63 @@ public static class V1ToolRegistryAdapter
 
             ["list_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
             ["find_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
-            ["read_file"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
+            ["read_file"] = new(
+                "files",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                true,
+                true,
+                new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Structured)),
             ["search_files"] = new("files", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true),
             ["write_text"] = new("files", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
             ["open_file"] = new("files", AgentToolRisk.Medium, AgentToolAccess.Mutating, false),
 
-            ["word_paragraphs"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
-            ["check_word"] = new("office", AgentToolRisk.Low, AgentToolAccess.ReadOnly, true, true),
+            ["word_paragraphs"] = new(
+                "office",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                true,
+                true,
+                new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Structured)),
+            ["check_word"] = new(
+                "office",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                true,
+                true,
+                new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Structured)),
 
-            ["inspect_window"] = new("desktop", AgentToolRisk.Low, AgentToolAccess.ReadOnly, false, true),
-            ["click_control"] = new("desktop", AgentToolRisk.High, AgentToolAccess.Mutating, false),
-            ["type_control"] = new("desktop", AgentToolRisk.High, AgentToolAccess.Mutating, false)
+            ["inspect_window"] = new(
+                "desktop",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                false,
+                true,
+                new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Accessibility)),
+            ["click_control"] = new(
+                "desktop",
+                AgentToolRisk.High,
+                AgentToolAccess.Mutating,
+                false,
+                Preference: new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Accessibility)),
+            ["type_control"] = new(
+                "desktop",
+                AgentToolRisk.High,
+                AgentToolAccess.Mutating,
+                false,
+                Preference: new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Accessibility))
         };
 
     private static readonly IReadOnlyDictionary<string, string> NamespaceDescriptions =
@@ -146,7 +210,8 @@ public static class V1ToolRegistryAdapter
                     ? MutationScope(name)
                     : metadata.Namespace,
                 canProvideVerificationEvidence:
-                    metadata.Evidence || metadata.Access == AgentToolAccess.Mutating));
+                    metadata.Evidence || metadata.Access == AgentToolAccess.Mutating,
+                preference: metadata.Preference));
         }
 
         var missingDefinitions = MetadataByName.Keys.Where(x => !seen.Contains(x)).ToArray();
