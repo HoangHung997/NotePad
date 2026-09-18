@@ -228,8 +228,11 @@ public static class MbThinCapabilityResolverTests
                 && candidate.CapabilityId == "provider.telemetry"
                 && candidate.SkillId is null
                 && candidate.AvailablePackage?.Providers.Count == 1
-                && candidate.AvailablePackage.ToolSummaries.Count == 0,
-                "Resolver still assumes a package must expose a skill/tool child candidate.");
+                && candidate.AvailablePackage.ToolSummaries.Count == 0
+                && candidate.Description.Contains(
+                    "telemetry metrics events",
+                    StringComparison.OrdinalIgnoreCase),
+                "Resolver still assumes a package must expose a skill/tool child candidate or lost provider metadata.");
         });
 
         await Test("MB-73 source guard keeps resolver thin and model-neutral", () =>
