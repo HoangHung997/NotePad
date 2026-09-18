@@ -17,12 +17,18 @@ public interface IAgentRuntimeFactory
 }
 
 /// <summary>
-/// Normal Agent Lab runtime construction seam. Provider selection details live here rather than in
-/// AgentOrchestrator/AgentRuntime. MB-12 owns the full provider matrix acceptance; MB-11 only needs
-/// the normal UI to cross this seam instead of creating AgentRunner.
+/// Normal Agent Lab runtime construction seam. Tool migration still uses V1ToolRegistryAdapter as a
+/// temporary provider bridge; model-provider selection is delegated to IAgentTransportFactory.
 /// </summary>
 public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 {
+    private readonly IAgentTransportFactory _transportFactory;
+
+    public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null)
+    {
+        _transportFactory = transportFactory ?? new AgentTransportFactory();
+    }
+
     public AgentRuntime Create(
         AiProfile profile,
         string apiKey,
@@ -36,28 +42,10 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         ArgumentNullException.ThrowIfNull(telemetry);
 
         var registry = V1ToolRegistryAdapter.Create(tools);
-        var transport = CreateTransport(profile, apiKey, telemetry);
+        var transport = _transportFactory.Create(profile, apiKey, telemetry);
         return new AgentRuntime(
             transport,
             contextManager,
             registry);
     }
-
-    internal static IAgentTransport CreateTransport(
-        AiProfile profile,
-        string apiKey,
-        AgentRunTelemetry telemetry)
-        => profile.Protocol switch
-        {
-            AiProtocol.Ollama => new OllamaTransport(profile),
-            AiProtocol.OpenAiResponses => new OpenAiResponsesTransport(
-                profile,
-                apiKey,
-                stateMode: OpenAiResponsesStateMode.Stateless),
-            AiProtocol.OpenAiChat => new ChatCompletionsTransport(profile, apiKey),
-            AiProtocol.Gemini => throw new NotSupportedException(
-                "H2 AgentRuntime chưa hỗ trợ Gemini tool runtime. Dùng Ollama, OpenAI Responses hoặc Chat Completions; Gemini không được chuyển ngầm về AgentRunner."),
-            _ => throw new NotSupportedException(
-                "Giao thức model chưa được H2 AgentRuntime hỗ trợ.")
-        };
 }
