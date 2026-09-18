@@ -55,7 +55,7 @@ public sealed class InstalledCapabilityIndex
 
     public void Rebuild(
         ToolRegistry registry,
-        UnifiedSkillCatalog skills,
+        SkillCatalog skills,
         IEnumerable<ProviderProvenance>? providers = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
