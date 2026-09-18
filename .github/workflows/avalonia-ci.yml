@@ -75,6 +75,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-session-context-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-session-context-tests.txt')
 
+      - name: Run H2 Agent Lab v2 artifact store tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-artifact-store'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-artifact-store-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-artifact-store-tests.txt')
+
       - name: Run H2 Agent Lab v2 transport contract tests
         shell: pwsh
         run: |
