@@ -198,7 +198,8 @@ Rules:
   Evidence: `Verification/VerificationReport.cs` provides per-criterion Passed/Failed/NotVerified results, typed failures, evidence IDs, coverage checks and aggregate pass state; architecture guard passed in GitHub Actions run `35304076438`, together with full regression/publish.
 
 - [~] **V2-0602 — Add file/hash/scope verifier.**  
-  Check exact changed files, expected hashes and unintended output.
+  Check exact changed files, expected hashes and unintended output.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0603 — Add generic artifact verifier contract.**  
   Allows domain verifiers without coupling orchestrator to Excel/Word.
