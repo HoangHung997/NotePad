@@ -74,6 +74,18 @@ public static class V1ToolRegistryAdapter
         return registry;
     }
 
+    private static string MutationScope(string name)
+        => name switch
+        {
+            "update_plan" => "task.plan",
+            "run_python" => "python.sandbox",
+            "view_artifact" => "model.vision",
+            "publish_artifact" or "write_text" => "workspace.write",
+            "open_file" => "desktop.open",
+            "click_control" or "type_control" => "desktop.selected-window",
+            _ => "mutation." + name.Replace('_', '.')
+        };
+
     public static void Populate(ToolRegistry registry, IAgentToolExecutor executor)
     {
         ArgumentNullException.ThrowIfNull(registry);
@@ -99,6 +111,12 @@ public static class V1ToolRegistryAdapter
                 metadata.Namespace,
                 NamespaceDescriptions[metadata.Namespace]);
 
+            var resourceScope = metadata.Access == AgentToolAccess.Mutating
+                ? new ToolResourceScope(
+                    MutationScope(name),
+                    MutationScope(name))
+                : null;
+
             registry.Register(new ToolDescriptor(
                 name,
                 toolNamespace,
@@ -108,7 +126,16 @@ public static class V1ToolRegistryAdapter
                 metadata.Parallel,
                 schemaVersion: "v1",
                 callableSchema: definition,
-                executor: executor));
+                executor: executor,
+                provenance: new ToolProvenance(
+                    "v1-agent-tools",
+                    "baseline",
+                    "local",
+                    "v1"),
+                resourceScope: resourceScope,
+                serializationKey: metadata.Access == AgentToolAccess.Mutating
+                    ? MutationScope(name)
+                    : metadata.Namespace));
         }
 
         var missingDefinitions = MetadataByName.Keys.Where(x => !seen.Contains(x)).ToArray();
