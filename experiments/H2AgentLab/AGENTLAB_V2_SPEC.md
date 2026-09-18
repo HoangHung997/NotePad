@@ -1,6 +1,10 @@
+> **HISTORICAL / SUPERSEDED — DO NOT USE AS THE EXECUTION AUTHORITY.**  
+> Since 2026-09-18, the canonical architecture is `docs/H2_AGENT_MASTER_SPEC.md` and the canonical task tracker is `docs/H2_AGENT_MASTER_TASKS.md`.  
+> This document is retained only as implementation history/evidence. H2 Notes redesign and non-AI bug-ledger documents remain separate.
+
 # H2 Agent Lab 2.0 — Codex-style provider-neutral agent harness
 
-Status: **approved implementation specification**  
+Status: **HISTORICAL / SUPERSEDED by H2_AGENT_MASTER_SPEC.md**  
 Scope: `experiments/H2AgentLab` first. **Do not integrate into H2 Notes UI until the acceptance gate in this document passes.**  
 Branch during implementation: `feature/nas-multi-device-sync` unless the user explicitly changes it.  
 Main principle: **reuse proven H2 Notes components when they are genuinely generic; do not duplicate stable code; do not make H2 Notes depend on unfinished Agent Lab code.**
