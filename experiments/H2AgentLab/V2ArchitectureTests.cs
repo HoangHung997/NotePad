@@ -1580,6 +1580,57 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Closed Word verifier missed unrelated header/table regression.");
         });
 
+        Test("Document tool preference keeps structured Office tools ahead of Python escape hatch", () =>
+        {
+            var executor = new DelegatingToolExecutor(
+                "doc-preference-fixture",
+                (call, ct) => ValueTask.FromResult("ok"));
+            ToolDescriptor Descriptor(string name, string ns, string description)
+                => new(
+                    name,
+                    new ToolNamespace(ns, ns + " namespace"),
+                    description,
+                    AgentToolRisk.Low,
+                    AgentToolAccess.ReadOnly,
+                    supportsParallel: true,
+                    "v1",
+                    JsonSerializer.SerializeToElement(new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name,
+                            description,
+                            parameters = new { type = "object" }
+                        }
+                    }),
+                    executor);
+
+            var python = new ToolSearchResult(
+                Descriptor("run_python", "python", "Execute arbitrary Python for custom transformations."),
+                Score: 100,
+                MatchedTerms: ["document"]);
+            var word = new ToolSearchResult(
+                Descriptor("word_paragraphs", "office", "Read structured Word paragraphs."),
+                Score: 1,
+                MatchedTerms: ["document"]);
+
+            var preferred = DocumentToolPreference.Apply(
+                "inspect Word document paragraphs",
+                [python, word],
+                2);
+            if (preferred[0].Descriptor.Name != "word_paragraphs"
+                || preferred[1].Descriptor.Name != "run_python")
+                throw new InvalidOperationException("Structured Word tool was not preferred over Python escape hatch.");
+
+            var explicitPython = DocumentToolPreference.Apply(
+                "use python code for custom transform of this Word document",
+                [python, word],
+                2);
+            if (explicitPython[0].Descriptor.Name != "run_python")
+                throw new InvalidOperationException("Explicit Python intent was incorrectly demoted.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
