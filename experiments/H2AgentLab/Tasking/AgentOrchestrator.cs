@@ -37,18 +37,30 @@ public sealed class AgentOrchestrator
 {
     private readonly AgentFastPathRouter _router;
     private readonly Func<global::H2AgentLab.AgentRunner> _compatibilityRunnerFactory;
+    private readonly AgentCapabilityRefreshCoordinator? _capabilityRefresh;
 
     public AgentOrchestrator(
         AgentFastPathRouter? router = null,
         AgentContextManager? contextManager = null,
-        Func<global::H2AgentLab.AgentRunner>? compatibilityRunnerFactory = null)
+        Func<global::H2AgentLab.AgentRunner>? compatibilityRunnerFactory = null,
+        AgentCapabilityRefreshCoordinator? capabilityRefresh = null)
     {
         _router = router ?? new AgentFastPathRouter();
         ContextManager = contextManager ?? new AgentContextManager();
         _compatibilityRunnerFactory = compatibilityRunnerFactory ?? (() => new global::H2AgentLab.AgentRunner());
+        _capabilityRefresh = capabilityRefresh;
     }
 
     public AgentContextManager ContextManager { get; }
+
+    public Task<CapabilityRefreshResult> RefreshCapabilitiesAtTaskBoundaryAsync(
+        CancellationToken cancellationToken = default)
+        => _capabilityRefresh is null
+            ? Task.FromResult(new CapabilityRefreshResult(0, 0, Array.Empty<string>(), DateTime.UtcNow))
+            : _capabilityRefresh.RefreshAtTaskBoundaryAsync(cancellationToken);
+
+    public IDisposable EnterCapabilityToolCallBoundary()
+        => _capabilityRefresh?.EnterToolCall() ?? EmptyScope.Instance;
 
     public AgentOrchestrationSession Receive(
         AgentTaskContract contract,
@@ -134,4 +146,10 @@ public sealed class AgentOrchestrator
 
     private static AgentTaskStateMachine Machine(AgentOrchestrationSession? session)
         => Session(session).StateMachine;
+
+    private sealed class EmptyScope : IDisposable
+    {
+        public static readonly EmptyScope Instance = new();
+        public void Dispose() { }
+    }
 }
