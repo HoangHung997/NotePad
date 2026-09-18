@@ -1173,6 +1173,53 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Expected hash mismatch was not reported.");
         });
 
+        Test("Artifact verifier contract stays domain-neutral and criterion-scoped", () =>
+        {
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Verify generated artifact",
+                "workspace:/fixture",
+                null,
+                ["produce artifact"],
+                null,
+                ["artifact"],
+                [
+                    new AgentAcceptanceCriterion("content", "Artifact content is correct."),
+                    new AgentAcceptanceCriterion("format", "Artifact format is preserved.")
+                ],
+                AgentTaskRiskClass.Low,
+                new AgentVerificationPolicy(requireVerification: true));
+
+            var target = new ArtifactVerificationTarget(
+                "artifact-1",
+                "application/vnd.test",
+                new string('a', 64),
+                "run:fixture");
+            var request = new ArtifactVerificationRequest(contract, target, ["content"]);
+            if (!request.CriterionIds.SequenceEqual(new[] { "content" })
+                || request.Target.ArtifactId != "artifact-1")
+                throw new InvalidOperationException("Artifact verification request lost scoped criteria/target.");
+
+            var registry = new ArtifactVerifierRegistry();
+            registry.Register(new FixtureArtifactVerifier());
+            var resolved = registry.Resolve(target);
+            if (resolved.Count != 1 || resolved[0].VerifierId != "fixture-artifact")
+                throw new InvalidOperationException("Artifact verifier registry did not resolve compatible verifier.");
+
+            var report = resolved[0].VerifyAsync(request, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            if (!report.Passed || !report.Covers(new[] { "content" }))
+                throw new InvalidOperationException("Generic artifact verifier contract did not produce report.");
+
+            try
+            {
+                _ = new ArtifactVerificationRequest(contract, target, ["unknown"]);
+                throw new InvalidOperationException("Unknown acceptance criterion was accepted for artifact verification.");
+            }
+            catch (ArgumentException)
+            {
+            }
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
@@ -1199,5 +1246,27 @@ public static class V2ArchitectureTests
         await File.WriteAllLinesAsync(report, lines);
         Console.WriteLine(string.Join("\n", lines));
         return failed == 0 ? 0 : 1;
+    }
+
+    private sealed class FixtureArtifactVerifier : IArtifactVerifier
+    {
+        public string VerifierId => "fixture-artifact";
+
+        public bool CanVerify(ArtifactVerificationTarget target)
+            => string.Equals(target.MediaType, "application/vnd.test", StringComparison.Ordinal);
+
+        public ValueTask<VerificationReport> VerifyAsync(
+            ArtifactVerificationRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var results = request.CriterionIds
+                .Select(id => new VerificationCriterionResult(
+                    id,
+                    VerificationCriterionStatus.Passed,
+                    ["artifact:" + request.Target.ArtifactId]))
+                .ToArray();
+            return ValueTask.FromResult(new VerificationReport(VerifierId, results));
+        }
     }
 }
