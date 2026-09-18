@@ -187,7 +187,7 @@ Rules:
 
 - [~] **V2-0508 — Tool-search regression/performance tests.**  
   Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.  
-  Dedicated CI suite added; compile fix applied; full CI verification retry in progress.
+  Dedicated CI suite added; compile fix applied; final full CI verification in progress.
 
 ---
 
