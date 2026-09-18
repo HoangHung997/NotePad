@@ -13,5 +13,6 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
     <ProjectReference Include="../../src/H2Notes.Core/H2Notes.Core.csproj" />
+    <ProjectReference Include="../H2AgentLab.OfficeProtocol/H2AgentLab.OfficeProtocol.csproj" />
   </ItemGroup>
 </Project>
