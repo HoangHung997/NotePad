@@ -112,6 +112,7 @@ public static class MbCompletionGateTests
 
             Check(session.StateMachine.State == AgentTaskState.Verifying,
                 "Failed verifier changed host state to a terminal completion state.");
+            return Task.CompletedTask;
         });
 
         await Test("MB-44 non-mechanical completion requires explicit host classification evidence", () =>
@@ -153,6 +154,7 @@ public static class MbCompletionGateTests
             Check(session.StateMachine.State == AgentTaskState.Completed
                 && session.StateMachine.IsTerminal,
                 "Explicit host classification evidence did not complete the allowed non-mechanical task.");
+            return Task.CompletedTask;
         });
 
         lines.Add($"RESULT: {lines.Count - failed} passed, {failed} failed.");
