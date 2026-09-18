@@ -1,6 +1,6 @@
 H2 Notes Avalonia Portable win-x64
 Source branch: feature/nas-multi-device-sync
-Source commit: bd6ff06d6f88103623d4aef5e374a236087941e0
-Built UTC: 2026-09-18T00:15:58.9866341Z
-ZIP bytes: 80106191
-SHA256: a80302af61207a1f3fdc1343ece365bfef59c4ac8cc2e079975d4d3fd44fd70b
+Source commit: ad4a56e62928dcffb7ef4016cd0205618eec721f
+Built UTC: 2026-09-18T00:22:11.2509231Z
+ZIP bytes: 80106207
+SHA256: 9f34d9c9a3b588ec12275a93274c1fab829db9aee17bf001e742cf65144f40c9
