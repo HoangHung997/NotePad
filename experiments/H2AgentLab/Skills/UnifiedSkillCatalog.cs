@@ -125,8 +125,9 @@ public sealed class BuiltInSkillSource : ISkillSource
         var skill = _skills.SingleOrDefault(x => x.Name == identity.SkillId)
             ?? throw new KeyNotFoundException($"Built-in skill '{identity.SkillId}' is unavailable.");
         var relative = ValidateProgressiveResource(relativePath);
-        var scope = new global::H2AgentLab.SafeWorkspace(skill.Directory);
-        var path = scope.Resolve(relative);
+        var path = relative == "references/runtime.md"
+            ? Path.Combine(AppContext.BaseDirectory, "runtime-guide.md")
+            : new global::H2AgentLab.SafeWorkspace(skill.Directory).Resolve(relative);
         var content = ReadBounded(path, 80_000);
         return new SkillResourceContent(identity, relative, HashText(content), content);
     }
@@ -213,9 +214,14 @@ public sealed class BuiltInSkillSource : ISkillSource
     private static string[] ListResources(string directory)
     {
         var scope = new global::H2AgentLab.SafeWorkspace(directory);
-        return scope.Files()
+        var resources = scope.Files()
             .Select(x => x.Replace((char)92, '/'))
             .Where(IsProgressiveResource)
+            .ToList();
+        if (File.Exists(Path.Combine(AppContext.BaseDirectory, "runtime-guide.md"))
+            && !resources.Contains("references/runtime.md", StringComparer.Ordinal))
+            resources.Add("references/runtime.md");
+        return resources
             .OrderBy(x => x, StringComparer.Ordinal)
             .Take(200)
             .ToArray();
