@@ -817,7 +817,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
     }
 
     private static string CleanWordText(string value)
-        => value.TrimEnd('', 'a');
+        => value.TrimEnd((char)13, (char)7);
 
     private static string ConvertOfficeValue(object? value)
         => value switch
