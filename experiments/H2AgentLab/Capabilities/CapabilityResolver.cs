@@ -89,6 +89,17 @@ public sealed class CapabilityResolver
                 InstallationAttempted: false);
         }
 
+        return await SearchCatalogAsync(
+            query,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<CapabilityResolution> SearchCatalogAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
         var availableCandidates = _available.Search(query, 12);
         var refreshed = false;
         if (availableCandidates.Count == 0
@@ -136,11 +147,10 @@ public sealed class CapabilityResolver
             })
             .ToArray();
 
-        var ordered = candidates;
-        var overall = ordered.Any(x =>
+        var overall = candidates.Any(x =>
                 x.Status == CapabilityResolutionStatus.AVAILABLE)
             ? CapabilityResolutionStatus.AVAILABLE
-            : ordered.Any(x =>
+            : candidates.Any(x =>
                 x.Status == CapabilityResolutionStatus.BLOCKED_BY_POLICY)
                 ? CapabilityResolutionStatus.BLOCKED_BY_POLICY
                 : CapabilityResolutionStatus.INCOMPATIBLE;
@@ -148,7 +158,7 @@ public sealed class CapabilityResolver
         return new(
             overall,
             query,
-            ordered,
+            candidates,
             refreshed,
             PackageDownloaded: false,
             InstallationAttempted: false);

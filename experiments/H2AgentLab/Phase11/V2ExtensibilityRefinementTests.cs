@@ -380,7 +380,7 @@ public static class V2ExtensibilityRefinementTests
                 "Retrieved package did not pass existing PluginManager verification/activation.");
         });
 
-        await Test("1122 missing capability installs differently named skill and resumes original task without restatement", async () =>
+        await Test("1122 ordinary catalog tools install package and leave skill selection to the model", async () =>
         {
             var builtInRoot = CreateBuiltInSkills(Path.Combine(root, "1122-builtins"));
             var packageRoot = Path.Combine(root, "1122-packages");
@@ -391,87 +391,102 @@ public static class V2ExtensibilityRefinementTests
             Directory.CreateDirectory(stateRoot);
 
             var package = BuildCadPlugin(packageRoot, "1.4.0", "End-to-end skill content.");
-            var availableRecord = Available(package, "remote-catalog", 100);
             var source = new InMemoryCatalogSource(
                 "remote-catalog",
                 100,
                 PluginTrustState.LocalDeveloper,
-                [availableRecord]);
+                [Available(package, "remote-catalog", 100)]);
             var catalogs = new CatalogSourceManager();
             catalogs.Register(source);
 
             var registry = new ToolRegistry();
-            var pluginManager = new PluginManager(stateRoot, registry, new FixturePluginResolver());
+            var pluginManager = new PluginManager(
+                stateRoot,
+                registry,
+                new FixturePluginResolver());
             var unified = new UnifiedSkillCatalog();
-            unified.Register(new BuiltInSkillSource(new global::H2AgentLab.SkillCatalog(builtInRoot)));
-            unified.Register(new PluginSkillSource(pluginManager, new PluginSkillCatalog(pluginManager)));
+            unified.Register(new BuiltInSkillSource(
+                new global::H2AgentLab.SkillCatalog(builtInRoot)));
+            unified.Register(new PluginSkillSource(
+                pluginManager,
+                new PluginSkillCatalog(pluginManager)));
 
             var installed = new InstalledCapabilityIndex();
-            installed.Rebuild(registry, unified, ProvidersFor(pluginManager));
-            var available = new AvailableCapabilityIndex();
+            installed.Bind(
+                registry,
+                unified,
+                () => ProvidersFor(pluginManager));
             var resolver = new CapabilityResolver(
                 installed,
-                available,
+                new AvailableCapabilityIndex(),
                 catalogs,
-                new PredicateCapabilityInstallPolicy(x =>
-                    x.TrustState == PluginTrustState.LocalDeveloper));
-            var retriever = new LocalPackageRetriever(stagingRoot, [packageRoot]);
-
-            var taskId = Guid.NewGuid();
-            var initial = TaskCapabilitySnapshotBuilder.Capture(
-                taskId,
-                1,
-                registry,
-                ProvidersFor(pluginManager),
-                pluginManager.ActivePlugins(),
-                [],
-                "task-start");
-            var guard = new TaskCapabilityPinGuard(initial);
-            var continuation = new MissingCapabilityContinuation(
+                new PredicateCapabilityInstallPolicy(
+                    x => x.TrustState == PluginTrustState.LocalDeveloper));
+            var executor = new CatalogRuntimeToolExecutor(
                 resolver,
-                retriever,
+                new LocalPackageRetriever(stagingRoot, [packageRoot]),
                 pluginManager,
-                unified,
-                installed,
-                registry,
-                () => ProvidersFor(pluginManager));
-
-            const string originalQuery = "audit AutoCAD dynamic block parameters and actions";
-            var result = await continuation.ResolveInstallAndContinueAsync(
-                originalQuery,
-                guard,
                 DeveloperPolicy(),
-                userApproved: true,
+                userApproved: true);
+            CatalogRuntimeTools.Register(registry, executor);
+
+            const string originalQuery =
+                "audit AutoCAD dynamic block parameters and actions";
+            var searchJson = await executor.ExecuteAsync(
+                new global::H2AgentLab.ToolCall(
+                    "search",
+                    CatalogRuntimeToolExecutor.SearchToolName,
+                    JsonSerializer.SerializeToElement(new
+                    {
+                        query = originalQuery
+                    })),
+                CancellationToken.None);
+            Check(searchJson.Contains(
+                    "h2.autocad.productivity",
+                    StringComparison.Ordinal)
+                && searchJson.Contains(
+                    "cad-integrity",
+                    StringComparison.Ordinal),
+                "Ordinary catalog_search did not return compact package metadata.");
+
+            var installJson = await executor.ExecuteAsync(
+                new global::H2AgentLab.ToolCall(
+                    "install",
+                    CatalogRuntimeToolExecutor.InstallToolName,
+                    JsonSerializer.SerializeToElement(new
+                    {
+                        plugin_id = "h2.autocad.productivity",
+                        version = "1.4.0"
+                    })),
                 CancellationToken.None);
 
-            Check(result.OriginalQuery == originalQuery
-                && !result.UserRestatementRequired,
-                "Original task did not resume automatically after controlled capability install.");
-            Check(result.InitialResolution.Status == CapabilityResolutionStatus.AVAILABLE
-                && result.InstallResult?.PluginId == "h2.autocad.productivity",
-                "Missing capability was not resolved through catalog metadata and PluginManager.");
-            Check(result.SelectedSkill.Summary.Name == "cad-integrity"
-                && !originalQuery.Contains("cad-integrity", StringComparison.OrdinalIgnoreCase),
-                "Differently named skill was not selected from description metadata.");
-            Check(result.LoadedResources.Count == 0,
-                "Capability continuation auto-loaded skill resources instead of waiting for an explicit runtime/model request.");
+            Check(installJson.Contains(
+                    "cad-integrity",
+                    StringComparison.Ordinal)
+                && installJson.Contains(
+                    "autocad.native",
+                    StringComparison.Ordinal)
+                && !installJson.Contains(
+                    "End-to-end skill content.",
+                    StringComparison.Ordinal),
+                "Install result did not stay package-level or auto-loaded SKILL.md content.");
+            Check(registry.TryGet(
+                    "autocad.find_blocks",
+                    out _),
+                "PluginManager did not register the installed tool.");
+            var selected = unified.Search(
+                "audit dynamic block parameters actions",
+                5).Single(x =>
+                    x.Identity.PluginId == "h2.autocad.productivity");
             var explicitReference = unified.ReadResource(
-                result.SelectedSkill.Summary.Identity,
+                selected.Identity,
                 "references/dynamic-block.md");
-            Check(explicitReference.Content.Contains("visibility states", StringComparison.OrdinalIgnoreCase),
-                "Selected skill reference was not available through explicit on-demand access.");
-            Check(result.CapabilitySnapshot.Revision == 2
-                && result.CapabilityEvidence.PluginVersions.Contains("h2.autocad.productivity@1.4.0", StringComparer.Ordinal)
-                && result.CapabilityEvidence.ProviderVersions.Contains("autocad.native@1.4.0", StringComparer.Ordinal)
-                && result.CapabilityEvidence.ToolVersions.Any(x => x.StartsWith("autocad.find_blocks@", StringComparison.Ordinal))
-                && result.CapabilityEvidence.SkillHashes.Any(x => x.Contains(result.SelectedSkill.Summary.Identity.Sha256, StringComparison.Ordinal)),
-                "Continuation evidence does not record exact plugin/provider/tool/skill identities.");
-            Check(result.TraceEvents.Any(x => x.Code == "capability-missing")
-                && result.TraceEvents.Any(x => x.Code == "package-retrieved")
-                && result.TraceEvents.Any(x => x.Code == "capability-snapshot-revised"),
-                "Capability installation transition was invisible in task trace.");
+            Check(explicitReference.Content.Contains(
+                    "visibility states",
+                    StringComparison.OrdinalIgnoreCase),
+                "Installed skill was not available for later explicit model selection.");
             Check(source.FetchCount == 1,
-                "Missing-capability flow performed unexpected repeated catalog metadata refresh.");
+                "Ordinary catalog/install tools unexpectedly refreshed fresh metadata twice.");
         });
 
         lines.Add($"RESULT: {lines.Count - failed} passed, {failed} failed.");

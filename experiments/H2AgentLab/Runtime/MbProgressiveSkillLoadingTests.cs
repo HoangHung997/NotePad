@@ -168,13 +168,12 @@ public static class MbProgressiveSkillLoadingTests
         await Test("MB-52 source guard removes mandatory resource directive parsing", () =>
         {
             var repo = FindRepoRoot();
-            var continuation = File.ReadAllText(
-                Path.Combine(
-                    repo,
-                    "experiments",
-                    "H2AgentLab",
-                    "Capabilities",
-                    "MissingCapabilityContinuation.cs"));
+            var retiredContinuation = Path.Combine(
+                repo,
+                "experiments",
+                "H2AgentLab",
+                "Capabilities",
+                "MissingCapabilityContinuation.cs");
             var runtimeTools = File.ReadAllText(
                 Path.Combine(
                     repo,
@@ -183,10 +182,8 @@ public static class MbProgressiveSkillLoadingTests
                     "Tools",
                     "SkillRuntimeTools.cs"));
 
-            Check(!continuation.Contains("ParseResourceDirectives", StringComparison.Ordinal)
-                && !continuation.Contains("StartsWith(prefix", StringComparison.Ordinal)
-                && !continuation.Contains("skill-resource-loaded", StringComparison.Ordinal),
-                "Historical continuation still parses/auto-loads custom resource directives.");
+            Check(!File.Exists(retiredContinuation),
+                "Retired MissingCapabilityContinuation source returned to the runtime.");
             Check(runtimeTools.Contains("ReadResource", StringComparison.Ordinal)
                 && runtimeTools.Contains("Resources are inventory only and were not loaded", StringComparison.Ordinal)
                 && runtimeTools.Contains("does not execute it", StringComparison.Ordinal),
