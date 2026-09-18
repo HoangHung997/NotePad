@@ -198,21 +198,24 @@ public sealed class ClosedWorkbookSnapshotReader
     private static string ReadValue(S.Cell cell, IReadOnlyList<string> sharedStrings)
     {
         var value = cell.CellValue?.Text ?? "";
-        return cell.DataType?.Value switch
+        var type = cell.DataType?.Value;
+        if (type == S.CellValues.SharedString)
         {
-            S.CellValues.SharedString => int.TryParse(
+            if (!int.TryParse(
                     value,
                     System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var index)
-                && index >= 0
-                && index < sharedStrings.Count
-                    ? sharedStrings[index]
-                    : throw new InvalidDataException("Excel shared string index is invalid."),
-            S.CellValues.InlineString => cell.InlineString?.InnerText ?? "",
-            S.CellValues.Boolean => value == "1" ? "TRUE" : "FALSE",
-            _ => value
-        };
+                || index < 0
+                || index >= sharedStrings.Count)
+                throw new InvalidDataException("Excel shared string index is invalid.");
+            return sharedStrings[index];
+        }
+        if (type == S.CellValues.InlineString)
+            return cell.InlineString?.InnerText ?? "";
+        if (type == S.CellValues.Boolean)
+            return value == "1" ? "TRUE" : "FALSE";
+        return value;
     }
 
     private static bool On(DocumentFormat.OpenXml.Spreadsheet.BooleanPropertyType? value)
