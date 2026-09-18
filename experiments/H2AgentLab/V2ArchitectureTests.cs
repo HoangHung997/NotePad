@@ -1,5 +1,6 @@
 using H2AgentLab.Context;
 using H2AgentLab.Prompting;
+using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
 using H2Notes.Core;
 
@@ -355,6 +356,60 @@ public static class V2ArchitectureTests
                 ]));
             if (small.Pressure.RequiresCompaction || small.Pressure.Reasons.Count != 0)
                 throw new InvalidOperationException("Small bounded context triggered unnecessary compaction.");
+        });
+
+        Test("AgentTaskContract snapshots host-owned task requirements", () =>
+        {
+            var inputs = new List<string> { " input-a ", "input-b" };
+            var requiredChanges = new List<string> { "change-a" };
+            var criteria = new List<string> { "criterion-a", "criterion-b" };
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                " Update the target safely ",
+                " workspace:/fixture ",
+                inputs,
+                requiredChanges,
+                ["preserve-a"],
+                ["output-a"],
+                criteria,
+                AgentTaskRiskClass.Medium,
+                new AgentVerificationPolicy(
+                    requireVerification: true,
+                    allowNotMechanicallyVerifiable: false,
+                    requiredVerifierIds: [" build ", "tests", "build"]));
+
+            inputs[0] = "MUTATED_AFTER_CONSTRUCTION";
+            requiredChanges.Add("MUTATED_CHANGE");
+            criteria.Clear();
+
+            if (contract.UserGoal != "Update the target safely" || contract.Scope != "workspace:/fixture")
+                throw new InvalidOperationException("Task contract did not normalize required scalar fields.");
+            if (!contract.Inputs.SequenceEqual(new[] { "input-a", "input-b" })
+                || !contract.RequiredChanges.SequenceEqual(new[] { "change-a" })
+                || !contract.AcceptanceCriteria.SequenceEqual(new[] { "criterion-a", "criterion-b" }))
+                throw new InvalidOperationException("Caller mutation changed an accepted task contract snapshot.");
+            if (!contract.VerificationPolicy.RequiredVerifierIds.SequenceEqual(new[] { "build", "tests" })
+                || !contract.VerificationPolicy.RequireVerification
+                || contract.VerificationPolicy.AllowNotMechanicallyVerifiable)
+                throw new InvalidOperationException("Task verification policy was not preserved deterministically.");
+            if (!contract.IsMutating || contract.RiskClass != AgentTaskRiskClass.Medium)
+                throw new InvalidOperationException("Task mutation/risk classification is inconsistent.");
+
+            var readOnly = new AgentTaskContract(
+                Guid.NewGuid(), "Read the target", "workspace:/fixture", null, null, null, null,
+                ["return requested facts"], AgentTaskRiskClass.ReadOnly,
+                new AgentVerificationPolicy(requireVerification: false));
+            if (readOnly.IsMutating)
+                throw new InvalidOperationException("Read-only contract was classified as mutating.");
+
+            try
+            {
+                _ = new AgentTaskContract(
+                    Guid.Empty, "goal", "scope", null, null, null, null, null,
+                    AgentTaskRiskClass.ReadOnly, new AgentVerificationPolicy(false));
+                throw new InvalidOperationException("Empty task ID was accepted.");
+            }
+            catch (ArgumentException) { }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
