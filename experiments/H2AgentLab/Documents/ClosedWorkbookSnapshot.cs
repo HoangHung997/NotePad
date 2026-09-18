@@ -85,7 +85,7 @@ public sealed class ClosedWorkbookSnapshotReader
         {
             var nameValue = sheet.Name?.Value
                 ?? throw new InvalidDataException("Excel sheet is missing a name.");
-            var state = NormalizeSheetState(sheet.State?.Value.ToString());
+            var state = NormalizeSheetState(sheet.State?.Value);
             if (sheet.Id?.Value is not { Length: > 0 } relationshipId
                 || main.GetPartById(relationshipId) is not WorksheetPart worksheetPart)
             {
@@ -153,14 +153,35 @@ public sealed class ClosedWorkbookSnapshotReader
             sheets.ToArray());
     }
 
-    private static string NormalizeSheetState(string? value)
+    private static string NormalizeSheetState(S.SheetStateValues? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "Visible";
-        if (string.Equals(value, "hidden", StringComparison.OrdinalIgnoreCase)) return "Hidden";
-        if (string.Equals(value, "veryHidden", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "veryhidden", StringComparison.OrdinalIgnoreCase))
-            return "VeryHidden";
+        if (value == S.SheetStateValues.Hidden) return "Hidden";
+        if (value == S.SheetStateValues.VeryHidden) return "VeryHidden";
         return "Visible";
+    }
+
+    private static string? NormalizePattern(S.PatternValues? value)
+    {
+        if (value is null) return null;
+        if (value == S.PatternValues.Solid) return "Solid";
+        if (value == S.PatternValues.None) return "None";
+        if (value == S.PatternValues.Gray125) return "Gray125";
+        if (value == S.PatternValues.DarkGray) return "DarkGray";
+        if (value == S.PatternValues.MediumGray) return "MediumGray";
+        if (value == S.PatternValues.LightGray) return "LightGray";
+        return "Other";
+    }
+
+    private static string NormalizeCellType(S.CellValues? value)
+    {
+        if (value is null) return "NumberOrGeneral";
+        if (value == S.CellValues.SharedString) return "SharedString";
+        if (value == S.CellValues.InlineString) return "InlineString";
+        if (value == S.CellValues.Boolean) return "Boolean";
+        if (value == S.CellValues.String) return "String";
+        if (value == S.CellValues.Date) return "Date";
+        if (value == S.CellValues.Error) return "Error";
+        return "NumberOrGeneral";
     }
 
     private static ClosedCellSnapshot SnapshotCell(
@@ -174,7 +195,7 @@ public sealed class ClosedWorkbookSnapshotReader
         var address = cell.CellReference!.Value!;
         var raw = ReadValue(cell, sharedStrings);
         var formula = cell.CellFormula?.Text;
-        var cellType = cell.DataType?.Value.ToString() ?? "NumberOrGeneral";
+        var cellType = NormalizeCellType(cell.DataType?.Value);
         var styleIndex = cell.StyleIndex?.Value ?? 0U;
 
         S.CellFormat? format = styleIndex < cellFormats.Count
@@ -197,7 +218,7 @@ public sealed class ClosedWorkbookSnapshotReader
             styleIndex,
             On(font?.Bold),
             On(font?.Italic),
-            pattern?.PatternType?.Value.ToString(),
+            NormalizePattern(pattern?.PatternType?.Value),
             Color(pattern?.ForegroundColor),
             numberFormatId,
             numberFormats.TryGetValue(numberFormatId, out var code) ? code : null,
