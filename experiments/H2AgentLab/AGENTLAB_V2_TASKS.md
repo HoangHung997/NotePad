@@ -133,11 +133,11 @@ Rules:
   Acceptance criterion cannot be silently removed after task starts; evidence references are typed.  
   Evidence: stable criterion IDs, typed durable evidence references and append-only criterion expansion/evidence APIs in `Tasking/AgentAcceptanceEvidence.cs` + `AgentTaskContract.cs`; architecture guard covers evidence typing, snapshot immutability and redefinition rejection. GitHub Actions run `35293534110` passed full build/regression/publish.
 
-- [~] **V2-0403 — Add `AgentTaskState` state machine.**  
+- [x] **V2-0403 — Add `AgentTaskState` state machine.**  
   Received → Grounded → Planned → Executing → Verifying → Completed/Repairing/Blocked/Cancelled/Failed.  
-  Implementation + architecture guard added; full CI verification in progress.
+  Evidence: deterministic host-owned lifecycle + repair loop/terminal guards in `Tasking/AgentTaskStateMachine.cs`; architecture guard covers happy path, repair, cancellation, illegal skips and terminal lockout. GitHub Actions run `35293866199` passed full build/regression/publish.
 
-- [ ] **V2-0404 — Enforce no mutation completion without verification.**  
+- [~] **V2-0404 — Enforce no mutation completion without verification.**  
   Deterministic test: direct transition Executing→Completed is rejected for mutating tasks.
 
 - [ ] **V2-0405 — Add fast-path router.**  
@@ -377,4 +377,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0403 — Add AgentTaskState state machine`.
+**Active task:** `V2-0404 — Enforce no mutation completion without verification`.
