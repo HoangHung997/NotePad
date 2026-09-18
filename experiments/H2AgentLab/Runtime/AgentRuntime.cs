@@ -36,13 +36,21 @@ public sealed record AgentRuntimeResult(
     AgentContextSnapshot ContextSnapshot,
     IReadOnlyList<VerificationReport> VerificationHistory,
     IReadOnlyList<string> LoadedToolSchemas,
-    AgentPromptCacheIdentity? PromptCacheIdentity = null);
+    AgentPromptCacheIdentity? PromptCacheIdentity = null)
+{
+    public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
+        = Array.Empty<AgentEvidenceReference>();
+}
 
 public sealed record AgentRuntimeVerificationContext(
     AgentTaskContract Contract,
     int ToolRound,
     IReadOnlyList<global::H2AgentLab.ToolCall> Calls,
-    IReadOnlyList<AgentToolResult> Results);
+    IReadOnlyList<AgentToolResult> Results)
+{
+    public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
+        = Array.Empty<AgentEvidenceReference>();
+}
 
 public interface IAgentRuntimeVerifier
 {
@@ -69,6 +77,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     private readonly AgentRepairController _repairController;
     private readonly IAgentRuntimeVerifier? _verifier;
     private readonly IAgentRuntimePermissionPolicy _permissionPolicy;
+    private readonly AgentRuntimeEvidenceProjector? _evidenceProjector;
     private bool _disposed;
 
     public AgentRuntime(
@@ -79,7 +88,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         ToolExecutionScheduler? scheduler = null,
         AgentRepairController? repairController = null,
         IAgentRuntimeVerifier? verifier = null,
-        IAgentRuntimePermissionPolicy? permissionPolicy = null)
+        IAgentRuntimePermissionPolicy? permissionPolicy = null,
+        AgentRuntimeEvidenceProjector? evidenceProjector = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
@@ -89,6 +99,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         _repairController = repairController ?? new AgentRepairController();
         _verifier = verifier;
         _permissionPolicy = permissionPolicy ?? new ScopedAgentRuntimePermissionPolicy();
+        _evidenceProjector = evidenceProjector;
     }
 
     public async Task<AgentRuntimeResult> RunAsync(
@@ -138,6 +149,7 @@ public sealed class AgentRuntime : IAsyncDisposable
 
         var usage = new MutableUsage();
         var verificationHistory = new List<VerificationReport>();
+        var evidenceHistory = new List<AgentEvidenceReference>();
         VerificationReport? latestVerification = null;
         var toolRounds = 0;
         var toolCalls = 0;
@@ -174,7 +186,10 @@ public sealed class AgentRuntime : IAsyncDisposable
                         contextSnapshot,
                         verificationHistory.ToArray(),
                         _discovery.LoadedSchemaNames,
-                        promptCacheIdentity);
+                        promptCacheIdentity)
+                    {
+                        Evidence = evidenceHistory.ToArray()
+                    };
                 }
 
                 if (++toolRounds > request.MaxToolRounds)
@@ -184,9 +199,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                 toolCalls += round.ToolCalls.Count;
                 var execution = await ExecuteCallsAsync(
                     request.Contract,
+                    turnId,
+                    toolRounds,
                     round.ToolCalls,
                     cancellationToken).ConfigureAwait(false);
 
+                evidenceHistory.AddRange(execution.Evidence);
                 var results = execution.Results.ToArray();
                 if (_verifier is not null)
                 {
@@ -195,7 +213,10 @@ public sealed class AgentRuntime : IAsyncDisposable
                             request.Contract,
                             toolRounds,
                             execution.Calls,
-                            results),
+                            results)
+                        {
+                            Evidence = execution.Evidence
+                        },
                         cancellationToken).ConfigureAwait(false);
 
                     if (report is not null)
@@ -257,11 +278,14 @@ public sealed class AgentRuntime : IAsyncDisposable
 
     private async Task<ExecutionBatch> ExecuteCallsAsync(
         AgentTaskContract contract,
+        Guid turnId,
+        int toolRound,
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         CancellationToken cancellationToken)
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
         var results = new AgentToolResult?[transportCalls.Count];
+        var evidence = new List<AgentEvidenceReference>();
         var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request, AgentRuntimePermissionRequest Permission)>();
         var newlyLoadedSchemas = new List<AgentToolDefinition>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
@@ -391,14 +415,23 @@ public sealed class AgentRuntime : IAsyncDisposable
             {
                 var original = scheduled[i].OriginalIndex;
                 var scheduledResult = scheduledResults[i];
-                var boundedOutput = BoundToolOutput(scheduledResult.Output);
+                var rawOutput = scheduledResult.Output ?? "";
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
-                    boundedOutput);
+                    rawOutput);
+
+                var projection = _evidenceProjector?.Project(
+                    scheduled[i].Request.Descriptor,
+                    $"tool-result:{turnId:N}:{toolRound}:{original}",
+                    ((long)toolRound * 1_000L) + original,
+                    rawOutput);
+                if (projection is not null)
+                    evidence.Add(projection.Evidence);
+
                 results[original] = new AgentToolResult(
                     calls[original].Id,
                     scheduledResult.ToolName,
-                    boundedOutput,
+                    BoundToolOutput(projection?.ModelContent ?? rawOutput),
                     IsError: false);
             }
         }
@@ -413,7 +446,8 @@ public sealed class AgentRuntime : IAsyncDisposable
             newlyLoadedSchemas
                 .GroupBy(x => x.Name, StringComparer.Ordinal)
                 .Select(x => x.First())
-                .ToArray());
+                .ToArray(),
+            evidence.ToArray());
     }
 
     private static string? ResourceKey(ToolDescriptor descriptor)
@@ -583,7 +617,8 @@ public sealed class AgentRuntime : IAsyncDisposable
     private sealed record ExecutionBatch(
         IReadOnlyList<global::H2AgentLab.ToolCall> Calls,
         IReadOnlyList<AgentToolResult> Results,
-        IReadOnlyList<AgentToolDefinition> NewlyLoadedTools);
+        IReadOnlyList<AgentToolDefinition> NewlyLoadedTools,
+        IReadOnlyList<AgentEvidenceReference> Evidence);
 
     private sealed class MutableUsage
     {
