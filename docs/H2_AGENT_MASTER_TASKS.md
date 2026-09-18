@@ -468,7 +468,7 @@ Evidence: `AgentRuntime` now keeps bounded repair state, merges prior passed cri
 
 ---
 
-## [ ] MB-44 — Host-owned final completion gate
+## [x] MB-44 — Host-owned final completion gate
 
 Goal:
 
@@ -479,6 +479,8 @@ Acceptance:
 - model phrase “done” is insufficient;
 - required verifier failures keep task non-complete;
 - non-mechanically-verifiable tasks have explicit classification/evidence.
+
+Evidence: host completion ownership remains in `AgentOrchestrator`/`AgentTaskStateMachine`: a mutating runtime may return model text such as `done`, but without accepted host verification the orchestration state becomes `Blocked`, never `Completed`. `AgentVerificationOutcome` now carries typed non-mechanical evidence, `AgentEvidenceKind.HostClassification` records the explicit host classification, and `AgentTaskCompletionGate` permits that exceptional path only when policy explicitly allows it, no concrete verifier IDs are being bypassed, and host-classification evidence is present. `AgentOrchestrator.CompleteNotMechanicallyVerifiable` is the explicit host API for that path. `Runtime/MbCompletionGateTests.cs` proves model-only completion is insufficient, a required verifier failure stays non-complete, and non-mechanical completion requires explicit host classification evidence. Exact functional source commit `c720266865beac2f60aefafbefe627bb7bcb779e`, GitHub Actions run `35368661263`: MB-44 **3 passed, 0 failed**; MB-10 through MB-43 regression suites, H2 Notes, DesktopHost, OfficeHost, provider transports, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `53d26578e49f4a9b115e12eb5a8a1d43abe29ba4`; portable ZIP SHA256 `d986b9654b502aae92b2e19731fad1b67118604526f9e58307f6c3972c34ffaa`.
 
 ---
 
