@@ -14,6 +14,9 @@ public sealed record Approval(string Title, string Details);
 public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     Func<Approval, CancellationToken, Task<bool>> approve, Action<string, string> journal)
 {
+    public SafeWorkspace Workspace { get; } = workspace ?? throw new ArgumentNullException(nameof(workspace));
+    public string StateRoot { get; } = Path.GetFullPath(stateRoot ?? throw new ArgumentNullException(nameof(stateRoot)));
+
     private static readonly JsonSerializerOptions ToolJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All) };
     public bool ReadOnly { get; set; } = true;
     public ComputerTools? Computer { get; set; }
