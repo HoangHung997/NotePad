@@ -23,6 +23,18 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     public SkillCatalog Skills { get; } = new();
     private ScriptWorkspace? _scripts;
     private ScriptWorkspace Scripts => _scripts ??= new(workspace, stateRoot, approve);
+
+    public ScriptRunEvidence ObserveScriptRunEvidence(string runId)
+    {
+        var evidence = Scripts.Evidence(runId);
+        foreach (var artifact in evidence.Artifacts)
+            _ = Scripts.Read(runId, artifact.Path);
+        return evidence;
+    }
+
+    public byte[] ObserveScriptArtifact(string runId, string path)
+        => Scripts.Read(runId, path);
+
     public List<(string Mime, string Data, string Name)> PendingImages { get; } = [];
     private int _imagesSent;
     private readonly HashSet<string> _declinedScopes = new(StringComparer.OrdinalIgnoreCase);
