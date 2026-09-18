@@ -28,9 +28,7 @@ public static class Program
             };
 
             new OfficeHostServer(pipeName, backend, fixture)
-                .RunAsync(shutdown.Token)
-                .GetAwaiter()
-                .GetResult();
+                .Run(shutdown.Token);
             return 0;
         }
         catch (OperationCanceledException)
