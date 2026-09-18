@@ -141,6 +141,8 @@ Evidence: `Runtime/AgentRuntime.cs` owns bounded prompt/context assembly, deferr
 
 ## [~] MB-11 — Wire AgentOrchestrator to AgentRuntime
 
+Implementation note: normal `AgentOrchestratedRun` now constructs/runs `AgentRuntime` through `AgentOrchestrator`; compatibility `AgentRunner` remains diagnostic-only. Dedicated MB-11 guard tests are wired into CI; verification run in progress.
+
 Goal:
 
 Make AgentOrchestrator the lifecycle coordinator for the real runtime.
