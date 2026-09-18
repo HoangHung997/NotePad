@@ -5,6 +5,8 @@ Scope: `experiments/H2AgentLab` first. **Do not integrate into H2 Notes UI until
 Branch during implementation: `feature/nas-multi-device-sync` unless the user explicitly changes it.  
 Main principle: **reuse proven H2 Notes components when they are genuinely generic; do not duplicate stable code; do not make H2 Notes depend on unfinished Agent Lab code.**
 
+Supplementary normative requirements: **`docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md` is part of this specification.** Where that document adds capability or acceptance requirements not yet represented below, the task tracker must add explicit work before Phase 13; earlier completed tasks remain valid foundations but do not waive the new gates.
+
 ---
 
 ## 1. Goal
@@ -698,3 +700,479 @@ Rules:
 5. If a task discovers new work, add a new uniquely numbered task under the correct phase; do not silently broaden an existing task.
 6. Every architectural change must keep deterministic Lab tests and H2 Notes tests passing before it can be marked complete.
 7. No integration into `src/H2Notes.Avalonia` until the final Agent Lab gate passes and the user explicitly authorizes integration.
+
+---
+
+## 19. Normative MCP / Web / Office / extensibility addendum
+
+The requirements in `docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md` are mandatory for the accepted Agent Lab engine.
+
+This addendum reconciles that document with the architecture above. It does **not** invalidate completed OfficeHost/DesktopHost work. Those components remain accepted lower-level providers, but final Agent Lab acceptance also requires the provider, web, legal-research and extension layers below.
+
+The final execution model remains:
+
+```text
+user goal
+  -> host-owned task contract
+  -> bounded context
+  -> capability/tool discovery
+  -> observe current state
+  -> act through the highest-level safe adapter
+  -> observe again
+  -> deterministic verification
+  -> focused repair
+  -> concise final answer
+```
+
+Tool-call count is not fixed. A complex task may use many sequential or parallel structured calls while active context and loaded schemas remain bounded.
+
+### 19.1 Provider neutrality
+
+MCP is a provider protocol, never the agent itself.
+
+`AgentOrchestrator` remains responsible for:
+
+- whether a tool is required;
+- provider/tool selection;
+- call order;
+- evidence sufficiency;
+- verification and repair;
+- permission/scope enforcement;
+- final completion.
+
+The model must not need to know whether a capability is implemented through MCP, COM, C#, OpenXML, Python, REST, named pipe, plugin IPC or another transport.
+
+---
+
+## 20. Generic capability-provider and MCP layer
+
+Agent Lab requires an explicit provider layer above concrete transports.
+
+Conceptual contracts include:
+
+```text
+ICapabilityProvider
+McpServerConnection
+McpToolProvider
+McpResourceAdapter
+McpPermissionPolicy
+McpHealthState
+ProviderProvenance
+```
+
+Exact type names may differ.
+
+### 20.1 Required MCP lifecycle
+
+The MCP/provider layer must support:
+
+- connect, disconnect and bounded reconnect;
+- cancellation and timeout;
+- health state and last bounded error;
+- compact namespace/capability summaries before schemas;
+- lazy detailed schema loading only after selection;
+- dynamic registration into `ToolRegistry`;
+- read-only vs mutating classification;
+- provider/resource/session scope declarations;
+- parallel-safety and serialization boundaries;
+- provenance: provider/server/tool/schema/version;
+- secret-safe metadata;
+- deterministic removal/refresh of provider tools.
+
+One provider must not silently broaden another provider's scope.
+
+Provider claims are **not** automatically trusted verifier evidence. Verification remains host-owned.
+
+### 20.2 Deferred discovery remains mandatory
+
+Initial model exposure remains intentionally small:
+
+```text
+tool_search
+update_plan
+compact namespace metadata
+```
+
+Large Word/Excel/AutoCAD/Web/plugin schemas are loaded only when selected. Registry/provider/plugin refreshes invalidate the relevant search/schema cache deterministically.
+
+---
+
+## 21. General computer-control capability families
+
+DesktopHost is the UI/vision foundation, but the accepted engine also needs Codex-like typed capability families for broader computer work.
+
+Required families, whether implemented by built-ins, native hosts or approved plugins/providers:
+
+```text
+filesystem.*
+process.*
+shell.*
+app.*
+window.*
+uia.*
+input.*
+screen.*
+browser.*
+```
+
+Representative capabilities include:
+
+- filesystem list/stat/search/read/write/copy/move/hash/watch and policy-controlled delete;
+- process list/start/wait/exit-status and policy-controlled terminate;
+- bounded shell/build/test/script execution;
+- app list/active/launch/activate/wait-for-window;
+- window enumerate/bounds/title/process/activate/observe;
+- UIA inspect/find/invoke/set/select/expand;
+- input click/double-click/type/key/chord/scroll/drag;
+- screen capture/region/observe-after-action;
+- browser navigate/inspect/click/type/download/wait where structured web access is insufficient.
+
+### 21.1 Safety
+
+These capabilities must be scope- and permission-aware:
+
+- no unrestricted machine access by default;
+- read/observe separated from mutation;
+- process/window/state identity binding;
+- stale-state rejection;
+- cancellation and timeout;
+- explicit shell/process side-effect policy;
+- protected password/security/system surfaces blocked;
+- observe-after-mutation before completion evidence;
+- durable evidence for important side effects.
+
+Preference remains:
+
+```text
+structured app adapter
+  > native API / MCP / COM / plugin
+  > direct file adapter
+  > UI Automation
+  > screenshot / mouse / keyboard
+```
+
+---
+
+## 22. WebResearchHost, freshness and web evidence
+
+A first-class `WebResearchHost` is required and is distinct from DesktopHost.
+
+Required structured families:
+
+```text
+web.search
+web.fetch
+web.download
+web.extract
+web.get_metadata
+web.open_browser   # fallback only when structured access is insufficient
+```
+
+### 22.1 Freshness policy
+
+The task/router layer must infer an explicit equivalent of `FreshnessRequired = true` for intents such as:
+
+- today/current/latest/newest;
+- currently valid/still effective;
+- has it been replaced/amended/repealed;
+- new law/regulation/standard;
+- current weather/news/price;
+- current vendor/product documentation.
+
+A freshness-required task cannot complete from model memory alone. It requires current authoritative data from WebResearchHost or another approved current provider.
+
+### 22.2 Durable web evidence
+
+Web results are structured evidence, not trusted prompt text only.
+
+Required fields include the equivalent of:
+
+```text
+WebEvidence
+  EvidenceId
+  Url
+  Title
+  Publisher
+  PublishedAt
+  EffectiveAt
+  FetchedAt
+  SourceType
+  ContentHash
+  RelevantExcerpt
+```
+
+Large HTML/PDF/download bodies are stored in `ArtifactStore` or an equivalent durable store. Active context receives bounded summaries and evidence handles unless more content is explicitly requested.
+
+---
+
+## 23. Legal/regulatory verification and structured Office namespaces
+
+### 23.1 Legal status model
+
+A newer document is not automatically a replacement.
+
+The engine must structurally distinguish:
+
+```text
+REPLACED
+AMENDED
+SUPPLEMENTED
+PARTIALLY_REPEALED
+REPEALED
+STILL_EFFECTIVE
+NOT_YET_EFFECTIVE
+UNKNOWN
+```
+
+A `LegalDocumentStatus`-equivalent result must preserve:
+
+- document ID/jurisdiction/issuer;
+- issue/effective dates;
+- status;
+- typed relationships to related documents;
+- effective date of each relationship;
+- evidence IDs.
+
+Authoritative/official sources are preferred for legal-effect conclusions. Search snippets or secondary articles alone are insufficient when official material is available.
+
+### 23.2 Word structured capability family
+
+The live Word provider must ultimately expose capabilities equivalent to:
+
+```text
+word.list_documents
+word.get_active_document
+word.get_selection
+word.read_outline
+word.read_range
+word.find_text
+word.read_paragraphs
+word.read_runs
+word.read_styles
+word.read_tables
+word.read_sections
+word.read_headers_footers
+word.replace_range
+word.insert_text
+word.apply_format
+word.save_copy
+word.export
+word.verify_range
+word.get_spelling_errors
+word.get_grammar_candidates
+word.extract_legal_citations
+```
+
+Native Word spelling evidence should be preferred for ordinary spelling detection when available.
+
+### 23.3 Excel structured capability family
+
+The live Excel provider must expose equivalents of:
+
+```text
+excel.list_workbooks
+excel.get_active_workbook
+excel.get_active_sheet
+excel.get_selection
+excel.read_range
+excel.read_formulas
+excel.read_styles
+excel.read_merges
+excel.read_hidden_state
+excel.write_range
+excel.set_formula
+excel.apply_format
+excel.recalculate
+excel.save_copy
+excel.verify_range
+```
+
+Large range work must use structured calls rather than UI clicking.
+
+### 23.4 AutoCAD provider boundary
+
+Production AutoCAD mutation should prefer:
+
+```text
+Agent
+ -> ToolRegistry/MCP/provider
+ -> local bridge/IPC
+ -> C# AutoCAD plugin
+ -> DocumentLock
+ -> Transaction
+ -> AutoCAD Database
+```
+
+The provider surface should support typed discovery/read/mutate/plot/verify operations rather than arbitrary command execution as the default mutation path.
+
+---
+
+## 24. Dynamic Plugin / Skill Catalog and update system
+
+The accepted engine must support future capabilities without rebuilding the full H2 application.
+
+Keep these concepts separate:
+
+```text
+Tool   = callable capability
+Skill  = reusable workflow/instructions for combining capabilities
+Plugin = installable package containing tools/providers/skills/verifiers/resources/helpers
+```
+
+### 24.1 Manifest and catalog
+
+An installable package has bounded machine-readable metadata equivalent to:
+
+- ID/name/version/min agent version;
+- publisher/source;
+- package hash/signature/trust state;
+- capability and skill keywords;
+- providers;
+- requested permissions;
+- native helper declarations;
+- compatibility metadata.
+
+Catalogs expose compact metadata first. Supported source abstractions may include official, organization/private, Git, local-folder or enterprise catalogs.
+
+Discovery does not imply trust or installation.
+
+### 24.2 Installation/update policy
+
+Host policy, not model text, decides whether installation/update may proceed.
+
+Required modes include equivalents of:
+
+- Disabled;
+- trusted official packages;
+- ask for new publisher/package;
+- organization-approved catalog;
+- developer/local-package mode.
+
+Before activation validate at least:
+
+- package ID/version and manifest schema;
+- cryptographic hash/signature/source identity where available;
+- agent compatibility;
+- capabilities and permission delta;
+- path traversal/forbidden paths;
+- conflicting tool names;
+- native helpers/hooks;
+- package self-test.
+
+Downloaded code never executes merely because it was discovered.
+
+### 24.3 Staged versioned activation
+
+Use a versioned package store:
+
+```text
+download metadata/package
+ -> verify
+ -> unpack to versioned staging
+ -> validate tools/skills/verifiers
+ -> self-test/compatibility probe
+ -> register
+ -> atomically activate
+```
+
+Failed install/update leaves the previous working version intact.
+
+New broader permissions require new policy/approval.
+
+Support:
+
+- metadata-only update discovery;
+- rollback;
+- quarantine;
+- diagnostics retention;
+- hot ToolRegistry registration at controlled boundaries;
+- helper-only restart when possible;
+- no tool-surface mutation during an in-flight tool call.
+
+### 24.4 Capability and skill indexes
+
+Installed metadata feeds rebuildable local indexes:
+
+```text
+intent/keywords/namespaces
+ -> plugin
+ -> skill
+ -> tool descriptors
+```
+
+Skills load progressively:
+
+```text
+metadata
+ -> search
+ -> summary
+ -> selected SKILL.md
+ -> cache task-local id/version/hash
+```
+
+Unchanged skills are not reread every turn. Changed plugin/skill hashes invalidate caches deterministically.
+
+Task evidence records exact plugin/skill/tool versions used.
+
+---
+
+## 25. Canonical Word + legal-research acceptance scenario
+
+Before Phase 13, the engine must pass the canonical scenario from the supplementary requirements:
+
+- Word is already open and may contain unsaved edits;
+- the document contains prose, tables, formatting and legal references;
+- spelling errors exist;
+- legal references may have later amending/replacing/supplementing documents.
+
+The agent must:
+
+1. identify the active Word document without pixel clicking;
+2. read unsaved live state;
+3. create bounded task/acceptance criteria;
+4. detect spelling candidates;
+5. extract legal citations;
+6. infer freshness/current research requirement;
+7. use WebResearchHost;
+8. prefer authoritative sources;
+9. determine typed legal relationships/status;
+10. preserve evidence/provenance;
+11. produce a scoped Word patch;
+12. modify only approved/required ranges;
+13. preserve unrelated formatting/content;
+14. re-read live Word state;
+15. verify every changed criterion;
+16. repair only failed criteria;
+17. return a concise evidence-backed summary.
+
+Required negative properties:
+
+- no model-memory-only legal status;
+- no “newer means replaced” shortcut;
+- no silent original overwrite;
+- no loss of unsaved Word edits;
+- no completion from tool success alone;
+- no full-document + full-web-page + all-schema replay each turn;
+- **Desktop pixel/computer-use calls = 0 when OfficeHost + WebResearchHost are sufficient.**
+
+---
+
+## 26. Revised acceptance gate and Phase 13 rule
+
+Phase 12 acceptance must additionally prove:
+
+- generic MCP provider lifecycle/deferred schema/scope/provenance;
+- general computer capability safety for filesystem/process/shell/app/window/UIA/input/screen/browser;
+- WebResearchHost freshness routing and bounded evidence;
+- legal relationship/status verification with authoritative-source preference;
+- structured Word spelling/citation extraction;
+- structured Word/Excel namespace routing;
+- AutoCAD provider/native-plugin boundary at least through its accepted provider contract and deterministic safety/verification tests;
+- plugin manifest/catalog/install/update/rollback/quarantine/hot-registration behavior;
+- bounded context across web pages, plugin/skill catalogs and provider schemas;
+- canonical Word + legal scenario end-to-end.
+
+**V2-1210 user acceptance is valid only after all of the above are evidenced.**
+
+No Phase 13 H2 Notes integration may begin earlier. H2 Notes integration must preserve the accepted long-running agent behavior; it must not collapse the engine back to one-shot chat.
+
