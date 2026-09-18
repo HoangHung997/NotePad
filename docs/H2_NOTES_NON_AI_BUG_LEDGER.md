@@ -47,6 +47,8 @@ Exclude:
 | H2-NONAI-005 | HIGH | Recovery / availability | OPEN | Persistent index/file mismatch has no automatic last-known-good or guided self-heal path |
 | H2-NONAI-006 | HIGH | Test coverage | OPEN | Multi-PC tests use local filesystem fixtures and do not prove real SMB/NAS lock/visibility behavior |
 | H2-NONAI-007 | MEDIUM | Offline durability | OPEN-KNOWN-GAP | No durable local pending-operation queue while NAS is unavailable; crash durability remains incomplete |
+| H2-NONAI-008 | HIGH | Storage location / network failover | OPEN | DataFolder is stored as one path string; no Local vs Mapped Network vs UNC classification or LAN/remote endpoint failover |
+| H2-NONAI-009 | HIGH | Workspace identity / locking | OPEN | Path aliases to the same NAS workspace can be treated as different roots, weakening instance lock and destination validation |
 
 ---
 
@@ -337,6 +339,164 @@ Add an append-only local pending-operation/recovery record with:
 - idempotent replay or explicit conflict handling.
 
 Do not blindly replay mutations after reconnect without first reading the current shared state.
+
+---
+
+# H2-NONAI-008 — Storage location is path-string only; mapped-network detection and endpoint failover are missing
+
+**Severity:** HIGH  
+**Status:** OPEN  
+**First confirmed:** 2026-09-18  
+**Area:** storage location / mapped network / LAN-remote failover
+
+## Observed design gap
+
+Windows shows the user's NAS shares as **Network locations** with mapped drive letters (for example X:, Y:, Z:). A mapped drive may look like an ordinary local path to application code, but it is not local storage.
+
+Current H2 Notes behavior:
+- `LocalConfiguration` stores only `string? DataFolder`;
+- folder selection uses `TryGetLocalPath()` and then persists the returned path string;
+- startup recreates `ProjectWorkspaceStore` from only that path;
+- no storage-kind metadata is persisted;
+- no mapped-drive root is resolved to its UNC/network target;
+- no alternative LAN/remote endpoints are associated with one logical workspace;
+- no automatic endpoint failover exists.
+
+The current picker error text also says `Cần thư mục cục bộ đã tải về máy.`, which is conceptually wrong for a valid mapped NAS drive that exposes a Windows path such as `X:\...`.
+
+## Required architecture
+
+Introduce a host-side storage-location abstraction instead of treating every selected path as local.
+
+A selected workspace location should be classified at minimum as:
+- `LocalFixed`;
+- `LocalRemovable`;
+- `MappedNetwork`;
+- `UncNetwork`;
+- `UnsupportedOrUnknownNetworkProvider`.
+
+On Windows, mapped drives should be detected using the drive/root type and resolved to the underlying network mapping (for example via the Windows network-drive mapping API) while preserving the user-friendly mapped path for display.
+
+Persist a local workspace profile similar to:
+
+```text
+WorkspaceId
+PreferredEndpointId
+Endpoints[]
+  EndpointId
+  Kind = Local | LanNetwork | RemoteNetwork
+  DisplayPath
+  ResolvedNetworkPath
+  Priority
+  LastSuccessfulUtc
+  CapabilityStatus
+```
+
+Do **not** store network credentials in the workspace profile.
+
+## LAN / Internet behavior
+
+Do not attempt to infer "same LAN" only from network-interface state.
+
+Prefer endpoint reachability:
+1. Try the configured LAN endpoint first with a short bounded probe.
+2. If unavailable, try a configured secure remote/VPN endpoint.
+3. Before switching, prove the candidate endpoint exposes the **same logical H2 workspace**.
+4. Never change endpoint in the middle of a storage transaction.
+5. If the fallback transport does not preserve the locking/atomic-replace semantics required by H2 Notes, fail closed or use a separate offline/pending-sync mode instead of pretending it is equivalent shared storage.
+
+Raw SMB should not be exposed directly over the public Internet merely to satisfy this failover design; remote access should use an appropriate secure network/VPN/overlay or another transport whose filesystem semantics are explicitly supported.
+
+## Required workspace identity
+
+Path strings must not be the logical identity of a shared workspace.
+
+Add/retain one stable workspace identity (GUID or equivalent) in the shared H2 workspace metadata. Every candidate endpoint must be verified against this ID before automatic failover.
+
+Example:
+
+```text
+PC A mapped path  -> X:\.Note
+PC B mapped path  -> X:\Dữ liệu Hưng\.Note
+LAN UNC endpoint  -> \\server\share\...\.Note
+Remote/VPN path   -> another reachable path
+                     |
+                     +--> all must expose the same WorkspaceId
+```
+
+Only after identity verification may H2 Notes treat these as aliases of one workspace.
+
+## Required acceptance
+
+- picker correctly identifies mapped-network paths as network storage;
+- UI shows Local / Network (LAN) / Network (Remote/VPN) status;
+- app preserves a friendly mapped path while retaining a canonical/network identity;
+- disconnect LAN while app is idle and verify safe failover to a configured remote endpoint for the same WorkspaceId;
+- reconnect LAN and verify safe preference switch back only while no transaction is in flight;
+- wrong endpoint with a different WorkspaceId must be rejected;
+- unsupported network provider semantics must not enable multi-writer mode silently.
+
+---
+
+# H2-NONAI-009 — Path aliases can bypass same-workspace identity checks and local instance locking
+
+**Severity:** HIGH  
+**Status:** OPEN  
+**First confirmed:** 2026-09-18  
+**Area:** workspace identity / duplicate instance / folder validation
+
+## Current code behavior
+
+`ProjectWorkspaceStore` currently canonicalizes only with:
+
+```text
+Root = Path.GetFullPath(root)
+```
+
+The same-PC instance lock key is derived from the resulting `Root` string.
+
+`ValidateDestination(source, target)` also compares only normalized path strings to decide whether two locations are the same or nested.
+
+## Failure mode
+
+The same physical NAS workspace may be reachable through multiple aliases:
+
+```text
+X:\Dữ liệu Hưng\.Note
+Y:\.Note
+\\DRPBM6\share\Dữ liệu Hưng\.Note
+```
+
+If these aliases resolve to the same underlying workspace but have different path strings:
+- same-machine duplicate-instance protection can allocate different local lock keys;
+- H2 Notes may allow two processes on one PC to open the same logical workspace through two aliases;
+- source/destination validation can fail to recognize that a transfer target is actually the same workspace;
+- future LAN/remote endpoint failover can accidentally be treated as a workspace change instead of an endpoint change.
+
+## Required direction
+
+Use a stable shared `WorkspaceId` as the primary identity after the workspace can be read.
+
+The local duplicate-instance lock should ultimately be keyed by logical workspace identity, not by the presentation path.
+
+For initial opening when the workspace ID is not yet available:
+- use a temporary path-level/opening lock if necessary;
+- read/validate the workspace identity;
+- acquire the logical WorkspaceId lock;
+- refuse the second instance if that logical ID is already open;
+- then release any temporary alias-specific lock.
+
+Transfer validation should compare logical workspace IDs when both source and destination already contain H2 workspaces.
+
+Path comparison remains useful for local empty folders and traversal protection, but it is insufficient as shared-workspace identity.
+
+## Required tests
+
+- same NAS root via mapped drive and UNC alias on one PC -> second instance rejected;
+- same NAS root via two mapped letters -> second instance rejected;
+- source/target aliases of same WorkspaceId -> transfer rejected as self-transfer;
+- two genuinely different workspaces with similar paths -> allowed;
+- endpoint failover between aliases of the same WorkspaceId -> no data migration prompt.
 
 ---
 
