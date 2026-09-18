@@ -77,9 +77,10 @@ public sealed class DeferredToolDiscovery
 
         var candidateLimit = Math.Min(50, Math.Max(maxResults * 4, maxResults));
         var candidates = _search.Search(query, candidateLimit);
-        var preferred = DocumentToolPreference.Apply(query, candidates, candidateLimit);
-        if (!PythonFallbackRouter.ShouldExposeRunPython(query, preferred))
-            preferred = preferred.Where(x => x.Descriptor.Name != "run_python").ToArray();
+        var preferred = DocumentToolPreference.Apply(
+            query,
+            candidates,
+            candidateLimit);
         return preferred.Take(maxResults).ToArray();
     }
 
