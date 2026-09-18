@@ -15,12 +15,12 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
 {
     private readonly Dictionary<string, ICapabilityProvider> _providers = new(StringComparer.Ordinal);
     private readonly ToolRegistry _registry;
-    private readonly McpToolRegistryAdapter _mcpAdapter;
+    private readonly CapabilityProviderToolRegistryAdapter _providerAdapter;
 
     public CapabilityProviderManager(ToolRegistry registry)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _mcpAdapter = new McpToolRegistryAdapter(registry);
+        _providerAdapter = new CapabilityProviderToolRegistryAdapter(registry);
     }
 
     public IReadOnlyList<ProviderProvenance> Providers
@@ -66,21 +66,34 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<ToolDescriptor>> LoadProviderToolsAsync(
+        string providerId,
+        IReadOnlyList<string> selectedNames,
+        CancellationToken cancellationToken)
+    {
+        var provider = Provider(providerId);
+
+        if (provider.Health.Status != ProviderHealthStatus.Ready)
+            await provider.ConnectAsync(cancellationToken).ConfigureAwait(false);
+
+        return await _providerAdapter.LoadSelectedAsync(
+            provider,
+            selectedNames,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<ToolDescriptor>> LoadMcpToolsAsync(
         string providerId,
         IReadOnlyList<string> selectedNames,
         CancellationToken cancellationToken)
     {
         var provider = Provider(providerId);
-        if (provider is not McpToolProvider mcp)
+        if (provider is not McpToolProvider)
             throw new InvalidOperationException(
                 $"Provider '{providerId}' is not an MCP tool provider.");
 
-        if (provider.Health.Status != ProviderHealthStatus.Ready)
-            await provider.ConnectAsync(cancellationToken).ConfigureAwait(false);
-
-        return await _mcpAdapter.LoadSelectedAsync(
-            mcp,
+        return await LoadProviderToolsAsync(
+            providerId,
             selectedNames,
             cancellationToken).ConfigureAwait(false);
     }
