@@ -1021,6 +1021,59 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("Deferred skill session preserves progressive loading and hash/version cache", () =>
+        {
+            var skillsRoot = Path.Combine(root, "v2-skill-cache-fixture");
+            if (Directory.Exists(skillsRoot)) Directory.Delete(skillsRoot, recursive: true);
+            var skillDir = Path.Combine(skillsRoot, "fixture-skill");
+            Directory.CreateDirectory(skillDir);
+            var skillPath = Path.Combine(skillDir, "SKILL.md");
+            File.WriteAllText(skillPath, string.Join(Environment.NewLine, new[]
+            {
+                "---",
+                "name: fixture-skill",
+                "description: Deterministic fixture guidance for deferred skill loading.",
+                "---",
+                "# Fixture",
+                "Read this guidance progressively."
+            }));
+
+            var catalog = new SkillCatalog(skillsRoot);
+            var session = new DeferredSkillSession(catalog);
+
+            var first = session.Read("fixture-skill", "SKILL.md");
+            if (first.Unchanged || string.IsNullOrWhiteSpace(first.Content)
+                || first.Sha256.Length != 64
+                || !first.Version.StartsWith("sha256:", StringComparison.Ordinal))
+                throw new InvalidOperationException("First progressive skill read did not return content/hash/version.");
+
+            var second = session.Read("fixture-skill", "SKILL.md");
+            if (!second.Unchanged || second.Content is not null
+                || second.Sha256 != first.Sha256
+                || second.Version != first.Version)
+                throw new InvalidOperationException("Unchanged skill guidance was resent instead of using cached hash/version.");
+
+            File.AppendAllText(skillPath, Environment.NewLine + "Changed guidance invalidates the task cache.");
+            var third = session.Read("fixture-skill", "SKILL.md");
+            if (third.Unchanged || string.IsNullOrWhiteSpace(third.Content)
+                || third.Sha256 == first.Sha256
+                || third.Version == first.Version)
+                throw new InvalidOperationException("Changed skill source failed to invalidate cached guidance.");
+
+            if (session.LoadedVersions.Count != 1
+                || session.LoadedVersions.Values.Single() != third.Version)
+                throw new InvalidOperationException("Per-task skill version memory is inconsistent.");
+
+            var executor = new DelegatingToolExecutor(
+                "skill-registry-fixture",
+                (call, ct) => ValueTask.FromResult("ok"));
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(registry, executor);
+            var skillTools = registry.GetNamespace("skills").Select(x => x.Name).ToArray();
+            if (!skillTools.SequenceEqual(new[] { "list_skills", "read_skill" }))
+                throw new InvalidOperationException("SkillCatalog tools were not preserved in deferred registry namespace.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
