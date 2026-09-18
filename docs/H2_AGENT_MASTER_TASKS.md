@@ -406,6 +406,8 @@ Acceptance:
 - verifier can reference evidence IDs;
 - final answer can cite/describe actual observed work without replaying giant raw outputs.
 
+Evidence: `Runtime/AgentRuntimeEvidence.cs` projects important/large tool outputs into durable `ArtifactStore` handles; `AgentRuntime` returns evidence history and passes evidence IDs into runtime verifiers. `Runtime/MbEvidenceRuntimeTests.cs` covers bounded large-output projection, stable hashes, readable small evidence and verifier evidence references. Exact-head source commit `3bc34025f66b2c07c9c5c0aecbc7c24cbe6692cc` completed the full workflow and produced publish commit `d19af177489a6c1a1a04383cd0527ad737f82300`.
+
 Evidence: `Runtime/AgentRuntimeEvidence.cs` stores important/large tool output in the existing `ArtifactStore` and returns bounded projections with durable SHA-256 handles; `Runtime/AgentRuntime.cs` carries typed evidence into verifier context and final runtime results; `Tools/V1ToolRegistryAdapter.cs` marks important reads and all mutations as evidence-capable; `Tasking/AgentOrchestratedRun.cs` surfaces evidence ID/hash/summary in the UI trace. `Runtime/MbEvidenceRuntimeTests.cs` covers large-output bounding/raw round-trip, stable hashes, small important observations, v1 evidence metadata, verifier evidence references, and final-answer evidence handles. Full regression run `35359705425` on source commit `3bc34025f66b2c07c9c5c0aecbc7c24cbe6692cc` completed successfully through MB-41, DesktopHost, OfficeHost, all provider transports, and package publication.
 
 ---
