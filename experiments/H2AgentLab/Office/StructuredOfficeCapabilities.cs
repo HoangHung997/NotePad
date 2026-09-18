@@ -118,7 +118,10 @@ public static class StructuredOfficeCapabilityCatalog
                     capability.ResourceScope,
                     capability.ResourceScope),
                 serializationKey: capability.Namespace,
-                canProvideVerificationEvidence: false);
+                canProvideVerificationEvidence: false,
+                preference: new ToolPreferenceMetadata(
+                    "active-content",
+                    ToolInteractionFidelity.Structured));
             registry.Register(descriptor);
             descriptors.Add(descriptor);
         }
