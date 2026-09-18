@@ -60,7 +60,7 @@ public static class V2ExtensibilityRefinementTests
 
             var pluginCatalog = new PluginSkillCatalog(manager);
             var unified = new UnifiedSkillCatalog();
-            unified.Register(new BuiltInSkillSource(new global::H2AgentLab.SkillCatalog(builtInRoot)));
+            unified.Register(new BuiltInSkillSource(builtInRoot));
             unified.Register(new PluginSkillSource(manager, pluginCatalog));
 
             var results = unified.Search("audit dynamic block parameters and actions", 10);
