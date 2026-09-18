@@ -232,6 +232,8 @@ public sealed class BuiltInSkillSource : ISkillSource
         string query,
         int maxResults)
     {
+        // Codex-style local discovery ranks only bounded name + description metadata.
+        // Do not add aliases/intents/examples requirements or domain synonym knowledge here.
         query ??= "";
         var terms = Tokens(query).Distinct(StringComparer.Ordinal).ToArray();
         var scored = skills.Select(skill => new
