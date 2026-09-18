@@ -191,6 +191,20 @@ public sealed class AgentOrchestrator
         return Machine(current).Complete(current.Contract, outcome, reason);
     }
 
+    public AgentTaskTransition CompleteNotMechanicallyVerifiable(
+        AgentOrchestrationSession session,
+        IEnumerable<AgentEvidenceReference> classificationEvidence,
+        string? reason = null)
+    {
+        ArgumentNullException.ThrowIfNull(classificationEvidence);
+        var current = Session(session);
+        var outcome = new AgentVerificationOutcome(
+            passed: false,
+            notMechanicallyVerifiable: true,
+            nonMechanicalEvidence: classificationEvidence);
+        return Machine(current).Complete(current.Contract, outcome, reason);
+    }
+
     public AgentTaskTransition Block(AgentOrchestrationSession session, string? reason = null)
         => Machine(session).TransitionTo(AgentTaskState.Blocked, reason);
 
