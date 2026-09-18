@@ -52,7 +52,8 @@ public sealed record AgentInspectionSnapshot(
     IReadOnlyList<AgentAcceptanceCriterion> Criteria,
     IReadOnlyList<AgentTraceEvent> TraceEvents,
     int ActiveContextCharacters,
-    bool ContextUnderPressure);
+    bool ContextUnderPressure,
+    AgentDiagnosticsSnapshot Diagnostics);
 
 /// <summary>
 /// UI-facing v2 run facade. AgentOrchestrator owns contract/route/state. The preserved v1 runner is
@@ -166,6 +167,7 @@ public sealed class AgentOrchestratedRun
         var context = new Context.LabSessionContextAdapter(_orchestrator.ContextManager)
             .Build(labSession, taskContract: prompt, currentState: session.StateMachine.State.ToString());
 
+        var diagnostics = AgentDiagnostics.FromContext(context);
         return new AgentInspectionSnapshot(
             contract.TaskId,
             contract.UserGoal,
@@ -174,7 +176,8 @@ public sealed class AgentOrchestratedRun
             contract.AcceptanceCriteria,
             trace.Events,
             context.Usage.TotalCharacters,
-            context.Pressure.RequiresCompaction);
+            context.Pressure.RequiresCompaction,
+            diagnostics);
     }
 
     private static void Emit(
