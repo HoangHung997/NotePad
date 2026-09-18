@@ -68,6 +68,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     private readonly ToolExecutionScheduler _scheduler;
     private readonly AgentRepairController _repairController;
     private readonly IAgentRuntimeVerifier? _verifier;
+    private readonly IAgentRuntimePermissionPolicy _permissionPolicy;
     private bool _disposed;
 
     public AgentRuntime(
@@ -77,7 +78,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         DeferredToolDiscovery? discovery = null,
         ToolExecutionScheduler? scheduler = null,
         AgentRepairController? repairController = null,
-        IAgentRuntimeVerifier? verifier = null)
+        IAgentRuntimeVerifier? verifier = null,
+        IAgentRuntimePermissionPolicy? permissionPolicy = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
@@ -86,6 +88,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         _scheduler = scheduler ?? new ToolExecutionScheduler();
         _repairController = repairController ?? new AgentRepairController();
         _verifier = verifier;
+        _permissionPolicy = permissionPolicy ?? new ScopedAgentRuntimePermissionPolicy();
     }
 
     public async Task<AgentRuntimeResult> RunAsync(
@@ -180,6 +183,7 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 toolCalls += round.ToolCalls.Count;
                 var execution = await ExecuteCallsAsync(
+                    request.Contract,
                     round.ToolCalls,
                     cancellationToken).ConfigureAwait(false);
 
@@ -252,6 +256,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         => _transport.Cancel();
 
     private async Task<ExecutionBatch> ExecuteCallsAsync(
+        AgentTaskContract contract,
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         CancellationToken cancellationToken)
     {
