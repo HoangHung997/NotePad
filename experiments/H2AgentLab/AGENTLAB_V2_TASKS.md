@@ -173,11 +173,11 @@ Rules:
   Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.  
   Evidence: `DeferredToolDiscovery.BuildInitialExposure` exposes only `tool_search` + optional stable `update_plan`, while namespace descriptions advertise deferred capabilities. Architecture guard proves file/Python/Desktop schemas do not leak initially. GitHub Actions run `35298186826` passed full build/regression/publish.
 
-- [~] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
+- [x] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
   Acceptance: exact selected schemas are traceable; duplicates coalesced.  
-  Per-task load state, runtime tool_search handler and architecture guard added; full CI verification in progress.
+  Evidence: per-task `DeferredToolDiscovery` tracks loaded schema identities and deterministic `ToolSchemaLoadRecord` batches; `ExecuteToolSearch` returns selected/newly-loaded identities and next-request schemas. Architecture guard verifies traceability and duplicate coalescing. GitHub Actions run `35298480630` passed full build/regression/publish.
 
-- [ ] **V2-0506 — Add parallel read-only execution support.**  
+- [~] **V2-0506 — Add parallel read-only execution support.**  
   Serialize overlapping mutations to same resource.
 
 - [ ] **V2-0507 — Migrate SkillCatalog into deferred registry model.**  
@@ -386,4 +386,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0505 — Load discovered tool schemas for subsequent model call`.
+**Active task:** `V2-0506 — Add parallel read-only execution support`.
