@@ -42,6 +42,15 @@ public sealed record AgentPromptCacheIdentity(
     AgentVersionIdentifiers Versions,
     IReadOnlyList<AgentStableSkillHash> StableSkillHashes);
 
+public sealed record AgentPromptCacheScope(
+    string Protocol,
+    string EndpointScheme,
+    string EndpointHost,
+    int EndpointPort,
+    string EndpointPath,
+    string Model);
+
+
 /// <summary>
 /// Builds one cache identity from stable prompt messages + provider/model + host policy/tool versions.
 /// Dynamic task state, current time, session journals, workspace state and user input are absent from
@@ -53,28 +62,63 @@ public static class AgentPromptCacheIdentityBuilder
     public const string Scheme = "h2pc1";
     public const int MaxProviderCacheKeyCharacters = 64;
 
-    public static AgentPromptCacheIdentity Build(
-        AgentPromptLayout layout,
-        AiProfile profile,
-        IEnumerable<AgentStableSkillHash>? stableSkillHashes = null)
+    public static AgentPromptCacheScope Scope(AiProfile profile)
     {
-        ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(profile);
         if (string.IsNullOrWhiteSpace(profile.Model))
             throw new ArgumentException("Prompt cache identity requires a model.", nameof(profile));
 
         var endpoint = AiClient.Endpoint(profile, "");
-        var model = CanonicalText(profile.Model.Trim());
-        var providerIdentity = ProviderIdentity(profile.Protocol, endpoint);
+        return new AgentPromptCacheScope(
+            profile.Protocol.ToString(),
+            endpoint.Scheme,
+            endpoint.IdnHost,
+            endpoint.Port,
+            endpoint.AbsolutePath,
+            profile.Model.Trim());
+    }
+
+    public static AgentPromptCacheIdentity Build(
+        AgentPromptLayout layout,
+        AiProfile profile,
+        IEnumerable<AgentStableSkillHash>? stableSkillHashes = null)
+        => Build(layout, Scope(profile), stableSkillHashes);
+
+    public static AgentPromptCacheIdentity Build(
+        AgentPromptLayout layout,
+        AgentPromptCacheScope scope,
+        IEnumerable<AgentStableSkillHash>? stableSkillHashes = null)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope.Protocol);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope.EndpointScheme);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope.EndpointHost);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope.Model);
+        if (scope.EndpointPort is < 1 or > 65535)
+            throw new ArgumentOutOfRangeException(nameof(scope), "Prompt cache endpoint port is invalid.");
+
+        var protocol = CanonicalText(scope.Protocol.Trim());
+        var endpointScheme = scope.EndpointScheme.Trim().ToLowerInvariant();
+        var endpointHost = scope.EndpointHost.Trim().ToLowerInvariant();
+        var endpointPath = CanonicalText(
+            string.IsNullOrWhiteSpace(scope.EndpointPath) ? "/" : scope.EndpointPath.Trim());
+        var model = CanonicalText(scope.Model.Trim());
+        var providerIdentity = ProviderIdentity(
+            protocol,
+            endpointScheme,
+            endpointHost,
+            scope.EndpointPort,
+            endpointPath);
         var skills = SnapshotSkills(stableSkillHashes);
         using var writer = new CanonicalHashWriter();
 
         writer.Field("scheme", Scheme);
-        writer.Field("protocol", profile.Protocol.ToString());
-        writer.Field("endpoint.scheme", endpoint.Scheme.ToLowerInvariant());
-        writer.Field("endpoint.host", endpoint.IdnHost.ToLowerInvariant());
-        writer.Field("endpoint.port", endpoint.Port.ToString(CultureInfo.InvariantCulture));
-        writer.Field("endpoint.path", CanonicalText(endpoint.AbsolutePath));
+        writer.Field("protocol", protocol);
+        writer.Field("endpoint.scheme", endpointScheme);
+        writer.Field("endpoint.host", endpointHost);
+        writer.Field("endpoint.port", scope.EndpointPort.ToString(CultureInfo.InvariantCulture));
+        writer.Field("endpoint.path", endpointPath);
         writer.Field("model", model);
         writer.Field("version.agent-policy", layout.Versions.AgentPolicyVersion);
         writer.Field("version.safety-policy", layout.Versions.SafetyPolicyVersion);
@@ -124,12 +168,19 @@ public static class AgentPromptCacheIdentityBuilder
         return result;
     }
 
-    private static string ProviderIdentity(AiProtocol protocol, Uri endpoint)
+    private static string ProviderIdentity(
+        string protocol,
+        string scheme,
+        string host,
+        int port,
+        string path)
     {
-        var authority = endpoint.IsDefaultPort
-            ? endpoint.IdnHost.ToLowerInvariant()
-            : endpoint.IdnHost.ToLowerInvariant() + ":" + endpoint.Port.ToString(CultureInfo.InvariantCulture);
-        return protocol + ":" + endpoint.Scheme.ToLowerInvariant() + "://" + authority + CanonicalText(endpoint.AbsolutePath);
+        var defaultPort = (scheme == "https" && port == 443)
+            || (scheme == "http" && port == 80);
+        var authority = defaultPort
+            ? host
+            : host + ":" + port.ToString(CultureInfo.InvariantCulture);
+        return protocol + ":" + scheme + "://" + authority + path;
     }
 
     private static string CanonicalText(string value)
