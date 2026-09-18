@@ -1,32 +1,12 @@
 namespace H2AgentLab.Tools;
 
 /// <summary>
-/// Host-side ranking policy that keeps structured document inspection ahead of arbitrary Python for
-/// ordinary Word/Excel/document work. Python remains discoverable as an escape hatch and is not
-/// demoted when the user explicitly asks for Python/script/custom unsupported transformation.
+/// Compatibility name for the generic metadata-driven tool preference policy.
+/// The core does not know application families. Providers/extensions declare equivalent
+/// capability families and interaction fidelity on ToolDescriptor.Preference.
 /// </summary>
 public static class DocumentToolPreference
 {
-    private static readonly string[] DocumentTerms =
-    [
-        "document", "docx", "word", "excel", "xlsx", "workbook", "spreadsheet",
-        "sheet", "paragraph", "table", "header", "footer", "formula", "cell"
-    ];
-
-    private static readonly string[] ExplicitPythonTerms =
-    [
-        "python", "script", "custom transform", "unsupported transform",
-        "arbitrary transform", "code"
-    ];
-
-    private static readonly HashSet<string> StructuredToolNames =
-        new(StringComparer.Ordinal)
-        {
-            "read_file",
-            "word_paragraphs",
-            "check_word"
-        };
-
     public static IReadOnlyList<ToolSearchResult> Apply(
         string query,
         IReadOnlyList<ToolSearchResult> candidates,
@@ -37,37 +17,79 @@ public static class DocumentToolPreference
         if (maxResults is < 1 or > 50)
             throw new ArgumentOutOfRangeException(nameof(maxResults));
 
-        if (!IsDocumentIntent(query) || IsExplicitPythonIntent(query))
-            return candidates.Take(maxResults).ToArray();
+        var filtered = candidates
+            .Where(x => IsEligible(query, x.Descriptor.Preference))
+            .Take(50)
+            .ToList();
 
-        return candidates
-            .OrderBy(x => Priority(x.Descriptor))
-            .ThenByDescending(x => x.Score)
-            .ThenBy(x => x.Descriptor.Name, StringComparer.Ordinal)
+        var indexed = filtered
+            .Select((result, index) => new IndexedResult(index, result))
+            .Where(x => x.Result.Descriptor.Preference is not null)
+            .GroupBy(
+                x => x.Result.Descriptor.Preference!.CapabilityFamily,
+                StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .ToArray();
+
+        foreach (var group in indexed)
+        {
+            var slots = group
+                .Select(x => x.Index)
+                .OrderBy(x => x)
+                .ToArray();
+            var ordered = group
+                .Select(x => x.Result)
+                .OrderByDescending(x => IsExactToolRequest(query, x.Descriptor))
+                .ThenBy(x => FidelityRank(
+                    x.Descriptor.Preference!.InteractionFidelity))
+                .ThenByDescending(x => x.Score)
+                .ThenBy(x => x.Descriptor.Name, StringComparer.Ordinal)
+                .ToArray();
+
+            for (var i = 0; i < slots.Length; i++)
+                filtered[slots[i]] = ordered[i];
+        }
+
+        return filtered
             .Take(maxResults)
             .ToArray();
     }
 
-    public static bool IsDocumentIntent(string query)
+    private static bool IsEligible(
+        string query,
+        ToolPreferenceMetadata? preference)
+        => preference is null
+            || !preference.ExplicitRequestOnly
+            || preference.MatchesExplicitRequest(query);
+
+    private static bool IsExactToolRequest(
+        string query,
+        ToolDescriptor descriptor)
     {
-        var normalized = query.ToLowerInvariant();
-        return DocumentTerms.Any(term => normalized.Contains(term, StringComparison.Ordinal));
+        var normalized = query
+            .Trim()
+            .ToLowerInvariant()
+            .Replace(' ', '_');
+        return string.Equals(
+                normalized,
+                descriptor.Name,
+                StringComparison.Ordinal)
+            || query.Contains(
+                descriptor.Name,
+                StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool IsExplicitPythonIntent(string query)
-    {
-        var normalized = query.ToLowerInvariant();
-        return ExplicitPythonTerms.Any(term => normalized.Contains(term, StringComparison.Ordinal));
-    }
+    internal static int FidelityRank(ToolInteractionFidelity fidelity)
+        => fidelity switch
+        {
+            ToolInteractionFidelity.Structured => 0,
+            ToolInteractionFidelity.Accessibility => 1,
+            ToolInteractionFidelity.Visual => 2,
+            ToolInteractionFidelity.EscapeHatch => 3,
+            _ => 4
+        };
 
-    private static int Priority(ToolDescriptor descriptor)
-    {
-        if (StructuredToolNames.Contains(descriptor.Name)
-            || descriptor.Namespace.Name == "office")
-            return 0;
-        if (descriptor.Namespace.Name == "python"
-            || descriptor.Name == "run_python")
-            return 2;
-        return 1;
-    }
+    private sealed record IndexedResult(
+        int Index,
+        ToolSearchResult Result);
 }
