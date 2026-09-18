@@ -1360,6 +1360,47 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("Lab PDF OCR adapter delegates direct PDF handling to H2 Core", () =>
+        {
+            var bytes = System.Text.Encoding.ASCII.GetBytes("%PDF-1.4\n%%EOF");
+            var settings = new AiPdfSettings
+            {
+                Engine = AiPdfEngine.Direct,
+                OcrImages = false
+            };
+            var service = new LabPdfOcrService();
+
+            var attachment = service.PrepareAttachmentAsync(
+                "fixture.pdf",
+                bytes,
+                settings,
+                Path.Combine(Path.GetTempPath(), "unused-bridge.py"),
+                cancellationToken: CancellationToken.None).GetAwaiter().GetResult();
+
+            if (!attachment.IsPdf
+                || attachment.Data.Length != bytes.Length
+                || !attachment.Data.SequenceEqual(bytes)
+                || attachment.PdfEngine != AiPdfEngine.Direct)
+                throw new InvalidOperationException("Direct PDF path diverged from H2 Core preparation.");
+
+            var expectedStatus = AiPdfProcessor.RuntimeStatus(
+                settings,
+                Path.Combine(Path.GetTempPath(), "unused-bridge.py"));
+            var actualStatus = service.RuntimeStatus(
+                settings,
+                Path.Combine(Path.GetTempPath(), "unused-bridge.py"));
+            if (actualStatus != expectedStatus)
+                throw new InvalidOperationException("Lab OCR runtime status diverged from H2 Core.");
+
+            var turns = new[]
+            {
+                new AiTurn("user", "inspect", Files: [new AiFile("fixture.pdf", "application/pdf", bytes)])
+            };
+            if (!service.NeedsPreparation(turns, settings)
+                || service.NeedsPreparation([new AiTurn("user", "text only")], settings))
+                throw new InvalidOperationException("Lab PDF preparation routing diverged from H2 Core.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
