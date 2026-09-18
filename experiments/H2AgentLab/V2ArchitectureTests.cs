@@ -775,6 +775,52 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("desktop mutation metadata is incorrect.");
         });
 
+        Test("ToolSearchIndex ranks lexically and caches by registry version", () =>
+        {
+            var executor = new DelegatingToolExecutor(
+                "search-fixture",
+                (call, ct) => ValueTask.FromResult("ok"));
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(registry, executor);
+            var search = new ToolSearchIndex(registry);
+
+            var read = search.Search("read_file workspace file");
+            if (read.Count == 0 || read[0].Descriptor.Name != "read_file")
+                throw new InvalidOperationException("BM25 tool search failed to rank exact read_file intent first.");
+            var rebuilds = search.RebuildCount;
+            _ = search.Search("inspect window control");
+            if (search.RebuildCount != rebuilds)
+                throw new InvalidOperationException("Tool search rebuilt an unchanged registry corpus.");
+
+            var fixtureNamespace = new ToolNamespace("fixture", "Synthetic registry-version fixture.");
+            registry.Register(new ToolDescriptor(
+                "fixture_probe",
+                fixtureNamespace,
+                "Unique quasarprobe diagnostic tool.",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                true,
+                "v1",
+                JsonSerializer.SerializeToElement(new
+                {
+                    type = "function",
+                    function = new
+                    {
+                        name = "fixture_probe",
+                        description = "Unique quasarprobe diagnostic tool.",
+                        parameters = new { type = "object" }
+                    }
+                }),
+                executor));
+
+            var probe = search.Search("quasarprobe");
+            if (search.RebuildCount != rebuilds + 1
+                || search.CachedRegistryVersion != registry.Version
+                || probe.Count == 0
+                || probe[0].Descriptor.Name != "fixture_probe")
+                throw new InvalidOperationException("Tool search cache did not invalidate on registry version change.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
