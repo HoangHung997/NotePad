@@ -8,8 +8,30 @@ namespace H2AgentLab;
 
 // OS-enforced AppContainer, no network capabilities, no host handles, one process.
 // This is not a claim of isolation against kernel vulnerabilities or disk exhaustion.
+public sealed record PythonSandboxSecurityProfile(
+    bool AppContainer,
+    bool NetworkCapability,
+    int MaxProcesses,
+    int MemoryLimitMb,
+    int TimeoutSeconds,
+    int MaxOutputMb,
+    IReadOnlyList<string> InheritedEnvironmentKeys);
+
 public static class WindowsPythonSandbox
 {
+    public static PythonSandboxSecurityProfile SecurityProfile { get; } = new(
+        AppContainer: true,
+        NetworkCapability: false,
+        MaxProcesses: 1,
+        MemoryLimitMb: 768,
+        TimeoutSeconds: 120,
+        MaxOutputMb: 128,
+        InheritedEnvironmentKeys:
+        [
+            "SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE",
+            "LOCALAPPDATA", "APPDATA", "SystemDrive", "PATH"
+        ]);
+
     public static string RuntimeRoot => ResolveRuntimeRoot(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
     internal static string ResolveRuntimeRoot(string appDirectory, string localData)
     {
