@@ -118,14 +118,14 @@ Rules:
 - [x] **V2-0308 — Add automatic context budget trigger.**  
   Evidence: `AgentContextManager` now emits host-owned `AgentContextPressure` metadata on every bounded snapshot with `RequiresCompaction`, estimated candidate characters, actual active characters and deterministic pressure reasons for total-budget pressure, scalar truncation, dropped recent/tool candidates, per-item truncation and compacted-history truncation. Candidate-size estimation uses saturating `long` arithmetic; the trigger never deletes or compacts durable history itself. `V2ArchitectureTests` stress-tests 500 synthetic turns: active context remains within the 1,000-character fixture budget, only the newest four equally relevant turns survive, 496 are reported dropped, pressure requests compaction with explicit reasons, and a small two-turn context does not trigger compaction. Source commit `6e61375a90f67b226ee4244f6d650a96b28aa4c7`; GitHub Actions push run `35291516190` and PR run `35291518534` both completed successfully. Push evidence: **0 warnings, 0 errors**, H2 Notes **336/336**, Lab v1 **18/18**, v2 guard **10/10**, metrics **7/7**, baseline **3/3**, session-context **3/3**, artifact-store **3/3**, compaction **3/3**, transport contract **4/4**, Ollama **6/6**, Chat **5/5**, Responses HTTP **7/7**, WebSocket **6/6**, resilience **13/13**, self-contained publish, artifact upload and `/bin` publication all succeeded. Workflow-generated portable commit `25adfd4f676be90b01c5515bd84c1ca3b01d881d` records source `6e61375a...` and ZIP SHA256 `090e8c6e3e1fbaeb891493bd994d232f374aed64eb2f2b5bd25bb00eb6db2800`.
 
-- [~] **V2-0309 — Add context/cache tests.**  
-  Verify stable prefix equality, budget enforcement, source preservation and no linear unbounded growth.
+- [x] **V2-0309 — Add context/cache tests.**  
+  Evidence: `Context/V2ContextCacheTests.cs` verifies stable-prefix/cache identity equality across changing runtime context, hard context budgets from 20 through 1,000 synthetic turns, durable journal/artifact source preservation through compaction, and cache stability under thread/compaction pressure. The test command is wired through `Program.cs` and GitHub Actions. Source commit `ee42dc806968c150062e1980989ffc872b9a4f2f`; GitHub Actions PR run `35292505113` completed successfully: H2 Notes tests, Agent Lab build, v1 baseline, architecture/metrics/session/artifact/compaction/context-cache suites, every provider transport/resilience suite, self-contained Windows x64 publish and artifact upload all passed.
 
 ---
 
 ## Phase 04 — task contract and orchestrator state machine
 
-- [ ] **V2-0401 — Add `AgentTaskContract`.**  
+- [~] **V2-0401 — Add `AgentTaskContract`.**  
   Fields: goal, scope, inputs, required changes, preserve constraints, outputs, acceptance criteria, risk class, verification policy.
 
 - [ ] **V2-0402 — Add criterion/evidence types.**  
@@ -374,4 +374,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0309 — Add context/cache tests` (full CI verification in progress).
+**Active task:** `V2-0401 — Add AgentTaskContract`.
