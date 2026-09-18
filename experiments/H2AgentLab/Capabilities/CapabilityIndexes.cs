@@ -55,7 +55,7 @@ public sealed class InstalledCapabilityIndex
 
     public void Rebuild(
         ToolRegistry registry,
-        SkillCatalog skills,
+        H2AgentLab.Skills.SkillCatalog skills,
         IEnumerable<ProviderProvenance>? providers = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
