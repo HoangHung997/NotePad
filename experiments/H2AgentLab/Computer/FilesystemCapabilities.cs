@@ -191,7 +191,7 @@ public sealed class FilesystemCapabilities
                 continue;
             var bytes = _workspace.Read(relative);
             entries.Add(new FilesystemWatchEntry(
-                relative.Replace('\', '/'),
+                relative.Replace((char)92, '/'),
                 info.Length,
                 info.LastWriteTimeUtc,
                 global::H2AgentLab.SafeWorkspace.Hash(bytes)));
