@@ -441,7 +441,7 @@ Evidence: normal mutating UI tasks now require the host-owned `runtime.mutation-
 
 ---
 
-## [~] MB-43 — Integrate bounded repair loop
+## [x] MB-43 — Integrate bounded repair loop
 
 Goal:
 
@@ -463,6 +463,8 @@ Acceptance:
 - full transcript is not replayed;
 - retry budget is bounded;
 - repeated identical failing mutations are stopped.
+
+Evidence: `AgentRuntime` now keeps bounded repair state, merges prior passed criteria into later verifier snapshots, injects only `AgentRepairController` failed-criteria repair context into the continuation result, enforces `MaxRepairRounds`, and canonicalizes failed mutation tool/arguments so an identical retry is rejected before the executor with `repeated_failed_mutation`. `Runtime/MbRepairRuntimeTests.cs` verifies failed-only context without full transcript replay, preservation of already-passed criteria, canonical duplicate-mutation blocking before a second executor call, and the host repair retry budget. Exact source commit `7c7acd4ee484c136755ced564bf9466c3c3d8729`, GitHub Actions run `35365463245`: MB-43 **3 passed, 0 failed**; all earlier MB suites, DesktopHost, OfficeHost, provider transport suites and self-contained publish also passed. Publish bot commit `423ca7223ab466199d18ed5aabf4c2a7f63bb523`; portable ZIP SHA256 `0a28e4447561dce7a860d487b3d0c295c4e098cf43ebc31ede81fe050dbce53c`.
 
 ---
 
