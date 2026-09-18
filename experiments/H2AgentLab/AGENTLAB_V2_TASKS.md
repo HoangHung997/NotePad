@@ -315,7 +315,7 @@ Rules:
 
 - [~] **V2-0901 — Create `H2AgentLab.DesktopHost` helper project.**  
   Separate from UI/model/Python sandbox.  
-  DesktopProtocol + DesktopHost + client + safety policy + Phase 09 acceptance suite added; full Phase 09 CI verification in progress.
+  DesktopProtocol + DesktopHost + client + safety policy + Phase 09 acceptance suite added; Agent Lab compile fix applied; full Phase 09 CI verification retry in progress.
 
 - [ ] **V2-0902 — Implement safe app/window enumeration.**  
   Block sensitive/system/password-manager/security windows according to explicit policy.
