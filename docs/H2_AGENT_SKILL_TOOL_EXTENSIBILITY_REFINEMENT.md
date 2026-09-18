@@ -212,6 +212,84 @@ The Agent must not need to reason:
 
 It should search one logical skill index.
 
+### 5.1 Canonical skill discovery metadata
+
+Based on the inspected Codex skill bundle, H2 should keep the mandatory skill discovery contract intentionally small.
+
+The baseline metadata exposed before a skill is loaded should be:
+
+```yaml
+name: cad-integrity
+description: >
+  Inspect AutoCAD blocks and dynamic blocks for inconsistent attributes,
+  dynamic parameters, actions, visibility states and stale block references.
+  Use for block audits and ATTSYNC/dynamic-block consistency checks.
+```
+
+The important routing field is **description**, not a requirement that the skill name resemble the user's wording.
+
+The description should explain, where useful:
+
+- what the skill can do;
+- when it should be used;
+- important boundaries / when it should not be used.
+
+Do **not** require every skill author to maintain a large mandatory list of:
+
+```text
+intents
+aliases
+examples
+keywords
+apps
+domains
+```
+
+Those may exist as optional catalog/search enrichment, but they are not the canonical minimum contract.
+
+### 5.2 Canonical skill folder structure
+
+H2 should support a Codex-style progressive skill folder shape:
+
+```text
+skill-name/
+├─ SKILL.md                 required
+├─ references/              optional
+├─ scripts/                 optional
+├─ assets/                  optional
+├─ agents/                  optional interface/invocation metadata
+└─ LICENSE*                 optional
+```
+
+Rules:
+
+- `SKILL.md` is the skill entry point.
+- `references/` contains guidance that should be read only when relevant.
+- `scripts/` contains deterministic/helper executables or source used by the skill; scripts do not automatically gain permission to execute.
+- `assets/` contains templates/examples/static resources and must not be injected into model context unless needed.
+- `agents/` or an equivalent H2 metadata file may contain UI name, short description, default prompt and invocation policy without bloating `SKILL.md`.
+
+H2 does not need to copy Codex filenames exactly. The important requirement is the separation of discovery metadata, core instructions, optional references, executable helpers and UI/invocation metadata.
+
+### 5.3 Progressive disclosure contract
+
+Skill loading should have three bounded stages:
+
+```text
+Stage 1 — discovery
+name + description + source/version/trust metadata
+
+Stage 2 — selected skill
+load SKILL.md only after selection
+
+Stage 3 — on-demand resources
+load only the specific references/scripts/assets needed by the current task
+```
+
+Never preload all `SKILL.md` files or all references for every installed skill.
+
+A selected skill may explicitly tell the Agent which reference to read next.
+
 ---
 
 ## 6. Skill identity must include provenance
@@ -253,9 +331,24 @@ Task evidence must preserve this identity.
 
 ---
 
-## 7. Add an InstalledCapabilityIndex
+## 7. Add InstalledCapabilityIndex and AvailableCapabilityIndex
 
 The Agent should not repeatedly inspect plugin folders or query remote sources for normal tool/skill discovery.
+
+Keep two conceptually separate indexes:
+
+```text
+InstalledCapabilityIndex
+    = capabilities usable now from local active state
+
+AvailableCapabilityIndex
+    = compact metadata for capabilities that can be installed/updated
+      from configured catalog sources
+```
+
+Installed search must never require network access.
+
+Available search may use cached remote-catalog metadata and may refresh metadata only when policy/freshness requires it.
 
 Maintain a rebuildable local installed-capability index.
 
@@ -285,9 +378,26 @@ provider:
     pluginVersion = 1.4.0
 ```
 
-The index must be rebuildable from installed/active packages and providers.
+The installed index must be rebuildable from installed/active packages and providers.
 
 It must not become a second authoritative store that can drift permanently from the active package state.
+
+The available index should contain compact discovery metadata only, for example:
+
+```text
+plugin id/version
+skill name
+skill description
+tool/capability summaries
+publisher
+trust/source
+compatibility
+permissions summary
+package hash/location
+update state
+```
+
+Do not place full `SKILL.md`, full references or large tool schemas into the available index.
 
 ---
 
@@ -369,6 +479,25 @@ A priority value is not allowed to silently override a trust/security conflict.
 ## 10. Add CapabilityResolver
 
 This is the key high-level refinement.
+
+The Agent should ask for a capability, not assume in advance that the answer must be a tool or a skill.
+
+The resolver may return:
+
+```text
+INSTALLED
+AVAILABLE
+UPDATE_AVAILABLE
+BLOCKED_BY_POLICY
+INCOMPATIBLE
+UNSUPPORTED
+```
+
+For example, a request such as:
+
+> "Check these AutoCAD blocks for invalid parameters and actions."
+
+may resolve to a skill named `cad-integrity` even though the user never said that name, because its **description** semantically matches the requested work.
 
 Current discovery mainly searches installed tools.
 
@@ -676,7 +805,82 @@ No AgentOrchestrator redesign should be required.
 
 ---
 
-## 20. Package retrieval must be a host service
+## 20. Local vs remote skill/capability discovery
+
+Installed and remote discovery should not be treated identically.
+
+### 20.1 Installed skill set
+
+For a normal local set of tens or hundreds of skills, expose bounded metadata such as:
+
+```text
+name
+description
+source
+version/hash
+availability
+```
+
+The selection layer/model can semantically choose among those compact descriptions.
+
+Exact name matching is not sufficient.
+
+### 20.2 Large remote catalog
+
+A remote catalog may eventually contain thousands of skills/plugins.
+
+Do not send all descriptions to the model.
+
+Use:
+
+```text
+user/task capability query
+ -> lexical/filter search over compact metadata
+ -> semantic similarity search when useful
+ -> top N candidates only
+ -> model rerank / CapabilityResolver
+ -> selected package metadata
+```
+
+The semantic layer is an **indexing/search optimization for large catalogs**, not a requirement that every skill author manually provide many aliases/intents.
+
+The canonical authoring contract remains `name + description + SKILL.md`.
+
+### 20.3 Search fallback behavior
+
+Recommended resolution:
+
+```text
+search InstalledCapabilityIndex
+        |
+        +-- sufficient -> use installed capability
+        |
+        +-- insufficient
+               |
+               v
+        search cached AvailableCapabilityIndex
+               |
+               +-- candidate found -> evaluate/install
+               |
+               +-- no candidate / metadata stale
+                       |
+                       v
+                refresh configured catalog metadata
+                       |
+                       v
+                rebuild AvailableCapabilityIndex
+                       |
+                       v
+                search again
+```
+
+Catalog refresh downloads **metadata only**.
+
+Plugin/skill package bytes are fetched only after a candidate has been selected and host policy allows installation.
+
+---
+
+## 21. Package retrieval must be a host service
 
 Separate catalog search from package download.
 
@@ -711,20 +915,43 @@ The abstraction itself must exist before Phase 12 if the external catalog archit
 
 ---
 
-## 21. Skill search remains progressive
+## 22. Skill search remains progressive
 
 Never inject every installed skill into every prompt.
 
 Required flow:
 
 ```text
-compact installed skill metadata
- -> skill search
+compact metadata: name + description + provenance
+ -> semantic/model selection
  -> select relevant skill
  -> load exact SKILL.md
+ -> load only required references/scripts/assets
  -> cache by source/plugin/version/hash
- -> do not reload if unchanged
+ -> do not reload unchanged content
 ```
+
+The search implementation must not require the query to match the skill name.
+
+For example:
+
+```text
+query:
+"audit dynamic block parameters and actions"
+
+skill name:
+"cad-integrity"
+
+description:
+"Inspect AutoCAD dynamic blocks, attributes, parameters,
+actions and visibility-state consistency..."
+```
+
+must be discoverable.
+
+For a small installed skill set, compact description-based model selection may be sufficient.
+
+For a large available remote catalog, use lexical + semantic retrieval to reduce candidates before model reranking.
 
 If plugin update changes the skill hash:
 
@@ -738,7 +965,7 @@ Existing `DeferredSkillSession` behavior should be reused where possible.
 
 ---
 
-## 22. Tool search remains progressive
+## 23. Tool search remains progressive
 
 Never expose all installed plugin/MCP tool schemas by default.
 
@@ -759,7 +986,7 @@ Reuse `DeferredToolDiscovery` and its registry-version behavior.
 
 ---
 
-## 23. Update behavior
+## 24. Update behavior
 
 Updates should not occur merely because a newer version exists.
 
@@ -789,7 +1016,7 @@ Phase 11 must at least preserve the architectural separation.
 
 ---
 
-## 24. Offline behavior
+## 25. Offline behavior
 
 Remote catalog access must not be required to execute already-installed capabilities.
 
@@ -813,7 +1040,7 @@ Catalog outage is not Agent outage.
 
 ---
 
-## 25. Recommended Phase 11 refinement tasks
+## 26. Recommended Phase 11 refinement tasks
 
 Do not rewind the tracker.
 
@@ -821,23 +1048,28 @@ After the current V2-1101 work is stable, add/refine tasks within Phase 11 befor
 
 Suggested task set:
 
-### V2-1116 — Add unified skill-source abstraction
+### V2-1116 — Add unified skill-source abstraction and canonical skill envelope
 
 Acceptance:
 
 - built-in and plugin skills can be searched through one logical interface;
+- discovery uses at least `name + description + provenance`, not exact-name matching;
+- supports progressive `SKILL.md -> references/scripts/assets` loading;
 - source/provenance preserved;
 - current built-in skill tests still pass;
-- plugin skill hash/version behavior preserved.
+- plugin skill hash/version behavior preserved;
+- deterministic test proves a differently named skill can be selected from its description.
 
-### V2-1117 — Add InstalledCapabilityIndex
+### V2-1117 — Add InstalledCapabilityIndex + AvailableCapabilityIndex
 
 Acceptance:
 
-- rebuild from active built-ins/plugins/providers;
+- installed index rebuilds from active built-ins/plugins/providers;
+- available index rebuilds from compact cached catalog metadata;
 - contains tool/skill/provider provenance;
-- no remote request required for installed search;
-- deterministic rebuild test.
+- installed search requires no remote request;
+- available index does not store full SKILL.md/reference/tool-schema payloads;
+- deterministic rebuild/search tests.
 
 ### V2-1118 — Add CatalogSource + CatalogSourceManager contracts
 
@@ -849,14 +1081,18 @@ Acceptance:
 - conflict detection;
 - unavailable source does not erase installed capability state.
 
-### V2-1119 — Add CapabilityResolver
+### V2-1119 — Add CapabilityResolver and semantic catalog candidate search
 
 Acceptance:
 
 - resolves installed capability first;
-- can return missing-capability/catalog candidates;
+- skill selection is description-aware and not exact-name dependent;
+- can return cached remote catalog candidates;
+- large-catalog path supports lexical + semantic candidate reduction before model rerank;
+- may refresh catalog metadata when cached metadata is absent/stale;
+- does not download package bytes just to search metadata;
 - does not install without host policy;
-- does not expose package content directly to model.
+- does not expose unselected package content directly to model.
 
 ### V2-1120 — Add TaskCapabilitySnapshot and safe refresh boundaries
 
@@ -881,24 +1117,29 @@ Acceptance:
 Scenario:
 
 ```text
-task requests specialized capability
- -> installed search insufficient
- -> catalog candidate discovered
+task requests:
+"audit AutoCAD dynamic block parameters/actions"
+
+installed skill names do not match that phrase
+ -> installed description-based search insufficient
+ -> cached remote catalog finds differently named candidate by metadata/semantic match
+ -> if metadata is stale/missing, refresh configured catalog metadata
  -> policy approves fixture package
- -> package retrieved
- -> PluginManager installs
- -> ToolRegistry refreshes at safe boundary
- -> skill loads progressively
- -> task resumes
+ -> PackageRetriever fetches immutable package
+ -> PluginManager verifies + installs
+ -> InstalledCapabilityIndex / ToolRegistry refresh at safe boundary
+ -> selected SKILL.md loads
+ -> only required reference/resource loads
+ -> task resumes without user repeating request
  -> verifier passes
- -> task evidence records package/skill/tool versions
+ -> task evidence records package/skill/tool/provider versions
 ```
 
 This is the key acceptance scenario proving the architecture.
 
 ---
 
-## 26. Relationship to existing Phase 11 tasks
+## 27. Relationship to existing Phase 11 tasks
 
 Do not delay the current V2-1101 work solely to implement this document.
 
@@ -928,28 +1169,32 @@ Do not reduce V2-1114 to only "reload ToolRegistry after provider restart."
 
 ---
 
-## 27. Relationship to Phase 12
+## 28. Relationship to Phase 12
 
 Phase 12 acceptance must not consider extensibility complete unless the following is demonstrated:
 
 1. installed tool discovery remains deferred;
 2. installed skill discovery remains deferred;
 3. built-in and plugin skills share one logical search path;
-4. catalog source is configurable and not hard-coded to one GitHub repo;
-5. multiple catalog sources can coexist;
-6. plugin update retains rollback/quarantine safety;
-7. task execution pins capability versions/hashes;
-8. no update mutates an in-flight tool call;
-9. missing capability can be discovered and safely installed through host policy;
-10. task resumes after controlled capability installation;
-11. offline installed capability execution still works;
-12. task evidence records exact plugin/skill/tool/provider versions.
+4. skill discovery is driven by bounded `name + description` metadata and does not require exact-name matching;
+5. selected skill loading follows `metadata -> SKILL.md -> on-demand references/scripts/assets`;
+6. large remote-catalog discovery can reduce candidates lexically/semantically before model rerank;
+7. catalog source is configurable and not hard-coded to one GitHub repo;
+8. multiple catalog sources can coexist;
+9. plugin update retains rollback/quarantine safety;
+10. task execution pins capability versions/hashes;
+11. no update mutates an in-flight tool call;
+12. missing capability can be discovered and safely installed through host policy;
+13. package bytes are downloaded only after candidate selection/policy;
+14. task resumes after controlled capability installation;
+15. offline installed capability execution still works;
+16. task evidence records exact plugin/skill/tool/provider versions.
 
 These should become part of V2-1201/V2-1203/V2-1205/V2-1207 acceptance coverage where appropriate.
 
 ---
 
-## 28. Security invariants
+## 29. Security invariants
 
 The following are mandatory:
 
@@ -967,7 +1212,7 @@ The following are mandatory:
 
 ---
 
-## 29. Implementation reuse map
+## 30. Implementation reuse map
 
 ### REUSE AS-IS OR EXTEND
 
@@ -995,9 +1240,13 @@ registry versioning
 ```text
 ISkillSource
 UnifiedSkillCatalog / SkillSearchIndex
+canonical name+description skill discovery metadata
+progressive SKILL.md/references/scripts/assets loader
 InstalledCapabilityIndex
+AvailableCapabilityIndex
 ICatalogSource
 CatalogSourceManager
+lexical/semantic available-catalog search
 CapabilityResolver
 TaskCapabilitySnapshot
 IPackageRetriever
@@ -1021,7 +1270,7 @@ Do not confuse FUTURE distribution work with the runtime abstractions required n
 
 ---
 
-## 30. Core architectural rule
+## 31. Core architectural rule
 
 The final Agent architecture should satisfy:
 
@@ -1069,3 +1318,64 @@ CapabilityResolver
 ```
 
 This refinement should be completed before Phase 12 acceptance, without discarding the successful Phase 10 work.
+
+---
+
+## 32. Codex skill-bundle design findings adopted by H2
+
+The inspected Codex skill bundle reinforces these H2 decisions:
+
+### Adopt
+
+- `SKILL.md` as the skill entry point.
+- Cheap pre-load discovery metadata centered on `name + description`.
+- Description-based semantic routing rather than exact skill-name matching.
+- Progressive disclosure.
+- `references/` loaded only when relevant.
+- `scripts/` as optional deterministic helpers, still gated by H2 execution permissions.
+- `assets/` kept outside prompt context until needed.
+- Optional separate interface/invocation metadata.
+- Local/repository skill sources.
+- Ability for a skill/package to exist primarily as guidance without requiring a new native tool.
+
+### Keep H2 stronger than the inspected bundle
+
+Do not give up existing H2 safety/versioning features:
+
+- versioned plugin store;
+- package SHA-256 verification;
+- staged install;
+- self-test;
+- permission delta checks;
+- rollback;
+- quarantine;
+- provider/tool provenance;
+- task capability version pinning;
+- multiple catalog sources;
+- offline installed capability use.
+
+### Do not copy blindly
+
+H2 should not:
+
+- require exact skill-name matching;
+- execute a skill directly from a remote repository branch;
+- overwrite an active package in place;
+- make GitHub a runtime dependency;
+- load all SKILL.md/reference content during discovery;
+- treat scripts bundled with a skill as automatically trusted executable code.
+
+The target is:
+
+```text
+Codex-style skill authoring/disclosure
++
+H2 PluginManager safety/versioning
++
+H2 CapabilityResolver
++
+multi-source catalog
++
+semantic discovery for large catalogs
+```
+
