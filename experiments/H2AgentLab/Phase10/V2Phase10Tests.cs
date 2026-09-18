@@ -2,6 +2,8 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using H2AgentLab.Computer;
+using H2AgentLab.Extensions;
+using H2AgentLab.FirstPartyExtensions.Computer;
 using H2AgentLab.Plugins;
 using H2AgentLab.Providers;
 using H2AgentLab.Tools;
@@ -466,23 +468,43 @@ public static class V2Phase10Tests
             }
         });
 
-        await Test("1012 normalized general computer catalog exposes typed families without monolithic control tool", () =>
+        await Test("1012 computer capability families register through independent provider extensions", async () =>
         {
+            var registry = new ToolRegistry();
+            var skills = new H2AgentLab.Skills.SkillCatalog();
+            var verifiers = new ArtifactVerifierRegistry();
+            await using var providers = new CapabilityProviderManager(registry);
+            var extensions = new AgentExtensionRegistry(
+                registry,
+                skills,
+                verifiers,
+                providers);
+            var executor = new DelegatingToolExecutor(
+                "computer-registration-fixture",
+                (call, ct) => ValueTask.FromResult("{}"));
+
+            extensions.Register(new FileSystemComputerExtension(executor));
+            extensions.Register(new ProcessShellComputerExtension(executor));
+            extensions.Register(new DesktopComputerExtension(executor));
+            extensions.Register(new BrowserComputerExtension(executor));
+
             var required = new[]
             {
                 "filesystem", "process", "shell", "app",
                 "window", "uia", "input", "screen", "browser"
             };
             foreach (var ns in required)
-                Check(GeneralComputerCapabilityCatalog.Namespace(ns).Count > 0,
-                    "Missing normalized computer capability namespace: " + ns);
+                Check(GeneralComputerCapabilityCatalog.Namespace(registry, ns).Count > 0,
+                    "Missing registered computer capability namespace: " + ns);
 
-            Check(!GeneralComputerCapabilityCatalog.ContainsMonolithicUnsafeControl(),
-                "General computer catalog contains monolithic unsafe control tool.");
-            Check(GeneralComputerCapabilityCatalog.Namespace("browser")
-                .All(x => x.Backing == ComputerCapabilityBacking.WebResearchOrBrowserFallback),
-                "Browser capabilities are not explicitly marked as fallback.");
-            return Task.CompletedTask;
+            Check(!GeneralComputerCapabilityCatalog.ContainsMonolithicUnsafeControl(registry),
+                "Registered computer capability set contains monolithic unsafe control tool.");
+            Check(GeneralComputerCapabilityCatalog.Namespace(registry, "browser")
+                .All(x => x.Provenance?.ProviderId == "firstparty.computer.browser"),
+                "Browser capabilities were not owned by the browser extension provider.");
+            Check(GeneralComputerCapabilityCatalog.Namespace(registry, "filesystem")
+                .All(x => x.Provenance?.ProviderId == "firstparty.computer.filesystem"),
+                "Filesystem capabilities were not owned by the filesystem extension provider.");
         });
 
         await Test("1013 plugin manifest catalog and capability index expose compact metadata before install", () =>
