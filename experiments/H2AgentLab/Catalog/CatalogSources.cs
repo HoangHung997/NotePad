@@ -232,6 +232,7 @@ public sealed class InMemoryCatalogSource : ICatalogSource
     public bool Enabled { get; set; } = true;
     public bool ThrowOnFetch { get; set; }
     public bool Stale { get; set; }
+    public int FetchCount { get; private set; }
 
     public void Replace(IReadOnlyList<AvailableCapabilityRecord> entries)
         => _entries = entries;
@@ -239,6 +240,7 @@ public sealed class InMemoryCatalogSource : ICatalogSource
     public Task<CatalogSnapshot> FetchMetadataAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        FetchCount++;
         if (ThrowOnFetch) throw new IOException("Fixture catalog source unavailable.");
         return Task.FromResult(new CatalogSnapshot(
             SourceId,
