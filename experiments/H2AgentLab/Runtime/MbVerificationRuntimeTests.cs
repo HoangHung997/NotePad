@@ -45,7 +45,7 @@ public static class MbVerificationRuntimeTests
                 "fixture.unverified_mutation",
                 "Mutate fixture without a verifier.",
                 "fixture:unverified",
-                (call, ct) => ValueTask.FromResult("{"ok":true}")));
+                (call, ct) => ValueTask.FromResult("{\"ok\":true}")));
 
             await using var runtime = new AgentRuntime(
                 new OneToolTransport(
