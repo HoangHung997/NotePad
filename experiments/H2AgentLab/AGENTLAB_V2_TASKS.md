@@ -231,7 +231,7 @@ Rules:
 
 - [~] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
   Values/formulas/styles/merges/sheets/hidden state needed by verifier.  
-  Snapshot reader + OpenXML fixture guard added; worksheet-state normalization fix applied; full CI verification retry in progress.
+  Snapshot reader + OpenXML fixture guard added; typed OpenXML state/style normalization fix applied; full CI verification retry in progress.
 
 - [ ] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
   Paragraph/run/style/table/section/header/footer fields needed by verifier.
