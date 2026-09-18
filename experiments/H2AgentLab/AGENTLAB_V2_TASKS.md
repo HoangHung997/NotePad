@@ -226,7 +226,8 @@ Rules:
   Evidence: `Documents/LabDocumentInspectionService.cs` is a thin adapter over `AiDocuments.Read`; architecture guard proves extracted text/hash/MIME/safety stay identical to H2 Core. GitHub Actions run `35306375793` passed full regression/publish.
 
 - [~] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
-  `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.
+  `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.  
+  Thin H2 Core PDF/OCR adapter + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
   Values/formulas/styles/merges/sheets/hidden state needed by verifier.
