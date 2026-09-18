@@ -2,8 +2,24 @@ using System.Text.Json;
 
 namespace H2AgentLab;
 
-public sealed record ScriptArtifact(string Path, long Bytes, string Sha256);
-public sealed record ScriptRun(string Id, string Workspace, int ExitCode, Dictionary<string, string> Inputs, List<ScriptArtifact> Artifacts);
+public sealed record ScriptArtifact(string Path, long Bytes, string Sha256)
+{
+    public string ArtifactId { get; init; } = "";
+    public string EvidenceId { get; init; } = "";
+}
+
+public sealed record ScriptRun(string Id, string Workspace, int ExitCode, Dictionary<string, string> Inputs, List<ScriptArtifact> Artifacts)
+{
+    public string EvidenceId { get; init; } = "";
+    public DateTime CompletedUtc { get; init; }
+}
+
+public sealed record ScriptRunEvidence(
+    string RunId,
+    string EvidenceId,
+    int ExitCode,
+    IReadOnlyList<ScriptArtifact> Artifacts,
+    DateTime CompletedUtc);
 public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, Func<Approval, CancellationToken, Task<bool>> approve)
 {
     private bool _authorized, _denied;
@@ -53,9 +69,19 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
         {
             if (artifacts.Count == 100) throw new IOException("Too many output files.");
             var name = Path.GetRelativePath(output.Root, file).Replace('\\', '/'); var bytes = output.Read(name);
-            artifacts.Add(new(name, bytes.Length, SafeWorkspace.Hash(bytes)));
+            var sha = SafeWorkspace.Hash(bytes);
+            artifacts.Add(new ScriptArtifact(name, bytes.Length, sha)
+            {
+                ArtifactId = ArtifactId(id, name, sha),
+                EvidenceId = ArtifactEvidenceId(id, name, sha)
+            });
         }
-        var run = new ScriptRun(id, workspace.Root, exit, originals.ToDictionary(x => x.Key, x => SafeWorkspace.Hash(x.Value)), artifacts);
+        var completedUtc = DateTime.UtcNow;
+        var run = new ScriptRun(id, workspace.Root, exit, originals.ToDictionary(x => x.Key, x => SafeWorkspace.Hash(x.Value)), artifacts)
+        {
+            EvidenceId = RunEvidenceId(id),
+            CompletedUtc = completedUtc
+        };
         File.WriteAllText(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(run));
         string Log(string name)
         {
@@ -64,7 +90,7 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
             using var reader = new StreamReader(file); var buffer = new char[24000]; var count = reader.ReadBlock(buffer, 0, buffer.Length);
             return new string(buffer, 0, count) + (reader.EndOfStream ? "" : "\n[truncated]");
         }
-        return new { runId = id, exitCode = exit, stdout = Log("stdout.log"), stderr = Log("stderr.log"), artifacts,
+        return new { runId = id, evidenceId = run.EvidenceId, exitCode = exit, stdout = Log("stdout.log"), stderr = Log("stderr.log"), artifacts,
             stagedInputs = originals.Keys.Select(p => "input/" + p.Replace('\\', '/')).ToArray(), outputFolder = "output/",
             originalFilesChanged = false, execution = "Windows AppContainer; no network capability; staged copies only", next = "Inspect results. On error revise code using previous_run if useful. Publish only verified outputs via publish_artifact." };
     }
@@ -74,7 +100,7 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
         var scope = new SafeWorkspace(RunsRoot); var bytes = scope.Read(id + "/manifest.json");
         var run = JsonSerializer.Deserialize<ScriptRun>(bytes) ?? throw new IOException("Invalid run manifest.");
         if (run.Id != id || !string.Equals(run.Workspace, workspace.Root, StringComparison.OrdinalIgnoreCase)) throw new IOException("Run belongs to a different workspace.");
-        return run;
+        return NormalizeEvidence(run);
     }
     public byte[] Read(string id, string path)
     {
@@ -104,6 +130,67 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
         if (File.Exists(destination) && (expectedHash.Length == 0 || SafeWorkspace.Hash(workspace.Read(target)) != expectedHash)) throw new AgentFaultException("stale_state", "Destination changed or missing expected hash. Read the current file before replacement.");
         if (!await approve(new("Lưu kết quả: " + target, $"Tác vụ: {id}\nKết quả: {artifact}\nĐích: {destination}\n{data.Length:N0} bytes · SHA256 {SafeWorkspace.Hash(data)}\n" + (File.Exists(destination) ? "Thay bản hiện có, có backup. Chỉ duyệt sau khi đã xem/kiểm kết quả." : "Tạo tệp mới. Không suy từ exit code rằng nội dung đã đúng.")), ct)) throw new AgentFaultException("denied", "Publication declined.", false);
         ct.ThrowIfCancellationRequested();
-        return new { path = target, sha256 = workspace.Write(target, data, expectedHash, stateRoot), sourceRun = id };
+        return new
+        {
+            path = target,
+            sha256 = workspace.Write(target, data, expectedHash, stateRoot),
+            sourceRun = id,
+            sourceEvidence = run.EvidenceId,
+            sourceArtifactId = run.Artifacts.Single(x => x.Path == artifact).ArtifactId,
+            sourceArtifactEvidence = run.Artifacts.Single(x => x.Path == artifact).EvidenceId
+        };
+    public ScriptRunEvidence Evidence(string id)
+    {
+        var run = Load(id);
+        return new ScriptRunEvidence(
+            run.Id,
+            run.EvidenceId,
+            run.ExitCode,
+            run.Artifacts.ToArray(),
+            run.CompletedUtc);
+    }
+
+    private static ScriptRun NormalizeEvidence(ScriptRun run)
+    {
+        var normalizedArtifacts = run.Artifacts
+            .Select(artifact => artifact with
+            {
+                ArtifactId = string.IsNullOrWhiteSpace(artifact.ArtifactId)
+                    ? ArtifactId(run.Id, artifact.Path, artifact.Sha256)
+                    : artifact.ArtifactId,
+                EvidenceId = string.IsNullOrWhiteSpace(artifact.EvidenceId)
+                    ? ArtifactEvidenceId(run.Id, artifact.Path, artifact.Sha256)
+                    : artifact.EvidenceId
+            })
+            .ToList();
+
+        return run with
+        {
+            Artifacts = normalizedArtifacts,
+            EvidenceId = string.IsNullOrWhiteSpace(run.EvidenceId)
+                ? RunEvidenceId(run.Id)
+                : run.EvidenceId,
+            CompletedUtc = run.CompletedUtc == default
+                ? DateTime.UnixEpoch
+                : run.CompletedUtc.ToUniversalTime()
+        };
+    }
+
+    private static string RunEvidenceId(string runId)
+        => "evidence:python-run:" + runId;
+
+    private static string ArtifactId(string runId, string path, string sha256)
+        => "artifact:python:" + runId + ":" + StableSuffix(path, sha256);
+
+    private static string ArtifactEvidenceId(string runId, string path, string sha256)
+        => "evidence:python-artifact:" + runId + ":" + StableSuffix(path, sha256);
+
+    private static string StableSuffix(string path, string sha256)
+    {
+        var material = System.Text.Encoding.UTF8.GetBytes(
+            path.Replace('\\', '/') + "\n" + sha256.ToLowerInvariant());
+        return SafeWorkspace.Hash(material)[..20];
+    }
+
     }
 }
