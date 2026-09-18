@@ -61,6 +61,7 @@ public static class Program
         if (args.Contains("--mb-progressive-skill-loading-test")) return MbProgressiveSkillLoadingTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-extension-registration-test")) return H2AgentLab.Extensions.MbExtensionRegistrationTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-generic-tool-preference-test")) return H2AgentLab.Tools.MbGenericToolPreferenceTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-computer-extension-registration-test")) return H2AgentLab.Computer.MbComputerExtensionRegistrationTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
