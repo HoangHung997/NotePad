@@ -1,5 +1,6 @@
 using System.Text.Json;
 using H2AgentLab.Context;
+using H2AgentLab.Documents;
 using H2AgentLab.Prompting;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
@@ -1331,6 +1332,32 @@ public static class V2ArchitectureTests
             if (!repair.FailedCriterionIds.SequenceEqual(new[] { "semantic" })
                 || !repair.PromptContext.Contains("Content mismatch.", StringComparison.Ordinal))
                 throw new InvalidOperationException("Semantic repair was not derived from verifier failure after runtime recovery.");
+        });
+
+        Test("Lab document inspection delegates safety hash and extraction to H2 Core AiDocuments", () =>
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes("H2-0701 fixture");
+            var expected = AiDocuments.Read("fixture.txt", bytes);
+            var actual = new LabDocumentInspectionService().Inspect("fixture.txt", bytes);
+
+            if (actual.Name != expected.Name
+                || actual.MimeType != expected.MimeType
+                || actual.Sha256 != expected.Sha256.ToLowerInvariant()
+                || actual.ByteLength != bytes.Length
+                || actual.Text != expected.Text
+                || actual.Notice != expected.Notice
+                || actual.IsPdf != expected.IsPdf
+                || actual.IsImage != expected.IsImage)
+                throw new InvalidOperationException("Lab inspection diverged from shared H2 Core AiDocuments result.");
+
+            try
+            {
+                _ = new LabDocumentInspectionService().Inspect("fixture.exe", bytes);
+                throw new InvalidOperationException("Lab adapter bypassed H2 Core unsupported-file safety.");
+            }
+            catch (InvalidDataException)
+            {
+            }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
