@@ -47,6 +47,7 @@ public static class Program
         if (args.Contains("--mb-context-runtime-test")) return MbContextRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-compaction-runtime-test")) return MbCompactionRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-prompt-cache-runtime-test")) return MbPromptCacheRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-initial-tool-exposure-test")) return MbInitialToolExposureTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
