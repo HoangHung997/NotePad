@@ -200,7 +200,7 @@ public static class V2ExtensibilityRefinementTests
                 "Unavailable catalog source erased cached usable metadata.");
         });
 
-        await Test("1119 capability resolver is installed-first description-aware and metadata-only for remote candidates", async () =>
+        await Test("1119 capability resolver is installed-first package-level metadata-only and model-neutral", async () =>
         {
             var builtInRoot = CreateBuiltInSkills(Path.Combine(root, "1119-builtins"));
             var unified = new UnifiedSkillCatalog();
@@ -237,10 +237,14 @@ public static class V2ExtensibilityRefinementTests
                 && !remote.InstallationAttempted,
                 "Remote capability resolution downloaded/installed or failed to refresh metadata.");
             var best = remote.Candidates.First();
-            Check(best.SkillId == "cad-integrity"
-                && best.CapabilityId == "cad-integrity"
-                && best.Description.Contains("dynamic blocks", StringComparison.OrdinalIgnoreCase),
-                "Description-aware semantic candidate reduction did not rank cad-integrity first.");
+            Check(best.SkillId is null
+                && best.CapabilityId == "h2.autocad.productivity"
+                && best.AvailablePackage?.Skills.Any(x =>
+                    x.SkillId == "cad-integrity") == true
+                && best.Description.Contains(
+                    "dynamic blocks",
+                    StringComparison.OrdinalIgnoreCase),
+                "Resolver did not return package-level compact metadata for model-side capability selection.");
         });
 
         await Test("1120 task capability snapshot pins versions hashes and requires explicit revision after update", () =>
