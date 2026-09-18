@@ -238,26 +238,8 @@ internal static class CapabilityRanking
 
     internal static IEnumerable<string> SemanticTerms(string value)
     {
-        foreach (var term in H2AgentLab.Skills.BuiltInSkillSource.Tokens(value))
-        {
-            yield return term;
-            foreach (var synonym in Synonyms(term))
-                yield return synonym;
-        }
+        // Generic capability search stays domain-neutral. Meaning belongs in model reasoning,
+        // skill/tool descriptions, or an optional specialized search extension—not a synonym table.
+        return H2AgentLab.Skills.BuiltInSkillSource.Tokens(value);
     }
-
-    private static IEnumerable<string> Synonyms(string term)
-        => term switch
-        {
-            "audit" => ["inspect", "check", "review"],
-            "inspect" => ["audit", "check", "review"],
-            "check" => ["audit", "inspect", "review"],
-            "dynamic" => ["parameter", "action", "visibility"],
-            "parameters" => ["parameter", "dynamic"],
-            "actions" => ["action", "dynamic"],
-            "blocks" => ["block", "autocad", "cad"],
-            "autocad" => ["cad", "block"],
-            "legal" => ["law", "regulation"],
-            _ => Array.Empty<string>()
-        };
 }
