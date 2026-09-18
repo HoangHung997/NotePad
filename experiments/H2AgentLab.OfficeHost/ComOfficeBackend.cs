@@ -535,14 +535,25 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 var style = StyleName(character);
                 var text = CleanWordText(SafeString(() => character.Text));
 
-                if (runs.LastOrDefault() is { } previous
-                    && previous.Bold == bold
-                    && previous.Italic == italic
-                    && previous.Underline == underline
-                    && previous.Style == style)
-                    runs[^1] = previous with { Text = previous.Text + text };
+                if (runs.Count > 0)
+                {
+                    var previous = runs[^1];
+                    if (previous.Bold == bold
+                        && previous.Italic == italic
+                        && previous.Underline == underline
+                        && previous.Style == style)
+                    {
+                        runs[^1] = previous with { Text = previous.Text + text };
+                    }
+                    else
+                    {
+                        runs.Add(new WordRunState(runs.Count, text, style, bold, italic, underline));
+                    }
+                }
                 else
-                    runs.Add(new WordRunState(runs.Count, text, style, bold, italic, underline));
+                {
+                    runs.Add(new WordRunState(0, text, style, bold, italic, underline));
+                }
             }
             finally { Release(character); }
             position++;
@@ -641,7 +652,8 @@ public sealed class ComOfficeBackend : IOfficeBackend
                                         0,
                                         CleanWordText(SafeString(() => range.Text)),
                                         StyleName(range),
-                                        [
+                                        new WordRunState[]
+                                        {
                                             new WordRunState(
                                                 0,
                                                 CleanWordText(SafeString(() => range.Text)),
@@ -649,7 +661,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
                                                 SafeBool(() => range.Font.Bold),
                                                 SafeBool(() => range.Font.Italic),
                                                 SafeLong(() => range.Font.Underline) is long u && u != 0)
-                                        ])
+                                        })
                                 };
                                 parts.Add(new WordPartState(
                                     $"section:{s - 1}:{(header ? "header" : "footer")}:{type.Name}",
