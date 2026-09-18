@@ -262,7 +262,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
         var results = new AgentToolResult?[transportCalls.Count];
-        var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request)>();
+        var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request, AgentRuntimePermissionRequest Permission)>();
         var newlyLoadedSchemas = new List<AgentToolDefinition>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
 
@@ -335,12 +335,38 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            var permissionRequest = new AgentRuntimePermissionRequest(
+                contract,
+                descriptor,
+                call,
+                ResourceKey(descriptor));
+            var permission = await _permissionPolicy.AuthorizeAsync(
+                permissionRequest,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!permission.Allowed)
+            {
+                results[i] = new AgentToolResult(
+                    transportCall.Id,
+                    transportCall.Name,
+                    JsonSerializer.Serialize(new
+                    {
+                        ok = false,
+                        error = permission.Code,
+                        message = permission.Message,
+                        scope = permission.ResourceKey
+                    }),
+                    IsError: true);
+                continue;
+            }
+
             scheduled.Add((
                 i,
                 new ToolExecutionRequest(
                     descriptor,
                     call,
-                    ResourceKey(descriptor))));
+                    permission.ResourceKey),
+                permissionRequest with { ResourceKey = permission.ResourceKey }));
         }
 
         if (scheduled.Count > 0)
@@ -353,10 +379,14 @@ public sealed class AgentRuntime : IAsyncDisposable
             {
                 var original = scheduled[i].OriginalIndex;
                 var scheduledResult = scheduledResults[i];
+                var boundedOutput = BoundToolOutput(scheduledResult.Output);
+                _permissionPolicy.ObserveResult(
+                    scheduled[i].Permission,
+                    boundedOutput);
                 results[original] = new AgentToolResult(
                     calls[original].Id,
                     scheduledResult.ToolName,
-                    BoundToolOutput(scheduledResult.Output),
+                    boundedOutput,
                     IsError: false);
             }
         }
