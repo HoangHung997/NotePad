@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using H2AgentLab.Context;
 using H2AgentLab.Documents;
 using H2AgentLab.Metrics;
+using H2AgentLab.Office;
 using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
@@ -33,6 +34,18 @@ public static class Program
         if (args.Contains("--v2-tool-registry-test")) return V2ToolRegistryTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-verification-test")) return V2VerificationTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-closed-file-test")) return V2ClosedFileTests.Run(args[^1]).GetAwaiter().GetResult();
+        var officeTest = Array.IndexOf(args, "--v2-office-host-test");
+        if (officeTest >= 0)
+        {
+            if (officeTest + 2 >= args.Length) throw new ArgumentException("--v2-office-host-test requires <output-directory> <office-host-exe>.");
+            return V2OfficeHostTests.Run(args[officeTest + 1], args[officeTest + 2]).GetAwaiter().GetResult();
+        }
+        var officeLive = Array.IndexOf(args, "--v2-office-live-acceptance");
+        if (officeLive >= 0)
+        {
+            if (officeLive + 2 >= args.Length) throw new ArgumentException("--v2-office-live-acceptance requires <output-directory> <office-host-exe>.");
+            return V2OfficeLiveAcceptance.Run(args[officeLive + 1], args[officeLive + 2]).GetAwaiter().GetResult();
+        }
         if (args.Contains("--v2-transport-contract-test")) return V2TransportContractTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-ollama-transport-test")) return V2OllamaTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
