@@ -230,7 +230,7 @@ internal static class CapabilityRanking
 
     internal static IEnumerable<string> SemanticTerms(string value)
     {
-        foreach (var term in Skills.BuiltInSkillSource.Tokens(value))
+        foreach (var term in H2AgentLab.Skills.BuiltInSkillSource.Tokens(value))
         {
             yield return term;
             foreach (var synonym in Synonyms(term))
