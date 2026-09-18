@@ -33,7 +33,7 @@ public sealed class AgentTaskStateMachine
             [AgentTaskState.Grounded] = [AgentTaskState.Planned],
             [AgentTaskState.Planned] = [AgentTaskState.Executing],
             [AgentTaskState.Executing] = [AgentTaskState.Verifying],
-            [AgentTaskState.Verifying] = [AgentTaskState.Completed, AgentTaskState.Repairing],
+            [AgentTaskState.Verifying] = [AgentTaskState.Repairing],
             [AgentTaskState.Repairing] = [AgentTaskState.Executing],
             [AgentTaskState.Completed] = [],
             [AgentTaskState.Blocked] = [],
@@ -52,6 +52,35 @@ public sealed class AgentTaskStateMachine
 
     public bool CanTransitionTo(AgentTaskState next)
     {
+        if (next == AgentTaskState.Completed)
+            return false;
+        return CanTransitionCore(next);
+    }
+
+    public AgentTaskTransition TransitionTo(AgentTaskState next, string? reason = null)
+    {
+        if (next == AgentTaskState.Completed)
+            throw new InvalidOperationException("Completed is protected by the verification gate. Use Complete(...).");
+        if (!CanTransitionCore(next))
+            throw new InvalidOperationException($"Illegal task transition {State} -> {next}.");
+
+        return ApplyTransition(next, reason);
+    }
+
+    public AgentTaskTransition Complete(
+        AgentTaskContract contract,
+        AgentVerificationOutcome outcome,
+        string? reason = null)
+    {
+        if (State != AgentTaskState.Verifying)
+            throw new InvalidOperationException($"Task can only complete from Verifying, not {State}.");
+
+        AgentTaskCompletionGate.EnsureCanComplete(contract, outcome);
+        return ApplyTransition(AgentTaskState.Completed, reason);
+    }
+
+    private bool CanTransitionCore(AgentTaskState next)
+    {
         if (!Enum.IsDefined(next) || IsTerminal)
             return false;
 
@@ -61,11 +90,8 @@ public sealed class AgentTaskStateMachine
         return MainTransitions.TryGetValue(State, out var allowed) && allowed.Contains(next);
     }
 
-    public AgentTaskTransition TransitionTo(AgentTaskState next, string? reason = null)
+    private AgentTaskTransition ApplyTransition(AgentTaskState next, string? reason)
     {
-        if (!CanTransitionTo(next))
-            throw new InvalidOperationException($"Illegal task transition {State} -> {next}.");
-
         var from = State;
         State = next;
         var transition = new AgentTaskTransition(
