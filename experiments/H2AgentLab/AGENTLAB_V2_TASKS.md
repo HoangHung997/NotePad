@@ -240,10 +240,10 @@ Rules:
 - [x] **V2-0705 — Add `ExcelVerifier` for closed files.**  
   Evidence: `Verification/ExcelVerifier.cs` validates exact target cell snapshots while preserving non-target cells, sheet order, merges and hidden state; architecture guard rejects unrelated formula/hidden-state regressions. GitHub Actions run `35308962233` passed full regression/publish.
 
-- [~] **V2-0706 — Add `WordVerifier` for closed files.**  
-  Closed snapshot verifier + architecture guard added; full CI verification in progress.
+- [x] **V2-0706 — Add `WordVerifier` for closed files.**  
+  Evidence: `Verification/WordVerifier.cs` validates exact body/header/footer target paragraphs and protects non-target body, tables, sections/margins and header/footer content; architecture guard rejects unrelated header/table regressions. GitHub Actions run `35309306112` passed full regression/publish.
 
-- [ ] **V2-0707 — Make structured document tools preferred over `run_python`.**  
+- [~] **V2-0707 — Make structured document tools preferred over `run_python`.**  
   Python remains escape hatch for unsupported transforms.
 
 - [ ] **V2-0708 — Closed-file acceptance tests.**  
@@ -401,4 +401,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0706 — Add WordVerifier for closed files`.
+**Active task:** `V2-0707 — Prefer structured document tools over run_python`.
