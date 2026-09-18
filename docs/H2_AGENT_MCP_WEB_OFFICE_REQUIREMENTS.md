@@ -151,7 +151,190 @@ Context/tool-schema growth must remain bounded.
 
 ---
 
-## 5. Direct application adapters are preferred over computer use
+## 5. Tool namespaces are capability families, not single tools
+
+Names such as `Word`, `Excel`, `AutoCAD`, `Web`, `FileSystem`, `Desktop`, and `Browser` describe **tool namespaces / capability families**. They are not one monolithic tool each.
+
+For example:
+
+```text
+word.*
+  get_active_document
+  read_range
+  find_text
+  get_spelling_errors
+  replace_range
+  apply_format
+  save_copy
+  verify_range
+  ...
+
+excel.*
+  list_workbooks
+  read_range
+  read_formulas
+  write_range
+  set_formula
+  recalculate
+  verify_range
+  ...
+
+autocad.*
+  list_documents
+  list_layers
+  find_blocks
+  read_attributes
+  update_attribute
+  create_entity
+  modify_entity
+  plot
+  verify_entity
+  ...
+
+web.*
+  search
+  fetch
+  download
+  extract
+  get_metadata
+  open_browser
+  ...
+```
+
+The agent must be able to discover and call as many tools from these namespaces as needed for one task.
+
+A difficult task may use tens of structured calls before the final response.
+
+---
+
+## 6. Codex-like general computer-control toolset is required
+
+In addition to app-specific structured namespaces, Agent Lab needs a **general computer-control capability set** comparable in role to the tools available to a coding/desktop agent such as Codex.
+
+This is not one unsafe `control_computer(command)` function.
+
+It is a bounded typed tool family that allows the AgentOrchestrator to inspect and operate the local machine when no higher-level adapter is sufficient.
+
+Required capability groups should include equivalents of:
+
+```text
+filesystem.*
+  list
+  stat
+  search
+  read
+  write
+  copy
+  move
+  delete_with_policy
+  hash
+  watch
+  ...
+
+process.*
+  list
+  start
+  wait
+  terminate_with_policy
+  read_exit_status
+  ...
+
+shell.*
+  run_bounded
+  run_build
+  run_test
+  run_script
+  ...
+
+app.*
+  list_running_apps
+  get_active_app
+  launch
+  activate
+  wait_for_window
+  ...
+
+window.*
+  enumerate
+  get_bounds
+  get_title
+  get_process
+  activate
+  observe
+  ...
+
+uia.*
+  inspect_tree
+  find_element
+  invoke
+  set_value
+  select
+  expand
+  ...
+
+input.*
+  click
+  double_click
+  type
+  key
+  chord
+  scroll
+  drag
+  ...
+
+screen.*
+  capture
+  inspect_region
+  observe_after_action
+  ...
+
+browser.*
+  navigate
+  inspect
+  click
+  type
+  download
+  wait
+  ...
+```
+
+Exact names may differ. The architectural requirement is that the agent can perform multi-step computer work without the user manually driving the machine.
+
+### Safety boundary
+
+The general computer-control host must be capability-scoped and permission-aware.
+
+Requirements:
+- no unrestricted arbitrary-machine access by default;
+- separate read/observe from mutating actions;
+- bind actions to process/window/state identity;
+- stale observation protection;
+- cancellation and timeout;
+- explicit policy for shell/process side effects;
+- no hidden access to password managers, security prompts, secrets, or protected system surfaces;
+- observe-after-mutation before claiming success;
+- durable evidence for important actions;
+- prefer a structured app adapter before UI/pixel control.
+
+### Relationship to structured app tools
+
+The preferred execution path remains:
+
+```text
+structured app tool
+    > app API / MCP / COM / plugin
+    > direct file operation
+    > UI Automation
+    > screenshot / mouse / keyboard
+```
+
+The general computer-control toolset is essential, but it is the fallback when Word/Excel/AutoCAD/Web structured adapters cannot complete the operation directly.
+
+This gives the agent Codex-like breadth without throwing away the speed and reliability of native application APIs.
+
+---
+
+## 7. Direct application adapters are preferred over computer use
 
 Preference order:
 
@@ -167,7 +350,7 @@ Computer Use is a fallback, not the default for Word, Excel, or AutoCAD when a s
 
 ---
 
-## 6. Word requirements
+## 8. Word requirements
 
 H2 must support the **already-open Word document**, including unsaved state.
 
@@ -208,7 +391,7 @@ Mutations must preserve unrelated formatting/content unless the task explicitly 
 
 ---
 
-## 7. Excel requirements
+## 9. Excel requirements
 
 H2 must support the **already-open Excel workbook**, including unsaved state.
 
@@ -238,7 +421,7 @@ Wrong workbook/sheet/process/session must be rejected deterministically.
 
 ---
 
-## 8. AutoCAD requirements
+## 10. AutoCAD requirements
 
 AutoCAD should expose structured tools through a production-safe host.
 
@@ -276,7 +459,7 @@ No arbitrary command execution should become the default mutation mechanism when
 
 ---
 
-## 9. WebResearchHost is required
+## 11. WebResearchHost is required
 
 Agent Lab currently has no complete first-class WebResearchHost requirement. This must be added.
 
@@ -306,7 +489,7 @@ Use cases:
 
 ---
 
-## 10. Freshness policy
+## 12. Freshness policy
 
 The agent must not answer freshness-sensitive requests solely from model memory.
 
@@ -334,7 +517,7 @@ and require WebResearchHost or another current authoritative data provider.
 
 ---
 
-## 11. Web evidence and provenance
+## 13. Web evidence and provenance
 
 Web results must not be treated as unstructured trusted text only.
 
@@ -362,7 +545,7 @@ This is required to prevent context growth.
 
 ---
 
-## 12. Legal/regulatory research requirements
+## 14. Legal/regulatory research requirements
 
 Finding a newer document is not enough to claim that it replaces an older one.
 
@@ -404,7 +587,7 @@ Search-engine snippets or secondary articles alone are insufficient evidence for
 
 ---
 
-## 13. Canonical Word + legal research acceptance scenario
+## 15. Canonical Word + legal research acceptance scenario
 
 This use case is mandatory before final acceptance.
 
@@ -471,7 +654,7 @@ when OfficeHost + WebResearchHost provide sufficient structured capabilities.
 
 ---
 
-## 14. Observe -> Act -> Verify rule
+## 16. Observe -> Act -> Verify rule
 
 For every structured application mutation:
 
@@ -509,7 +692,7 @@ update_attribute
 
 ---
 
-## 15. Repair context must stay small
+## 17. Repair context must stay small
 
 When verification fails, do not replay the entire task/transcript.
 
@@ -528,11 +711,12 @@ This is part of the core goal that H2 Agent context must not grow without bound.
 
 ---
 
-## 16. Phase integration requirements
+## 18. Phase integration requirements
 
 Before Phase 08-12 can be considered complete, the tracker/spec should explicitly account for:
 
 - generic MCP provider layer;
+- Codex-like general computer-control toolset (filesystem/process/shell/app/window/UIA/input/screen/browser);
 - WebResearchHost;
 - freshness policy;
 - web evidence/provenance;
@@ -551,7 +735,7 @@ Before Phase 13 H2 Notes integration:
 
 ---
 
-## 17. Core architectural principle
+## 19. Core architectural principle
 
 The target system is:
 
