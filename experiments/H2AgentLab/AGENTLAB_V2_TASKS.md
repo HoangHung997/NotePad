@@ -166,7 +166,8 @@ Rules:
   Evidence: `Tools/V1ToolRegistryAdapter.cs` projects every `AgentTools.Definitions` schema into v2 registry metadata while execution delegates back to `AgentTools.Execute`; architecture guard checks exact name-set equality and mutation metadata. GitHub Actions run `35296523430` passed full build/regression/publish.
 
 - [~] **V2-0503 — Build lexical/BM25-style `ToolSearchIndex`.**  
-  No embedding dependency. Cache by registry version.
+  No embedding dependency. Cache by registry version.  
+  Implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0504 — Expose `tool_search` as initial callable tool.**  
   Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.
