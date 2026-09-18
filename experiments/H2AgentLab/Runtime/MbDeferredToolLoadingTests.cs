@@ -259,10 +259,15 @@ public static class MbDeferredToolLoadingTests
             if (ContinuationCalls == 2)
             {
                 var result = request.ToolResults.Single();
+                using var parsed = JsonDocument.Parse(result.Content);
+                var formula = parsed.RootElement
+                    .GetProperty("formulas")[0]
+                    .GetString();
                 if (result.IsError
                     || result.ToolName != "excel.read_formulas"
-                    || !result.Content.Contains("=A1+1", StringComparison.Ordinal))
-                    throw new InvalidOperationException("Same-task deferred tool result was not preserved.");
+                    || formula != "=A1+1")
+                    throw new InvalidOperationException(
+                        $"Same-task deferred tool result was not preserved: name={result.ToolName}, error={result.IsError}, formula={formula}.");
                 yield return AgentTransportEvent.TextDeltaEvent("formula-read-ok");
                 await Task.Yield();
                 yield return AgentTransportEvent.Complete("mb32-3", "stop");
