@@ -74,11 +74,12 @@ public static class V2ExtensibilityRefinementTests
                 "Description-aware unified search did not select differently named plugin skill.");
 
             var content = unified.Read(selected.Identity);
-            Check(content.EntryPoint.Contains("resource: references/dynamic-block.md", StringComparison.Ordinal)
+            Check(content.EntryPoint.Contains("references/dynamic-block.md", StringComparison.Ordinal)
+                && !content.EntryPoint.Contains("resource:", StringComparison.OrdinalIgnoreCase)
                 && content.AvailableResources.Contains("references/dynamic-block.md", StringComparer.Ordinal)
                 && content.AvailableResources.Contains("scripts/helper.py", StringComparer.Ordinal)
                 && content.AvailableResources.Contains("assets/template.txt", StringComparer.Ordinal),
-                "Progressive skill envelope did not expose entry point/resource inventory.");
+                "Progressive skill envelope did not expose entry point/resource inventory without custom directives.");
 
             var reference = unified.ReadResource(selected.Identity, "references/dynamic-block.md");
             Check(reference.Content.Contains("visibility states", StringComparison.OrdinalIgnoreCase),
@@ -448,11 +449,13 @@ public static class V2ExtensibilityRefinementTests
             Check(result.SelectedSkill.Summary.Name == "cad-integrity"
                 && !originalQuery.Contains("cad-integrity", StringComparison.OrdinalIgnoreCase),
                 "Differently named skill was not selected from description metadata.");
-            Check(result.LoadedResources.Count == 1
-                && result.LoadedResources[0].RelativePath == "references/dynamic-block.md"
-                && !result.LoadedResources.Any(x => x.RelativePath.StartsWith("scripts/", StringComparison.Ordinal)
-                    || x.RelativePath.StartsWith("assets/", StringComparison.Ordinal)),
-                "Progressive continuation loaded resources that were not explicitly required.");
+            Check(result.LoadedResources.Count == 0,
+                "Capability continuation auto-loaded skill resources instead of waiting for an explicit runtime/model request.");
+            var explicitReference = unified.ReadResource(
+                result.SelectedSkill.Summary.Identity,
+                "references/dynamic-block.md");
+            Check(explicitReference.Content.Contains("visibility states", StringComparison.OrdinalIgnoreCase),
+                "Selected skill reference was not available through explicit on-demand access.");
             Check(result.CapabilitySnapshot.Revision == 2
                 && result.CapabilityEvidence.PluginVersions.Contains("h2.autocad.productivity@1.4.0", StringComparer.Ordinal)
                 && result.CapabilityEvidence.ProviderVersions.Contains("autocad.native@1.4.0", StringComparer.Ordinal)
@@ -617,7 +620,7 @@ public static class V2ExtensibilityRefinementTests
                     "",
                     "# CAD Integrity",
                     skillBody,
-                    "resource: references/dynamic-block.md"));
+                    "Read references/dynamic-block.md when detailed block verification guidance is needed."));
             WriteZip(
                 zip,
                 "skills/cad-integrity/references/dynamic-block.md",
