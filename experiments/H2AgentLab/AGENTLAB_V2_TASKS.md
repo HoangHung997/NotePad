@@ -418,7 +418,7 @@ Rules:
 
 - [~] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
   Keep a temporary v1 diagnostic mode only if needed for A/B comparison.  
-  Phase 11 implementation + dedicated 15-case acceptance suite added; regex compile fixes applied; full CI verification retry in progress.
+  Phase 11 implementation + dedicated 15-case acceptance suite added; regex/AiProfile compile fixes applied; full CI verification retry in progress.
 
 - [ ] **V2-1102 — Add UI progress based on typed trace events.**  
   Show meaningful phase/tool/verifier progress without exposing chain-of-thought.
