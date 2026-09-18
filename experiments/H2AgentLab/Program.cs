@@ -39,6 +39,7 @@ public static class Program
         if (args.Contains("--v2-closed-file-test")) return V2ClosedFileTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-phase10-test")) return V2Phase10Tests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-phase11-test")) return V2Phase11Tests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-extensibility-refinement-test")) return V2ExtensibilityRefinementTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
