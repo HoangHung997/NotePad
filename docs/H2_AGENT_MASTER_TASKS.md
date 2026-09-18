@@ -314,7 +314,7 @@ Evidence: `Runtime/MbToolRegistryExecutionTests.cs` verifies the selected descri
 
 ---
 
-## [~] MB-32 — Make deferred tool loading real during the same task
+## [x] MB-32 — Make deferred tool loading real during the same task
 
 Goal:
 
@@ -345,9 +345,11 @@ Acceptance:
 - duplicate schema loads coalesce;
 - registry version invalidation works.
 
+Evidence: `Runtime/MbDeferredToolLoadingTests.cs` exercises the real runtime plus discovery/index state. GitHub Actions run `35353071661` reported **3 passed, 0 failed**: tool_search loads and executes the selected schema in the same task without a new user turn, duplicate schema loads coalesce, and ToolSearchIndex rebuilds exactly when ToolRegistry.Version changes.
+
 ---
 
-## [ ] MB-33 — Wire ToolExecutionScheduler into real calls
+## [~] MB-33 — Wire ToolExecutionScheduler into real calls
 
 Goal:
 
