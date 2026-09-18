@@ -56,12 +56,13 @@ public static class V2ContextCacheTests
                     "SESSION_A\nWORKSPACE_A",
                     "TIME_A"),
                 "USER_A");
+            var secondRuntime = new AgentPromptRuntimeContext(
+                "task-two",
+                "SESSION_B\nWORKSPACE_B",
+                "TIME_B");
             var second = AgentPromptLayout.Create(
                 stable,
-                new AgentPromptRuntimeContext(
-                    "task-two",
-                    "SESSION_B\nWORKSPACE_B",
-                    "TIME_B"),
+                secondRuntime,
                 "USER_B");
 
             Check(first.CacheBoundaryIndex == first.StablePrefix.Count
@@ -77,7 +78,7 @@ public static class V2ContextCacheTests
 
             var changedStable = AgentPromptLayout.Create(
                 stable with { SecurityPolicy = "SECURITY_CHANGED" },
-                second.RuntimeContext,
+                secondRuntime,
                 "USER_B");
             var changedKey = AgentPromptCacheIdentityBuilder.Build(changedStable, profile).Key;
             Check(changedKey != firstKey,
