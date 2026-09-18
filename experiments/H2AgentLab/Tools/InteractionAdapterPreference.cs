@@ -43,6 +43,8 @@ public static class InteractionAdapterPreference
             .Where(x => !x.Preference.ExplicitRequestOnly
                 || x.Preference.MatchesExplicitRequest(query))
             .OrderByDescending(x => IsExactAdapterRequest(query, x))
+            .ThenByDescending(x => x.Preference.ExplicitRequestOnly
+                && x.Preference.MatchesExplicitRequest(query))
             .ThenBy(x => DocumentToolPreference.FidelityRank(
                 x.Preference.InteractionFidelity))
             .ThenBy(x => x.AdapterId, StringComparer.Ordinal)
