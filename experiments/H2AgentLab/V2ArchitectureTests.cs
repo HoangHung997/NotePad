@@ -1279,6 +1279,60 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("Runtime RecoverySupervisor stays below semantic verification repair", () =>
+        {
+            var contract = new AgentTaskContract(
+                Guid.NewGuid(),
+                "Verify runtime recovery separation",
+                "workspace:/fixture",
+                null,
+                ["produce verified result"],
+                null,
+                ["result"],
+                [new AgentAcceptanceCriterion("semantic", "Result content is semantically correct.")],
+                AgentTaskRiskClass.Low,
+                new AgentVerificationPolicy(requireVerification: true));
+
+            var semanticReport = new VerificationReport(
+                "semantic-fixture",
+                [
+                    new VerificationCriterionResult(
+                        "semantic",
+                        VerificationCriterionStatus.Failed,
+                        ["semantic:evidence"],
+                        new VerificationFailure("semantic", "Content mismatch.", ["semantic:evidence"]))
+                ]);
+
+            var coordinator = new VerificationRecoveryCoordinator();
+            var args = JsonSerializer.SerializeToElement(new { path = "missing.txt", offset = "0" });
+            var call = new ToolCall("runtime-1", "read_file", args);
+            var runtimeFailure = JsonSerializer.Serialize(new
+            {
+                recovery = new
+                {
+                    code = "not_found",
+                    message = "missing runtime input",
+                    recoverable = true,
+                    next = "inspect actual files"
+                }
+            });
+
+            coordinator.ObserveRuntimeCall(call, runtimeFailure);
+            var pending = coordinator.GetState(semanticReport);
+            if (!pending.HasRuntimeRecoveryPending || !pending.HasSemanticVerificationFailures)
+                throw new InvalidOperationException("Runtime + semantic failures were not tracked independently.");
+
+            coordinator.ObserveRuntimeCall(call, "{\"content\":\"runtime recovered\"}");
+            var recoveredRuntime = coordinator.GetState(semanticReport);
+            if (recoveredRuntime.HasRuntimeRecoveryPending || !recoveredRuntime.HasSemanticVerificationFailures)
+                throw new InvalidOperationException("Runtime recovery incorrectly cleared semantic verification failure.");
+
+            var repair = coordinator.BuildSemanticRepair(contract, semanticReport);
+            if (!repair.FailedCriterionIds.SequenceEqual(new[] { "semantic" })
+                || !repair.PromptContext.Contains("Content mismatch.", StringComparison.Ordinal))
+                throw new InvalidOperationException("Semantic repair was not derived from verifier failure after runtime recovery.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
