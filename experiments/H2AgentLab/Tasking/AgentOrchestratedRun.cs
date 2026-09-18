@@ -160,7 +160,8 @@ public sealed class AgentOrchestratedRun
             contextInput,
             PromptCacheKey: null,
             MaxToolRounds: 24,
-            MaxRepairRounds: 4);
+            MaxRepairRounds: 4,
+            PromptCacheScope: AgentPromptCacheIdentityBuilder.Scope(profile));
 
         labSession.Add("user", prompt.Trim());
         save();
