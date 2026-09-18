@@ -17,7 +17,7 @@ public sealed class LabSessionContextAdapter
         _manager = manager ?? new AgentContextManager();
     }
 
-    public AgentContextSnapshot Build(
+    public AgentContextInput BuildInput(
         LabSession session,
         string? taskContract = null,
         string? currentState = null,
@@ -39,13 +39,26 @@ public sealed class LabSessionContextAdapter
                 1));
         }
 
-        return _manager.Build(new AgentContextInput(
+        return new AgentContextInput(
             TaskContract: taskContract,
             CurrentState: currentState,
             RecentTurns: turns,
             ToolSummaries: toolSummaries,
-            CompactedHistory: compactedHistory));
+            CompactedHistory: compactedHistory);
     }
+
+    public AgentContextSnapshot Build(
+        LabSession session,
+        string? taskContract = null,
+        string? currentState = null,
+        IReadOnlyList<AgentContextToolSummary>? toolSummaries = null,
+        string? compactedHistory = null)
+        => _manager.Build(BuildInput(
+            session,
+            taskContract,
+            currentState,
+            toolSummaries,
+            compactedHistory));
 
     private static bool TryRole(string? kind, out AgentTransportMessageRole role)
     {
