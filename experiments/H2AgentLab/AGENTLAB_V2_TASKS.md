@@ -202,7 +202,8 @@ Rules:
   Evidence: `Verification/FileScopeVerifier.cs` compares before/after snapshots for exact changed paths, expected SHA-256 values and unintended created outputs; architecture guard passed in GitHub Actions run `35304688210`, together with full regression/publish.
 
 - [~] **V2-0603 — Add generic artifact verifier contract.**  
-  Allows domain verifiers without coupling orchestrator to Excel/Word.
+  Allows domain verifiers without coupling orchestrator to Excel/Word.  
+  Generic target/request/verifier/registry contract + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0604 — Add `AgentRepairController`.**  
   Convert failed criteria into concise repair context; preserve already-passed criteria.
