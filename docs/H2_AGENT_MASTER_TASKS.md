@@ -550,7 +550,7 @@ Evidence: canonical local skill discovery ranks only bounded `name + description
 
 ---
 
-## [ ] MB-52 — Progressive skill loading
+## [x] MB-52 — Progressive skill loading
 
 Goal:
 
@@ -576,6 +576,8 @@ Acceptance:
 - model may request one relevant reference;
 - scripts/assets are not trusted automatically;
 - source hash/version evidence preserved.
+
+Evidence: `SkillRuntimeToolExecutor` now provides the normal read-only runtime bridge over the canonical `Skills.SkillCatalog`: `list_skills` returns bounded name/description/provenance metadata, while `read_skill` loads exactly the selected `SKILL.md` or one explicitly requested `references/`, `scripts/`, `assets/` or `agents/` resource. Runtime projections are bounded to 32,000 characters and carry source/plugin identity, SHA-256 and derived version evidence; script/asset responses are explicitly inert data/text and this path never executes them. `V1AgentToolsExecutor` routes normal V2 skill calls through this canonical bounded executor while preserving the temporary v1 tool-schema bridge. The historical `MissingCapabilityContinuation` no longer parses `resource:` directives or auto-loads resources; after installation it loads only the selected `SKILL.md`, leaving resources for an explicit runtime/model request. Phase-11 regression fixtures were updated to natural SKILL.md prose plus explicit `ReadResource` access. `Runtime/MbProgressiveSkillLoadingTests.cs` proves the real `AgentRuntime` path `tool_search -> metadata -> SKILL.md -> one explicit reference`, proves resource bodies are absent until requested, proves script/asset reads do not execute content, proves independent skill/resource hash+version provenance, and source-guards against mandatory resource-directive parsing. Exact functional source commit `9456a9789a04ee43cc26217eb2ac1b0c11b63032`, GitHub Actions run `35373183466`: MB-52 **4 passed, 0 failed**; H2 Notes, Phase 10/11/extensibility, MB-10 through MB-51, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication succeeded. Publish bot commit `c370ba41d9de8f04d59793dff11c5ea4f24746a8`; portable ZIP SHA256 `fd80cce646043a506b5a096536104c6d6e29b0697532482f976899ce709a0673`.
 
 ---
 
