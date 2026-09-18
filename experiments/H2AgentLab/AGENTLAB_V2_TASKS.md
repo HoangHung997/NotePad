@@ -234,7 +234,8 @@ Rules:
   Evidence: `Documents/ClosedWorkbookSnapshot.cs` captures deterministic sheet/cell/formula/style/merge/hidden-row/hidden-column state behind H2 Core safety validation; OpenXML fixture guard passed after typed SDK-v3 enum normalization. GitHub Actions run `35308041247` passed full regression/publish.
 
 - [~] **V2-0704 — Add deterministic closed-DOCX snapshot model.**  
-  Paragraph/run/style/table/section/header/footer fields needed by verifier.
+  Paragraph/run/style/table/section/header/footer fields needed by verifier.  
+  Snapshot reader + OpenXML fixture guard added; full CI verification in progress.
 
 - [ ] **V2-0705 — Add `ExcelVerifier` for closed files.**
 
