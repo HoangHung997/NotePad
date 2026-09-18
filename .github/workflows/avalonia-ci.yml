@@ -117,6 +117,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-verification-test $out
           Get-Content -LiteralPath (Join-Path $out 'v2-verification-tests.txt')
 
+      - name: Run H2 Agent Lab v2 closed file acceptance tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-closed-files'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-closed-file-test $out
+          Get-Content -LiteralPath (Join-Path $out 'v2-closed-file-tests.txt')
+
       - name: Run H2 Agent Lab v2 transport contract tests
         shell: pwsh
         run: |
