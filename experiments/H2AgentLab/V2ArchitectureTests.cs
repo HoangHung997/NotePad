@@ -474,6 +474,52 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("AgentTaskStateMachine enforces deterministic lifecycle and repair loop", () =>
+        {
+            var machine = new AgentTaskStateMachine();
+            if (machine.State != AgentTaskState.Received || machine.IsTerminal)
+                throw new InvalidOperationException("Task state machine did not start in Received.");
+
+            machine.TransitionTo(AgentTaskState.Grounded, "inputs inspected");
+            machine.TransitionTo(AgentTaskState.Planned, "plan accepted");
+            machine.TransitionTo(AgentTaskState.Executing, "execution started");
+            machine.TransitionTo(AgentTaskState.Verifying, "changes produced");
+            machine.TransitionTo(AgentTaskState.Repairing, "verification failed");
+            machine.TransitionTo(AgentTaskState.Executing, "repair attempt");
+            machine.TransitionTo(AgentTaskState.Verifying, "re-verify");
+            machine.TransitionTo(AgentTaskState.Completed, "verification passed");
+
+            if (!machine.IsTerminal || machine.State != AgentTaskState.Completed)
+                throw new InvalidOperationException("Verified task did not reach terminal Completed state.");
+            if (machine.History.Count != 8
+                || machine.History.Select(x => x.Sequence).SequenceEqual(Enumerable.Range(0, 8).Select(x => (long)x)) is false)
+                throw new InvalidOperationException("Task transition history is not deterministic.");
+
+            try
+            {
+                machine.TransitionTo(AgentTaskState.Executing);
+                throw new InvalidOperationException("Terminal Completed task accepted a new transition.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Illegal task transition", StringComparison.Ordinal))
+            {
+            }
+
+            var cancelled = new AgentTaskStateMachine();
+            cancelled.TransitionTo(AgentTaskState.Cancelled, "user cancelled");
+            if (!cancelled.IsTerminal || cancelled.State != AgentTaskState.Cancelled)
+                throw new InvalidOperationException("Cancellation did not produce terminal state.");
+
+            var illegal = new AgentTaskStateMachine();
+            try
+            {
+                illegal.TransitionTo(AgentTaskState.Planned);
+                throw new InvalidOperationException("Received task skipped Grounded.");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Illegal task transition", StringComparison.Ordinal))
+            {
+            }
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
