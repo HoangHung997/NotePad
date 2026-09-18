@@ -23,7 +23,7 @@ public sealed class MissingCapabilityContinuation
     private readonly CapabilityResolver _resolver;
     private readonly IPackageRetriever _retriever;
     private readonly PluginManager _plugins;
-    private readonly UnifiedSkillCatalog _skills;
+    private readonly SkillCatalog _skills;
     private readonly InstalledCapabilityIndex _installed;
     private readonly ToolRegistry _registry;
     private readonly Func<IReadOnlyList<ProviderProvenance>> _providers;
@@ -32,7 +32,7 @@ public sealed class MissingCapabilityContinuation
         CapabilityResolver resolver,
         IPackageRetriever retriever,
         PluginManager plugins,
-        UnifiedSkillCatalog skills,
+        SkillCatalog skills,
         InstalledCapabilityIndex installed,
         ToolRegistry registry,
         Func<IReadOnlyList<ProviderProvenance>> providers)
