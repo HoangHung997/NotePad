@@ -1,3 +1,4 @@
+using H2Notes.Core;
 using H2AgentLab.Metrics;
 using H2AgentLab.Verification;
 
