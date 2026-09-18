@@ -205,7 +205,7 @@ public sealed class PluginManager
         if (active is null)
             return Array.Empty<PluginCatalogEntry>();
 
-        var activeVersion = Version.Parse(active.Manifest.Version);
+        var activeVersion = Version.Parse(active.Value.Manifest.Version);
         return catalog.All
             .Where(x => x.Id == pluginId
                 && Version.Parse(x.Version) > activeVersion
