@@ -740,6 +740,41 @@ public static class V2ArchitectureTests
             }
         });
 
+        Test("V1 tool registry adapter preserves every existing callable schema", () =>
+        {
+            var executor = new DelegatingToolExecutor(
+                "v1-fixture",
+                (call, ct) => ValueTask.FromResult("fixture:" + call.Name));
+            var registry = new ToolRegistry();
+            V1ToolRegistryAdapter.Populate(registry, executor);
+
+            var definitionNames = JsonSerializer.SerializeToElement(AgentTools.Definitions)
+                .EnumerateArray()
+                .Select(x => x.GetProperty("function").GetProperty("name").GetString()!)
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+            var registryNames = registry.Tools.Select(x => x.Name).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+            if (!registryNames.SequenceEqual(definitionNames))
+                throw new InvalidOperationException("V1 registry adapter deleted or invented tool definitions.");
+            if (registry.Tools.Any(x => x.SchemaVersion != "v1" || x.Executor != executor))
+                throw new InvalidOperationException("V1 registry adapter lost schema version or executor identity.");
+            if (!registry.TryGet("read_file", out var readFile)
+                || readFile.Namespace.Name != "files"
+                || readFile.IsMutating
+                || !readFile.SupportsParallel)
+                throw new InvalidOperationException("read_file registry metadata is incorrect.");
+            if (!registry.TryGet("write_text", out var writeText)
+                || !writeText.IsMutating
+                || writeText.SupportsParallel)
+                throw new InvalidOperationException("write_text mutation metadata is incorrect.");
+            if (!registry.TryGet("click_control", out var click)
+                || click.Namespace.Name != "desktop"
+                || click.Risk != AgentToolRisk.High
+                || !click.IsMutating)
+                throw new InvalidOperationException("desktop mutation metadata is incorrect.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
