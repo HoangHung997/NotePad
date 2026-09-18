@@ -209,11 +209,11 @@ Rules:
   Convert failed criteria into concise repair context; preserve already-passed criteria.  
   Evidence: `Verification/AgentRepairController.cs` emits bounded failure-only repair context plus explicit passed-criterion preservation; architecture guard passed in GitHub Actions run `35305244484`, together with full regression/publish.
 
-- [~] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
+- [x] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
   Runtime/protocol recovery remains distinct from semantic repair.  
-  Recovery coordinator + architecture guard added; full CI verification in progress.
+  Evidence: `Verification/VerificationRecoveryCoordinator.cs` wraps existing `RecoverySupervisor` below semantic verification and keeps runtime recovery state independent from verifier failures; architecture guard passed in GitHub Actions run `35305569774`, together with full regression/publish.
 
-- [ ] **V2-0606 — Add verification-gate tests.**  
+- [~] **V2-0606 — Add verification-gate tests.**  
   Model saying “done” must not pass if verifier fails.
 
 ---
@@ -394,4 +394,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0605 — Integrate RecoverySupervisor below verifier layer`.
+**Active task:** `V2-0606 — Add verification-gate tests`.
