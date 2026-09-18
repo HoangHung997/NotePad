@@ -1418,7 +1418,9 @@ public static class V2ArchitectureTests
                 || first.Sheets[0].State != "Visible"
                 || first.Sheets[1].Name != "Hidden"
                 || first.Sheets[1].State != "Hidden")
-                throw new InvalidOperationException("Workbook sheet identity/hidden state snapshot is wrong.");
+                throw new InvalidOperationException(
+                    "Workbook sheet identity/hidden state snapshot is wrong: "
+                    + JsonSerializer.Serialize(first.Sheets));
 
             var data = first.Sheets[0];
             var a1 = data.Cells.Single(x => x.Address == "A1");
