@@ -786,7 +786,7 @@ Evidence: `CapabilityResolver` was retained only as a thin host metadata/status 
 
 ---
 
-## [ ] MB-74 — Retire MissingCapabilityContinuation
+## [x] MB-74 — Retire MissingCapabilityContinuation
 
 Goal:
 
@@ -808,6 +808,8 @@ Acceptance:
 - plugin may contain only skills;
 - plugin may contain provider + tools;
 - original task continues without special skill-required result type.
+
+Evidence: the one-off `Capabilities/MissingCapabilityContinuation.cs` workflow was deleted and replaced by ordinary runtime tools in `Catalog/CatalogRuntimeTools.cs`. `catalog_search` exposes compact remote package metadata through the thin `CapabilityResolver.SearchCatalogAsync(...)` seam; `plugin_install` accepts only the exact plugin ID/version selected by the model while host-owned trust policy, approval, immutable retrieval and `PluginManager` verification/activation remain outside model arguments. Installation returns package-level tool/skill/provider metadata without auto-selecting or auto-loading skill content. Newly registered tools become discoverable in the same task through normal `tool_search` registry-version refresh, while newly installed skills appear through the canonical `SkillCatalog` / `PluginSkillSource` path and are read only after explicit model selection. `Capabilities/MbRuntimeCapabilityInstallTests.cs` drives one real `AgentRuntime` turn through tool-only, skill-only and provider-plus-tool plugin fixtures, proves the original task continues with exactly one `StartAsync` call and no user restatement, proves host approval is absent from the callable install schema, and source-guards retirement of the special continuation type. The historical Phase-11 1122 acceptance path now uses the same ordinary catalog/install flow; MB-52 and MB-71 source guards were updated to treat the removed source as intentional rather than a required runtime dependency. Exact functional source commit `255b54e060e071e45ac6bf7ceccd0bd5c6430835`, GitHub Actions run `35402814765`: MB-74 **2 passed, 0 failed**; MB-70/71/72/73, architecture guard, H2 Notes, Phase 10/11/extensibility, MB-10 through MB-63, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository portable ZIP publication all succeeded. Publish bot commit `e4a97bde210763cd6fbd5fd2eb39d4f0653052f2`; repository portable ZIP SHA256 `ac6381614eb1d5bdc634bff0a52c6bc4eb469049f6e52abbb70579846a87f88f`.
 
 ---
 
