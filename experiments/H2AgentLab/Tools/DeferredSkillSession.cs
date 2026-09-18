@@ -37,9 +37,8 @@ public sealed class DeferredSkillSession
         ArgumentException.ThrowIfNullOrWhiteSpace(resourcePath);
 
         var name = skillName.Trim();
-        var relative = resourcePath.Trim().Replace('\', '/');
-        var key = name + "
-" + relative;
+        var relative = resourcePath.Trim().Replace('\\', '/');
+        var key = name + "\n" + relative;
         var stamp = ResolveStamp(name, relative);
 
         if (_cache.TryGetValue(key, out var cached) && cached.Stamp == stamp)
@@ -70,8 +69,7 @@ public sealed class DeferredSkillSession
 
     public IReadOnlyDictionary<string, string> LoadedVersions
         => _cache.ToDictionary(
-            x => x.Key.Replace('
-', ':'),
+            x => x.Key.Replace('\n', ':'),
             x => x.Value.Version,
             StringComparer.Ordinal);
 
