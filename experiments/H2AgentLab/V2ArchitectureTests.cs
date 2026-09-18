@@ -1474,6 +1474,60 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Word header/footer content snapshot is incomplete.");
         });
 
+        Test("ExcelVerifier validates target cells and rejects unrelated formula/style/structure regressions", () =>
+        {
+            var before = new ClosedWorkbookSnapshotReader().Read(
+                "fixture.xlsx",
+                CreateArchitectureWorkbookFixture());
+            var data = before.Sheets.Single(x => x.Name == "Data");
+            var originalA1 = data.Cells.Single(x => x.Address == "A1");
+            var expectedA1 = originalA1 with { RawValue = "99" };
+
+            var afterData = data with
+            {
+                Cells = data.Cells
+                    .Select(x => x.Address == "A1" ? expectedA1 : x)
+                    .ToArray()
+            };
+            var after = before with
+            {
+                Sha256 = new string('f', 64),
+                Sheets = before.Sheets
+                    .Select(x => x.Name == "Data" ? afterData : x)
+                    .ToArray()
+            };
+            var expectation = new ExcelVerificationExpectation(
+                [new ExcelExpectedCell("Data", "A1", expectedA1)]);
+
+            var pass = ExcelVerifier.Verify(before, after, expectation);
+            if (!pass.Passed
+                || pass.Criteria.Any(x => x.Status != VerificationCriterionStatus.Passed))
+                throw new InvalidOperationException("Expected closed Excel edit did not pass verification.");
+
+            var regressedA2 = afterData.Cells.Single(x => x.Address == "A2") with
+            {
+                Formula = "SUM(A1,2)"
+            };
+            var badData = afterData with
+            {
+                Cells = afterData.Cells
+                    .Select(x => x.Address == "A2" ? regressedA2 : x)
+                    .ToArray(),
+                HiddenRows = Array.Empty<uint>()
+            };
+            var bad = after with
+            {
+                Sheets = after.Sheets
+                    .Select(x => x.Name == "Data" ? badData : x)
+                    .ToArray()
+            };
+            var failed = ExcelVerifier.Verify(before, bad, expectation);
+            if (failed.Passed
+                || !failed.Failures.Any(x => x.CriterionId == ExcelVerifier.PreserveCellsCriterionId)
+                || !failed.Failures.Any(x => x.CriterionId == ExcelVerifier.StructureCriterionId))
+                throw new InvalidOperationException("Closed Excel verifier missed unrelated formula/hidden-state regression.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
