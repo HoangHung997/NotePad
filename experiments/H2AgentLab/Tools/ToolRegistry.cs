@@ -22,6 +22,26 @@ public interface IAgentToolExecutor
     ValueTask<string> ExecuteAsync(global::H2AgentLab.ToolCall call, CancellationToken cancellationToken);
 }
 
+public sealed class DelegatingToolExecutor : IAgentToolExecutor
+{
+    private readonly Func<global::H2AgentLab.ToolCall, CancellationToken, ValueTask<string>> _execute;
+
+    public DelegatingToolExecutor(
+        string executorId,
+        Func<global::H2AgentLab.ToolCall, CancellationToken, ValueTask<string>> execute)
+    {
+        ExecutorId = ToolNamespace.NormalizeId(executorId, nameof(executorId));
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+    }
+
+    public string ExecutorId { get; }
+
+    public ValueTask<string> ExecuteAsync(
+        global::H2AgentLab.ToolCall call,
+        CancellationToken cancellationToken)
+        => _execute(call, cancellationToken);
+}
+
 public sealed record ToolNamespace
 {
     public ToolNamespace(string name, string description)
