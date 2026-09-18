@@ -11,6 +11,7 @@ Rules:
 - If new work is discovered, add a new unique ID. Never hide extra work inside another task.
 - Do not delete old v1 code until a replacement task explicitly says it may be retired.
 - H2 Notes production integration is forbidden until Phase 12 gate passes and the user explicitly approves it.
+- `docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md` is a normative requirement source. Phase 13 is blocked until the MCP/Web/Plugin/Legal requirements represented below also pass acceptance.
 
 ---
 
@@ -353,7 +354,7 @@ Rules:
 
 ---
 
-## Phase 10 — Python/runtime migration and fallback
+## Phase 10 — Python/runtime migration, MCP providers and extensibility foundations
 
 - [~] **V2-1001 — Adapt `ScriptWorkspace` to v2 artifact/evidence IDs.**
 
@@ -366,9 +367,39 @@ Rules:
 
 - [ ] **V2-1005 — Add fallback test: unsupported Office transform → Python → deterministic verifier.**
 
+- [ ] **V2-1006 — Define generic capability-provider/MCP contracts and provenance.**  
+  Provider identity, server/tool/schema/version provenance, namespace summaries and health state must be host-owned and provider-neutral.
+
+- [ ] **V2-1007 — Implement MCP connection lifecycle.**  
+  Connect/disconnect/reconnect, cancellation, timeout, bounded errors and deterministic health transitions; no secret values in prompt/tool metadata.
+
+- [ ] **V2-1008 — Normalize MCP tools/resources into ToolRegistry with deferred schemas.**  
+  Compact namespace metadata first; detailed schemas/resources load only after selection and are invalidated by provider/registry version.
+
+- [ ] **V2-1009 — Enforce MCP scope/permission/parallel/trust boundaries.**  
+  Preserve read-only vs mutating classification, provider/resource/session scope, serialization keys and parallel safety; one provider cannot broaden another provider's scope; provider claims are not trusted verifier evidence.
+
+- [ ] **V2-1010 — Add typed `filesystem.*` capability family.**  
+  List/stat/search/read/write/copy/move/hash/watch and policy-controlled delete with explicit workspace/scope boundaries and durable evidence.
+
+- [ ] **V2-1011 — Add bounded `process.*` and `shell.*` capability families.**  
+  List/start/wait/exit-status and policy-controlled terminate; bounded shell/build/test/script execution with timeout, cancellation, side-effect policy and evidence.
+
+- [ ] **V2-1012 — Normalize `app.*` / `window.*` / `uia.*` / `input.*` / `screen.*` / `browser.*` capability families.**  
+  Reuse DesktopHost where applicable; browser capability remains fallback behind structured WebResearchHost; no monolithic unrestricted computer-control tool.
+
+- [ ] **V2-1013 — Add H2 Plugin Manifest, catalog metadata and rebuildable capability index.**  
+  Separate Tool/Skill/Plugin concepts; catalogs expose compact discovery metadata before package download or schema/skill loading.
+
+- [ ] **V2-1014 — Add staged plugin install/update activation.**  
+  Validate manifest, hash/signature/source identity, agent compatibility, capability/permission delta, paths/conflicts/native helpers and self-test; use a versioned store and atomic activation/hot ToolRegistry registration at controlled boundaries.
+
+- [ ] **V2-1015 — Add plugin update discovery, rollback/quarantine and progressive skill/version evidence tests.**  
+  Failed updates keep the previous version; broader permissions require renewed policy/approval; changed plugin/skill hashes invalidate caches; task evidence records exact plugin/skill/tool versions.
+
 ---
 
-## Phase 11 — end-to-end v2 loop and UI
+## Phase 11 — end-to-end v2 loop, WebResearchHost, structured providers and UI
 
 - [ ] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
   Keep a temporary v1 diagnostic mode only if needed for A/B comparison.
@@ -389,34 +420,66 @@ Rules:
 - [ ] **V2-1107 — Run complete deterministic regression suite.**  
   Must include existing v1 tests, new v2 tests and shared H2 Core tests.
 
+- [ ] **V2-1108 — Add first-class `WebResearchHost` provider.**  
+  Structured capability family must cover `web.search`, `web.fetch`, `web.download`, `web.extract`, `web.get_metadata` and bounded `web.open_browser` fallback, with cancellation/timeout and deferred ToolRegistry exposure.
+
+- [ ] **V2-1109 — Add `FreshnessPolicy` and freshness-required completion gate.**  
+  Intents such as today/latest/current/still-effective/replaced/new-law/weather/news/current-price must require a current approved provider; model memory alone cannot complete them.
+
+- [ ] **V2-1110 — Add durable `WebEvidence` provenance and bounded web artifact flow.**  
+  Preserve evidence ID, URL, title, publisher, publish/effective/fetch times, source type, content hash and relevant excerpt; large HTML/PDF/downloads remain outside active context behind artifact/evidence handles.
+
+- [ ] **V2-1111 — Add typed legal/regulatory status model and verifier.**  
+  Distinguish REPLACED/AMENDED/SUPPLEMENTED/PARTIALLY_REPEALED/REPEALED/STILL_EFFECTIVE/NOT_YET_EFFECTIVE/UNKNOWN; prefer authoritative official sources and reject unsupported “newer means replaced” conclusions.
+
+- [ ] **V2-1112 — Expand structured Word/Excel provider namespaces in ToolRegistry.**  
+  Word must expose active document/selection, range/find/outline/paragraph/run/style/table/section/header-footer operations, replace/insert/format/save/export/verify plus native spelling/grammar candidates and legal-citation extraction; Excel must expose granular range/formula/style/merge/hidden/write/recalc/save/verify capabilities.
+
+- [ ] **V2-1113 — Add production AutoCAD provider/native-plugin bridge contract.**  
+  Target boundary: Agent → Tool/MCP provider → local IPC → C# AutoCAD plugin → DocumentLock → Transaction → Database; expose typed list/read/mutate/plot/verify families and deterministic scope/safety tests instead of arbitrary command execution as default mutation.
+
+- [ ] **V2-1114 — Integrate dynamic provider/plugin capability refresh into AgentOrchestrator.**  
+  Refresh capability metadata only at controlled task boundaries; never mutate the tool surface during an in-flight tool call; helper/provider restart must not require restarting the full H2 UI when avoidable.
+
+- [ ] **V2-1115 — Add canonical Word + legal-research end-to-end deterministic scenario.**  
+  Open/unsaved Word state → spelling candidates + legal citations → FreshnessPolicy → WebResearchHost authoritative evidence → typed legal relationships → scoped Word patch → re-read → verify/repair. Acceptance metric: Desktop pixel/computer-use calls = 0 when OfficeHost + WebResearchHost are sufficient.
+
 ---
 
 ## Phase 12 — acceptance gate before H2 Notes integration
 
-- [ ] **V2-1201 — Build final 30+ task acceptance corpus.**
+- [ ] **V2-1201 — Build final 30+ task acceptance corpus.**  
+  Corpus must explicitly include MCP provider lifecycle/scope, plugin install/update/rollback, filesystem/process/shell safety, WebResearchHost/freshness/legal research, AutoCAD structured-provider boundaries and the canonical Word + legal-research scenario.
 
 - [ ] **V2-1202 — Run each accepted model/provider configuration >= 3 times per task.**
 
-- [ ] **V2-1203 — Produce correctness report by task class.**
+- [ ] **V2-1203 — Produce correctness report by task class.**  
+  Report separate classes for core agent, MCP/providers, plugins/skills, filesystem/process/shell, Office, Desktop, Web/freshness, legal status and AutoCAD structured-provider flows.
 
-- [ ] **V2-1204 — Produce performance/cost report A(raw)/B(v1)/C(v2).**
+- [ ] **V2-1204 — Produce performance/cost report A(raw)/B(v1)/C(v2).**  
+  Include tool-schema/context size, provider reconnect/search latency, web bytes/artifact usage and plugin/skill discovery overhead where relevant.
 
-- [ ] **V2-1205 — Verify permission/scope safety gate: zero violations.**
+- [ ] **V2-1205 — Verify permission/scope safety gate: zero violations.**  
+  Scope includes MCP/provider isolation, plugin permissions, filesystem/process/shell side effects, Office/Desktop/Web/browser boundaries, AutoCAD bridge scope and secret-safe metadata.
 
 - [ ] **V2-1206 — Verify >=90% supported-task correctness gate.**
 
-- [ ] **V2-1207 — Verify context does not grow unbounded with long threads.**
+- [ ] **V2-1207 — Verify context does not grow unbounded with long threads.**  
+  Also verify bounded provider/tool schemas, plugin/skill catalogs and Web page/PDF evidence: full documents/pages/packages must not be replayed every turn.
 
-- [ ] **V2-1208 — Verify open Excel/Word unsaved-state workflows.**
+- [ ] **V2-1208 — Verify open Excel/Word unsaved-state workflows.**  
+  Include structured Word spelling/citation extraction and legal-reference patching while preserving unsaved edits and unrelated formatting/content.
 
-- [ ] **V2-1209 — Verify DesktopHost observe-after-act workflows.**
+- [ ] **V2-1209 — Verify DesktopHost observe-after-act workflows.**  
+  Also prove structured-adapter priority: canonical Word + legal research must use zero Desktop pixel/computer-use calls when OfficeHost + WebResearchHost are sufficient.
 
 - [ ] **V2-1210 — User acceptance decision.**  
+  Valid only after all MCP/Web/Plugin/Legal/AutoCAD/canonical-scenario requirements from `docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md` are evidenced.  
   **Do not integrate into H2 Notes before the user explicitly approves this gate.**
 
 ---
 
-## Phase 13 — future H2 Notes integration (blocked until V2-1210)
+## Phase 13 — future H2 Notes integration (blocked until V2-1210 and the normative MCP/Web/Plugin/Legal gate)
 
 - [ ] **V2-1301 — Design H2 Notes adapter boundary around accepted Agent Lab engine.**
 - [ ] **V2-1302 — Reuse H2 shared project memory/context router without coupling Agent Lab core to H2 UI.**
