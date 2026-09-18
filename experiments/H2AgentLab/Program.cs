@@ -66,6 +66,7 @@ public static class Program
         if (args.Contains("--mb-domain-neutral-capability-search-test")) return H2AgentLab.Capabilities.MbDomainNeutralCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-available-capability-search-test")) return H2AgentLab.Capabilities.MbAvailableCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-installed-capability-projection-test")) return H2AgentLab.Capabilities.MbInstalledCapabilityProjectionTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-available-capability-search-test")) return H2AgentLab.Capabilities.MbAvailableCapabilitySearchTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
