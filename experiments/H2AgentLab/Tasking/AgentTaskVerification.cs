@@ -72,7 +72,7 @@ public static class AgentTaskCompletionGate
             if (policy.RequiredVerifierIds.Count > 0)
                 throw new InvalidOperationException(
                     "Not-mechanically-verifiable completion cannot bypass explicitly required verifier(s).");
-            if (outcome.NonMechanicalEvidence.Count == 0)
+            if (!outcome.NonMechanicalEvidence.Any(x => x.Kind == AgentEvidenceKind.HostClassification))
                 throw new InvalidOperationException(
                     "Not-mechanically-verifiable completion requires explicit host classification evidence.");
             return;
