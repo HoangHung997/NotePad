@@ -163,6 +163,7 @@ public sealed class PluginManager
         }
 
         var previous = ReadActivation(pluginRoot)?.ActiveVersion;
+        var registered = ActivateIntoRegistry(manifest, finalRoot);
         WriteActivation(
             pluginRoot,
             new PluginActivationRecord(
@@ -170,7 +171,6 @@ public sealed class PluginManager
                 previous,
                 DateTime.UtcNow));
 
-        var registered = ActivateIntoRegistry(manifest, finalRoot);
         return new PluginInstallResult(
             manifest.Id,
             manifest.Version,
@@ -214,13 +214,13 @@ public sealed class PluginManager
 
         var previousManifest = ReadManifest(previousRoot);
         var current = activation.ActiveVersion;
+        ActivateIntoRegistry(previousManifest, previousRoot);
         WriteActivation(
             pluginRoot,
             new PluginActivationRecord(
                 previousManifest.Version,
                 current,
                 DateTime.UtcNow));
-        ActivateIntoRegistry(previousManifest, previousRoot);
         return previousManifest;
     }
 
@@ -300,28 +300,28 @@ public sealed class PluginManager
     {
         EnsureActivationBoundary();
         var providerId = "plugin." + manifest.Id;
-        _registry.UnregisterWhere(x =>
-            string.Equals(
-                x.Provenance?.ProviderId,
-                providerId,
-                StringComparison.Ordinal));
+        var descriptors = new List<ToolDescriptor>();
 
-        var registered = new List<string>();
         foreach (var tool in ReadToolDefinitions(versionRoot))
         {
             if (!manifest.Capabilities.Contains(tool.Name, StringComparer.Ordinal))
                 throw new InvalidDataException(
                     $"Plugin tool '{tool.Name}' is not declared in manifest capabilities.");
-            if (_registry.TryGet(tool.Name, out _))
+
+            if (_registry.TryGet(tool.Name, out var existing)
+                && !string.Equals(
+                    existing.Provenance?.ProviderId,
+                    providerId,
+                    StringComparison.Ordinal))
                 throw new InvalidOperationException(
                     $"Plugin tool '{tool.Name}' conflicts with an existing registered tool.");
 
             var executor = _resolver.Resolve(manifest, tool);
-            _registry.Register(new ToolDescriptor(
+            descriptors.Add(new ToolDescriptor(
                 tool.Name,
                 new ToolNamespace(
                     tool.Namespace,
-                    $"Plugin {manifest.Id}@{manifest.Version} capability family."),
+                    $"Plugin capability namespace '{tool.Namespace}'."),
                 tool.Description,
                 tool.Risk,
                 tool.Access,
@@ -339,9 +339,18 @@ public sealed class PluginManager
                     tool.ResourceScope),
                 serializationKey: tool.SerializationKey,
                 canProvideVerificationEvidence: false));
-            registered.Add(tool.Name);
         }
-        return registered;
+
+        _registry.UnregisterWhere(x =>
+            string.Equals(
+                x.Provenance?.ProviderId,
+                providerId,
+                StringComparison.Ordinal));
+
+        foreach (var descriptor in descriptors)
+            _registry.Register(descriptor);
+
+        return descriptors.Select(x => x.Name).ToArray();
     }
 
     private void ValidateToolDefinitions(
