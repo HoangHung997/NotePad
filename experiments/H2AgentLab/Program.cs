@@ -24,6 +24,7 @@ public static class Program
         if (args.Contains("--v2-session-context-test")) return V2SessionContextTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-artifact-store-test")) return V2ArtifactStoreTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-compaction-test")) return V2CompactionTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--v2-context-cache-test")) return V2ContextCacheTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-transport-contract-test")) return V2TransportContractTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-ollama-transport-test")) return V2OllamaTransportTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-chat-transport-test")) return V2ChatCompletionsTransportTests.Run(args[^1]).GetAwaiter().GetResult();
