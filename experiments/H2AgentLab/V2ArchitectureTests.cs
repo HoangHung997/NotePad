@@ -307,6 +307,56 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Context output depends on input enumeration order instead of relevance/sequence/source identity.");
         });
 
+        Test("AgentContextManager automatically triggers compaction under long-thread pressure", () =>
+        {
+            var budget = new AgentContextBudget
+            {
+                MaxTotalCharacters = 1_000,
+                MaxTaskContractCharacters = 100,
+                MaxCurrentStateCharacters = 100,
+                MaxRecentTurnsCharacters = 620,
+                MaxToolSummariesCharacters = 80,
+                MaxCompactedHistoryCharacters = 80,
+                MaxCharactersPerItem = 80,
+                MaxRecentTurns = 4,
+                MaxToolSummaries = 1
+            };
+            var turns = Enumerable.Range(0, 500)
+                .Select(i => new AgentContextTurn(
+                    $"turn-{i}",
+                    i % 2 == 0 ? AgentTransportMessageRole.User : AgentTransportMessageRole.Assistant,
+                    $"TURN_{i:D3}_" + new string('x', 220),
+                    i))
+                .ToArray();
+
+            var stressed = new AgentContextManager(budget).Build(new AgentContextInput(RecentTurns: turns));
+            if (stressed.Usage.TotalCharacters > budget.MaxTotalCharacters
+                || stressed.Pressure.ActiveCharacters != stressed.Usage.TotalCharacters)
+                throw new InvalidOperationException("Long-thread active context exceeded or misreported its hard budget.");
+            if (!stressed.Pressure.RequiresCompaction
+                || stressed.Pressure.CandidateCharacters <= budget.MaxTotalCharacters)
+                throw new InvalidOperationException("Long-thread pressure did not automatically request compaction.");
+            if (!stressed.Pressure.Reasons.Contains("recent-turns-dropped", StringComparer.Ordinal)
+                || !stressed.Pressure.Reasons.Contains("recent-turn-item-truncated", StringComparer.Ordinal))
+                throw new InvalidOperationException("Compaction trigger did not explain dropped/truncated recent-turn pressure.");
+            if (stressed.Usage.SelectedRecentTurns != 4 || stressed.Usage.DroppedRecentTurns != 496)
+                throw new InvalidOperationException("Long-thread bounded selection counts are wrong.");
+            if (!stressed.RecentTurnSourceIds.SequenceEqual(new[] { "turn-496", "turn-497", "turn-498", "turn-499" }))
+                throw new InvalidOperationException("Long-thread context did not retain the newest equally relevant turns deterministically.");
+            var active = stressed.RuntimeContext.WorkingState ?? "";
+            if (active.Contains("TURN_000_", StringComparison.Ordinal))
+                throw new InvalidOperationException("Old raw history leaked into bounded long-thread context.");
+
+            var small = new AgentContextManager(budget).Build(new AgentContextInput(
+                RecentTurns:
+                [
+                    new AgentContextTurn("small-1", AgentTransportMessageRole.User, "short question", 1),
+                    new AgentContextTurn("small-2", AgentTransportMessageRole.Assistant, "short answer", 2)
+                ]));
+            if (small.Pressure.RequiresCompaction || small.Pressure.Reasons.Count != 0)
+                throw new InvalidOperationException("Small bounded context triggered unnecessary compaction.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
