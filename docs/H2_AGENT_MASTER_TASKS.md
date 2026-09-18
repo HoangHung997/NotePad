@@ -395,7 +395,7 @@ Evidence: `Runtime/AgentRuntimePermission.cs` centralizes host authorization and
 
 ## [~] MB-41 — Wire artifacts/evidence into tool results
 
-Implementation note: MB-41 implementation and dedicated runtime evidence tests are wired; exact-head full regression CI is in progress.
+Implementation note: MB-41 implementation, v1 evidence metadata coverage and dedicated runtime evidence tests are wired; exact-head full regression CI is in progress.
 
 Goal:
 
