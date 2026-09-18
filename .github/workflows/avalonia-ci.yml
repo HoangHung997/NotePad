@@ -134,8 +134,8 @@ jobs:
         shell: pwsh
         run: |
           $out = Join-Path $env:RUNNER_TEMP 'h2-agent-v2-office-host'
-          $host = (Resolve-Path '.\experiments\H2AgentLab.OfficeHost\bin\Release\net10.0-windows\H2AgentLab.OfficeHost.exe').Path
-          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-office-host-test $out $host
+          $officeHostExe = (Resolve-Path '.\experiments\H2AgentLab.OfficeHost\bin\Release\net10.0-windows\H2AgentLab.OfficeHost.exe').Path
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --v2-office-host-test $out $officeHostExe
           Get-Content -LiteralPath (Join-Path $out 'v2-office-host-tests.txt')
 
       - name: Run H2 Agent Lab v2 transport contract tests
