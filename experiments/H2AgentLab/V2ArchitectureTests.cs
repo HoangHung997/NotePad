@@ -589,6 +589,63 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Verified mutating task did not complete.");
         });
 
+        Test("Fast path router classifies direct retrieval action and complex tasks without heavy direct schemas", () =>
+        {
+            static AgentTaskContract Contract(
+                string goal,
+                IEnumerable<string>? inputs = null,
+                IEnumerable<string>? changes = null,
+                AgentTaskRiskClass risk = AgentTaskRiskClass.ReadOnly)
+                => new(
+                    Guid.NewGuid(),
+                    goal,
+                    "workspace:/fixture",
+                    inputs,
+                    changes,
+                    null,
+                    null,
+                    [new AgentAcceptanceCriterion("done", "Requested outcome is satisfied.")],
+                    risk,
+                    new AgentVerificationPolicy(requireVerification: changes is not null));
+
+            var router = new AgentFastPathRouter();
+
+            var direct = router.Route(Contract("Explain the already-grounded result"));
+            if (direct.RouteClass != AgentTaskRouteClass.Direct
+                || direct.SchemaMode != AgentRouteSchemaMode.None
+                || direct.InitialToolNamespaces.Count != 0)
+                throw new InvalidOperationException("Direct route loaded or requested tool schema material.");
+
+            var retrieval = router.Route(
+                Contract("Read the supplied source", inputs: ["artifact-handle"]),
+                new AgentTaskRoutingSignals(NeedsExternalRetrieval: true));
+            if (retrieval.RouteClass != AgentTaskRouteClass.Retrieval
+                || retrieval.SchemaMode != AgentRouteSchemaMode.RetrievalOnly
+                || !retrieval.InitialToolNamespaces.SequenceEqual(new[] { "files" }))
+                throw new InvalidOperationException("Retrieval route did not stay files-only.");
+
+            var action = router.Route(
+                Contract("Modify the target", changes: ["update target"], risk: AgentTaskRiskClass.Medium));
+            if (action.RouteClass != AgentTaskRouteClass.Action
+                || action.SchemaMode != AgentRouteSchemaMode.DeferredToolSearch
+                || action.InitialToolNamespaces.Count != 0)
+                throw new InvalidOperationException("Action route eagerly loaded tool namespaces.");
+
+            var complex = router.Route(
+                Contract("Investigate and execute a multi-step task"),
+                new AgentTaskRoutingSignals(NeedsExternalRetrieval: true, NeedsAction: true, NeedsComplexPlanning: true));
+            if (complex.RouteClass != AgentTaskRouteClass.ComplexAgent
+                || complex.SchemaMode != AgentRouteSchemaMode.DeferredToolSearch
+                || complex.InitialToolNamespaces.Count != 0)
+                throw new InvalidOperationException("Complex route did not defer tool schema discovery.");
+
+            if (direct.InitialToolNamespaces.Any(x =>
+                    x.Equals("office", StringComparison.OrdinalIgnoreCase)
+                    || x.Equals("desktop", StringComparison.OrdinalIgnoreCase)
+                    || x.Equals("python", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Direct route exposed Office/Desktop/Python schemas.");
+        });
+
         Test("Preserved v1 deterministic suites remain callable", () =>
         {
             Func<string[], Task<int>> general = LabTests.Run;
