@@ -170,7 +170,8 @@ Rules:
   Evidence: `Tools/ToolSearchIndex.cs` provides deterministic Unicode lexical/BM25 ranking, exact-name boost and registry-version cache invalidation; architecture guard covers ranking, unchanged-cache reuse and invalidation. GitHub Actions run `35297813401` passed full build/regression/publish.
 
 - [~] **V2-0504 — Expose `tool_search` as initial callable tool.**  
-  Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.
+  Acceptance: model initially sees only stable core + namespace descriptions, not every detailed tool schema.  
+  Initial exposure implementation + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0505 — Load discovered tool schemas for subsequent model call.**  
   Acceptance: exact selected schemas are traceable; duplicates coalesced.
