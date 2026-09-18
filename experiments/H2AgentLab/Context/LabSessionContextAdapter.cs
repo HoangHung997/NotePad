@@ -4,7 +4,7 @@ namespace H2AgentLab.Context;
 
 /// <summary>
 /// V2 bridge from the durable LabSession journal into bounded active context. It deliberately does
-/// not call LabSession.Context(): only completed user/assistant conversation events are eligible for
+/// not call the legacy session context assembler: only completed user/assistant conversation events are eligible for
 /// recent-turn context, while recovery/script/unverified-draft and any future event kinds remain in
 /// the raw journal until a dedicated v2 context source explicitly models them.
 /// </summary>
