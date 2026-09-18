@@ -18,7 +18,7 @@ public sealed record FileVerificationEntry
         while (normalized.StartsWith("./", StringComparison.Ordinal))
             normalized = normalized[2..];
         if (normalized.Length == 0
-            || normalized.StartsWith('/', StringComparison.Ordinal)
+            || normalized.StartsWith("/", StringComparison.Ordinal)
             || normalized.Contains("../", StringComparison.Ordinal)
             || normalized.Contains("/..", StringComparison.Ordinal)
             || normalized.Any(char.IsControl))
