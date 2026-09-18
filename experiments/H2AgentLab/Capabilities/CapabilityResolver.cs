@@ -108,69 +108,40 @@ public sealed class CapabilityResolver
                 PackageDownloaded: false,
                 InstallationAttempted: false);
 
-        var candidates = new List<CapabilityResolutionCandidate>();
-        foreach (var package in availableCandidates)
-        {
-            var compatible = Version.TryParse(package.MinAgentVersion, out var minimum)
-                && minimum <= _agentVersion;
-            var allowed = compatible && _policy.AllowsMetadataCandidate(package);
-            var status = !compatible
-                ? CapabilityResolutionStatus.INCOMPATIBLE
-                : allowed
-                    ? CapabilityResolutionStatus.AVAILABLE
-                    : CapabilityResolutionStatus.BLOCKED_BY_POLICY;
-
-            var matchingSkills = package.Skills
-                .Select(skill => new
-                {
-                    Skill = skill,
-                    Score = Score(query, skill.Name, skill.Description)
-                })
-                .Where(x => x.Score > 0)
-                .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.Skill.SkillId, StringComparer.Ordinal)
-                .Take(5)
-                .ToArray();
-
-            if (matchingSkills.Length == 0)
+        var candidates = availableCandidates
+            .Select((package, index) =>
             {
-                candidates.Add(new CapabilityResolutionCandidate(
+                var compatible = Version.TryParse(
+                        package.MinAgentVersion,
+                        out var minimum)
+                    && minimum <= _agentVersion;
+                var allowed = compatible
+                    && _policy.AllowsMetadataCandidate(package);
+                var status = !compatible
+                    ? CapabilityResolutionStatus.INCOMPATIBLE
+                    : allowed
+                        ? CapabilityResolutionStatus.AVAILABLE
+                        : CapabilityResolutionStatus.BLOCKED_BY_POLICY;
+
+                return new CapabilityResolutionCandidate(
                     status,
                     package.PluginId,
-                    string.Join(" ", package.ToolSummaries),
+                    CompactDescription(package),
                     package.SourceId,
                     package.PluginId,
                     package.PluginVersion,
-                    null,
-                    Score(query, package.PluginId, string.Join(" ", package.ToolSummaries)),
-                    package));
-            }
-            else
-            {
-                foreach (var match in matchingSkills)
-                {
-                    candidates.Add(new CapabilityResolutionCandidate(
-                        status,
-                        match.Skill.SkillId,
-                        match.Skill.Description,
-                        package.SourceId,
-                        package.PluginId,
-                        package.PluginVersion,
-                        match.Skill.SkillId,
-                        match.Score,
-                        package));
-                }
-            }
-        }
-
-        var ordered = candidates
-            .OrderByDescending(x => x.Score)
-            .ThenBy(x => x.CapabilityId, StringComparer.Ordinal)
-            .Take(12)
+                    SkillId: null,
+                    Score: 100 - index,
+                    package);
+            })
             .ToArray();
-        var overall = ordered.Any(x => x.Status == CapabilityResolutionStatus.AVAILABLE)
+
+        var ordered = candidates;
+        var overall = ordered.Any(x =>
+                x.Status == CapabilityResolutionStatus.AVAILABLE)
             ? CapabilityResolutionStatus.AVAILABLE
-            : ordered.Any(x => x.Status == CapabilityResolutionStatus.BLOCKED_BY_POLICY)
+            : ordered.Any(x =>
+                x.Status == CapabilityResolutionStatus.BLOCKED_BY_POLICY)
                 ? CapabilityResolutionStatus.BLOCKED_BY_POLICY
                 : CapabilityResolutionStatus.INCOMPATIBLE;
 
@@ -183,18 +154,18 @@ public sealed class CapabilityResolver
             InstallationAttempted: false);
     }
 
-    private static double Score(string query, string name, string description)
+    private static string CompactDescription(
+        AvailableCapabilityRecord package)
     {
-        var q = CapabilityRanking.LexicalTerms(query).Distinct(StringComparer.Ordinal).ToArray();
-        var n = CapabilityRanking.LexicalTerms(name).ToHashSet(StringComparer.Ordinal);
-        var d = CapabilityRanking.LexicalTerms(description).ToHashSet(StringComparer.Ordinal);
-        var score = 0d;
-        foreach (var term in q)
-        {
-            if (d.Contains(term)) score += 4;
-            if (n.Contains(term)) score += 2;
-        }
-        return score;
+        var parts = package.ToolSummaries
+            .Concat(package.Skills.Select(x => x.Description))
+            .Concat(package.Providers)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Take(12)
+            .ToArray();
+        return parts.Length == 0
+            ? $"Extension package {package.PluginId}."
+            : string.Join(" ", parts);
     }
 }
 
