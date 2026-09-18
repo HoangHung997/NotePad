@@ -160,14 +160,14 @@ public static class PythonFallbackRouter
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         ArgumentNullException.ThrowIfNull(selected);
 
-        if (DocumentToolPreference.IsExplicitPythonIntent(query))
-            return true;
+        var candidate = selected.FirstOrDefault(x =>
+            x.Descriptor.Name == "run_python");
+        if (candidate is null)
+            return false;
 
-        var hasRunPython = selected.Any(x => x.Descriptor.Name == "run_python");
-        if (!hasRunPython) return false;
-
-        return !selected.Any(x =>
-            x.Descriptor.Name != "run_python"
-            && x.Descriptor.Namespace.Name != "python");
+        var preference = candidate.Descriptor.Preference;
+        return preference is null
+            || !preference.ExplicitRequestOnly
+            || preference.MatchesExplicitRequest(query);
     }
 }
