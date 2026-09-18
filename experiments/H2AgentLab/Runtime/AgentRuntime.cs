@@ -50,6 +50,9 @@ public sealed record AgentRuntimeVerificationContext(
 {
     public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
         = Array.Empty<AgentEvidenceReference>();
+
+    public IReadOnlyDictionary<string, string> RawToolOutputs { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
 }
 
 public interface IAgentRuntimeVerifier
@@ -215,7 +218,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                             execution.Calls,
                             results)
                         {
-                            Evidence = execution.Evidence
+                            Evidence = execution.Evidence,
+                            RawToolOutputs = execution.RawToolOutputs
                         },
                         cancellationToken).ConfigureAwait(false);
 
@@ -286,6 +290,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
         var results = new AgentToolResult?[transportCalls.Count];
         var evidence = new List<AgentEvidenceReference>();
+        var rawToolOutputs = new Dictionary<string, string>(StringComparer.Ordinal);
         var scheduled = new List<(int OriginalIndex, ToolExecutionRequest Request, AgentRuntimePermissionRequest Permission)>();
         var newlyLoadedSchemas = new List<AgentToolDefinition>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
@@ -416,6 +421,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var original = scheduled[i].OriginalIndex;
                 var scheduledResult = scheduledResults[i];
                 var rawOutput = scheduledResult.Output ?? "";
+                rawToolOutputs[calls[original].Id] = rawOutput;
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
                     rawOutput);
@@ -447,7 +453,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 .GroupBy(x => x.Name, StringComparer.Ordinal)
                 .Select(x => x.First())
                 .ToArray(),
-            evidence.ToArray());
+            evidence.ToArray(),
+            rawToolOutputs);
     }
 
     private static string? ResourceKey(ToolDescriptor descriptor)
@@ -618,7 +625,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         IReadOnlyList<global::H2AgentLab.ToolCall> Calls,
         IReadOnlyList<AgentToolResult> Results,
         IReadOnlyList<AgentToolDefinition> NewlyLoadedTools,
-        IReadOnlyList<AgentEvidenceReference> Evidence);
+        IReadOnlyList<AgentEvidenceReference> Evidence,
+        IReadOnlyDictionary<string, string> RawToolOutputs);
 
     private sealed class MutableUsage
     {
