@@ -416,55 +416,69 @@ Rules:
 
 ## Phase 11 — end-to-end v2 loop, WebResearchHost, structured providers and UI
 
-- [~] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
+- [x] **V2-1101 — Move Lab UI send path to AgentOrchestrator.**  
   Keep a temporary v1 diagnostic mode only if needed for A/B comparison.  
-  Phase 11 implementation + dedicated 15-case acceptance suite added; Phase 11 suite reached 14/15; legal-citation parser rebuilt without backslash literals; full CI verification retry in progress.
+  Evidence: `LabWindow.Send` now routes through `AgentOrchestratedRun`; `AgentOrchestrator` owns task/route/state while v1 `AgentRunner` remains only as the temporary compatibility executor. GitHub Actions run `35326883411`: PASS 1101.
 
-- [ ] **V2-1102 — Add UI progress based on typed trace events.**  
-  Show meaningful phase/tool/verifier progress without exposing chain-of-thought.
+- [x] **V2-1102 — Add UI progress based on typed trace events.**  
+  Show meaningful phase/tool/verifier progress without exposing chain-of-thought.  
+  Evidence: `AgentTraceEventStream` exposes Phase/Tool/Verification/Evidence/Warning/Final progress codes only; UI consumes typed trace events without exposing model chain-of-thought. Run `35326883411`: PASS 1102.
 
-- [ ] **V2-1103 — Add task/criterion/evidence inspection panel.**  
-  User can see what is required, what passed and what failed.
+- [x] **V2-1103 — Add task/criterion/evidence inspection panel.**  
+  User can see what is required, what passed and what failed.  
+  Evidence: `AgentInspectionSnapshot` carries task state/route/criteria/evidence counts/trace/diagnostics and Lab UI exposes “Tác vụ · tiêu chí · bằng chứng”. Run `35326883411`: PASS 1103.
 
-- [ ] **V2-1104 — Add cancel behavior across transport/tool/helper processes.**
+- [x] **V2-1104 — Add cancel behavior across transport/tool/helper processes.**  
+  Evidence: `AgentCancellationCoordinator` propagates cancellation through linked transport/tool tokens and registered helper-abort callbacks with deterministic cleanup. Run `35326883411`: PASS 1104.
 
-- [ ] **V2-1105 — Add restart/resume of durable task state.**  
-  Never resume an uncertain mutation by blindly repeating it; observe current state first.
+- [x] **V2-1105 — Add restart/resume of durable task state.**  
+  Never resume an uncertain mutation by blindly repeating it; observe current state first.  
+  Evidence: `DurableAgentTaskStore` + `AgentResumePlanner` persist mutation state and force ReobserveBeforeContinuing/VerifyObservedMutation for uncertain mutations; `MayRepeatMutation=false`. Run `35326883411`: PASS 1105.
 
-- [ ] **V2-1106 — Add compaction UI/diagnostic counters.**
+- [x] **V2-1106 — Add compaction UI/diagnostic counters.**  
+  Evidence: `AgentDiagnosticsSnapshot` reports active/candidate context, pressure reasons, dropped turns/tool summaries and truncation flags; Lab inspection UI renders those counters. Run `35326883411`: PASS 1106.
 
-- [ ] **V2-1107 — Run complete deterministic regression suite.**  
-  Must include existing v1 tests, new v2 tests and shared H2 Core tests.
+- [x] **V2-1107 — Run complete deterministic regression suite.**  
+  Must include existing v1 tests, new v2 tests and shared H2 Core tests.  
+  Evidence: CI acceptance asserts the shared H2 Notes tests, v1 baseline and complete v2 suite chain are present; final run `35326883411` passed all regression, host, transport and publish steps. PASS 1107.
 
-- [ ] **V2-1108 — Add first-class `WebResearchHost` provider.**  
-  Structured capability family must cover `web.search`, `web.fetch`, `web.download`, `web.extract`, `web.get_metadata` and bounded `web.open_browser` fallback, with cancellation/timeout and deferred ToolRegistry exposure.
+- [x] **V2-1108 — Add first-class `WebResearchHost` provider.**  
+  Structured capability family must cover `web.search`, `web.fetch`, `web.download`, `web.extract`, `web.get_metadata` and bounded `web.open_browser` fallback, with cancellation/timeout and deferred ToolRegistry exposure.  
+  Evidence: `Web/WebResearchHost.cs` implements all six structured capabilities behind provider contracts and selected-schema loading; HTTP backend bounds downloads/extraction and preserves browser as explicit fallback. Run `35326883411`: PASS 1108.
 
-- [ ] **V2-1109 — Add `FreshnessPolicy` and freshness-required completion gate.**  
-  Intents such as today/latest/current/still-effective/replaced/new-law/weather/news/current-price must require a current approved provider; model memory alone cannot complete them.
+- [x] **V2-1109 — Add `FreshnessPolicy` and freshness-required completion gate.**  
+  Intents such as today/latest/current/still-effective/replaced/new-law/weather/news/current-price must require a current approved provider; model memory alone cannot complete them.  
+  Evidence: `FreshnessPolicy` distinguishes CurrentWeb vs CurrentAuthoritative and `FreshnessCompletionGate` blocks completion without sufficiently recent approved evidence. Run `35326883411`: PASS 1109.
 
-- [ ] **V2-1110 — Add durable `WebEvidence` provenance and bounded web artifact flow.**  
-  Preserve evidence ID, URL, title, publisher, publish/effective/fetch times, source type, content hash and relevant excerpt; large HTML/PDF/downloads remain outside active context behind artifact/evidence handles.
+- [x] **V2-1110 — Add durable `WebEvidence` provenance and bounded web artifact flow.**  
+  Preserve evidence ID, URL, title, publisher, publish/effective/fetch times, source type, content hash and relevant excerpt; large HTML/PDF/downloads remain outside active context behind artifact/evidence handles.  
+  Evidence: `WebEvidenceStore` persists bounded metadata/excerpt plus hash-verified body artifacts; active-context projection is capped and never replays full fetched bodies. Run `35326883411`: PASS 1110.
 
-- [ ] **V2-1111 — Add typed legal/regulatory status model and verifier.**  
-  Distinguish REPLACED/AMENDED/SUPPLEMENTED/PARTIALLY_REPEALED/REPEALED/STILL_EFFECTIVE/NOT_YET_EFFECTIVE/UNKNOWN; prefer authoritative official sources and reject unsupported “newer means replaced” conclusions.
+- [x] **V2-1111 — Add typed legal/regulatory status model and verifier.**  
+  Distinguish REPLACED/AMENDED/SUPPLEMENTED/PARTIALLY_REPEALED/REPEALED/STILL_EFFECTIVE/NOT_YET_EFFECTIVE/UNKNOWN; prefer authoritative official sources and reject unsupported “newer means replaced” conclusions.  
+  Evidence: `LegalDocumentStatus`/typed relationships + `LegalStatusVerifier` require authoritative/primary evidence for legal-effect claims and reject replacement/amendment claims lacking typed relationship evidence. Run `35326883411`: PASS 1111.
 
-- [ ] **V2-1112 — Expand structured Word/Excel provider namespaces in ToolRegistry.**  
-  Word must expose active document/selection, range/find/outline/paragraph/run/style/table/section/header-footer operations, replace/insert/format/save/export/verify plus native spelling/grammar candidates and legal-citation extraction; Excel must expose granular range/formula/style/merge/hidden/write/recalc/save/verify capabilities.
+- [x] **V2-1112 — Expand structured Word/Excel provider namespaces in ToolRegistry.**  
+  Word must expose active document/selection, range/find/outline/paragraph/run/style/table/section/header-footer operations, replace/insert/format/save/export/verify plus native spelling/grammar candidates and legal-citation extraction; Excel must expose granular range/formula/style/merge/hidden/write/recalc/save/verify capabilities.  
+  Evidence: `StructuredOfficeCapabilityCatalog` registers the complete required Word/Excel names; language evidence contracts cover spelling/grammar/legal citations and deterministic citation extraction. Run `35326883411`: PASS 1112.
 
-- [ ] **V2-1113 — Add production AutoCAD provider/native-plugin bridge contract.**  
-  Target boundary: Agent → Tool/MCP provider → local IPC → C# AutoCAD plugin → DocumentLock → Transaction → Database; expose typed list/read/mutate/plot/verify families and deterministic scope/safety tests instead of arbitrary command execution as default mutation.
+- [x] **V2-1113 — Add production AutoCAD provider/native-plugin bridge contract.**  
+  Target boundary: Agent → Tool/MCP provider → local IPC → C# AutoCAD plugin → DocumentLock → Transaction → Database; expose typed list/read/mutate/plot/verify families and deterministic scope/safety tests instead of arbitrary command execution as default mutation.  
+  Evidence: `Cad/AutoCadProviderContract.cs` defines document/entity state-token contracts and typed list/read/update/plot/verify descriptors; mutation policy rejects arbitrary command/script/sendkeys fields. Run `35326883411`: PASS 1113.
 
-- [ ] **V2-1114 — Integrate dynamic provider/plugin capability refresh into AgentOrchestrator.**  
-  Refresh capability metadata only at controlled task boundaries; never mutate the tool surface during an in-flight tool call; helper/provider restart must not require restarting the full H2 UI when avoidable.
+- [x] **V2-1114 — Integrate dynamic provider/plugin capability refresh into AgentOrchestrator.**  
+  Refresh capability metadata only at controlled task boundaries; never mutate the tool surface during an in-flight tool call; helper/provider restart must not require restarting the full H2 UI when avoidable.  
+  Evidence: `AgentCapabilityRefreshCoordinator` tracks source versions, refreshes only at task boundaries and rejects registry mutation while a tool call is in flight; `AgentOrchestrator` owns the boundary. Run `35326883411`: PASS 1114.
 
-- [ ] **V2-1115 — Add canonical Word + legal-research end-to-end deterministic scenario.**  
-  Open/unsaved Word state → spelling candidates + legal citations → FreshnessPolicy → WebResearchHost authoritative evidence → typed legal relationships → scoped Word patch → re-read → verify/repair. Acceptance metric: Desktop pixel/computer-use calls = 0 when OfficeHost + WebResearchHost are sufficient.
+- [x] **V2-1115 — Add canonical Word + legal-research end-to-end deterministic scenario.**  
+  Open/unsaved Word state → spelling candidates + legal citations → FreshnessPolicy → WebResearchHost authoritative evidence → typed legal relationships → scoped Word patch → re-read → verify/repair. Acceptance metric: Desktop pixel/computer-use calls = 0 when OfficeHost + WebResearchHost are sufficient.  
+  Evidence: `CanonicalWordLegalScenario` executes unsaved structured Word read → spelling/citation extraction → authoritative freshness/web evidence → typed legal verification → scoped patch → live reread/preservation verification and hard-fails if Desktop calls are nonzero. CI run `35326883411`: PASS 1115; Phase 11 suite 15 passed, 0 failed.
 
 ---
 
 ## Phase 12 — acceptance gate before H2 Notes integration
 
-- [ ] **V2-1201 — Build final 30+ task acceptance corpus.**  
+- [~] **V2-1201 — Build final 30+ task acceptance corpus.**  
   Corpus must explicitly include MCP provider lifecycle/scope, plugin install/update/rollback, filesystem/process/shell safety, WebResearchHost/freshness/legal research, AutoCAD structured-provider boundaries and the canonical Word + legal-research scenario.
 
 - [ ] **V2-1202 — Run each accepted model/provider configuration >= 3 times per task.**
@@ -507,4 +521,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-1101 — Move Lab UI send path to AgentOrchestrator`.
+**Active task:** `V2-1201 — Build final 30+ task acceptance corpus`.
