@@ -477,7 +477,7 @@ Rules:
 
 - [~] **V2-1116 — Add unified skill-source abstraction and canonical skill envelope.**  
   Built-in and plugin skills must share one logical search path using bounded name + description + provenance metadata; selected skills load progressively as metadata → SKILL.md → on-demand references/scripts/assets.  
-  Refinement implementation + dedicated 7-case acceptance suite added; semantic tokenizer fix applied; full CI retry in progress.
+  Refinement implementation + dedicated 7-case acceptance suite added; stopword-safe semantic routing fix applied; full CI retry in progress.
 
 - [ ] **V2-1117 — Add InstalledCapabilityIndex + AvailableCapabilityIndex.**  
   Installed index rebuilds from active built-ins/plugins/providers without network; available index rebuilds from compact cached catalog metadata only and never stores full SKILL.md/reference/tool schemas.
