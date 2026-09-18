@@ -221,11 +221,11 @@ Rules:
 
 ## Phase 07 — document/file tools and H2 Notes reuse
 
-- [~] **V2-0701 — Wrap `AiDocuments` as Lab document-inspection service.**  
+- [x] **V2-0701 — Wrap `AiDocuments` as Lab document-inspection service.**  
   Reuse H2 Core safety/size/hash/Office extraction rather than duplicate readers.  
-  Thin H2 Core adapter + architecture guard added; full CI verification in progress.
+  Evidence: `Documents/LabDocumentInspectionService.cs` is a thin adapter over `AiDocuments.Read`; architecture guard proves extracted text/hash/MIME/safety stay identical to H2 Core. GitHub Actions run `35306375793` passed full regression/publish.
 
-- [ ] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
+- [~] **V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter.**  
   `AiPdfProcessor`/portable OCR only when task requires PDF/image text/layout.
 
 - [ ] **V2-0703 — Add deterministic closed-XLSX snapshot model.**  
@@ -396,4 +396,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0701 — Wrap AiDocuments as Lab document-inspection service`.
+**Active task:** `V2-0702 — Reuse H2 PDF/OCR pipeline in Lab adapter`.
