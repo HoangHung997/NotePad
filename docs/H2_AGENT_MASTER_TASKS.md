@@ -135,6 +135,8 @@ Acceptance:
 - runtime has no dependency on `AgentRunner`;
 - cancellation works.
 
+Implementation/evidence in progress: `Runtime/AgentRuntime.cs` owns bounded prompt/context assembly, deferred tool search/schema loading, ToolRegistry/Scheduler execution, provider-neutral continuation, verification feedback/repair continuation and final completion gate. `Runtime/MbAgentRuntimeTests.cs` adds deterministic discovery→tool→final, verifier repair, cancellation and no-AgentRunner guards.
+
 ---
 
 ## [ ] MB-11 — Wire AgentOrchestrator to AgentRuntime
