@@ -53,6 +53,5 @@ internal static class OfficeHostSafety
         => Sha256(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
 
     public static string StableSessionId(params string[] parts)
-        => "office-" + Sha256(Encoding.UTF8.GetBytes(string.Join("
-", parts)))[..24];
+        => "office-" + Sha256(Encoding.UTF8.GetBytes(string.Join("\n", parts)))[..24];
 }
