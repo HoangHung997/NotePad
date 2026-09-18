@@ -85,7 +85,7 @@ public sealed class ClosedWorkbookSnapshotReader
         {
             var nameValue = sheet.Name?.Value
                 ?? throw new InvalidDataException("Excel sheet is missing a name.");
-            var state = sheet.State?.Value.ToString() ?? "Visible";
+            var state = NormalizeSheetState(sheet.State?.Value.ToString());
             if (sheet.Id?.Value is not { Length: > 0 } relationshipId
                 || main.GetPartById(relationshipId) is not WorksheetPart worksheetPart)
             {
@@ -151,6 +151,16 @@ public sealed class ClosedWorkbookSnapshotReader
         return new ClosedWorkbookSnapshot(
             attachment.Sha256.ToLowerInvariant(),
             sheets.ToArray());
+    }
+
+    private static string NormalizeSheetState(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Visible";
+        if (string.Equals(value, "hidden", StringComparison.OrdinalIgnoreCase)) return "Hidden";
+        if (string.Equals(value, "veryHidden", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "veryhidden", StringComparison.OrdinalIgnoreCase))
+            return "VeryHidden";
+        return "Visible";
     }
 
     private static ClosedCellSnapshot SnapshotCell(
