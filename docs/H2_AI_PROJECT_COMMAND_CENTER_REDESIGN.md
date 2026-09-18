@@ -615,18 +615,19 @@ AI Project Command Center UI
 
 ## 19. Phase-13 mandatory reading
 
-Before redesigning H2 Notes after Agent Lab acceptance, the implementer/reviewer must read:
+`docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md` is **not deferred Phase-13 backlog**. It is being consumed during Agent Lab implementation now and its accepted requirements must be folded into the final Agent Lab spec/tracker and verified engine before H2 integration.
+
+Therefore, after Agent Lab acceptance, the two additional H2-specific documents that must be read before redesign/integration are:
 
 1. `docs/H2_AI_PROJECT_COMMAND_CENTER_REDESIGN.md`
-2. `docs/H2_AGENT_MCP_WEB_OFFICE_REQUIREMENTS.md`
-3. `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
-4. final Agent Lab spec/tracker
+2. `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
 
-These documents jointly define:
-- product UX direction;
-- Agent capability requirements;
-- known non-AI product defects;
-- accepted Agent engine behavior.
+The final accepted Agent Lab spec/tracker remains the source of truth for Agent capability behavior; it should already include the MCP/Web/Office/plugin/tool requirements implemented during Agent Lab work.
+
+These sources jointly define:
+- future H2 product UX direction;
+- known non-AI H2 product defects and robustness gaps;
+- the already-accepted Agent engine behavior that H2 must integrate without downgrading.
 
 ---
 
