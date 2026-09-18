@@ -205,7 +205,7 @@ public sealed class PluginManager
         if (active is null)
             return Array.Empty<PluginCatalogEntry>();
 
-        var activeVersion = Version.Parse(active.Value.Manifest.Version);
+        var activeVersion = Version.Parse(active.Manifest.Version);
         return catalog.All
             .Where(x => x.Id == pluginId
                 && Version.Parse(x.Version) > activeVersion
@@ -284,10 +284,10 @@ public sealed class PluginManager
     {
         var active = GetActive(pluginId)
             ?? throw new InvalidOperationException("Plugin is not active.");
-        var manifest = active.Value.Manifest;
+        var manifest = active.Manifest;
         var index = new PluginCapabilityIndex();
-        index.Rebuild([(manifest, active.Value.VersionRoot)]);
-        var tools = ReadToolDefinitions(active.Value.VersionRoot);
+        index.Rebuild(new[] { (manifest, active.VersionRoot) });
+        var tools = ReadToolDefinitions(active.VersionRoot);
         return new PluginVersionEvidence(
             manifest.Id,
             manifest.Version,
