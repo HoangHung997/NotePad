@@ -66,7 +66,7 @@ public sealed class MissingCapabilityContinuation
         {
             var selected = SelectInstalledSkill(originalQuery);
             var content = _skills.Read(selected.Identity);
-            var resources = LoadExplicitResources(content);
+            var resources = Array.Empty<SkillResourceContent>();
             trace.Add(
                 AgentTraceEventKind.Phase,
                 "capability-installed",
@@ -160,14 +160,7 @@ public sealed class MissingCapabilityContinuation
             "skill-loaded",
             $"Loaded selected SKILL.md {selectedSkill.Identity.SkillId}@sha256:{selectedSkill.Identity.Sha256}.");
 
-        var loadedResources = LoadExplicitResources(skillContent);
-        foreach (var resource in loadedResources)
-        {
-            trace.Add(
-                AgentTraceEventKind.Evidence,
-                "skill-resource-loaded",
-                $"Loaded selected resource {resource.RelativePath}@sha256:{resource.Sha256}.");
-        }
+        var loadedResources = Array.Empty<SkillResourceContent>();
 
         var revision = TaskCapabilitySnapshotBuilder.ReviseAfterExplicitInstall(
             pinGuard.Current,
@@ -209,33 +202,5 @@ public sealed class MissingCapabilityContinuation
                 "Installed capability index refreshed, but the selected skill is not discoverable from the original task description.");
     }
 
-    private IReadOnlyList<SkillResourceContent> LoadExplicitResources(
-        SkillContent content)
-    {
-        var requested = ParseResourceDirectives(content.EntryPoint)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var allowed = content.AvailableResources.ToHashSet(StringComparer.Ordinal);
-        return requested
-            .Where(allowed.Contains)
-            .Select(path => _skills.ReadResource(content.Summary.Identity, path))
-            .ToArray();
-    }
 
-    internal static IReadOnlyList<string> ParseResourceDirectives(string entryPoint)
-    {
-        entryPoint ??= "";
-        var result = new List<string>();
-        foreach (var raw in entryPoint.Split((char)10))
-        {
-            var line = raw.Trim();
-            const string prefix = "resource:";
-            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                continue;
-            var path = line[prefix.Length..].Trim().Replace((char)92, '/');
-            if (path.Length > 0)
-                result.Add(path);
-        }
-        return result;
-    }
 }
