@@ -178,6 +178,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-orchestrator-runtime-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-orchestrator-runtime-tests.txt')
 
+      - name: Run H2 Agent MB-12 provider runtime tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-provider-runtime'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-provider-runtime-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-provider-runtime-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
