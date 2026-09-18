@@ -260,14 +260,23 @@ public sealed class BuiltInSkillSource : ISkillSource
 
     internal static IEnumerable<string> Tokens(string value)
     {
-        foreach (Match match in Regex.Matches(
-            (value ?? "").ToLowerInvariant().Replace('_', ' ').Replace('-', ' '),
-            @"[p{L}p{N}]+",
-            RegexOptions.CultureInvariant))
+        value ??= "";
+        var builder = new StringBuilder();
+        foreach (var ch in value.ToLowerInvariant())
         {
-            if (match.Value.Length > 1)
-                yield return match.Value;
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(ch);
+                continue;
+            }
+
+            if (builder.Length > 1)
+                yield return builder.ToString();
+            builder.Clear();
         }
+
+        if (builder.Length > 1)
+            yield return builder.ToString();
     }
 
     internal static string HashFile(string path)
