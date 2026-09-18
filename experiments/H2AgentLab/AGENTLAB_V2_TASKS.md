@@ -185,15 +185,15 @@ Rules:
   Preserve progressive `SKILL.md` loading; remember skill hash/version within a task so the model does not reread unchanged guidance repeatedly.  
   Evidence: `DeferredSkillSession` delegates validation/content to v1 `SkillCatalog`, records per-task SHA-256 versions, suppresses unchanged content and invalidates on source stamp change; skills remain deferred registry tools. GitHub Actions run `35299208295` passed full build/regression/publish.
 
-- [~] **V2-0508 — Tool-search regression/performance tests.**  
+- [x] **V2-0508 — Tool-search regression/performance tests.**  
   Verify relevant-tool ranking, stable cache, bounded schema tokens and mutation serialization.  
-  Dedicated CI suite added; compile fix applied; final full CI verification in progress.
+  Evidence: dedicated `Tools/V2ToolRegistryTests.cs` suite verifies representative tool ranking, registry-version cache stability, 1,000-query lexical performance, bounded deferred schema payload and same-resource mutation serialization. GitHub Actions run `35301446171` passed the dedicated tool-registry suite plus full H2 Notes regression, Agent Lab build, v1 baseline, every v2 suite, Windows x64 publish and artifact upload.
 
 ---
 
 ## Phase 06 — verification framework
 
-- [ ] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
+- [~] **V2-0601 — Add `VerificationReport` / `VerificationFailure`.**  
   Machine-readable pass/fail per criterion with evidence IDs.
 
 - [ ] **V2-0602 — Add file/hash/scope verifier.**  
@@ -389,4 +389,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0508 — Tool-search regression/performance tests`.
+**Active task:** `V2-0601 — Add VerificationReport / VerificationFailure`.
