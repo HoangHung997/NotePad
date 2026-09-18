@@ -3,6 +3,7 @@ using H2AgentLab.Metrics;
 using H2AgentLab.Session;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
+using H2AgentLab.Verification;
 using H2Notes.Core;
 
 namespace H2AgentLab.Runtime;
@@ -44,10 +45,18 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 
         var registry = V1ToolRegistryAdapter.Create(tools);
         var transport = _transportFactory.Create(profile, apiKey, telemetry);
+        var verifier = new AgentRuntimeDomainVerifierRouter(
+        [
+            new FileRuntimeDomainVerifier(tools.Workspace),
+            new PythonRuntimeDomainVerifier(tools.Workspace, tools.StateRoot),
+            new StructuredOfficeRuntimeDomainVerifier()
+        ]);
+
         return new AgentRuntime(
             transport,
             contextManager,
             registry,
+            verifier: verifier,
             permissionPolicy: new ScopedAgentRuntimePermissionPolicy(
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
