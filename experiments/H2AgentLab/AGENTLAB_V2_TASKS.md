@@ -142,7 +142,8 @@ Rules:
   Evidence: `AgentTaskCompletionGate` + protected `Complete(...)` API reject direct completion, failed verification and missing required verifiers; architecture guard proves verified mutation is the only completion path. GitHub Actions run `35294254411` passed full build/regression/publish.
 
 - [~] **V2-0405 — Add fast-path router.**  
-  Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.
+  Classes: Direct, Retrieval, Action, ComplexAgent. Direct path must not load Office/Desktop/Python schemas.  
+  Deterministic router + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0406 — Add `AgentOrchestrator` skeleton around existing runner/execution pieces.**  
   Existing AgentRunner retained as compatibility path until migration completes.
