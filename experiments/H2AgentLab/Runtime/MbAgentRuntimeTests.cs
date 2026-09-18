@@ -217,7 +217,7 @@ public static class MbAgentRuntimeTests
             AgentToolAccess.ReadOnly,
             AgentToolRisk.Low,
             supportsParallel: true,
-            execute ?? ((call, ct) => ValueTask.FromResult("{"value":"fixture-value"}")),
+            execute ?? ((call, ct) => ValueTask.FromResult(JsonSerializer.Serialize(new { value = "fixture-value" }))),
             resourceScope: null);
 
     private static ToolDescriptor WriteTool()
@@ -313,7 +313,7 @@ public static class MbAgentRuntimeTests
             yield return AgentTransportEvent.Tool(new(
                 "search-1",
                 DeferredToolDiscovery.SearchToolName,
-                "{"query":"fixture read evidence"}"));
+                JsonSerializer.Serialize(new { query = "fixture read evidence" })));
             yield return AgentTransportEvent.Meter(new(InputTokens: 10, OutputTokens: 1));
             await Task.Yield();
             yield return AgentTransportEvent.Complete("r1", "tool_calls");
@@ -381,7 +381,7 @@ public static class MbAgentRuntimeTests
             yield return AgentTransportEvent.Tool(new(
                 "search-write",
                 DeferredToolDiscovery.SearchToolName,
-                "{"query":"set fixture value"}"));
+                JsonSerializer.Serialize(new { query = "set fixture value" })));
             await Task.Yield();
             yield return AgentTransportEvent.Complete("w1", "tool_calls");
         }
@@ -400,7 +400,7 @@ public static class MbAgentRuntimeTests
                 yield return AgentTransportEvent.Tool(new(
                     "write-bad",
                     "fixture.write",
-                    "{"value":"bad"}"));
+                    JsonSerializer.Serialize(new { value = "bad" })));
                 await Task.Yield();
                 yield return AgentTransportEvent.Complete("w2", "tool_calls");
                 yield break;
@@ -418,7 +418,7 @@ public static class MbAgentRuntimeTests
                 yield return AgentTransportEvent.Tool(new(
                     "write-good",
                     "fixture.write",
-                    "{"value":"good"}"));
+                    JsonSerializer.Serialize(new { value = "good" })));
                 await Task.Yield();
                 yield return AgentTransportEvent.Complete("w3", "tool_calls");
                 yield break;
