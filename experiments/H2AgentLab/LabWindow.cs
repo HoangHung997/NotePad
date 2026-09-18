@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using H2AgentLab.Metrics;
+using H2AgentLab.Tasking;
 using H2Notes.Core;
 
 namespace H2AgentLab;
@@ -31,6 +32,7 @@ public sealed class LabWindow : Window
     private WindowTarget? _target;
     private Task? _runTask;
     private bool _historyHealthy = true;
+    private AgentInspectionSnapshot? _lastInspection;
     public LabWindow()
     {
         Title = "H2 Agent Lab · Bản thử độc lập"; Width = 1180; Height = 800; MinWidth = 840; MinHeight = 620;
@@ -56,7 +58,7 @@ public sealed class LabWindow : Window
         side.Children.Add(Label("Không dùng kho H2 Notes.\nChưa đạt điều kiện tích hợp.", 13));
         side.Children.Add(new Separator()); side.Children.Add(Label("PHẠM VI LÀM VIỆC", 11)); side.Children.Add(_workspaceLabel);
         AddAction("Chọn thư mục…", PickWorkspace); AddAction("Kết nối AI…", Configure); AddAction("Chọn cửa sổ…", PickWindow); AddAction("Mở vùng thử điều khiển", OpenComputerFixture);
-        AddAction("Nhật ký & bằng chứng", ShowJournal); AddAction("Tạo dữ liệu mẫu", Seed); AddAction("Cuộc trao đổi mới", NewSession);
+        AddAction("Nhật ký & bằng chứng", ShowJournal); AddAction("Tác vụ · tiêu chí · bằng chứng", ShowTaskInspection); AddAction("Tạo dữ liệu mẫu", Seed); AddAction("Cuộc trao đổi mới", NewSession);
         AddAction("Kỹ năng & môi trường", ShowSkills);
         side.Children.Add(_actions); side.Children.Add(_computerLabel); side.Children.Add(new Separator());
         side.Children.Add(Label("KỸ NĂNG HIỆN CÓ", 11));
@@ -120,19 +122,30 @@ public sealed class LabWindow : Window
         try
         {
             var tools = new AgentTools(new SafeWorkspace(_session.Workspace), _stateRoot, Confirm, (kind, text) => { _session.Add(kind, text); Save(); }) { ReadOnly = _readOnly.IsChecked != false, Computer = _target is null ? null : new(_target) };
-            using var runner = new AgentRunner();
-            await runner.Run(_profile, _key, _session, tools, prompt, (kind, text) =>
-            {
-                if (kind == "status") { _status.Text = text; answer = ""; }
-                else if (kind == "recovery") { _status.Text = text; streamed.Text = text; answer = ""; }
-                else if (kind == "thinking") { thought += text; _status.Text = "Model đang suy nghĩ…"; streamed.Text = thought.Length > 6000 ? thought[^6000..] : thought; }
-                else if (kind == "thinking-clear") { thought = ""; streamed.Text = answer; }
-                else if (kind == "delta") { answer += text; streamed.Text = answer; }
-                else if (kind == "tool") { Bubble("tool", text.Length > 1600 ? text[..1600] + "\n… Xem đầy đủ trong nhật ký." : text); streamed.Text = "Đang đối chiếu kết quả công cụ…"; }
-                else if (kind == "final") { _messages.Children.Remove(streamed); Bubble("assistant", text); }
-                Dispatcher.UIThread.Post(() => _scroll.ScrollToEnd(), DispatcherPriority.Background);
-            }, Save, telemetry, cancel.Token);
-            _status.Text = "Lượt đã kết thúc · Xem kết quả công cụ trước khi kết luận";
+            var orchestrated = new AgentOrchestratedRun();
+            _lastInspection = await orchestrated.RunAsync(
+                _profile,
+                _key,
+                _session,
+                tools,
+                prompt,
+                (kind, text) =>
+                {
+                    if (kind == "status") { _status.Text = text; answer = ""; }
+                    else if (kind == "trace") { _status.Text = text; }
+                    else if (kind == "recovery") { _status.Text = text; streamed.Text = text; answer = ""; }
+                    else if (kind == "thinking") { thought += text; _status.Text = "Model đang suy nghĩ…"; streamed.Text = thought.Length > 6000 ? thought[^6000..] : thought; }
+                    else if (kind == "thinking-clear") { thought = ""; streamed.Text = answer; }
+                    else if (kind == "delta") { answer += text; streamed.Text = answer; }
+                    else if (kind == "tool") { Bubble("tool", text.Length > 1600 ? text[..1600] + "\n… Xem đầy đủ trong nhật ký." : text); streamed.Text = "Đang đối chiếu kết quả công cụ…"; }
+                    else if (kind == "final") { _messages.Children.Remove(streamed); Bubble("assistant", text); }
+                    Dispatcher.UIThread.Post(() => _scroll.ScrollToEnd(), DispatcherPriority.Background);
+                },
+                Save,
+                telemetry,
+                _readOnly.IsChecked != false,
+                cancel.Token);
+            _status.Text = $"Lượt đã kết thúc · {_lastInspection.State} · context {_lastInspection.ActiveContextCharacters:N0} ký tự";
         }
         catch (OperationCanceledException) { streamed.Text = answer; _status.Text = "Đã dừng. Thao tác đã hoàn tất trước khi dừng vẫn giữ trong nhật ký."; _session.Add("cancelled", "User stopped this run."); Save(); }
         catch (Exception ex) { streamed.Text = answer; _status.Text = "Chưa hoàn tất: " + ex.Message; _session.Add("error", ex.Message); try { Save(); } catch (IOException) { } }
@@ -214,6 +227,22 @@ public sealed class LabWindow : Window
         win.Show(); return Task.CompletedTask;
     }
     private Task ShowJournal() => Message("Nhật ký có thời gian", string.Join("\n\n", _session.Events.Select(e => $"{e.At.ToLocalTime():dd/MM/yyyy HH:mm:ss} · {e.Kind}\n{e.Text}")));
+
+    private Task ShowTaskInspection()
+    {
+        if (_lastInspection is null)
+            return Message("Tác vụ · tiêu chí · bằng chứng", "Chưa có tác vụ v2 trong phiên UI này.");
+
+        var criteria = string.Join("\n", _lastInspection.Criteria.Select(x =>
+            $"- {x.CriterionId}: {x.Requirement} · evidence {x.Evidence.Count}"));
+        var trace = string.Join("\n", _lastInspection.TraceEvents.TakeLast(40).Select(x =>
+            $"{x.Sequence:00} · {x.Kind} · {x.Code}: {x.Message}"));
+        var text =
+            $"Task: {_lastInspection.TaskId}\nState: {_lastInspection.State}\nRoute: {_lastInspection.Route}\n"
+            + $"Context: {_lastInspection.ActiveContextCharacters:N0} chars · pressure={_lastInspection.ContextUnderPressure}\n\n"
+            + "Acceptance criteria\n" + criteria + "\n\nTyped trace\n" + trace;
+        return Message("Tác vụ · tiêu chí · bằng chứng", text);
+    }
     private async Task ShowSkills()
     {
         var catalog = new SkillCatalog();
