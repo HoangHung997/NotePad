@@ -239,7 +239,9 @@ public sealed class LabWindow : Window
             $"{x.Sequence:00} · {x.Kind} · {x.Code}: {x.Message}"));
         var text =
             $"Task: {_lastInspection.TaskId}\nState: {_lastInspection.State}\nRoute: {_lastInspection.Route}\n"
-            + $"Context: {_lastInspection.ActiveContextCharacters:N0} chars · pressure={_lastInspection.ContextUnderPressure}\n\n"
+            + $"Context: {_lastInspection.ActiveContextCharacters:N0} chars · pressure={_lastInspection.ContextUnderPressure}\n"
+            + $"Candidate: {_lastInspection.Diagnostics.CandidateContextCharacters:N0} · dropped turns={_lastInspection.Diagnostics.RecentTurnsDropped} · dropped tools={_lastInspection.Diagnostics.ToolSummariesDropped}\n"
+            + $"Compaction reasons: {string.Join(", ", _lastInspection.Diagnostics.CompactionReasons)}\n\n"
             + "Acceptance criteria\n" + criteria + "\n\nTyped trace\n" + trace;
         return Message("Tác vụ · tiêu chí · bằng chứng", text);
     }
