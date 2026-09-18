@@ -210,7 +210,8 @@ Rules:
   Evidence: `Verification/AgentRepairController.cs` emits bounded failure-only repair context plus explicit passed-criterion preservation; architecture guard passed in GitHub Actions run `35305244484`, together with full regression/publish.
 
 - [~] **V2-0605 — Integrate existing RecoverySupervisor below verifier layer.**  
-  Runtime/protocol recovery remains distinct from semantic repair.
+  Runtime/protocol recovery remains distinct from semantic repair.  
+  Recovery coordinator + architecture guard added; full CI verification in progress.
 
 - [ ] **V2-0606 — Add verification-gate tests.**  
   Model saying “done” must not pass if verifier fails.
