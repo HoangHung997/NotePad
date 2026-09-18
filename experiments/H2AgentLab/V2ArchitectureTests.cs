@@ -4,6 +4,7 @@ using H2AgentLab.Prompting;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
 using H2AgentLab.Tools;
+using H2AgentLab.Verification;
 using H2Notes.Core;
 
 namespace H2AgentLab;
@@ -1072,6 +1073,54 @@ public static class V2ArchitectureTests
             var skillTools = registry.GetNamespace("skills").Select(x => x.Name).ToArray();
             if (!skillTools.SequenceEqual(new[] { "list_skills", "read_skill" }))
                 throw new InvalidOperationException("SkillCatalog tools were not preserved in deferred registry namespace.");
+        });
+
+        Test("VerificationReport is machine-readable per criterion with typed failures and evidence IDs", () =>
+        {
+            var report = new VerificationReport(
+                "fixture-verifier",
+                [
+                    new VerificationCriterionResult(
+                        "c1",
+                        VerificationCriterionStatus.Passed,
+                        evidenceIds: ["evidence:hash:1"]),
+                    new VerificationCriterionResult(
+                        "c2",
+                        VerificationCriterionStatus.Failed,
+                        evidenceIds: ["evidence:tool:2"],
+                        failure: new VerificationFailure(
+                            "c2",
+                            "Expected value did not match.",
+                            ["evidence:tool:2", "evidence:snapshot:3"]))
+                ],
+                reportEvidenceIds: ["report:fixture"]);
+
+            if (report.Passed)
+                throw new InvalidOperationException("Verification report passed despite failed criterion.");
+            if (!report.Covers(new[] { "c1", "c2" }) || report.Covers(new[] { "c1", "missing" }))
+                throw new InvalidOperationException("Verification report criterion coverage is inconsistent.");
+            if (report.Failures.Count != 1
+                || report.Failures[0].CriterionId != "c2"
+                || !report.Failures[0].EvidenceIds.SequenceEqual(new[] { "evidence:tool:2", "evidence:snapshot:3" }))
+                throw new InvalidOperationException("Verification failure/evidence projection is incorrect.");
+
+            var passing = new VerificationReport(
+                "fixture-verifier",
+                [
+                    new VerificationCriterionResult("c1", VerificationCriterionStatus.Passed, ["e1"]),
+                    new VerificationCriterionResult("c2", VerificationCriterionStatus.Passed, ["e2"])
+                ]);
+            if (!passing.Passed)
+                throw new InvalidOperationException("All-passed verification report did not pass.");
+
+            try
+            {
+                _ = new VerificationCriterionResult("c1", VerificationCriterionStatus.Failed);
+                throw new InvalidOperationException("Failed criterion without failure detail was accepted.");
+            }
+            catch (ArgumentException)
+            {
+            }
         });
 
         Test("Preserved v1 deterministic suites remain callable", () =>
