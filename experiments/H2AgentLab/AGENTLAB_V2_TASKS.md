@@ -243,11 +243,11 @@ Rules:
 - [x] **V2-0706 — Add `WordVerifier` for closed files.**  
   Evidence: `Verification/WordVerifier.cs` validates exact body/header/footer target paragraphs and protects non-target body, tables, sections/margins and header/footer content; architecture guard rejects unrelated header/table regressions. GitHub Actions run `35309306112` passed full regression/publish.
 
-- [~] **V2-0707 — Make structured document tools preferred over `run_python`.**  
+- [x] **V2-0707 — Make structured document tools preferred over `run_python`.**  
   Python remains escape hatch for unsupported transforms.  
-  Deferred discovery preference policy + architecture guard added; full CI verification in progress.
+  Evidence: `Tools/DocumentToolPreference.cs` is applied inside `DeferredToolDiscovery.Search/SearchAndLoad`; structured Office/file tools outrank Python for document intent while explicit Python/custom-transform intent is preserved. GitHub Actions run `35309660295` passed full regression/publish.
 
-- [ ] **V2-0708 — Closed-file acceptance tests.**  
+- [~] **V2-0708 — Closed-file acceptance tests.**  
   Fixtures must include formulas, italic/bold, fills, merges, tables, headers/footers and preservation checks.
 
 ---
@@ -402,4 +402,4 @@ Rules:
 
 ## Current execution pointer
 
-**Active task:** `V2-0707 — Prefer structured document tools over run_python`.
+**Active task:** `V2-0708 — Closed-file acceptance tests`.
