@@ -541,7 +541,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                 .ToArray());
     }
 
-    private static int FirstRepairFeedbackIndex(
+    private int FirstRepairFeedbackIndex(
         IReadOnlyList<global::H2AgentLab.ToolCall> calls,
         IReadOnlyList<AgentToolResult> results)
     {
@@ -551,14 +551,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                 break;
             if (results[i].IsError)
                 continue;
-            if (_StaticMutationCheck(calls[i].Name))
+            if (_registry.TryGet(calls[i].Name, out var descriptor)
+                && descriptor.IsMutating)
                 return i;
         }
         return 0;
     }
-
-    private static bool _StaticMutationCheck(string toolName)
-        => !string.IsNullOrWhiteSpace(toolName);
 
     private static string MutationSignature(global::H2AgentLab.ToolCall call)
     {
