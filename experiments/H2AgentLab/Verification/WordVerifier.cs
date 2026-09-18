@@ -8,7 +8,7 @@ public sealed record WordExpectedBodyParagraph(
     ClosedWordParagraphSnapshot Expected);
 
 public sealed record WordExpectedPartParagraph(
-    string RelationshipId,
+    string PartKey,
     int Index,
     ClosedWordParagraphSnapshot Expected);
 
@@ -60,10 +60,10 @@ public sealed record WordVerificationExpectation
         string parameterName)
     {
         var result = (values ?? Array.Empty<WordExpectedPartParagraph>()).ToArray();
-        if (result.Any(x => x is null || x.Index < 0 || x.Expected is null || string.IsNullOrWhiteSpace(x.RelationshipId)))
+        if (result.Any(x => x is null || x.Index < 0 || x.Expected is null || string.IsNullOrWhiteSpace(x.PartKey)))
             throw new ArgumentException("Expected Word part paragraphs contain an invalid entry.", parameterName);
         var duplicate = result
-            .GroupBy(x => x.RelationshipId.Trim() + ":" + x.Index, StringComparer.Ordinal)
+            .GroupBy(x => x.PartKey.Trim() + ":" + x.Index, StringComparer.Ordinal)
             .FirstOrDefault(x => x.Count() > 1);
         if (duplicate is not null)
             throw new ArgumentException($"Duplicate expected Word part paragraph '{duplicate.Key}'.", parameterName);
@@ -104,15 +104,20 @@ public static class WordVerifier
                 targetFailures.Add($"body:{expected.Index}: expected {Describe(expected.Expected)}, actual {Describe(actual)}");
         }
 
+        var beforeHeaders = LogicalParts(before, header: true);
+        var afterHeaders = LogicalParts(after, header: true);
+        var beforeFooters = LogicalParts(before, header: false);
+        var afterFooters = LogicalParts(after, header: false);
+
         VerifyExpectedPartParagraphs(
             "header",
-            after.Headers,
+            afterHeaders,
             expectation.ExpectedHeaderParagraphs,
             targetFailures,
             targetEvidence);
         VerifyExpectedPartParagraphs(
             "footer",
-            after.Footers,
+            afterFooters,
             expectation.ExpectedFooterParagraphs,
             targetFailures,
             targetEvidence);
@@ -157,16 +162,16 @@ public static class WordVerifier
         else if (expectation.PreserveTables)
             structureEvidence.Add("preserved:tables");
 
-        if (expectation.PreserveSections && !Same(before.Sections, after.Sections))
-            structureFailures.Add("Sections/page margins/header-footer references changed.");
+        if (expectation.PreserveSections && !SameSectionStructure(before.Sections, after.Sections))
+            structureFailures.Add("Sections/page margins/header-footer logical slots changed.");
         else if (expectation.PreserveSections)
             structureEvidence.Add("preserved:sections");
 
         if (expectation.PreserveOtherHeaders)
             VerifyPreservedParts(
                 "header",
-                before.Headers,
-                after.Headers,
+                beforeHeaders,
+                afterHeaders,
                 expectation.ExpectedHeaderParagraphs,
                 structureFailures,
                 structureEvidence);
@@ -174,8 +179,8 @@ public static class WordVerifier
         if (expectation.PreserveOtherFooters)
             VerifyPreservedParts(
                 "footer",
-                before.Footers,
-                after.Footers,
+                beforeFooters,
+                afterFooters,
                 expectation.ExpectedFooterParagraphs,
                 structureFailures,
                 structureEvidence);
@@ -198,53 +203,50 @@ public static class WordVerifier
 
     private static void VerifyExpectedPartParagraphs(
         string kind,
-        IReadOnlyList<ClosedWordPartSnapshot> parts,
+        IReadOnlyDictionary<string, ClosedWordPartSnapshot> parts,
         IReadOnlyList<WordExpectedPartParagraph> expected,
         List<string> failures,
         List<string> evidence)
     {
-        var byId = parts.ToDictionary(x => x.RelationshipId, StringComparer.Ordinal);
-        foreach (var target in expected.OrderBy(x => x.RelationshipId, StringComparer.Ordinal).ThenBy(x => x.Index))
+        foreach (var target in expected.OrderBy(x => x.PartKey, StringComparer.Ordinal).ThenBy(x => x.Index))
         {
-            if (!byId.TryGetValue(target.RelationshipId, out var part))
+            if (!parts.TryGetValue(target.PartKey, out var part))
             {
-                failures.Add($"{kind}:{target.RelationshipId}: part missing");
+                failures.Add($"{kind}:{target.PartKey}: part missing");
                 continue;
             }
             if (target.Index >= part.Paragraphs.Count)
             {
-                failures.Add($"{kind}:{target.RelationshipId}:{target.Index}: paragraph missing");
+                failures.Add($"{kind}:{target.PartKey}:{target.Index}: paragraph missing");
                 continue;
             }
 
             var actual = part.Paragraphs[target.Index];
-            evidence.Add($"word:{kind}:{target.RelationshipId}:{target.Index}");
+            evidence.Add($"word:{kind}:{target.PartKey}:{target.Index}");
             if (!Same(actual, target.Expected))
-                failures.Add($"{kind}:{target.RelationshipId}:{target.Index}: target state mismatch");
+                failures.Add($"{kind}:{target.PartKey}:{target.Index}: target state mismatch");
         }
     }
 
     private static void VerifyPreservedParts(
         string kind,
-        IReadOnlyList<ClosedWordPartSnapshot> before,
-        IReadOnlyList<ClosedWordPartSnapshot> after,
+        IReadOnlyDictionary<string, ClosedWordPartSnapshot> before,
+        IReadOnlyDictionary<string, ClosedWordPartSnapshot> after,
         IReadOnlyList<WordExpectedPartParagraph> expected,
         List<string> failures,
         List<string> evidence)
     {
         var expectedKeys = expected
-            .Select(x => x.RelationshipId.Trim() + ":" + x.Index)
+            .Select(x => x.PartKey.Trim() + ":" + x.Index)
             .ToHashSet(StringComparer.Ordinal);
-        var beforeMap = before.ToDictionary(x => x.RelationshipId, StringComparer.Ordinal);
-        var afterMap = after.ToDictionary(x => x.RelationshipId, StringComparer.Ordinal);
 
-        foreach (var id in beforeMap.Keys.Union(afterMap.Keys, StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal))
+        foreach (var id in before.Keys.Union(after.Keys, StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal))
         {
-            beforeMap.TryGetValue(id, out var leftPart);
-            afterMap.TryGetValue(id, out var rightPart);
+            before.TryGetValue(id, out var leftPart);
+            after.TryGetValue(id, out var rightPart);
             if (leftPart is null || rightPart is null)
             {
-                failures.Add($"{kind}:{id}: part added/removed");
+                failures.Add($"{kind}:{id}: logical part added/removed");
                 continue;
             }
 
@@ -260,6 +262,53 @@ public static class WordVerifier
                     evidence.Add($"preserved:{kind}:{id}:{index}");
             }
         }
+    }
+
+    private static IReadOnlyDictionary<string, ClosedWordPartSnapshot> LogicalParts(
+        ClosedWordSnapshot snapshot,
+        bool header)
+    {
+        var physical = (header ? snapshot.Headers : snapshot.Footers)
+            .ToDictionary(x => x.RelationshipId, StringComparer.Ordinal);
+        var logical = new Dictionary<string, ClosedWordPartSnapshot>(StringComparer.Ordinal);
+
+        foreach (var section in snapshot.Sections.OrderBy(x => x.Index))
+        {
+            var references = header ? section.HeaderReferences : section.FooterReferences;
+            foreach (var reference in references)
+            {
+                if (!physical.TryGetValue(reference.RelationshipId, out var part))
+                    continue;
+                var key = $"section:{section.Index}:{(header ? "header" : "footer")}:{reference.Type}";
+                logical[key] = part;
+            }
+        }
+        return logical;
+    }
+
+    private static bool SameSectionStructure(
+        IReadOnlyList<ClosedWordSectionSnapshot> before,
+        IReadOnlyList<ClosedWordSectionSnapshot> after)
+    {
+        if (before.Count != after.Count) return false;
+        for (var index = 0; index < before.Count; index++)
+        {
+            var left = before[index];
+            var right = after[index];
+            if (left.Index != right.Index
+                || left.PageWidthTwips != right.PageWidthTwips
+                || left.PageHeightTwips != right.PageHeightTwips
+                || left.MarginTopTwips != right.MarginTopTwips
+                || left.MarginRightTwips != right.MarginRightTwips
+                || left.MarginBottomTwips != right.MarginBottomTwips
+                || left.MarginLeftTwips != right.MarginLeftTwips
+                || !left.HeaderReferences.Select(x => x.Type)
+                    .SequenceEqual(right.HeaderReferences.Select(x => x.Type), StringComparer.Ordinal)
+                || !left.FooterReferences.Select(x => x.Type)
+                    .SequenceEqual(right.FooterReferences.Select(x => x.Type), StringComparer.Ordinal))
+                return false;
+        }
+        return true;
     }
 
     private static VerificationCriterionResult Result(
