@@ -147,6 +147,7 @@ public static class MbAvailableCapabilitySearchTests
             Check(strategy.CallCount == 1
                 && result.Single().PluginId == "fixture.two",
                 "Available search strategy seam was not used.");
+            return Task.CompletedTask;
         });
 
         await Test("MB-72 source guard keeps remote search compact and non-authoritative", () =>
