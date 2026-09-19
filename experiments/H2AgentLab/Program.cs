@@ -75,6 +75,12 @@ public static class Program
         if (args.Contains("--mb-retire-agent-tools-switch-test")) return H2AgentLab.Runtime.MbRetireAgentToolsSwitchTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-v1-tool-registry-adapter-test")) return H2AgentLab.Runtime.MbRetireV1ToolRegistryAdapterTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-duplicate-skill-catalog-test")) return H2AgentLab.Skills.MbSkillCatalogRetirementTests.Run(args[^1]).GetAwaiter().GetResult();
+        var mb94 = Array.IndexOf(args, "--mb-retire-computer-tools-test");
+        if (mb94 >= 0)
+        {
+            if (mb94 + 2 >= args.Length) throw new ArgumentException("--mb-retire-computer-tools-test requires <output-directory> <desktop-host-exe>.");
+            return H2AgentLab.Desktop.MbRetireComputerToolsTests.Run(args[mb94 + 1], args[mb94 + 2]).GetAwaiter().GetResult();
+        }
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
