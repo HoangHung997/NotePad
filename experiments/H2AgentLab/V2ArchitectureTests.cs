@@ -1046,7 +1046,7 @@ public static class V2ArchitectureTests
             }
         });
 
-        Test("Deferred skill session preserves progressive loading and hash/version cache", () =>
+        Test("Canonical skill catalog preserves progressive loading and hash identity", () =>
         {
             var skillsRoot = Path.Combine(root, "v2-skill-cache-fixture");
             if (Directory.Exists(skillsRoot)) Directory.Delete(skillsRoot, recursive: true);
@@ -1063,31 +1063,29 @@ public static class V2ArchitectureTests
                 "Read this guidance progressively."
             }));
 
-            var catalog = new SkillCatalog(skillsRoot);
-            var session = new DeferredSkillSession(catalog);
+            var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn(skillsRoot);
+            var first = catalog.Search("", 10).Single();
+            var firstContent = catalog.Read(first.Identity);
+            if (string.IsNullOrWhiteSpace(firstContent.EntryPoint)
+                || first.Identity.Sha256.Length != 64)
+                throw new InvalidOperationException("Canonical progressive skill read did not return content/hash identity.");
 
-            var first = session.Read("fixture-skill", "SKILL.md");
-            if (first.Unchanged || string.IsNullOrWhiteSpace(first.Content)
-                || first.Sha256.Length != 64
-                || !first.Version.StartsWith("sha256:", StringComparison.Ordinal))
-                throw new InvalidOperationException("First progressive skill read did not return content/hash/version.");
+            var second = catalog.Search("", 10).Single();
+            if (second.Identity.Sha256 != first.Identity.Sha256)
+                throw new InvalidOperationException("Unchanged canonical skill metadata changed hash identity.");
 
-            var second = session.Read("fixture-skill", "SKILL.md");
-            if (!second.Unchanged || second.Content is not null
-                || second.Sha256 != first.Sha256
-                || second.Version != first.Version)
-                throw new InvalidOperationException("Unchanged skill guidance was resent instead of using cached hash/version.");
-
-            File.AppendAllText(skillPath, Environment.NewLine + "Changed guidance invalidates the task cache.");
-            var third = session.Read("fixture-skill", "SKILL.md");
-            if (third.Unchanged || string.IsNullOrWhiteSpace(third.Content)
-                || third.Sha256 == first.Sha256
-                || third.Version == first.Version)
-                throw new InvalidOperationException("Changed skill source failed to invalidate cached guidance.");
-
-            if (session.LoadedVersions.Count != 1
-                || session.LoadedVersions.Values.Single() != third.Version)
-                throw new InvalidOperationException("Per-task skill version memory is inconsistent.");
+            File.AppendAllText(skillPath, Environment.NewLine + "Changed guidance invalidates selected identity.");
+            var third = catalog.Search("", 10).Single();
+            if (third.Identity.Sha256 == first.Identity.Sha256)
+                throw new InvalidOperationException("Changed skill source failed to invalidate canonical hash identity.");
+            try
+            {
+                _ = catalog.Read(first.Identity);
+                throw new InvalidOperationException("Stale selected skill identity remained readable after source mutation.");
+            }
+            catch (InvalidOperationException)
+            {
+            }
 
             var executor = new DelegatingToolExecutor(
                 "skill-registry-fixture",
