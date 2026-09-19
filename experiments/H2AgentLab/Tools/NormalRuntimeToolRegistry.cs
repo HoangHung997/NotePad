@@ -585,7 +585,7 @@ public static class NormalRuntimeToolRegistry
         public SkillExecutor(global::H2AgentLab.AgentTools host)
             : base(host)
         {
-            _inner = new SkillRuntimeToolExecutor(host.Skills.Canonical);
+            _inner = new SkillRuntimeToolExecutor(host.Skills);
         }
 
         public override string ExecutorId => "normal.skills";
