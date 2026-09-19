@@ -82,6 +82,36 @@ internal static class WorkspaceTests
             Check(mapped.CanonicalPath.Equals(unc.CanonicalPath, StringComparison.OrdinalIgnoreCase));
         });
 
+        test("Workspace endpoint fallback switches only to reachable alias with matching WorkspaceId", () =>
+        {
+            var id = Guid.NewGuid();
+            var profile = new WorkspaceLocationProfile(
+                id,
+                WorkspaceLocationKind.MappedNetwork,
+                @"X:\Dữ liệu Hưng\.Note",
+                @"\\NAS-SERVER\Share\Dữ liệu Hưng\.Note",
+                @"\\NAS-SERVER\Share\Dữ liệu Hưng\.Note",
+                DateTime.UtcNow);
+
+            var selected = WorkspaceEndpointSelector.Select(
+                profile,
+                path => path.StartsWith(@"\\NAS-SERVER", StringComparison.OrdinalIgnoreCase),
+                path => path.StartsWith(@"\\NAS-SERVER", StringComparison.OrdinalIgnoreCase) ? id : null);
+            Check(selected == profile.ResolvedNetworkPath);
+
+            var wrong = WorkspaceEndpointSelector.Select(
+                profile,
+                _ => true,
+                _ => Guid.NewGuid());
+            Check(wrong is null);
+
+            var preferred = WorkspaceEndpointSelector.Select(
+                profile,
+                _ => true,
+                _ => id);
+            Check(preferred == profile.DisplayPath);
+        });
+
         test("Schema 5 workspace migrates atomically to schema 6 stable WorkspaceId", () =>
         {
             var root = Folder();
