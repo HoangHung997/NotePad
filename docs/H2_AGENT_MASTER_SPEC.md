@@ -1312,6 +1312,8 @@ MB-100 adds `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` as the consoli
 
 MB-101 proves the normal UI path itself is fully V2. `Acceptance/MbNormalUiV2PathTests.cs` drives the same `LabWindow -> AgentOrchestratedRun.RunAsync` facade used by a real user turn: a read-only run reaches `IAgentTransport` with bounded context and deferred `tool_search` exposure, while a mutating run performs deferred schema loading, verifier FAIL, bounded repair, verifier PASS and host-owned completion. Repository guards require `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentRuntimeFactory`, provider-neutral transport, ToolRegistry/scheduler and repair wiring and reject hidden `AgentRunner` / compatibility fallback from the normal UI chain.
 
+MB-102 adds the hard context-boundedness gate on that same normal UI facade. `Acceptance/MbContextBoundednessGateTests.cs` measures 10/100/1000-turn histories and records active-context characters plus serialized provider-request bytes: 10 turns = 4,872 chars / 6,091 bytes; 100 turns = 5,821 chars / 7,053 bytes; 1000 turns = 5,837 chars / 7,069 bytes, while candidate history continues to grow. A repeated-large-output case stores sixteen ~24K-character tool results as durable `ArtifactStore` evidence and produces only 9,858 active characters / 11,139 request bytes; exact raw payloads remain available by artifact handle and raw tails do not enter the prompt. This is deterministic evidence that total history/raw evidence growth is decoupled from active model-context growth.
+
 ---
 
 ## 36. Reference extension acceptance gate
