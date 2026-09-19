@@ -1007,27 +1007,27 @@ public static class NormalRuntimeToolRegistry
             global::H2AgentLab.ToolCall call,
             CancellationToken cancellationToken)
         {
-            var computer = Host.Computer;
+            var desktop = Host.Desktop;
             if (call.Name == "inspect_window")
             {
                 _ = Arg(call, "reason");
-                if (computer is null)
+                if (desktop is null)
                     throw new global::H2AgentLab.AgentFaultException(
                         "unavailable",
                         "Bạn chưa chọn cửa sổ được phép điều khiển.",
                         false);
-                return await computer.Inspect(
+                return await desktop.Inspect(
                     Host.RuntimeApproveAsync,
                     cancellationToken).ConfigureAwait(false);
             }
 
-            if (Host.ReadOnly || computer is null)
+            if (Host.ReadOnly || desktop is null)
                 throw new global::H2AgentLab.AgentFaultException(
                     "permission_required",
                     "Chưa cấp quyền thao tác cửa sổ.",
                     false);
 
-            return await computer.Act(
+            return await desktop.Act(
                 call.Name,
                 Arg(call, "token"),
                 call.Name == "type_control"
