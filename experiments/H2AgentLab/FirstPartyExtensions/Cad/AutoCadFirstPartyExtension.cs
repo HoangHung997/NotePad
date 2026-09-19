@@ -19,6 +19,18 @@ public sealed class AutoCadFirstPartyExtension : IAgentExtension
             nameof(providerVersion));
     }
 
+    public AutoCadFirstPartyExtension(
+        IAutoCadNativeBridge bridge,
+        Func<string, CancellationToken, ValueTask<bool>> authorizeMutation,
+        string providerVersion = "1.0.0")
+        : this(
+            new AutoCadNativeToolExecutor(
+                bridge ?? throw new ArgumentNullException(nameof(bridge)),
+                authorizeMutation ?? throw new ArgumentNullException(nameof(authorizeMutation))),
+            providerVersion)
+    {
+    }
+
     public AgentExtensionMetadata Metadata => new(
         "autocad-first-party-extension",
         _providerVersion,
