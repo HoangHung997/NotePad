@@ -161,7 +161,7 @@ public sealed class LabWindow : Window
             try
             {
                 var evidence = AgentTraceStore.Save(_stateRoot, telemetry.Trace, telemetry.Metrics);
-                _session.Add("telemetry", "Turn metrics: " + Path.GetFileName(evidence));
+                _session.AddTelemetryReference(evidence);
                 Save();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
