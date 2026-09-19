@@ -1129,7 +1129,7 @@ Evidence: `Acceptance/MbOfficeAcceptanceTests.cs` provides six explicit cases ma
 
 ---
 
-## [~] MB-111 — Web/freshness/legal acceptance
+## [x] MB-111 — Web/freshness/legal acceptance
 
 Cover:
 
@@ -1139,7 +1139,7 @@ Cover:
 - typed legal relationship;
 - no “newer means replaced” inference.
 
-Implementation under verification: `Web/MbWebFreshnessLegalAcceptanceTests.cs` adds five deterministic acceptance cases matching the five tracker requirements. The gate uses a fixture `IWebResearchBackend` (no Internet dependency), proves freshness-sensitive intent fails without current evidence, current legal status requires authoritative/primary evidence, `WebEvidenceStore` keeps full hashed bodies outside the bounded context projection, typed `LegalDocumentRelationship` is required for replacement claims, and a newer official document alone is rejected as proof of replacement. The acceptance gate is wired into `Program.cs` and GitHub Actions after MB-110.
+Evidence: `Web/MbWebFreshnessLegalAcceptanceTests.cs` passed all five deterministic Web/freshness/legal acceptance cases on source `01d1e84577ca740db850d230c69d82b4ab444478`. GitHub Actions run `35443918265` was fully green, including H2 Notes, Agent suites, DesktopHost, OfficeHost, transports, resilience and publish. MB-111: 5 passed, 0 failed. Publish bot commit `b485a59dcc954ed4710dc033cec25ac4c56eda0f`; repository portable ZIP SHA256 `182be9321e21caabab04fa41021959cff751db4a40d4e62b76852c697e31c00b`.
 
 ---
 
