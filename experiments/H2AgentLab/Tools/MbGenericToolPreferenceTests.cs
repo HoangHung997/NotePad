@@ -194,20 +194,20 @@ public static class MbGenericToolPreferenceTests
                 && results[2].Descriptor.Name == "revit.pixel.inspect",
                 "A newly registered structured modeling provider required application-specific core ranking.");
 
-            var legacy = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(
-                legacy,
+            var canonical = new ToolRegistry();
+            NormalRuntimeToolRegistry.Populate(
+                canonical,
                 new DelegatingToolExecutor(
-                    "mb61-legacy-fixture",
+                    "mb61-normal-fixture",
                     (call, ct) => ValueTask.FromResult("{}")));
-            Check(legacy.TryGet("run_python", out var escape)
+            Check(canonical.TryGet("run_python", out var escape)
                     && escape.Preference?.InteractionFidelity == ToolInteractionFidelity.EscapeHatch
                     && escape.Preference.ExplicitRequestOnly
-                && legacy.TryGet("word_paragraphs", out var structured)
+                && canonical.TryGet("word_paragraphs", out var structured)
                     && structured.Preference?.InteractionFidelity == ToolInteractionFidelity.Structured
-                && legacy.TryGet("inspect_window", out var accessibility)
+                && canonical.TryGet("inspect_window", out var accessibility)
                     && accessibility.Preference?.InteractionFidelity == ToolInteractionFidelity.Accessibility,
-                "Compatibility providers did not declare generic interaction preference metadata.");
+                "Canonical normal-runtime providers did not declare generic interaction preference metadata.");
 
             var repo = FindRepoRoot();
             foreach (var relative in new[]
