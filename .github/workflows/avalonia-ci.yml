@@ -37,6 +37,13 @@ jobs:
       - name: Run H2 Notes tests
         run: dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
 
+      - name: Run H2 NAS acceptance harness self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-nas-acceptance-self-test'
+          dotnet run --project .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release --no-build -- --self-test $out
+          Get-Content -LiteralPath (Join-Path $out 'self-test-result.txt')
+
       - name: Restore H2 Agent Lab DesktopHost
         run: dotnet restore .\experiments\H2AgentLab.DesktopHost\H2AgentLab.DesktopHost.csproj
 
@@ -595,6 +602,17 @@ jobs:
 
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
+
+      - name: Publish H2 NAS acceptance probe Windows x64
+        run: dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
+
+      - name: Upload H2 NAS acceptance probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: H2Notes-NasAcceptance-win-x64
+          path: artifacts/H2Notes-NasAcceptance/
+          if-no-files-found: error
 
       - name: Upload Avalonia portable build
         if: always()
