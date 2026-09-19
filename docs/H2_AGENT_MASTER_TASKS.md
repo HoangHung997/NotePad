@@ -969,7 +969,7 @@ Evidence: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession.cs`, and the
 
 ---
 
-## [~] MB-94 — Retire legacy ComputerTools after DesktopHost parity
+## [x] MB-94 — Retire legacy ComputerTools after DesktopHost parity
 
 Do not remove until:
 
@@ -977,7 +977,7 @@ Do not remove until:
 - permission tests pass;
 - real runtime uses DesktopHost/provider tools.
 
-Implementation under verification: `ComputerTools.cs` and the `--computer-worker` path are removed. `SelectedDesktopWindowController` preserves the narrow selected-window inspect/click/type contract over the isolated `DesktopHostClient`, requires host approval for every read/action, uses DesktopHost state IDs/short-lived tokens and performs observe-after-act verification. AgentTools, normal ToolRegistry execution and LabWindow selection now use that controller; Agent Lab build output also includes DesktopHost. The legacy H2 Agent Lab self-target block was moved into `DesktopSafetyPolicy` and locked by DesktopHost self-tests. `MbRetireComputerToolsTests` exercises fixture parity, denial-before-mutation, normal runtime wiring and repository source guards.
+Evidence: `ComputerTools.cs` and the `--computer-worker` path are removed. `Desktop/SelectedDesktopWindowController.cs` preserves the narrow `inspect_window` / `click_control` / `type_control` compatibility surface over the isolated `DesktopHostClient`, requires host approval for reads/actions, uses DesktopHost state IDs and short-lived element tokens, and requires a newer post-action observation through `DesktopEvidenceGate` before mutation evidence is accepted. `AgentTools`, `NormalRuntimeToolRegistry.DesktopExecutor`, and `LabWindow` now route selected-window execution/selection through DesktopHost; `H2AgentLab.csproj` builds/copies DesktopHost into Agent Lab output. `DesktopSafetyPolicy` now preserves the legacy self-target boundary (main H2AgentLab blocked, dedicated safe fixture allowed), locked by DesktopHost self-tests. `Desktop/MbRetireComputerToolsTests.cs` proves selected-window parity, denial-before-mutation, real normal-runtime DesktopHost routing, and repository source retirement. Final functional source commit `0002b39b2f18da5a3696eaccea4ddef45a8b60af`, GitHub Actions run `35432132990`: MB-94 **4 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-93, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `f44dd19a56b6c0f77d7eb07a126f80beb5effd96`; repository portable ZIP SHA256 `311082e9ba383d386aa606c84127e7d05b19e536f337e220a34a9ac5cd675748`.
 
 ---
 
