@@ -496,7 +496,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     {
         generationId = "";
         generationFolder = "";
-        snapshot = WorkspaceSnapshot.Empty();
+        snapshot = WorkspaceSnapshot.Empty(_workspaceId);
         try
         {
             if (!File.Exists(RecoveryPointerPath)) return false;
@@ -511,7 +511,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         {
             generationId = "";
             generationFolder = "";
-            snapshot = WorkspaceSnapshot.Empty();
+            snapshot = WorkspaceSnapshot.Empty(_workspaceId);
             return false;
         }
     }
