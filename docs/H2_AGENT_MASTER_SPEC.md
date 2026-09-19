@@ -95,7 +95,7 @@ The remaining migration gap is narrower:
 
 - normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry`, and callable execution is split across domain executors rather than `AgentTools.Definitions` / the giant `AgentTools.Execute` switch;
 - the legacy `AgentTools` object remains temporarily as host state/approval/journal storage and for frozen v1 tests; `V1ToolRegistryAdapter` has been retired, and reusable canonical schema/risk/scope/preference metadata now comes directly from `NormalRuntimeToolRegistry`;
-- the duplicate legacy skill/catalog path is retired in MB-93; the legacy computer-tool path still requires cleanup after its parity gate.
+- the duplicate legacy skill/catalog path is retired in MB-93, and the legacy `ComputerTools` path is retired in MB-94; selected-window execution now routes through the isolated DesktopHost boundary.
 
 Therefore the next architectural priority is **legacy cleanup behind the already-bootable AgentRuntime**, not a return to the v1 model loop.
 
@@ -1116,7 +1116,7 @@ Tools/DeferredSkillSession.cs
   -> retired in MB-93; progressive reads/hash identity are owned by canonical SkillCatalog/runtime skill tools
 
 ComputerTools.cs
-  -> retire after DesktopHost covers accepted behavior
+  -> retired in MB-94 after selected-window parity moved to DesktopHost / SelectedDesktopWindowController
 
 LabSession.Context()
   -> no longer primary model-context path
