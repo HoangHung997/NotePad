@@ -16,21 +16,38 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private bool _loaded;
     private Dictionary<Guid, FileEntry> _entries = [];
     private readonly Action<int>? _checkpoint;
+    private readonly Action<int>? _consistencyCheckpoint;
+    private readonly string _recoveryRoot;
     private SheetState? _baseState;
+    private const int ConsistencyReadAttempts = 3;
 
     public string Root { get; }
     public string FilePath => Path.Combine(Root, "workspace.h2index.json");
     public string WriterId { get; }
+    public string RecoveryCacheRoot => _recoveryRoot;
+    public WorkspaceSyncDiagnostic? LastSyncDiagnostic { get; private set; }
     public IReadOnlyList<WorkspaceMergeConflict> LastMergeConflicts { get; private set; } = Array.Empty<WorkspaceMergeConflict>();
 
     private string JournalPath => Path.Combine(Root, ".h2-transaction.json");
+    private string RecoveryPointerPath => Path.Combine(_recoveryRoot, "last-good.txt");
+    private string SyncDiagnosticPath => Path.Combine(_recoveryRoot, "last-sync-diagnostic.json");
     private string CommitLockPath => Path.Combine(Root, ".h2-commit.lock");
 
-    public ProjectWorkspaceStore(string root, Action<int>? checkpoint = null, string? writerId = null)
+    public ProjectWorkspaceStore(
+        string root,
+        Action<int>? checkpoint = null,
+        string? writerId = null,
+        string? recoveryRoot = null,
+        Action<int>? consistencyCheckpoint = null)
     {
         Root = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
         _checkpoint = checkpoint;
+        _consistencyCheckpoint = consistencyCheckpoint;
         WriterId = string.IsNullOrWhiteSpace(writerId) ? Environment.MachineName : writerId.Trim();
+        var recoveryKey = Hash(Encoding.UTF8.GetBytes(Root))[..32];
+        _recoveryRoot = Path.GetFullPath(recoveryRoot
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "H2Notes", "workspace-recovery", recoveryKey));
     }
 
     // This lock is intentionally local to one Windows profile. It prevents two copies
@@ -79,7 +96,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     {
         using var commit = AcquireCommitLock();
         RecoverUnderLock();
-        var snapshot = ReadSnapshot();
+        var snapshot = ReadStableSnapshotUnderLock();
         ApplySnapshot(snapshot);
         _baseState = Clone(snapshot.State);
         _loaded = true;
@@ -91,7 +108,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         if (!_loaded || !File.Exists(FilePath)) return false;
         using var commit = AcquireCommitLock();
         RecoverUnderLock();
-        var snapshot = ReadSnapshot();
+        var snapshot = ReadStableSnapshotUnderLock();
         if (_known.TryGetValue("workspace.h2index.json", out var knownIndex)
             && snapshot.Fingerprints.TryGetValue("workspace.h2index.json", out var currentIndex)
             && knownIndex == currentIndex) return false;
@@ -115,7 +132,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         using var commit = AcquireCommitLock();
         RecoverUnderLock();
         var hasRemote = File.Exists(FilePath);
-        var remote = hasRemote ? ReadSnapshot() : WorkspaceSnapshot.Empty();
+        var remote = hasRemote ? ReadStableSnapshotUnderLock() : WorkspaceSnapshot.Empty();
         var baseline = _baseState is null ? Clone(remote.State) : Clone(_baseState);
 
         LastMergeConflicts = hasRemote
@@ -177,12 +194,330 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             ApplySnapshot(final);
             _baseState = Clone(final.State);
             _sourceVersion = SchemaVersion;
+            TryCaptureLastKnownGood(final);
         }
         catch
         {
             RecoverUnderLock();
             throw;
         }
+    }
+
+    private WorkspaceSnapshot ReadStableSnapshotUnderLock()
+    {
+        WorkspaceConsistencyException? last = null;
+        for (var attempt = 1; attempt <= ConsistencyReadAttempts; attempt++)
+        {
+            try
+            {
+                var snapshot = ReadSnapshot();
+                if (last is null) LastSyncDiagnostic = null;
+                else
+                {
+                    SetSyncDiagnostic(new WorkspaceSyncDiagnostic
+                    {
+                        Code = "transient_generation_converged",
+                        FailureCode = last.Code,
+                        ExceptionType = last.GetType().Name,
+                        Message = "NAS đã hội tụ về một generation hợp lệ sau khi đọc lại.",
+                        WriterId = WriterId,
+                        RelativeFile = last.RelativeFile,
+                        ExpectedHash = last.ExpectedHash,
+                        ActualHash = last.ActualHash,
+                        IndexHash = last.IndexHash,
+                        Attempt = attempt,
+                        IsPersistent = false,
+                        RecoveryAvailable = HasValidLastKnownGood(),
+                        Recovered = false
+                    });
+                }
+                TryCaptureLastKnownGood(snapshot);
+                return snapshot;
+            }
+            catch (WorkspaceConsistencyException ex)
+            {
+                last = ex;
+                var recoveryAvailable = HasValidLastKnownGood();
+                SetSyncDiagnostic(DiagnosticFrom(ex, attempt, false, recoveryAvailable, false));
+                _consistencyCheckpoint?.Invoke(attempt);
+                if (attempt < ConsistencyReadAttempts) Thread.Sleep(75);
+            }
+        }
+
+        if (last is null) throw new InvalidOperationException("Không xác định được lỗi generation.");
+        if (TryLoadLastKnownGood(out var recoveryId, out var recoveryFolder, out var recoverySnapshot))
+        {
+            try
+            {
+                var quarantine = QuarantineCurrentGeneration(last);
+                RestoreRecoveryGeneration(recoveryFolder, recoverySnapshot);
+                var restored = ReadSnapshot();
+                TryCaptureLastKnownGood(restored);
+                SetSyncDiagnostic(new WorkspaceSyncDiagnostic
+                {
+                    Code = "persistent_generation_recovered",
+                    FailureCode = last.Code,
+                    ExceptionType = last.GetType().Name,
+                    Message = "Đã phục hồi generation NAS từ bản last-known-good sau khi cách ly generation lỗi.",
+                    WriterId = WriterId,
+                    RelativeFile = last.RelativeFile,
+                    ExpectedHash = last.ExpectedHash,
+                    ActualHash = last.ActualHash,
+                    IndexHash = last.IndexHash,
+                    Attempt = ConsistencyReadAttempts,
+                    IsPersistent = true,
+                    RecoveryAvailable = true,
+                    Recovered = true,
+                    RecoverySnapshotId = recoveryId,
+                    QuarantinePath = quarantine
+                });
+                return restored;
+            }
+            catch (Exception recoveryError) when (recoveryError is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+            {
+                SetSyncDiagnostic(new WorkspaceSyncDiagnostic
+                {
+                    Code = "persistent_recovery_failed",
+                    FailureCode = last.Code,
+                    ExceptionType = recoveryError.GetType().Name,
+                    Message = BoundDiagnosticMessage(recoveryError.Message),
+                    WriterId = WriterId,
+                    RelativeFile = last.RelativeFile,
+                    ExpectedHash = last.ExpectedHash,
+                    ActualHash = last.ActualHash,
+                    IndexHash = last.IndexHash,
+                    Attempt = ConsistencyReadAttempts,
+                    IsPersistent = true,
+                    RecoveryAvailable = true,
+                    Recovered = false,
+                    RecoverySnapshotId = recoveryId
+                });
+            }
+        }
+        else
+        {
+            SetSyncDiagnostic(DiagnosticFrom(last, ConsistencyReadAttempts, true, false, false));
+        }
+
+        throw last;
+    }
+
+    private WorkspaceSyncDiagnostic DiagnosticFrom(
+        WorkspaceConsistencyException ex,
+        int attempt,
+        bool persistent,
+        bool recoveryAvailable,
+        bool recovered)
+        => new()
+        {
+            Code = ex.Code,
+            FailureCode = ex.Code,
+            ExceptionType = ex.GetType().Name,
+            Message = BoundDiagnosticMessage(ex.Message),
+            WriterId = WriterId,
+            RelativeFile = ex.RelativeFile,
+            ExpectedHash = ex.ExpectedHash,
+            ActualHash = ex.ActualHash,
+            IndexHash = ex.IndexHash,
+            Attempt = attempt,
+            IsPersistent = persistent,
+            RecoveryAvailable = recoveryAvailable,
+            Recovered = recovered
+        };
+
+    public WorkspaceSyncDiagnostic RecordSyncFailure(Exception ex)
+    {
+        if (ex is WorkspaceConsistencyException && LastSyncDiagnostic is not null) return LastSyncDiagnostic;
+        var code = ex switch
+        {
+            UnauthorizedAccessException => "access_denied",
+            System.Text.Json.JsonException => "invalid_json",
+            IOException => "io_error",
+            _ => "sync_error"
+        };
+        var diagnostic = new WorkspaceSyncDiagnostic
+        {
+            Code = code,
+            ExceptionType = ex.GetType().Name,
+            Message = BoundDiagnosticMessage(ex.Message),
+            WriterId = WriterId,
+            Attempt = 1,
+            IsPersistent = false,
+            RecoveryAvailable = HasValidLastKnownGood(),
+            Recovered = false
+        };
+        SetSyncDiagnostic(diagnostic);
+        return diagnostic;
+    }
+
+    private void SetSyncDiagnostic(WorkspaceSyncDiagnostic diagnostic)
+    {
+        LastSyncDiagnostic = diagnostic;
+        try { AtomicWrite(SyncDiagnosticPath, Encode(diagnostic)); }
+        catch { /* diagnostics must never overwrite or block project data */ }
+    }
+
+    private static string BoundDiagnosticMessage(string value)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return value.Length <= 600 ? value : value[..600];
+    }
+
+    private bool HasValidLastKnownGood()
+        => TryLoadLastKnownGood(out _, out _, out _);
+
+    private bool TryCaptureLastKnownGood(WorkspaceSnapshot snapshot)
+    {
+        try
+        {
+            if (!snapshot.Fingerprints.TryGetValue("workspace.h2index.json", out var generationId)) return false;
+            var generationFolder = Path.Combine(_recoveryRoot, "generations", generationId);
+            if (Directory.Exists(generationFolder))
+            {
+                try
+                {
+                    var existing = ReadRecoverySnapshot(generationFolder);
+                    if (existing.Fingerprints.TryGetValue("workspace.h2index.json", out var existingId) && existingId == generationId)
+                    {
+                        AtomicWrite(RecoveryPointerPath, Encoding.UTF8.GetBytes(generationId));
+                        return true;
+                    }
+                }
+                catch { Directory.Delete(generationFolder, true); }
+            }
+
+            Directory.CreateDirectory(generationFolder);
+            foreach (var pair in snapshot.Fingerprints)
+            {
+                var bytes = File.ReadAllBytes(Resolve(pair.Key));
+                if (Hash(bytes) != pair.Value) throw new IOException("Generation đổi trong lúc tạo last-known-good: " + pair.Key);
+                AtomicWrite(RecoveryDataPath(generationFolder, pair.Key), bytes);
+            }
+
+            var verified = ReadRecoverySnapshot(generationFolder);
+            if (!verified.Fingerprints.TryGetValue("workspace.h2index.json", out var verifiedId) || verifiedId != generationId)
+                throw new InvalidDataException("Last-known-good không vượt qua kiểm tra generation.");
+            AtomicWrite(RecoveryPointerPath, Encoding.UTF8.GetBytes(generationId));
+            CleanupRecoveryGenerations(generationId);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool TryLoadLastKnownGood(out string generationId, out string generationFolder, out WorkspaceSnapshot snapshot)
+    {
+        generationId = "";
+        generationFolder = "";
+        snapshot = WorkspaceSnapshot.Empty();
+        try
+        {
+            if (!File.Exists(RecoveryPointerPath)) return false;
+            generationId = File.ReadAllText(RecoveryPointerPath).Trim();
+            if (generationId.Length != 64 || generationId.Any(c => !Uri.IsHexDigit(c))) return false;
+            generationFolder = Path.Combine(_recoveryRoot, "generations", generationId);
+            if (!Directory.Exists(generationFolder)) return false;
+            snapshot = ReadRecoverySnapshot(generationFolder);
+            return snapshot.Fingerprints.TryGetValue("workspace.h2index.json", out var actual) && actual == generationId;
+        }
+        catch
+        {
+            generationId = "";
+            generationFolder = "";
+            snapshot = WorkspaceSnapshot.Empty();
+            return false;
+        }
+    }
+
+    private WorkspaceSnapshot ReadRecoverySnapshot(string generationFolder)
+        => ReadSnapshotFrom(relative => File.ReadAllBytes(RecoveryDataPath(generationFolder, relative)));
+
+    private string QuarantineCurrentGeneration(WorkspaceConsistencyException cause)
+    {
+        var indexBytes = File.ReadAllBytes(FilePath);
+        var index = Decode<WorkspaceIndex>(indexBytes);
+        var quarantineBase = Path.Combine(_recoveryRoot, "quarantine");
+        Directory.CreateDirectory(quarantineBase);
+        var name = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N");
+        var pending = Path.Combine(quarantineBase, name + ".pending");
+        var final = Path.Combine(quarantineBase, name);
+        Directory.CreateDirectory(pending);
+
+        var files = new List<object>();
+        AtomicWrite(RecoveryDataPath(pending, "workspace.h2index.json"), indexBytes);
+        foreach (var entry in index.Files)
+        {
+            var source = Resolve(entry.File);
+            if (!File.Exists(source))
+            {
+                files.Add(new { entry.File, Missing = true, entry.Hash, ActualHash = (string?)null });
+                continue;
+            }
+
+            var bytes = File.ReadAllBytes(source);
+            AtomicWrite(RecoveryDataPath(pending, entry.File), bytes);
+            files.Add(new { entry.File, Missing = false, entry.Hash, ActualHash = Hash(bytes) });
+        }
+
+        AtomicWrite(Path.Combine(pending, "diagnostic.json"), Encode(new
+        {
+            CapturedUtc = DateTime.UtcNow,
+            WriterId,
+            Cause = cause.Code,
+            cause.RelativeFile,
+            cause.ExpectedHash,
+            cause.ActualHash,
+            cause.IndexHash,
+            Files = files
+        }));
+        Directory.Move(pending, final);
+        return final;
+    }
+
+    private void RestoreRecoveryGeneration(string generationFolder, WorkspaceSnapshot snapshot)
+    {
+        foreach (var pair in snapshot.Fingerprints.Where(p => p.Key != "workspace.h2index.json"))
+        {
+            var bytes = File.ReadAllBytes(RecoveryDataPath(generationFolder, pair.Key));
+            if (Hash(bytes) != pair.Value) throw new InvalidDataException("Last-known-good bị thay đổi: " + pair.Key);
+            AtomicWrite(Resolve(pair.Key), bytes);
+        }
+
+        var indexBytes = File.ReadAllBytes(RecoveryDataPath(generationFolder, "workspace.h2index.json"));
+        if (Hash(indexBytes) != snapshot.Fingerprints["workspace.h2index.json"])
+            throw new InvalidDataException("Last-known-good index bị thay đổi.");
+        AtomicWrite(FilePath, indexBytes);
+    }
+
+    private string RecoveryDataPath(string root, string relative)
+    {
+        if (!IsWorkspaceDataFile(relative)) throw new InvalidDataException("Đường dẫn recovery không hợp lệ.");
+        var path = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+        if (!path.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Đường dẫn recovery vượt phạm vi.");
+        return path;
+    }
+
+    private static bool IsWorkspaceDataFile(string relative)
+        => relative == "workspace.h2index.json"
+           || (relative.StartsWith("projects/", StringComparison.Ordinal) && relative.EndsWith(".h2project.json", StringComparison.Ordinal))
+           || (relative.StartsWith("notes/", StringComparison.Ordinal) && relative.EndsWith(".h2note.json", StringComparison.Ordinal));
+
+    private void CleanupRecoveryGenerations(string current)
+    {
+        try
+        {
+            var root = Path.Combine(_recoveryRoot, "generations");
+            if (!Directory.Exists(root)) return;
+            foreach (var directory in new DirectoryInfo(root).EnumerateDirectories()
+                         .OrderByDescending(d => d.LastWriteTimeUtc)
+                         .Skip(3))
+                if (!directory.Name.Equals(current, StringComparison.OrdinalIgnoreCase)) directory.Delete(true);
+        }
+        catch { /* best-effort local cache cleanup only */ }
     }
 
     private WritePackage BuildPackage(SheetState state, IReadOnlySet<Guid>? changedProjects, WorkspaceSnapshot remote)
@@ -263,9 +598,27 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     }
 
     private WorkspaceSnapshot ReadSnapshot()
+        => ReadSnapshotFrom(relative => File.ReadAllBytes(Resolve(relative)));
+
+    private WorkspaceSnapshot ReadSnapshotFrom(Func<string, byte[]> read)
     {
-        var indexBytes = File.ReadAllBytes(FilePath);
-        var index = Decode<WorkspaceIndex>(indexBytes);
+        byte[] indexBytes;
+        try { indexBytes = read("workspace.h2index.json"); }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new WorkspaceConsistencyException("missing_index", "Thiếu chỉ mục kho dữ liệu.",
+                "workspace.h2index.json", inner: ex);
+        }
+
+        var indexHash = Hash(indexBytes);
+        WorkspaceIndex index;
+        try { index = Decode<WorkspaceIndex>(indexBytes); }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new WorkspaceConsistencyException("invalid_index_json", "Chỉ mục kho không phải JSON hợp lệ.",
+                "workspace.h2index.json", actualHash: indexHash, indexHash: indexHash, inner: ex);
+        }
+
         if (index.SchemaVersion is not 2 and not 3 and not 4 and not SchemaVersion)
             throw new InvalidDataException("Kho thuộc phiên bản không được hỗ trợ. Không ghi đè.");
         if (index.State is null || index.Files is null) throw new InvalidDataException("Chỉ mục kho không đầy đủ.");
@@ -274,35 +627,70 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         foreach (var board in state.Notes.Where(n => n.IsBoard)) board.Projects.Clear();
         var fingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["workspace.h2index.json"] = Hash(indexBytes)
+            ["workspace.h2index.json"] = indexHash
         };
         var ids = new HashSet<Guid>();
         foreach (var entry in index.Files)
         {
             if (!ids.Add(entry.Id)) throw new InvalidDataException("ID trùng trong chỉ mục kho.");
-            var path = Resolve(entry.File);
-            var bytes = File.ReadAllBytes(path);
-            if (Hash(bytes) != entry.Hash) throw new InvalidDataException("Tệp đã thay đổi ngoài app hoặc bị lỗi: " + entry.File);
+            byte[] bytes;
+            try { bytes = read(entry.File); }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                throw new WorkspaceConsistencyException("missing_file",
+                    "Chỉ mục tham chiếu tệp chưa xuất hiện: " + entry.File,
+                    entry.File, entry.Hash, indexHash: indexHash, inner: ex);
+            }
+
+            var actualHash = Hash(bytes);
+            if (actualHash != entry.Hash)
+                throw new WorkspaceConsistencyException("hash_mismatch",
+                    "Tệp và chỉ mục đang thuộc hai generation khác nhau: " + entry.File,
+                    entry.File, entry.Hash, actualHash, indexHash);
+
             fingerprints.Add(entry.File, entry.Hash);
             if (entry.Kind == "project")
             {
-                var doc = Decode<ProjectFile>(bytes);
+                ProjectFile doc;
+                try { doc = Decode<ProjectFile>(bytes); }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    throw new WorkspaceConsistencyException("invalid_project_json",
+                        "Tệp dự án không phải JSON hợp lệ: " + entry.File,
+                        entry.File, entry.Hash, actualHash, indexHash, ex);
+                }
                 if (doc.SchemaVersion != index.SchemaVersion || doc.Project?.Id != entry.Id || doc.BoardId != entry.BoardId)
-                    throw new InvalidDataException("Tệp dự án không khớp chỉ mục: " + entry.File);
+                    throw new WorkspaceConsistencyException("project_index_mismatch",
+                        "Tệp dự án không khớp chỉ mục: " + entry.File,
+                        entry.File, entry.Hash, actualHash, indexHash);
                 var board = state.Notes.SingleOrDefault(n => n.Id == entry.BoardId)
                     ?? throw new InvalidDataException("Không tìm thấy bảng sở hữu dự án.");
                 board.Projects.Add(doc.Project);
             }
             else if (entry.Kind == "note")
             {
-                var doc = Decode<GeneralNoteFile>(bytes);
+                GeneralNoteFile doc;
+                try { doc = Decode<GeneralNoteFile>(bytes); }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    throw new WorkspaceConsistencyException("invalid_note_json",
+                        "Tệp ghi chú không phải JSON hợp lệ: " + entry.File,
+                        entry.File, entry.Hash, actualHash, indexHash, ex);
+                }
                 if (doc.SchemaVersion != index.SchemaVersion || doc.Note?.Id != entry.Id || doc.Note.IsBoard)
-                    throw new InvalidDataException("Tệp ghi chú không hợp lệ: " + entry.File);
+                    throw new WorkspaceConsistencyException("note_index_mismatch",
+                        "Tệp ghi chú không khớp chỉ mục: " + entry.File,
+                        entry.File, entry.Hash, actualHash, indexHash);
                 state.Notes.Add(doc.Note);
             }
             else throw new InvalidDataException("Loại tệp trong kho không được hỗ trợ.");
         }
-        ValidateState(state);
+        try { ValidateState(state); }
+        catch (InvalidDataException ex)
+        {
+            throw new WorkspaceConsistencyException("invalid_snapshot_state",
+                "Generation kho không vượt qua kiểm tra trạng thái.", indexHash: indexHash, inner: ex);
+        }
         return new(state, fingerprints, index.Files.ToDictionary(e => e.Id), index.SchemaVersion);
     }
 
@@ -393,9 +781,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
 
     private string Resolve(string relative)
     {
-        if (relative != "workspace.h2index.json"
-            && !(relative.StartsWith("projects/", StringComparison.Ordinal) && relative.EndsWith(".h2project.json", StringComparison.Ordinal))
-            && !(relative.StartsWith("notes/", StringComparison.Ordinal) && relative.EndsWith(".h2note.json", StringComparison.Ordinal)))
+        if (!IsWorkspaceDataFile(relative))
             throw new InvalidDataException("Đường dẫn tệp kho không hợp lệ.");
         return ResolveSafe(relative);
     }
