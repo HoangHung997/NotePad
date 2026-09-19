@@ -1184,17 +1184,27 @@ CompactionManager
 
 Target: AgentContextManager/Compaction for model context; LabSession remains durable journal only.
 
-### Trace/progress duplication
+### Trace / progress / journal boundary
 
-Review:
+MB-95 defines three separate responsibilities instead of three competing truth sources:
 
 ```text
-Metrics.AgentTrace
-Tasking.AgentTraceEventStream
-journal events
+Metrics.AgentTrace / AgentTraceStore
+  -> bounded machine telemetry and performance/reproducibility evidence
+  -> persisted separately; detailed trace text is not copied into the journal
+
+Tasking.AgentProgressEventStream
+  -> ephemeral typed user-visible orchestration progress
+  -> exposed through AgentInspectionSnapshot.ProgressEvents / UI progress channel
+  -> not durable conversation history and not machine telemetry
+
+LabSession journal
+  -> durable user/assistant/tool/error history
+  -> rejects ephemeral status/progress/thinking/delta events
+  -> stores only a safe telemetry-reference filename for a turn trace
 ```
 
-Do not force one type if they serve different concerns, but avoid three independent sources of truth for the same runtime event.
+These types intentionally remain separate because they serve different consumers and retention rules.
 
 ---
 
