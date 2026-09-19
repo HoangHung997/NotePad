@@ -5,6 +5,8 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using H2AgentLab.Desktop;
+using H2AgentLab.DesktopProtocol;
 using H2AgentLab.Metrics;
 using H2AgentLab.Tasking;
 using H2Notes.Core;
@@ -29,7 +31,7 @@ public sealed class LabWindow : Window
     private readonly Button _stop = Button("Dừng");
     private readonly StackPanel _actions = new() { Spacing = 10 };
     private CancellationTokenSource? _running;
-    private WindowTarget? _target;
+    private DesktopWindowInfo? _target;
     private Task? _runTask;
     private bool _historyHealthy = true;
     private AgentInspectionSnapshot? _lastInspection;
@@ -121,7 +123,11 @@ public sealed class LabWindow : Window
         _messages.Children.Add(streamed); var answer = ""; var thought = "";
         try
         {
-            var tools = new AgentTools(new SafeWorkspace(_session.Workspace), _stateRoot, Confirm, (kind, text) => { _session.Add(kind, text); Save(); }) { ReadOnly = _readOnly.IsChecked != false, Computer = _target is null ? null : new(_target) };
+            using var tools = new AgentTools(new SafeWorkspace(_session.Workspace), _stateRoot, Confirm, (kind, text) => { _session.Add(kind, text); Save(); })
+            {
+                ReadOnly = _readOnly.IsChecked != false,
+                Desktop = _target is null ? null : new SelectedDesktopWindowController(_target)
+            };
             var orchestrated = new AgentOrchestratedRun();
             _lastInspection = await orchestrated.RunAsync(
                 _profile,
@@ -210,12 +216,25 @@ public sealed class LabWindow : Window
     }
     private async Task PickWindow()
     {
-        var choices = new ComboBox { ItemsSource = await ComputerTools.List(CancellationToken.None), HorizontalAlignment = HorizontalAlignment.Stretch };
+        var choices = new ComboBox
+        {
+            ItemsSource = await SelectedDesktopWindowController.ListAsync(CancellationToken.None),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
         var select = Button("Cho phép chọn cửa sổ này", true); var clear = Button("Thu hồi quyền cửa sổ");
-        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 12, Children = { Label("Chỉ một cửa sổ được chọn", 22), Label("Chưa đọc nội dung khi chọn. Mỗi lần đọc/bấm/sửa đều hỏi trước. Không hỗ trợ mọi phần mềm, không tự điều khiển theo tọa độ.", 13), choices, select, clear } };
+        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 12, Children = { Label("Chỉ một cửa sổ được chọn", 22), Label("Chưa đọc nội dung khi chọn. Mỗi lần đọc/bấm/sửa đều hỏi trước. DesktopHost chặn cửa sổ nhạy cảm, token cũ và thao tác ngoài trạng thái đã quan sát.", 13), choices, select, clear } };
         var dialog = Dialog("Phạm vi điều khiển", panel, 620, 310);
-        select.Click += (_, _) => { if (choices.SelectedItem is WindowTarget t) { _target = t; _computerLabel.Text = t.ToString(); dialog.Close(); } };
-        clear.Click += (_, _) => { _target = null; _computerLabel.Text = "Chưa cấp quyền cửa sổ"; dialog.Close(); }; await dialog.ShowDialog(this);
+        select.Click += (_, _) =>
+        {
+            if (choices.SelectedItem is DesktopWindowChoice choice)
+            {
+                _target = choice.Window;
+                _computerLabel.Text = choice.ToString();
+                dialog.Close();
+            }
+        };
+        clear.Click += (_, _) => { _target = null; _computerLabel.Text = "Chưa cấp quyền cửa sổ"; dialog.Close(); };
+        await dialog.ShowDialog(this);
     }
     private Task OpenComputerFixture()
     {
