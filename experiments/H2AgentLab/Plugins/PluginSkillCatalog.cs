@@ -1,18 +1,18 @@
 namespace H2AgentLab.Plugins;
 
-public sealed record PluginSkillSummary(
+internal sealed record PluginSkillSummary(
     string PluginId,
     string PluginVersion,
     string SkillId,
     string Description,
     string Sha256);
 
-public sealed record PluginSkillContent(
+internal sealed record PluginSkillContent(
     PluginSkillSummary Summary,
     string Content,
     int LoadCount);
 
-public sealed class PluginSkillCatalog
+internal sealed class PluginSkillCatalog
 {
     private readonly PluginManager _plugins;
     private readonly Dictionary<string, (string Content, int LoadCount)> _cache = new(StringComparer.Ordinal);
