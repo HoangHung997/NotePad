@@ -1,5 +1,7 @@
 using H2Notes.Core;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 
 internal static class WorkspaceTests
 {
@@ -63,6 +65,90 @@ internal static class WorkspaceTests
             var untimed = new AiConversation { Messages = [new AiMessage { Content = "Legacy turn" }] };
             Check(AiHistory.RequestTurns(untimed).Single().Content == "Legacy turn");
         });
+        test("Workspace location resolves mapped network and UNC aliases to one canonical endpoint", () =>
+        {
+            var mapped = WorkspaceLocation.Inspect(
+                @"X:\Dữ liệu Hưng\.Note",
+                _ => DriveType.Network,
+                _ => @"\\NAS-SERVER\Share");
+            var unc = WorkspaceLocation.Inspect(
+                @"\\NAS-SERVER\Share\Dữ liệu Hưng\.Note",
+                _ => DriveType.Network,
+                _ => null);
+
+            Check(mapped.Kind == WorkspaceLocationKind.MappedNetwork);
+            Check(unc.Kind == WorkspaceLocationKind.UncNetwork);
+            Check(mapped.ResolvedNetworkPath is not null);
+            Check(mapped.CanonicalPath.Equals(unc.CanonicalPath, StringComparison.OrdinalIgnoreCase));
+        });
+
+        test("Schema 5 workspace migrates atomically to schema 6 stable WorkspaceId", () =>
+        {
+            var root = Folder();
+            var seed = new ProjectWorkspaceStore(root); seed.LoadOrImport(); var original = SheetStorage.Demo(); seed.Save(original);
+            var indexPath = Path.Combine(root, "workspace.h2index.json");
+            var index = JsonNode.Parse(File.ReadAllText(indexPath))!.AsObject();
+            index["SchemaVersion"] = 5;
+            index.Remove("WorkspaceId");
+
+            foreach (var entryNode in index["Files"]!.AsArray())
+            {
+                var entry = entryNode!.AsObject();
+                var relative = entry["File"]!.GetValue<string>();
+                var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+                var document = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+                document["SchemaVersion"] = 5;
+                File.WriteAllText(path, document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                entry["Hash"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+            }
+            File.WriteAllText(indexPath, index.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+            var legacy = new ProjectWorkspaceStore(root);
+            var loaded = legacy.LoadOrImport();
+            Check(legacy.WorkspaceId != Guid.Empty);
+            Check(loaded.Notes[0].Projects.Count == original.Notes[0].Projects.Count);
+            legacy.Save(loaded);
+
+            using var migrated = JsonDocument.Parse(File.ReadAllBytes(indexPath));
+            Check(migrated.RootElement.GetProperty("SchemaVersion").GetInt32() == ProjectWorkspaceStore.SchemaVersion);
+            Check(migrated.RootElement.GetProperty("WorkspaceId").GetGuid() == legacy.WorkspaceId);
+            foreach (var entry in migrated.RootElement.GetProperty("Files").EnumerateArray())
+            {
+                var relative = entry.GetProperty("File").GetString()!;
+                using var child = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar))));
+                Check(child.RootElement.GetProperty("SchemaVersion").GetInt32() == ProjectWorkspaceStore.SchemaVersion);
+            }
+        });
+
+        test("Logical WorkspaceId prevents same-machine duplicate aliases and self-transfer", () =>
+        {
+            var source = Folder();
+            var first = new ProjectWorkspaceStore(source); first.LoadOrImport(); first.Save(SheetStorage.Demo());
+            Check(first.WorkspaceId != Guid.Empty);
+
+            var alias = Folder();
+            foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+                Directory.CreateDirectory(directory.Replace(source, alias));
+            foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                var target = file.Replace(source, alias);
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                File.Copy(file, target, true);
+            }
+
+            var a = new ProjectWorkspaceStore(source);
+            var b = new ProjectWorkspaceStore(alias);
+            Check(a.WorkspaceId == b.WorkspaceId && a.WorkspaceId != Guid.Empty);
+            using var held = a.AcquireLock();
+            Fails(() => { using var duplicate = b.AcquireLock(); });
+            Fails(() => ProjectWorkspaceStore.ValidateDestination(source, alias));
+
+            var otherRoot = Folder();
+            var other = new ProjectWorkspaceStore(otherRoot); other.LoadOrImport(); other.Save(SheetStorage.Demo());
+            Check(other.WorkspaceId != a.WorkspaceId);
+            ProjectWorkspaceStore.ValidateDestination(source, otherRoot);
+        });
+
         test("Workspace rename keeps a stable GUID file path and project identity", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
