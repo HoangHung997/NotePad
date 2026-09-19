@@ -432,6 +432,13 @@ jobs:
           Get-Content -LiteralPath (Join-Path $out 'mb-minimum-bootable-agent-acceptance.txt')
           Get-Content -LiteralPath (Join-Path $out 'mb-minimum-bootable-agent-acceptance.json')
 
+      - name: Run H2 Agent MB-101 fully V2 normal UI path acceptance
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-normal-ui-v2-path'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-normal-ui-v2-path-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-normal-ui-v2-path-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
