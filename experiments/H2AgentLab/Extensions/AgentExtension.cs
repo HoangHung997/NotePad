@@ -49,36 +49,63 @@ public interface IAgentExtension
 /// Narrow registration surface exposed to extensions. AgentRuntime remains unaware of concrete
 /// application families and continues to depend only on ToolRegistry/runtime abstractions.
 /// </summary>
+internal sealed class AgentExtensionContributions
+{
+    public List<string> ToolNames { get; } = [];
+    public List<string> SkillSourceIds { get; } = [];
+    public List<string> VerifierIds { get; } = [];
+    public List<string> ProviderIds { get; } = [];
+}
+
 public sealed class AgentExtensionRegistration
 {
     private readonly ToolRegistry _tools;
     private readonly H2AgentLab.Skills.SkillCatalog _skills;
     private readonly ArtifactVerifierRegistry _verifiers;
     private readonly CapabilityProviderManager _providers;
+    private readonly AgentExtensionContributions _contributions;
 
     internal AgentExtensionRegistration(
         ToolRegistry tools,
         H2AgentLab.Skills.SkillCatalog skills,
         ArtifactVerifierRegistry verifiers,
-        CapabilityProviderManager providers)
+        CapabilityProviderManager providers,
+        AgentExtensionContributions contributions)
     {
         _tools = tools ?? throw new ArgumentNullException(nameof(tools));
         _skills = skills ?? throw new ArgumentNullException(nameof(skills));
         _verifiers = verifiers ?? throw new ArgumentNullException(nameof(verifiers));
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+        _contributions = contributions ?? throw new ArgumentNullException(nameof(contributions));
     }
 
     public void RegisterTool(ToolDescriptor descriptor)
-        => _tools.Register(descriptor);
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        _tools.Register(descriptor);
+        _contributions.ToolNames.Add(descriptor.Name);
+    }
 
     public void RegisterSkillSource(ISkillSource source)
-        => _skills.Register(source);
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _skills.Register(source);
+        _contributions.SkillSourceIds.Add(source.SourceId);
+    }
 
     public void RegisterVerifier(IArtifactVerifier verifier)
-        => _verifiers.Register(verifier);
+    {
+        ArgumentNullException.ThrowIfNull(verifier);
+        _verifiers.Register(verifier);
+        _contributions.VerifierIds.Add(verifier.VerifierId);
+    }
 
     public void RegisterProvider(ICapabilityProvider provider)
-        => _providers.Register(provider);
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        _providers.Register(provider);
+        _contributions.ProviderIds.Add(provider.Provenance.ProviderId);
+    }
 }
 
 public sealed record RegisteredAgentExtension(
@@ -91,8 +118,13 @@ public sealed record RegisteredAgentExtension(
 /// </summary>
 public sealed class AgentExtensionRegistry
 {
-    private readonly AgentExtensionRegistration _registration;
+    private readonly ToolRegistry _tools;
+    private readonly H2AgentLab.Skills.SkillCatalog _skills;
+    private readonly ArtifactVerifierRegistry _verifiers;
+    private readonly CapabilityProviderManager _providers;
     private readonly Dictionary<string, RegisteredAgentExtension> _extensions =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AgentExtensionContributions> _contributions =
         new(StringComparer.Ordinal);
 
     public AgentExtensionRegistry(
@@ -101,11 +133,10 @@ public sealed class AgentExtensionRegistry
         ArtifactVerifierRegistry verifiers,
         CapabilityProviderManager providers)
     {
-        _registration = new AgentExtensionRegistration(
-            tools,
-            skills,
-            verifiers,
-            providers);
+        _tools = tools ?? throw new ArgumentNullException(nameof(tools));
+        _skills = skills ?? throw new ArgumentNullException(nameof(skills));
+        _verifiers = verifiers ?? throw new ArgumentNullException(nameof(verifiers));
+        _providers = providers ?? throw new ArgumentNullException(nameof(providers));
     }
 
     public IReadOnlyList<RegisteredAgentExtension> Extensions
@@ -124,12 +155,66 @@ public sealed class AgentExtensionRegistry
             throw new InvalidOperationException(
                 $"Extension '{metadata.ExtensionId}' is already registered.");
 
-        extension.Register(_registration);
+        var contributions = new AgentExtensionContributions();
+        var registration = new AgentExtensionRegistration(
+            _tools,
+            _skills,
+            _verifiers,
+            _providers,
+            contributions);
+        extension.Register(registration);
 
         var registered = new RegisteredAgentExtension(
             metadata,
             DateTime.UtcNow);
         _extensions.Add(metadata.ExtensionId, registered);
+        _contributions.Add(metadata.ExtensionId, contributions);
         return registered;
+    }
+
+    public Task<bool> DisableAsync(
+        string extensionId,
+        CancellationToken cancellationToken = default)
+        => RemoveAsync(extensionId, cancellationToken);
+
+    public Task<bool> UnregisterAsync(
+        string extensionId,
+        CancellationToken cancellationToken = default)
+        => RemoveAsync(extensionId, cancellationToken);
+
+    private async Task<bool> RemoveAsync(
+        string extensionId,
+        CancellationToken cancellationToken)
+    {
+        var normalized = ToolNamespace.NormalizeId(
+            extensionId,
+            nameof(extensionId));
+        if (!_extensions.ContainsKey(normalized)
+            || !_contributions.TryGetValue(normalized, out var contributions))
+            return false;
+
+        foreach (var providerId in contributions.ProviderIds
+            .Distinct(StringComparer.Ordinal))
+        {
+            await _providers.UnregisterProviderAsync(
+                providerId,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var toolNames = contributions.ToolNames
+            .ToHashSet(StringComparer.Ordinal);
+        _tools.UnregisterWhere(x => toolNames.Contains(x.Name));
+
+        foreach (var sourceId in contributions.SkillSourceIds
+            .Distinct(StringComparer.Ordinal))
+            _skills.UnregisterSource(sourceId);
+
+        foreach (var verifierId in contributions.VerifierIds
+            .Distinct(StringComparer.Ordinal))
+            _verifiers.Unregister(verifierId);
+
+        _contributions.Remove(normalized);
+        _extensions.Remove(normalized);
+        return true;
     }
 }
