@@ -40,7 +40,7 @@ public static class V2ToolRegistryTests
                 "tool-regression-fixture",
                 (call, ct) => ValueTask.FromResult("ok:" + call.Name));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
             return (registry, executor);
         }
 
