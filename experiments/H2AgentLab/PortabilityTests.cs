@@ -51,9 +51,11 @@ public static class PortabilityTests
         {
             var result = await Execute("read_skill", "{\"name\":\"invented\",\"path\":\"SKILL.md\"}");
             Check(result.GetProperty("error").GetString()!.Contains("documents"), "No observed candidates");
-            var catalog = new SkillCatalog(Path.Combine(root, "absent-skills"));
-            try { catalog.Discover(""); throw new Exception("Missing skills silently accepted"); }
-            catch (AgentFaultException e) { Check(e.Message.Contains("Portable"), "No repair instructions"); }
+            var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn(Path.Combine(root, "absent-skills"));
+            Check(catalog.SnapshotMetadata().Count == 0, "Absent skill root invented installed metadata");
+            Check(LabEnvironment.Problems(catalog).Any(x => x.Contains("Thiếu skill", StringComparison.Ordinal))
+                  && LabEnvironment.Summary(catalog).Contains("Portable", StringComparison.Ordinal),
+                "Missing skill bundle readiness no longer provides repair instructions");
         });
         await Test("Required mutation arguments remain required", async () =>
         {
