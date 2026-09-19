@@ -1007,7 +1007,7 @@ Evidence: `Metrics.AgentTrace` remains the bounded machine telemetry stream and 
 
 # Stage K — Core acceptance gate
 
-## [~] MB-100 — Build Minimum Bootable Agent acceptance corpus
+## [x] MB-100 — Build Minimum Bootable Agent acceptance corpus
 
 At least cover:
 
@@ -1024,7 +1024,7 @@ At least cover:
 - progressive skill loading;
 - install-and-continue.
 
-Implementation under verification: `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` defines one 12-case Minimum Bootable Agent corpus and emits both text and machine-readable JSON reports. Direct-response and unknown-tool recovery are exercised directly through `AgentRuntime`; the other cases rerun the existing deterministic V2 suites for multi-tool/deferred loading, verification/repair, bounded context, cancellation, provider switching, extension registration, progressive skills and install-and-continue. Shared suites are cached within the corpus so one evidence suite is not redundantly rerun for multiple acceptance cases. The corpus is wired into `Program` and the full GitHub Actions pipeline.
+Evidence: `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` is the consolidated 12-case Minimum Bootable Agent corpus and emits both `mb-minimum-bootable-agent-acceptance.txt` and machine-readable JSON. MBA-01 directly proves a zero-tool `AgentRuntime` response with only the initial `tool_search` schema retained; MBA-04 directly proves typed unknown-tool failure followed by same-task `tool_search`, corrected tool execution and final recovery. The remaining cases rerun the accepted deterministic V2 suites for multi-tool/deferred loading, verification/repair, 10/100/1000-turn bounded context, cancellation, provider switching, extension registration, progressive skills and install-and-continue, with shared suites cached inside the corpus. Final functional source commit `aef8e5830de5df794e136dd6a63050be9f294d69`, GitHub Actions run `35439400855`: MB-100 **12 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-95, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `d4d43f9875425c49e3f80180f9b2a6994986b2de`; repository portable ZIP SHA256 `57c50188de26fa5b68cf6ec9be85fbb58861eb61d300dcab72a07e0b311868dc`.
 
 ---
 
