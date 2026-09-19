@@ -24,6 +24,31 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     private ScriptWorkspace? _scripts;
     private ScriptWorkspace Scripts => _scripts ??= new(workspace, stateRoot, approve);
 
+    // MB-91: normal AgentRuntime executors may use host state/services, but must not route through
+    // the legacy Definitions/Execute giant switch. These seams disappear with later AgentTools cleanup.
+    internal ScriptWorkspace RuntimeScripts => Scripts;
+    internal Task<bool> RuntimeApproveAsync(Approval request, CancellationToken cancellationToken)
+        => approve(request, cancellationToken);
+    internal void RuntimeJournal(string kind, string text)
+        => journal(kind, text);
+    internal async Task RuntimePermitAsync(
+        string title,
+        string details,
+        CancellationToken cancellationToken)
+    {
+        if (ReadOnly)
+            throw new AgentFaultException(
+                "permission_required",
+                "Chế độ Chỉ đọc: chưa thực hiện thao tác.",
+                false);
+        if (!await approve(new Approval(title, details), cancellationToken).ConfigureAwait(false))
+            throw new AgentFaultException(
+                "denied",
+                "Người dùng từ chối; chưa thực hiện thao tác.",
+                false);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
     public ScriptRunEvidence ObserveScriptRunEvidence(string runId)
     {
         var evidence = Scripts.Evidence(runId);

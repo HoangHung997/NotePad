@@ -19,8 +19,9 @@ public interface IAgentRuntimeFactory
 }
 
 /// <summary>
-/// Normal Agent Lab runtime construction seam. Tool migration still uses V1ToolRegistryAdapter as a
-/// temporary provider bridge; model-provider selection is delegated to IAgentTransportFactory.
+/// Normal Agent Lab runtime construction seam. ToolRegistry is the sole callable surface; domain
+/// executors are registered directly and the legacy AgentTools giant switch is not reachable here.
+/// Model-provider selection remains delegated to IAgentTransportFactory.
 /// </summary>
 public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 {
@@ -43,7 +44,7 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         ArgumentNullException.ThrowIfNull(contextManager);
         ArgumentNullException.ThrowIfNull(telemetry);
 
-        var registry = V1ToolRegistryAdapter.Create(tools);
+        var registry = NormalRuntimeToolRegistry.Create(tools);
         var transport = _transportFactory.Create(profile, apiKey, telemetry);
         var verifier = new AgentRuntimeDomainVerifierRouter(
         [
