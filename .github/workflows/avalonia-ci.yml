@@ -454,6 +454,15 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-extension-bus-gate-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-extension-bus-gate-tests.txt')
 
+      - name: Run H2 Agent MB-104 permission and scope gate
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-permission-scope-gate'
+          $desktopHostExe = (Resolve-Path '.\experiments\H2AgentLab.DesktopHost\bin\Release\net10.0-windows\H2AgentLab.DesktopHost.exe').Path
+          $officeHostExe = (Resolve-Path '.\experiments\H2AgentLab.OfficeHost\bin\Release\net10.0-windows\H2AgentLab.OfficeHost.exe').Path
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-permission-scope-gate-test $out $desktopHostExe $officeHostExe
+          Get-Content -LiteralPath (Join-Path $out 'mb-permission-scope-gate-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
