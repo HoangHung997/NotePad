@@ -82,7 +82,7 @@ The protocol records these cases:
    - PC2 observes the exact published bytes, not a partial generation.
 
 5. `CONCURRENT-WRITERS-READ-AFTER-COMMIT`
-   - both PCs preload the same Schema-5 workspace;
+   - both PCs preload the same Schema-6 workspace;
    - both mutate different projects and save from the same baseline;
    - commit locking/merge preserves both edits;
    - both machines reread the final committed generation successfully.
