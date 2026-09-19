@@ -224,10 +224,12 @@ public static class MbMinimumBootableAgentAcceptanceTests
         if (result.FinalText != "direct-ok"
             || result.ToolRounds != 0
             || result.ToolCalls != 0
-            || result.LoadedToolSchemas.Count != 0)
+            || !result.LoadedToolSchemas.SequenceEqual(
+                [DeferredToolDiscovery.SearchToolName],
+                StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
-                "Direct response did not finish without executing/loading a detailed tool.");
+                "Direct response did not finish with zero tool execution and only the initial tool_search schema loaded.");
         }
     }
 
