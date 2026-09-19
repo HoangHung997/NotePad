@@ -37,6 +37,7 @@ public partial class App : Application
     private bool _storageReady;
     private bool _restoring;
     private readonly HashSet<Guid> _dirtyProjects = [];
+    private WorkspacePendingRestoreResult? _restoredPending;
     public void MarkProjectDirty(Guid id) => _dirtyProjects.Add(id);
     public Task StopAiAsync() => Task.WhenAll(_aiWindows.Values.Select(w => w.StopAiAsync()).Append(_main?.StopAiAsync() ?? Task.CompletedTask));
     private void CancelAi() { _main?.CancelAi(); foreach (var window in _aiWindows.Values) window.CancelAi(); }
@@ -89,6 +90,13 @@ public partial class App : Application
             {
                 State = _demo ? File.Exists(dataPath) ? SheetStorage.Read(dataPath) : SheetStorage.Demo()
                     : _storage.LoadOrImport(UsesProjectFiles && File.Exists(dataPath) ? dataPath : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nodepad", "state.json"));
+                if (_storage is ProjectWorkspaceStore pendingStore
+                    && pendingStore.TryRestoreLatestPending(State, out var restoredPending))
+                {
+                    State = restoredPending.State;
+                    _dirtyProjects.UnionWith(restoredPending.DirtyProjectIds);
+                    _restoredPending = restoredPending;
+                }
                 if (UsesProjectFiles && _local.DesktopSession is not null)
                     State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
                 if (_storage is ProjectWorkspaceStore loadedStore)
@@ -124,6 +132,14 @@ public partial class App : Application
             BuildTray();
             RestoreWindows(plan);
             _restoring = false;
+            if (_restoredPending is { } restored)
+            {
+                var text = restored.Conflicts.Count > 0
+                    ? "Đã khôi phục bản chờ cục bộ · có xung đột sẽ được ghi audit khi đồng bộ"
+                    : "Đã khôi phục bản chờ cục bộ · đang chờ đồng bộ NAS";
+                _main?.SetSaveStatus(text);
+                foreach (var window in _aiWindows.Values) window.SetSaveStatus(text);
+            }
             if (UsesProjectFiles) _syncTimer.Start();
             if (args.Contains("--show")) ShowMain();
             if (args.Contains("--show-ai")) ShowProjectAiWindow();
@@ -142,7 +158,15 @@ public partial class App : Application
                     try { ShowMain(); await _main.CaptureChatEvidence(Path.GetFullPath(args[chatEvidenceIndex + 1])); }
                     catch (Exception ex) { await Dialogs.Message(_main, "Chat evidence failed", ex.Message); }
                 });
-            desktop.ShutdownRequested += (_, e) => { CancelAi(); SaveNow(); if (LastSaveError is not null) e.Cancel = true; };
+            desktop.ShutdownRequested += (_, e) =>
+            {
+                CancelAi();
+                SaveNow();
+                // A workspace save failure no longer traps the user in the process when a durable
+                // machine-local pending snapshot exists. It will be replayed after reconnect/restart.
+                if (LastSaveError is not null && _storage is not ProjectWorkspaceStore { HasPendingChanges: true })
+                    e.Cancel = true;
+            };
             var aiErrorEvidenceIndex = Array.IndexOf(args, "--ai-error-evidence");
             if (_demo && dataIndex >= 0 && aiErrorEvidenceIndex >= 0 && aiErrorEvidenceIndex + 1 < args.Length)
                 Dispatcher.UIThread.Post(async () =>
@@ -221,6 +245,7 @@ public partial class App : Application
     {
         if (_saving || !_storageReady || _restoring || IsExiting) return;
         if (_main?.SelectedProjectId is { } id) MarkProjectDirty(id);
+        _saveTimer.Interval = TimeSpan.FromMilliseconds(900);
         _main?.SetSaveStatus("Đang soạn…"); _saveTimer.Stop(); _saveTimer.Start();
         foreach (var window in _aiWindows.Values) window.SetSaveStatus("Đang soạn…");
     }
@@ -239,8 +264,17 @@ public partial class App : Application
                 _local.DesktopSession = State.DesktopSession is null ? null : ProjectWorkspaceStore.Clone(State.DesktopSession);
                 _local.Save();
             }
-            if (_storage is ProjectWorkspaceStore projectStore) projectStore.SaveIncremental(State, _dirtyProjects);
+            if (_storage is ProjectWorkspaceStore projectStore)
+            {
+                // Persist locally before touching NAS. If the remote operation fails or the process
+                // exits, the immutable pending record is enough to reconstruct and merge this state.
+                projectStore.PersistPendingChanges(State, _dirtyProjects);
+                projectStore.SaveIncremental(State, _dirtyProjects);
+                projectStore.AcknowledgePendingChanges();
+                _restoredPending = null;
+            }
             else _storage.Save(State);
+            _saveTimer.Interval = TimeSpan.FromMilliseconds(900);
             _dirtyProjects.Clear(); LastSaveError = null;
             var merged = _storage is ProjectWorkspaceStore p && p.LastMergeConflicts.Count > 0;
             _main?.SetSaveStatus(merged ? "Đã lưu · đã gộp thay đổi từ máy khác" : "Đã lưu");
@@ -250,20 +284,31 @@ public partial class App : Application
         catch (IOException ex) when (ex.Message.StartsWith("Kho dữ liệu đang được thiết bị khác ghi", StringComparison.Ordinal))
         {
             LastSaveError = null;
-            _main?.SetSaveStatus("NAS đang bận · sẽ tự lưu lại");
-            foreach (var window in _aiWindows.Values) window.SetSaveStatus("NAS đang bận · sẽ tự lưu lại");
+            _main?.SetSaveStatus("NAS đang bận · bản chờ đã lưu cục bộ · sẽ tự thử lại");
+            foreach (var window in _aiWindows.Values) window.SetSaveStatus("NAS đang bận · bản chờ cục bộ an toàn");
+            _saveTimer.Interval = TimeSpan.FromSeconds(3);
             _saveTimer.Start();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException or InvalidOperationException)
         {
-            var fallback = _storage is ProjectWorkspaceStore projectStore && projectStore.IsRecoveryFallbackActive;
+            var projectStore = _storage as ProjectWorkspaceStore;
+            var fallback = projectStore?.IsRecoveryFallbackActive == true;
+            var locallyDurable = projectStore?.HasPendingChanges == true;
             var status = fallback
-                ? "NAS lỗi generation · bản đang soạn chưa ghi đè · mở Cài đặt để phục hồi"
-                : "Lỗi lưu · xem cài đặt";
+                ? "NAS lỗi generation · bản chờ đã giữ cục bộ · mở Cài đặt để phục hồi"
+                : locallyDurable
+                    ? "NAS chưa lưu được · bản chờ đã giữ cục bộ · sẽ thử lại"
+                    : "Lỗi lưu và chưa tạo được bản chờ cục bộ · xem cài đặt";
             _main?.SetSaveStatus(status);
             LastSaveError = ex.Message;
             foreach (var window in _aiWindows.Values)
-                window.SetSaveStatus(fallback ? "NAS đang ở chế độ chỉ đọc an toàn · chưa ghi đè" : "Chưa lưu được · kiểm tra thư mục dữ liệu");
+                window.SetSaveStatus(fallback ? "NAS đang chỉ đọc an toàn · bản chờ cục bộ được giữ"
+                    : locallyDurable ? "Đã giữ bản chờ cục bộ · chờ NAS" : "Chưa lưu được · kiểm tra thư mục dữ liệu");
+            if (locallyDurable && !fallback)
+            {
+                _saveTimer.Interval = TimeSpan.FromSeconds(5);
+                _saveTimer.Start();
+            }
         }
         finally { _saving = false; }
     }
@@ -281,7 +326,16 @@ public partial class App : Application
                 foreach (var window in _aiWindows.Values) window.SetSaveStatus(status);
                 return;
             }
-            if (!changed) return;
+            if (!changed)
+            {
+                if (projectStore.HasPendingChanges)
+                {
+                    _saveTimer.Interval = TimeSpan.FromSeconds(2);
+                    _saveTimer.Stop();
+                    _saveTimer.Start();
+                }
+                return;
+            }
             LastSaveError = null;
             _main?.RefreshAfterExternalSync();
             foreach (var window in _aiWindows.Values) window.RefreshFromModel();
