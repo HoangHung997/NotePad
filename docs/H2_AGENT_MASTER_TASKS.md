@@ -1210,7 +1210,7 @@ Evidence: `Acceptance/MbPluginPackageLifecycleAcceptanceTests.cs` runs the real 
 
 # Stage M — H2 Notes integration readiness
 
-## [ ] MB-120 — Produce final architecture report
+## [~] MB-120 — Produce final architecture report
 
 Report:
 
@@ -1223,6 +1223,8 @@ Report:
 - verification failure rate;
 - provider matrix;
 - known limitations.
+
+Implementation under verification: `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` freezes the accepted post-MB-115 architecture/evidence baseline, including exact runtime call graph, core/extension split, retired compatibility paths, MB-102 measured context envelopes, 19-descriptor/2-initial-schema tool metrics, MB-100/104/105 correctness and safety results, synthetic-vs-operational verification failure-rate distinction, transport/provider matrices and explicit integration limitations. `Acceptance/MbFinalArchitectureReportTests.cs` binds those claims back to current source constants, registry exposure, provider factory behavior and removed legacy paths.
 
 ---
 
