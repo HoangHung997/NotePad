@@ -143,7 +143,7 @@ Evidence: `ProjectWorkspaceStore.SaveIncremental` now retains the recovery journ
 
 ---
 
-## [ ] H2M-012 — Resolve persistent mixed-generation recovery path
+## [x] H2M-012 — Resolve persistent mixed-generation recovery path
 
 Target:
 
@@ -160,6 +160,8 @@ Acceptance:
 
 - persistent hash mismatch does not trap the second PC forever without a recovery path;
 - no silent data loss.
+
+Evidence: `ProjectWorkspaceStore` now performs bounded consistency rereads; persists machine-local validated last-known-good generations; opens a persistent mismatch in write-blocked last-good fallback when safe evidence exists; fails closed when it does not; persists structured bounded diagnostics; and exposes explicit guided recovery that quarantines the complete invalid referenced generation before restoring verified last-good bytes. `App` surfaces transient/persistent/fallback state and Settings exposes the confirmed recovery action. Regression coverage proves transient convergence, persistent fallback, write blocking, exact corrupt-byte quarantine, guided recovery, no-cache fail-closed behavior and preservation of externally modified bytes. Exact source `d3937e501b50220c6688d336a84e5b58ac1539a4`, Actions run `35452160225` SUCCESS, H2 Notes **340/340**, full Agent/reference-extension/provider/publish pipeline green. Publish `819ab68bcf73174282df98e68ef726d81b0ad82b`; ZIP SHA256 `4a27bf96882a7518baa87e0feeb91a577415f3a957e85435210e9bd741acdbfd`. H2-NONAI-005 and H2-NONAI-003 are FIXED; H2-NONAI-001 remains OPEN-REAL-NAS for H2M-013 physical two-PC proof.
 
 ---
 
