@@ -1,5 +1,9 @@
 # Project-aware AI assistant (discussion, not implemented)
 
+> **HISTORICAL PRODUCT DESIGN EVIDENCE**
+>
+> This file is retained for migration/history only. Future H2 product architecture is defined by `docs/H2_PRODUCT_MASTER_SPEC.md` and executed through `docs/H2_PRODUCT_MASTER_TASKS.md`. It must not override the Product Master or the independent `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`.
+
 Status: proposal following the user's 2026-09-15 feedback. This icon/resize change
 does not enable filesystem access, OS activity monitoring, or autonomous actions.
 
