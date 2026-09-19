@@ -67,16 +67,46 @@ A dedicated real-device acceptance harness now exists at `tools/H2Notes.NasAccep
 
 This changes neither H2-NONAI-004 nor H2-NONAI-006 to FIXED. Their statuses remain open until two physical PCs execute the same session against the intended NAS/share and preserve the coordinator/peer JSON evidence. GitHub-hosted/local self-tests prove harness behavior only, not SMB/NAS semantics.
 
+## H2M-013 deferred real-NAS acceptance — 2026-09-20
+
+The user explicitly approved continuing without the physical two-PC/NAS execution at this stage because the application is not yet complete enough for that test.
+
+This is an **ACCEPTED_LIMITATION**, not a claim of FIXED or VERIFIED real NAS behavior.
+
+Evidence available now:
+
+- `tools/H2Notes.NasAcceptance` two-node acceptance harness;
+- `docs/H2_NAS_REAL_ACCEPTANCE.md` physical-run procedure;
+- source `ed0a02de50fdffc63ef4fa5bd8b89505c5c52092`;
+- GitHub Actions run `35453854716` SUCCESS;
+- H2 Notes **340/340**;
+- NAS harness local protocol self-test PASS;
+- self-contained Windows NAS probe artifact published.
+
+Deferred evidence still mandatory before final production acceptance:
+
+- two distinct physical PCs;
+- the user's intended NAS/share;
+- exclusive lock visibility;
+- durable flush visibility;
+- replacement/rename visibility;
+- concurrent writers/read-after-commit;
+- interrupted-save recovery;
+- no persistent mixed generation;
+- coordinator/peer JSON reports preserved.
+
+Reopen this limitation no later than H2M-116 / H2M-133. Do not advertise real multi-PC NAS support as certified until that evidence exists.
+
 ## Summary
 
 | ID | Severity | Area | Status | Short description |
 |---|---|---|---|---|
-| H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN-REAL-NAS | Code-side persistent-mismatch recovery is implemented; physical two-PC/NAS convergence/root-cause proof remains H2M-013 |
+| H2-NONAI-001 | HIGH | NAS / multi-PC sync | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Code-side recovery is implemented; user explicitly deferred physical two-PC/NAS convergence proof until final app acceptance |
 | H2-NONAI-002 | HIGH | Persistence / recovery | FIXED | Journal now survives through final snapshot validation; fault-injection proves rollback after a bad committed generation |
 | H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | FIXED | Structured bounded sync diagnostics are persisted locally and surfaced as transient/persistent/recovery status |
-| H2-NONAI-004 | HIGH | NAS protocol compatibility | OPEN-RISK | Multi-PC protocol assumes locking/rename semantics without proving the selected shared filesystem supports them |
+| H2-NONAI-004 | HIGH | NAS protocol compatibility | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Harness exists and self-tests; real share locking/rename/flush semantics are not yet certified and must be tested before final production acceptance |
 | H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
-| H2-NONAI-006 | HIGH | Test coverage | OPEN | Multi-PC tests use local filesystem fixtures and do not prove real SMB/NAS lock/visibility behavior |
+| H2-NONAI-006 | HIGH | Test coverage | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Real two-PC harness is ready, but user explicitly deferred physical run until the app is more complete |
 | H2-NONAI-007 | MEDIUM | Offline durability | OPEN-KNOWN-GAP | No durable local pending-operation queue while NAS is unavailable; crash durability remains incomplete |
 | H2-NONAI-008 | HIGH | Storage location / network failover | OPEN | DataFolder is stored as one path string; no Local vs Mapped Network vs UNC classification or LAN/remote endpoint failover |
 | H2-NONAI-009 | HIGH | Workspace identity / locking | OPEN | Path aliases to the same NAS workspace can be treated as different roots, weakening instance lock and destination validation |
