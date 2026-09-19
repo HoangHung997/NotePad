@@ -889,7 +889,7 @@ Evidence: `Catalog/PackageRetriever.cs` remains a byte-staging boundary only: `L
 
 ---
 
-## [ ] MB-82 — End-to-end install-and-continue test
+## [x] MB-82 — End-to-end install-and-continue test
 
 Scenario:
 
@@ -909,6 +909,8 @@ Scenario:
 This proves the expansion slot.
 
 No semantic marketplace engine required.
+
+Evidence: `Capabilities/MbEndToEndInstallContinueTests.cs` exercises the complete expansion slot in one real `AgentRuntime` request. The scripted model first runs `tool_search` for the target operation and observes no matching local tool, loads ordinary discovery tools, then runs `list_skills` and observes no matching local skill. It calls `catalog_search` against the configured `LocalFolderCatalogSource`, receives compact metadata for `fixture.verified-state` including the exact callable identity `fixture.set_value`, and requests `plugin_install`; host-owned DeveloperLocal policy/user approval remain outside model arguments. The catalog re-resolves the exact package location/hash, a counting wrapper proves `IPackageRetriever` stages the package exactly once, and `PluginManager` verifies/installs/activates it. Without a new user turn, the same runtime observes the newly installed skill through canonical `SkillCatalog`, reads its selected `SKILL.md`, re-runs `tool_search` so registry-version refresh loads the new tool schema, executes the newly installed mutating tool exactly once, and a host `IAgentRuntimeVerifier` independently confirms the resulting fixture state and returns PASS for criterion `mb82.state-applied`. Completion policy requires verifier `mb82-state-verifier`, and the runtime finishes only after that PASS. The transport asserts exactly one `StartAsync` call, proving the user never restates the request. The first CI attempt exposed a fixture metadata omission (tool ID absent from compact `toolSummaries`); commit `87d9482381a16dd4071395688817f3d38115960a` corrected the candidate metadata while keeping it compact. GitHub Actions run `35419850856`: MB-82 **1 passed, 0 failed**; MB-70 through MB-81, H2 Notes, architecture guard, Phase 10/11/extensibility, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `3c87799e992b20677fe32d2d8fbdf7a7241c54a0`; repository portable ZIP SHA256 `65b6678083a989f2d0e03e78af042169087e2173076d792b3b7f53590494a6d4`.
 
 ---
 
