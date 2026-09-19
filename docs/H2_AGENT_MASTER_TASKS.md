@@ -1189,7 +1189,7 @@ Evidence: `Acceptance/MbMcpAcceptanceTests.cs` provides six deterministic offlin
 
 ---
 
-## [ ] MB-115 — Plugin package lifecycle acceptance
+## [~] MB-115 — Plugin package lifecycle acceptance
 
 Cover:
 
@@ -1203,6 +1203,8 @@ Cover:
 - safe hot registration.
 
 This remains valuable, but it is an extension-system test, not the definition of Agent core.
+
+Implementation under verification: `Acceptance/MbPluginPackageLifecycleAcceptanceTests.cs` adds an independent lifecycle gate over the real `PluginManager`. Five end-to-end cases verify install/hot registration with exact ToolRegistry provenance, update blocking during in-flight tool execution plus permission-delta reapproval, archive SHA-256 and declarative self-test fail-closed behavior, rollback restoring both active manifest and runtime descriptor/executor, and quarantine diagnostics with automatic runtime rollback.
 
 ---
 
