@@ -70,6 +70,7 @@ public static class Program
         if (args.Contains("--mb-runtime-capability-install-test")) return H2AgentLab.Capabilities.MbRuntimeCapabilityInstallTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-task-capability-pinning-test")) return H2AgentLab.Capabilities.MbTaskCapabilityPinningTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-minimal-catalog-source-test")) return H2AgentLab.Catalog.MbMinimalCatalogSourceTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-package-retriever-boundary-test")) return H2AgentLab.Catalog.MbPackageRetrieverBoundaryTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
