@@ -150,7 +150,7 @@ Disposition:
 | H2-NONAI-004 | HIGH | NAS protocol compatibility | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Harness exists and self-tests; real share locking/rename/flush semantics are not yet certified and must be tested before final production acceptance |
 | H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
 | H2-NONAI-006 | HIGH | Test coverage | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Real two-PC harness is ready, but user explicitly deferred physical run until the app is more complete |
-| H2-NONAI-007 | MEDIUM | Offline durability | OPEN-KNOWN-GAP | No durable local pending-operation queue while NAS is unavailable; crash durability remains incomplete |
+| H2-NONAI-007 | MEDIUM | Offline durability | FIXED | Durable machine-local pending snapshots survive restart, merge after reconnect, audit conflicts and clear only after shared commit |
 | H2-NONAI-008 | HIGH | Storage location / network failover | PARTIAL-FIX-H2M015-FOLLOWUP | Local/mapped/UNC classification, canonical mapped→UNC resolution, WorkspaceId and identity-checked alias fallback are implemented; optional secure remote/VPN endpoint policy remains H2M-015 |
 | H2-NONAI-009 | HIGH | Workspace identity / locking | FIXED | Schema 6 WorkspaceId drives logical alias identity, same-machine locking and self-transfer rejection; mapped/UNC alias regressions are green |
 
@@ -483,7 +483,7 @@ At minimum:
 # H2-NONAI-007 — No durable pending-operation queue while NAS is offline
 
 **Severity:** MEDIUM  
-**Status:** OPEN-KNOWN-GAP  
+**Status:** FIXED  
 **First recorded:** existing project boundary, retained 2026-09-18  
 **Area:** offline durability
 
@@ -506,6 +506,29 @@ Add an append-only local pending-operation/recovery record with:
 - idempotent replay or explicit conflict handling.
 
 Do not blindly replay mutations after reconnect without first reading the current shared state.
+
+---
+
+## H2M-015 resolution evidence — 2026-09-20
+
+H2-NONAI-007 is closed by a durable local pending-work path:
+
+- every normal ProjectWorkspaceStore save persists a machine-local immutable pending snapshot before remote I/O;
+- each pending record carries operation identity, WorkspaceId and base-generation identity;
+- restart/reconnect observes remote first, then performs the existing three-way merge;
+- local and remote non-conflicting work is preserved;
+- same-field conflicts are retained in the existing conflict audit;
+- replay of the same pending record is idempotent;
+- successful remote commit acknowledges pending state;
+- corrupt pending files are quarantined;
+- pending history is bounded to eight snapshots.
+
+Exact source: `cc2b03ddec6e9fd3524e376c7013426308b70ef4`.  
+Actions: `35476297321` — SUCCESS.  
+H2 Notes: **348 passed, 0 failed**.  
+Portable source/publish: `38f0975622bf0191017356fbec41dde11e8d8f99`, SHA256 `5e2514dae1de9e478c80b05c486fb8badc6a090d54def8ff5ba1fad0107ad660`.
+
+The remaining H2-NONAI-008 remote/VPN portion is intentionally not marked fixed. Current policy is: known friendly/resolved aliases may switch only after WorkspaceId verification; otherwise H2 enters durable pending/offline behavior. Automatic discovery/use of arbitrary Internet/VPN endpoints remains deferred and must be resolved or explicitly accepted at H2M-133 before final production claim.
 
 ---
 
