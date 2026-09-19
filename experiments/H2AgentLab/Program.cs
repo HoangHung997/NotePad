@@ -24,7 +24,6 @@ public static class Program
     public static int Main(string[] args)
     {
         Arguments = args;
-        if (args.Contains("--computer-worker")) return ComputerTools.Worker();
         if (args.Contains("--self-test")) return LabTests.Run(args).GetAwaiter().GetResult();
         if (args.Contains("--skills-test")) return SkillTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--v2-guard-test")) return V2ArchitectureTests.Run(args[^1]).GetAwaiter().GetResult();
