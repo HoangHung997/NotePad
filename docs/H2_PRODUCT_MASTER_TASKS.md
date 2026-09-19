@@ -236,7 +236,7 @@ Endpoint policy at this stage is deliberately fail-safe rather than distributed 
 
 # Stage H2 — Wait for Agent acceptance boundary
 
-## [ ] H2M-020 — Verify Agent integration gate
+## [x] H2M-020 — Verify Agent integration gate
 
 Blocking dependency:
 
@@ -256,6 +256,8 @@ Before H2 integration confirm Agent exposes a stable product-facing boundary for
 Acceptance:
 
 - H2 integration does not need direct access to ToolRegistry/transport/MCP internals.
+
+Evidence: `docs/H2_AGENT_INTEGRATION_GATE.md` maps every H2 lifecycle need to the frozen MB-121 seven-operation boundary and records the explicitly approved MB-122 gate. `InspectTask` supplies task summary/evidence projection; H2-specific recent-run enumeration, nullable ProjectId correlation and later task-to-project attachment are intentionally owned by H2AgentAdapter/H2M-031 rather than expanding Agent Core or exposing ToolRegistry/transport/MCP internals. Latest full pipeline evidence used: source `cc2b03ddec6e9fd3524e376c7013426308b70ef4`, Actions `35476297321` SUCCESS.
 
 ---
 
