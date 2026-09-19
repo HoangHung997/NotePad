@@ -1101,14 +1101,14 @@ Evidence: `Acceptance/MbPermissionScopeGateTests.cs` is the consolidated host-bo
 
 ---
 
-## [~] MB-105 — Core correctness gate
+## [x] MB-105 — Core correctness gate
 
 Target:
 
 - >=90% supported-task correctness on the agreed core corpus;
 - no false “completed” on known verifier failures.
 
-Implementation under verification: `Acceptance/MbCoreCorrectnessGateTests.cs` scores the accepted core task corpus from MB-100 (12 task cases) plus the two task-level normal UI scenarios from MB-101, producing a machine-readable correctness percentage with a hard >=90% threshold. It separately re-runs the MB-44 host completion invariants and counts model-only completion and required-verifier-failure cases as false-completion violations; any violation fails the gate. CI emits both text and JSON evidence.
+Evidence: `Acceptance/MbCoreCorrectnessGateTests.cs` scores the accepted core task corpus from MB-100 (12 task cases) plus the two task-level normal UI scenarios from MB-101 and emits text + machine-readable JSON. The accepted run scored **14/14 = 100.00% correctness** against the required **>=90%** threshold. The gate separately reruns the MB-44 model-only-completion and required-verifier-failure host invariants; **FALSE_COMPLETION_VIOLATIONS = 0** and the complete host completion-policy suite exited **0**. Final functional source commit `4404bb009c719c90ade4f89050c94d34ff4f0d46`, GitHub Actions run `35442540777`: MB-105 PASS; MB-100 through MB-104, H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-95, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `4ab11203ee30d3769af4579a9ef1270f28d75378`; repository portable ZIP SHA256 `4b10de5ca21529b6863a7bf9e5eb478518bffc30030ca2d7aaf74d8f472914a4`.
 
 ---
 
