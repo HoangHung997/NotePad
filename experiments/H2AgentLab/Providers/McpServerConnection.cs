@@ -145,14 +145,24 @@ public sealed class McpServerConnection : IAsyncDisposable
             {
                 throw;
             }
-            catch (Exception ex) when (attempt < _maxReconnectAttempts)
+            catch (Exception ex)
             {
-                attempt++;
+                var failures = _health.ConsecutiveFailures + 1;
                 await StopQuietly().ConfigureAwait(false);
+                if (attempt >= _maxReconnectAttempts)
+                {
+                    Transition(
+                        ProviderHealthStatus.Failed,
+                        Bound(ex.Message, 800),
+                        failures);
+                    throw;
+                }
+
+                attempt++;
                 Transition(
                     ProviderHealthStatus.Degraded,
                     Bound(ex.Message, 800),
-                    _health.ConsecutiveFailures + 1);
+                    failures);
             }
         }
     }
