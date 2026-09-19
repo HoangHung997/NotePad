@@ -165,7 +165,7 @@ Evidence: `ProjectWorkspaceStore` now performs bounded consistency rereads; pers
 
 ---
 
-## [ ] H2M-013 — Real NAS/SMB capability acceptance
+## [~] H2M-013 — Real NAS/SMB capability acceptance
 
 Targets:
 
@@ -185,6 +185,8 @@ Run real two-PC/NAS tests for:
 Acceptance:
 
 - shared filesystem mode is either verified supported or explicitly blocked/limited.
+
+H2M-013 preparation evidence: `tools/H2Notes.NasAcceptance` now implements a two-physical-PC shared-folder protocol with machine-readable JSON evidence for rendezvous, cross-PC `FileShare.None` exclusion, durable-flush visibility, rename/replace visibility, concurrent Schema-5 writers + read-after-commit, and intentional interrupted-save recovery. `docs/H2_NAS_REAL_ACCEPTANCE.md` defines the safe dedicated-folder runbook and strict closure rule. CI builds the probe, runs only a local harness self-test, and publishes a self-contained `H2Notes-NasAcceptance-win-x64` artifact. **Local/CI PASS is not sufficient to close H2M-013.** Physical two-PC/NAS evidence is still required; do not start H2M-014 merely because the harness is green.
 
 ---
 
