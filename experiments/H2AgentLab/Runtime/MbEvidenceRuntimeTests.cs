@@ -131,13 +131,13 @@ public static class MbEvidenceRuntimeTests
                 "Small evidence raw output did not round-trip.");
         });
 
-        await Test("MB-41 v1 important tool metadata declares verification evidence capability", () =>
+        await Test("MB-41 canonical tool metadata declares verification evidence capability", () =>
         {
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(
+            NormalRuntimeToolRegistry.Populate(
                 registry,
                 new DelegatingToolExecutor(
-                    "mb41-v1-metadata",
+                    "mb41-normal-metadata",
                     (call, ct) => ValueTask.FromResult("{}")));
 
             foreach (var name in new[]
@@ -153,7 +153,7 @@ public static class MbEvidenceRuntimeTests
             })
             {
                 Check(registry.TryGet(name, out var descriptor),
-                    "V1 registry is missing " + name + ".");
+                    "Normal registry is missing " + name + ".");
                 Check(descriptor.CanProvideVerificationEvidence,
                     "V1 evidence-capable tool is not marked: " + name + ".");
             }
