@@ -51,6 +51,14 @@ public static class DesktopHostSelfTests
             }
         });
 
+        Test("H2 Agent Lab approval UI is blocked except the dedicated safe fixture", () =>
+        {
+            if (DesktopSafetyPolicy.IsWindowAllowed("H2AgentLab", "H2 Agent Lab · Bản thử độc lập"))
+                throw new InvalidOperationException("Main H2 Agent Lab window became a desktop target.");
+            if (!DesktopSafetyPolicy.IsWindowAllowed("H2AgentLab", "H2 Agent Lab · Vùng thử an toàn"))
+                throw new InvalidOperationException("Dedicated H2 Agent Lab safe fixture was blocked.");
+        });
+
         Test("Ordinary user application window is allowed", () =>
         {
             if (!DesktopSafetyPolicy.IsWindowAllowed("notepad", "Fixture Notes"))
