@@ -56,7 +56,7 @@ AI chờ đến khi xong hoặc người dùng Dừng/lỗi mạng; không có t
 
 - `LabWindow.cs`, `App.axaml`: giao diện.
 - `AgentRunner.cs`: vòng model → tool → kết quả → model; Ollama native và Chat Completions.
-- `AgentTools.cs`, `ComputerTools.cs`: công cụ và lớp duyệt/phạm vi.
+- `AgentTools.cs`, `Desktop/SelectedDesktopWindowController.cs`, `Desktop/DesktopHostClient.cs`: host state và phạm vi/duyệt selected-window qua DesktopHost cô lập.
 - `LabSession.cs`: lịch sử và kiểm đường dẫn.
 - `SkillCatalog.cs`, `skills/`: khám phá và tải kỹ năng theo nhu cầu.
 - `ScriptWorkspace.cs`, `WindowsPythonSandbox.cs`: bản sao, thực thi OS sandbox, bằng chứng và xuất tệp.
