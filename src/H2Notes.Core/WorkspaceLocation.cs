@@ -134,3 +134,41 @@ public static class WorkspaceLocation
         StringBuilder lpRemoteName,
         ref int lpnLength);
 }
+
+
+public static class WorkspaceEndpointSelector
+{
+    public static string? Select(WorkspaceLocationProfile? profile)
+        => Select(profile, Directory.Exists, ProjectWorkspaceStore.TryGetWorkspaceId);
+
+    public static string? Select(
+        WorkspaceLocationProfile? profile,
+        Func<string, bool> reachable,
+        Func<string, Guid?> workspaceIdentity)
+    {
+        if (profile is null) return null;
+        ArgumentNullException.ThrowIfNull(reachable);
+        ArgumentNullException.ThrowIfNull(workspaceIdentity);
+
+        var candidates = new[] { profile.DisplayPath, profile.ResolvedNetworkPath }
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var candidate in candidates)
+        {
+            bool available;
+            try { available = reachable(candidate); } catch { available = false; }
+            if (!available) continue;
+
+            if (profile.WorkspaceId is { } expected)
+            {
+                Guid? actual;
+                try { actual = workspaceIdentity(candidate); } catch { actual = null; }
+                if (actual != expected) continue;
+            }
+            return candidate;
+        }
+        return null;
+    }
+}
