@@ -4,6 +4,23 @@ using System.Text.Json;
 
 namespace H2Notes.Core;
 
+public sealed record WorkspacePendingInfo(
+    Guid OperationId,
+    Guid WorkspaceId,
+    DateTime CreatedAtUtc,
+    string? BaseGenerationId,
+    IReadOnlyList<Guid> DirtyProjectIds,
+    string FilePath);
+
+public sealed record WorkspacePendingRestoreResult(
+    SheetState State,
+    IReadOnlySet<Guid> DirtyProjectIds,
+    IReadOnlyList<WorkspaceMergeConflict> Conflicts,
+    Guid OperationId,
+    DateTime CreatedAtUtc,
+    string? BaseGenerationId,
+    string? ObservedRemoteGenerationId);
+
 // Schema 6 keeps the schema-5 multi-device protocol and adds a stable WorkspaceId
 // to the shared index so mapped-drive/UNC aliases identify the same logical workspace.
 public sealed class ProjectWorkspaceStore : INoteStorage
@@ -20,7 +37,9 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private SheetState? _baseState;
     private bool _recoveryFallbackActive;
     private Guid _workspaceId;
+    private List<WorkspaceMergeConflict> _pendingReplayConflicts = [];
     private const int ConsistencyReadAttempts = 3;
+    private const int MaxPendingSnapshots = 8;
 
     public string Root { get; }
     public WorkspaceLocationInfo Location { get; }
@@ -28,6 +47,16 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     public string FilePath => Path.Combine(Root, "workspace.h2index.json");
     public string WriterId { get; }
     public string RecoveryCacheRoot => _recoveryRoot;
+    public string PendingCacheRoot => PendingRoot;
+    public string? CurrentGenerationId => _known.TryGetValue("workspace.h2index.json", out var generation) ? generation : null;
+    public bool HasPendingChanges
+    {
+        get
+        {
+            try { return Directory.Exists(PendingRoot) && Directory.EnumerateFiles(PendingRoot, "*.pending.json").Any(); }
+            catch { return false; }
+        }
+    }
     public WorkspaceSyncDiagnostic? LastSyncDiagnostic { get; private set; }
     public bool IsRecoveryFallbackActive => _recoveryFallbackActive;
     public IReadOnlyList<WorkspaceMergeConflict> LastMergeConflicts { get; private set; } = Array.Empty<WorkspaceMergeConflict>();
@@ -36,6 +65,17 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private string RecoveryPointerPath => Path.Combine(_recoveryRoot, "last-good.txt");
     private string SyncDiagnosticPath => Path.Combine(_recoveryRoot, "last-sync-diagnostic.json");
     private string CommitLockPath => Path.Combine(Root, ".h2-commit.lock");
+    private string PendingRoot
+    {
+        get
+        {
+            var identity = _workspaceId == Guid.Empty
+                ? "path-" + Hash(Encoding.UTF8.GetBytes(Location.CanonicalPath))[..32]
+                : _workspaceId.ToString("N");
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "H2Notes", "workspace-pending", identity);
+        }
+    }
 
     public ProjectWorkspaceStore(
         string root,
@@ -73,6 +113,109 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     public WorkspaceLocationProfile CreateLocationProfile()
         => new(_workspaceId == Guid.Empty ? null : _workspaceId, Location.Kind, Location.DisplayPath,
             Location.CanonicalPath, Location.ResolvedNetworkPath, DateTime.UtcNow);
+
+
+    public WorkspacePendingInfo PersistPendingChanges(SheetState state, IReadOnlySet<Guid>? dirtyProjects = null)
+    {
+        if (!_loaded) throw new InvalidOperationException("Đọc kho trước khi lưu bản chờ cục bộ.");
+        if (_workspaceId == Guid.Empty) throw new InvalidOperationException("Workspace chưa có định danh ổn định.");
+        ValidateState(state);
+
+        var operationId = Guid.NewGuid();
+        var createdUtc = DateTime.UtcNow;
+        var allProjects = state.Notes.Where(n => n.IsBoard).SelectMany(n => n.Projects).Select(p => p.Id);
+        var dirty = allProjects.Concat(dirtyProjects ?? Array.Empty<Guid>()).Distinct().OrderBy(id => id).ToList();
+        var record = new WorkspacePendingRecord
+        {
+            SchemaVersion = 1,
+            OperationId = operationId,
+            WorkspaceId = _workspaceId,
+            WriterId = WriterId,
+            CreatedAtUtc = createdUtc,
+            BaseGenerationId = CurrentGenerationId,
+            DirtyProjectIds = dirty,
+            BaseState = Clone(_baseState ?? state),
+            LocalState = Clone(state)
+        };
+
+        Directory.CreateDirectory(PendingRoot);
+        var file = Path.Combine(PendingRoot,
+            createdUtc.ToString("yyyyMMddHHmmssfffffff") + "-" + operationId.ToString("N") + ".pending.json");
+        AtomicWrite(file, Encode(record));
+        CleanupPendingSnapshots();
+        return new(operationId, _workspaceId, createdUtc, record.BaseGenerationId, dirty, file);
+    }
+
+    public bool TryRestoreLatestPending(SheetState currentRemote, out WorkspacePendingRestoreResult result)
+    {
+        result = null!;
+        if (!_loaded || _workspaceId == Guid.Empty || !Directory.Exists(PendingRoot)) return false;
+
+        foreach (var file in Directory.EnumerateFiles(PendingRoot, "*.pending.json")
+                     .OrderByDescending(File.GetLastWriteTimeUtc))
+        {
+            try
+            {
+                var record = Decode<WorkspacePendingRecord>(File.ReadAllBytes(file));
+                if (record.SchemaVersion != 1 || record.OperationId == Guid.Empty || record.WorkspaceId != _workspaceId
+                    || record.BaseState is null || record.LocalState is null || record.DirtyProjectIds is null)
+                    throw new InvalidDataException("Bản chờ cục bộ không hợp lệ.");
+
+                ValidateState(record.BaseState);
+                ValidateState(record.LocalState);
+                var merged = Clone(record.LocalState);
+                var dirty = record.DirtyProjectIds.ToHashSet();
+                var conflicts = WorkspaceConcurrency.MergeIntoLocal(
+                    Clone(record.BaseState), merged, Clone(currentRemote), dirty, WriterId);
+                _pendingReplayConflicts = conflicts.ToList();
+                result = new(merged, dirty, conflicts, record.OperationId, record.CreatedAtUtc,
+                    record.BaseGenerationId, CurrentGenerationId);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+            {
+                QuarantinePendingSnapshot(file);
+            }
+        }
+        return false;
+    }
+
+    public void AcknowledgePendingChanges()
+    {
+        try
+        {
+            if (!Directory.Exists(PendingRoot)) return;
+            foreach (var file in Directory.EnumerateFiles(PendingRoot, "*.pending.json"))
+                File.Delete(file);
+            if (!Directory.EnumerateFileSystemEntries(PendingRoot).Any()) Directory.Delete(PendingRoot);
+        }
+        catch
+        {
+            // Remote commit already succeeded. A stale local pending snapshot is safe to keep:
+            // the next replay is idempotent against the newer generation and will be retried.
+        }
+    }
+
+    private void CleanupPendingSnapshots()
+    {
+        try
+        {
+            var files = Directory.EnumerateFiles(PendingRoot, "*.pending.json")
+                .OrderByDescending(File.GetLastWriteTimeUtc).ToArray();
+            foreach (var file in files.Skip(MaxPendingSnapshots)) File.Delete(file);
+        }
+        catch { /* best-effort bounded local history */ }
+    }
+
+    private static void QuarantinePendingSnapshot(string file)
+    {
+        try
+        {
+            var target = file + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
+            File.Move(file, target, false);
+        }
+        catch { }
+    }
 
     private FileStream AcquireCommitLock()
     {
@@ -153,9 +296,10 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             throw new InvalidOperationException("Kho NAS vẫn lỗi generation. Chưa ghi đè dữ liệu; hãy phục hồi từ last-known-good trước.");
         var baseline = _baseState is null ? Clone(remote.State) : Clone(_baseState);
 
-        LastMergeConflicts = hasRemote
+        var currentMergeConflicts = hasRemote
             ? WorkspaceConcurrency.MergeIntoLocal(baseline, state, remote.State, changedProjects, WriterId)
-            : Array.Empty<WorkspaceMergeConflict>();
+            : [];
+        LastMergeConflicts = _pendingReplayConflicts.Concat(currentMergeConflicts).ToArray();
 
         _sourceVersion = hasRemote ? remote.SchemaVersion : SchemaVersion;
         if (_sourceVersion != SchemaVersion) changedProjects = null; // one complete upgrade transaction
@@ -213,6 +357,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             _baseState = Clone(final.State);
             _sourceVersion = SchemaVersion;
             TryCaptureLastKnownGood(final);
+            _pendingReplayConflicts.Clear();
         }
         catch
         {
@@ -1014,6 +1159,19 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private sealed record FileEntry(Guid Id, Guid? BoardId, string Kind, string File, string Hash);
     private sealed class ProjectFile { public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion; public Guid BoardId { get; set; } public ProjectRecord Project { get; set; } = null!; }
     private sealed class GeneralNoteFile { public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion; public NoteRecord Note { get; set; } = null!; }
+    private sealed class WorkspacePendingRecord
+    {
+        public int SchemaVersion { get; set; } = 1;
+        public Guid OperationId { get; set; }
+        public Guid WorkspaceId { get; set; }
+        public string WriterId { get; set; } = "";
+        public DateTime CreatedAtUtc { get; set; }
+        public string? BaseGenerationId { get; set; }
+        public List<Guid> DirtyProjectIds { get; set; } = [];
+        public SheetState BaseState { get; set; } = new();
+        public SheetState LocalState { get; set; } = new();
+    }
+
     private sealed class SaveJournal { public List<JournalEntry> Entries { get; set; } = []; }
     private sealed record JournalEntry(string File, bool Existed, string Backup);
     private sealed record WritePackage(Dictionary<string, byte[]?> Data, WorkspaceIndex Index);
