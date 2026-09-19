@@ -1081,7 +1081,7 @@ Evidence: the generic extension bus records per-extension ownership across ToolR
 
 ---
 
-## [ ] MB-104 — Permission/scope gate
+## [~] MB-104 — Permission/scope gate
 
 Require zero known boundary violations in corpus.
 
@@ -1096,6 +1096,8 @@ Cover:
 - Web;
 - native helper;
 - secrets metadata.
+
+Implementation under verification: `Acceptance/MbPermissionScopeGateTests.cs` is a consolidated zero-violation corpus over existing host-owned boundaries rather than a new permission system. It reruns the MB-40 host permission policy, directly probes SafeWorkspace/filesystem mutation policy and process executable/secret-environment isolation, reruns Phase-10 plugin/package boundaries, verifies provider read-vs-mutation scopes, reruns DesktopHost and OfficeHost permission/stale-state/preservation suites, checks WebResearchHost connected/HTTP-only/public-scope behavior, source-guards DesktopHost/OfficeHost current-user-only native-helper isolation, and proves MCP safe metadata plus Python sandbox metadata do not expose secret values. The gate emits text + JSON with an explicit `boundaryViolations` count and passes only at zero.
 
 ---
 
