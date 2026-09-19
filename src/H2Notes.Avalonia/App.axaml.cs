@@ -248,7 +248,11 @@ public partial class App : Application
             LastSaveError = null;
             _main?.RefreshAfterExternalSync();
             foreach (var window in _aiWindows.Values) window.RefreshFromModel();
-            var text = projectStore.LastMergeConflicts.Count > 0 ? "Đã đồng bộ · giữ bản đang sửa khi trùng trường" : "Đã đồng bộ thay đổi từ máy khác";
+            var text = projectStore.LastSyncDiagnostic?.Code == "transient_generation_converged"
+                ? "Đã đồng bộ · NAS ổn định sau khi đọc lại"
+                : projectStore.LastMergeConflicts.Count > 0
+                    ? "Đã đồng bộ · giữ bản đang sửa khi trùng trường"
+                    : "Đã đồng bộ thay đổi từ máy khác";
             _main?.SetSaveStatus(text);
             foreach (var window in _aiWindows.Values) window.SetSaveStatus(text);
         }
@@ -258,8 +262,48 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
         {
-            _main?.SetSaveStatus("Chưa đồng bộ được NAS · vẫn giữ bản đang soạn");
+            var diagnostic = projectStore.RecordSyncFailure(ex);
+            var text = diagnostic.IsPersistent
+                ? diagnostic.RecoveryAvailable
+                    ? "NAS lỗi generation kéo dài · có bản phục hồi an toàn trong Cài đặt"
+                    : "NAS lỗi generation kéo dài · chưa có bản phục hồi an toàn trên máy này"
+                : diagnostic.RelativeFile is { Length: > 0 } file
+                    ? "NAS chưa nhất quán · " + file + " · vẫn giữ bản đang soạn"
+                    : "Chưa đồng bộ được NAS · vẫn giữ bản đang soạn";
+            _main?.SetSaveStatus(text);
+            foreach (var window in _aiWindows.Values) window.SetSaveStatus(text);
         }
+    }
+
+    public WorkspaceSyncDiagnostic? LastWorkspaceSyncDiagnostic
+        => (_storage as ProjectWorkspaceStore)?.LastSyncDiagnostic;
+
+    public async Task<WorkspaceSyncDiagnostic> RecoverSharedWorkspaceAsync()
+    {
+        if (_storage is not ProjectWorkspaceStore projectStore)
+            return new WorkspaceSyncDiagnostic
+            {
+                Code = "recovery_not_supported",
+                ExceptionType = "",
+                Message = "Kho hiện tại không dùng ProjectWorkspaceStore.",
+                WriterId = DeviceId
+            };
+
+        var result = await Task.Run(() =>
+        {
+            var recovered = projectStore.TryRecoverLastKnownGood(out var diagnostic);
+            return (Recovered: recovered, Diagnostic: diagnostic);
+        });
+
+        if (result.Recovered)
+        {
+            LastSaveError = null;
+            _main?.RefreshAfterExternalSync();
+            foreach (var window in _aiWindows.Values) window.RefreshFromModel();
+            _main?.SetSaveStatus("Đã phục hồi NAS từ bản tốt gần nhất · generation lỗi đã được cách ly");
+            foreach (var window in _aiWindows.Values) window.SetSaveStatus("Đã phục hồi NAS · generation lỗi đã được cách ly");
+        }
+        return result.Diagnostic;
     }
 
     public string? LastSaveError { get; private set; }
