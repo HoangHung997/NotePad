@@ -965,7 +965,7 @@ After canonical skill parity:
 - `DeferredSkillSession` merged/removed if redundant;
 - PluginSkillCatalog remains only if useful internally to PluginSkillSource.
 
-Implementation under verification: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession`, and the behavior-free `UnifiedSkillCatalog` alias are retired. `H2AgentLab.Skills.SkillCatalog` now owns built-in construction through `CreateBuiltIn(...)`, AgentTools/Lab UI/environment/normal runtime all consume that single catalog, and `PluginSkillCatalog` is internal and constructed only inside `PluginSkillSource`. `MbSkillCatalogRetirementTests` plus updated MB-50/V2/Phase-11 regressions guard parity and forbid duplicate catalog construction.
+Implementation under verification: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession`, and the behavior-free `UnifiedSkillCatalog` alias are retired. The first CI compile regression was repaired by preserving frozen-v1 discovery as a projection from the canonical catalog and fully qualifying the architecture guard type. `H2AgentLab.Skills.SkillCatalog` now owns built-in construction through `CreateBuiltIn(...)`, AgentTools/Lab UI/environment/normal runtime all consume that single catalog, and `PluginSkillCatalog` is internal and constructed only inside `PluginSkillSource`. `MbSkillCatalogRetirementTests` plus updated MB-50/V2/Phase-11 regressions guard parity and forbid duplicate catalog construction.
 
 ---
 
