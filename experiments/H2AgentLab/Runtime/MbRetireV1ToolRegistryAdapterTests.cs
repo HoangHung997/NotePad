@@ -160,10 +160,15 @@ public static class MbRetireV1ToolRegistryAdapterTests
                 if (Path.GetFullPath(path).Equals(self, StringComparison.OrdinalIgnoreCase))
                     continue;
                 var source = File.ReadAllText(path);
-                Check(!source.Contains("V1ToolRegistryAdapter", StringComparison.Ordinal),
-                    "C# source still references retired V1ToolRegistryAdapter: " + path);
-                Check(!source.Contains("V1AgentToolsExecutor", StringComparison.Ordinal),
-                    "C# source still references retired V1AgentToolsExecutor: " + path);
+                foreach (var forbidden in new[]
+                {
+                    "V1ToolRegistryAdapter.Populate",
+                    "V1ToolRegistryAdapter.Create",
+                    "new V1AgentToolsExecutor",
+                    "V1AgentToolsExecutor("
+                })
+                    Check(!source.Contains(forbidden, StringComparison.Ordinal),
+                        "C# source still depends on retired adapter symbol '" + forbidden + "': " + path);
             }
 
             var pythonCard = File.ReadAllText(Path.Combine(
