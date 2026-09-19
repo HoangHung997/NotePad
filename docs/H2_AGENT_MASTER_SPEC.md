@@ -1310,6 +1310,8 @@ A Minimum Bootable Agent passes only if the real runtime proves all of these:
 
 MB-100 adds `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` as the consolidated deterministic Minimum Bootable Agent corpus. It records text and machine-readable JSON evidence for 12 required scenarios: direct response, multi-tool execution, dynamic `tool_search` loading, tool-error recovery, verification pass, verification-fail/repair/pass, long bounded context, cancellation, provider switching, plugin tool registration, progressive skill loading, and install-and-continue. This corpus consolidates previously proven runtime capabilities into one repeatable gate; it does not replace the harder UI-path and core-gate tasks MB-101 through MB-105.
 
+MB-101 proves the normal UI path itself is fully V2. `Acceptance/MbNormalUiV2PathTests.cs` drives the same `LabWindow -> AgentOrchestratedRun.RunAsync` facade used by a real user turn: a read-only run reaches `IAgentTransport` with bounded context and deferred `tool_search` exposure, while a mutating run performs deferred schema loading, verifier FAIL, bounded repair, verifier PASS and host-owned completion. Repository guards require `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentRuntimeFactory`, provider-neutral transport, ToolRegistry/scheduler and repair wiring and reject hidden `AgentRunner` / compatibility fallback from the normal UI chain.
+
 ---
 
 ## 36. Reference extension acceptance gate
