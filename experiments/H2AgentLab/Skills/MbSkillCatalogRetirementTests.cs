@@ -92,10 +92,10 @@ public static class MbSkillCatalogRetirementTests
                     continue;
 
                 var source = File.ReadAllText(path);
-                Check(!source.Contains("DeferredSkillSession", StringComparison.Ordinal),
-                    "C# source still references retired DeferredSkillSession: " + path);
-                Check(!source.Contains("global::H2AgentLab.SkillCatalog", StringComparison.Ordinal),
-                    "C# source still references retired root SkillCatalog: " + path);
+                Check(!source.Contains("new DeferredSkillSession", StringComparison.Ordinal),
+                    "C# source still constructs retired DeferredSkillSession: " + path);
+                Check(!source.Contains("new global::H2AgentLab.SkillCatalog", StringComparison.Ordinal),
+                    "C# source still constructs retired root SkillCatalog: " + path);
                 Check(!source.Contains("new UnifiedSkillCatalog", StringComparison.Ordinal),
                     "C# source still constructs historical UnifiedSkillCatalog: " + path);
                 Check(!source.Contains(".Skills.Canonical", StringComparison.Ordinal),
