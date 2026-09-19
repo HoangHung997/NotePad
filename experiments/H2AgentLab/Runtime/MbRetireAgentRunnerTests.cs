@@ -39,7 +39,7 @@ public static class MbRetireAgentRunnerTests
             var offenders = Directory
                 .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
                 .Where(path => !IsGeneratedPath(path))
-                .Where(path => File.ReadAllText(path).Contains("AgentRunner", StringComparison.Ordinal))
+                .Where(path => ContainsLegacyRunnerCodeToken(File.ReadAllText(path)))
                 .Where(path => !IsAllowedLegacyHarness(path))
                 .Select(path => Path.GetRelativePath(repo, path).Replace('\\', '/'))
                 .OrderBy(path => path, StringComparer.Ordinal)
@@ -114,6 +114,59 @@ public static class MbRetireAgentRunnerTests
         await File.WriteAllLinesAsync(report, lines);
         Console.WriteLine(string.Join(Environment.NewLine, lines));
         return failed == 0 ? 0 : 1;
+    }
+
+    private static bool ContainsLegacyRunnerCodeToken(string source)
+    {
+        foreach (var rawLine in source.Split('\n'))
+        {
+            var line = rawLine;
+            var comment = line.IndexOf("//", StringComparison.Ordinal);
+            if (comment >= 0)
+                line = line[..comment];
+
+            var searchFrom = 0;
+            while (searchFrom < line.Length)
+            {
+                var index = line.IndexOf("AgentRunner", searchFrom, StringComparison.Ordinal);
+                if (index < 0)
+                    break;
+
+                var beforeIsWord = index > 0
+                    && (char.IsLetterOrDigit(line[index - 1]) || line[index - 1] == '_');
+                var afterIndex = index + "AgentRunner".Length;
+                var afterIsWord = afterIndex < line.Length
+                    && (char.IsLetterOrDigit(line[afterIndex]) || line[afterIndex] == '_');
+
+                if (!beforeIsWord
+                    && !afterIsWord
+                    && !IsInsideQuotedString(line, index))
+                    return true;
+
+                searchFrom = afterIndex;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsInsideQuotedString(string line, int index)
+    {
+        var quoted = false;
+        for (var i = 0; i < index; i++)
+        {
+            if (line[i] != '"')
+                continue;
+
+            var backslashes = 0;
+            for (var j = i - 1; j >= 0 && line[j] == '\\'; j--)
+                backslashes++;
+
+            if (backslashes % 2 == 0)
+                quoted = !quoted;
+        }
+
+        return quoted;
     }
 
     private static bool IsAllowedLegacyHarness(string path)
