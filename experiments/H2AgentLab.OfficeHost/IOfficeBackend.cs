@@ -13,6 +13,7 @@ public interface IOfficeBackend
     WordDiscovery DiscoverWord();
     WordLiveSnapshot SnapshotWord(string sessionId);
     WordPatchResult PatchWord(WordPatchRequest request);
+    WordLanguageEvidenceResult InspectWordLanguage(WordLanguageEvidenceRequest request);
     OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest request);
 }
 
