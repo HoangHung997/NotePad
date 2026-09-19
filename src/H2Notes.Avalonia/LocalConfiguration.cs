@@ -6,6 +6,7 @@ namespace H2Notes.Avalonia;
 public sealed class LocalConfiguration
 {
     public string? DataFolder { get; set; }
+    public WorkspaceLocationProfile? WorkspaceLocation { get; set; }
     public string DeviceId { get; set; } = "";
     public DesktopSessionState? DesktopSession { get; set; }
     public AiConnectionSettings Ai { get; set; } = new();
