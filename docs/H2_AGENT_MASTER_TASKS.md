@@ -949,9 +949,11 @@ Evidence: normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry
 
 ---
 
-## [ ] MB-92 — Retire V1ToolRegistryAdapter
+## [~] MB-92 — Retire V1ToolRegistryAdapter
 
 Delete only after AgentTools no longer supplies normal tools.
+
+Implementation under verification: the adapter source has been deleted; canonical schemas/risk/scope/preference metadata now come from reusable `NormalRuntimeToolRegistry.Populate(...)` / `PopulateNamespace(...)` paths. Remaining regression tests and the Python first-party extension were migrated to those canonical descriptors, and `MbRetireV1ToolRegistryAdapterTests` plus CI source guards reject any C# dependency on the retired adapter.
 
 ---
 
