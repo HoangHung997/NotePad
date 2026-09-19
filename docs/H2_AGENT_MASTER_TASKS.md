@@ -1049,7 +1049,7 @@ Evidence: `Acceptance/MbNormalUiV2PathTests.cs` drives the exact `AgentOrchestra
 
 ---
 
-## [~] MB-102 — Context boundedness gate
+## [x] MB-102 — Context boundedness gate
 
 Run long deterministic cases equivalent to:
 
@@ -1064,7 +1064,7 @@ Acceptance:
 - bytes/request do not grow linearly with total history;
 - artifact/raw evidence retained out of prompt.
 
-Implementation under verification: `Acceptance/MbContextBoundednessGateTests.cs` drives the exact `AgentOrchestratedRun` UI facade with deterministic 10/100/1000-turn histories, records active-context characters and serialized request bytes, and requires request growth to remain bounded while candidate history grows. A second case projects sixteen ~24K-character tool outputs through `AgentRuntimeEvidenceProjector`/`ArtifactStore`, verifies exact raw readback from durable artifact files, and proves only bounded summaries/opaque handles reach the next UI request. A source guard requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentContextManager` and the production `ArtifactStore` evidence projector on the normal path.
+Evidence: `Acceptance/MbContextBoundednessGateTests.cs` drives the exact `AgentOrchestratedRun` UI facade and records machine-readable measurements. 10 turns measured **4,872 active chars / 6,091 request bytes**; 100 turns **5,821 / 7,053**; 1000 turns **5,837 / 7,069** even as candidate context remained materially larger, proving provider-request bytes do not grow linearly with total history. A second case projected sixteen ~24K-character tool outputs through `AgentRuntimeEvidenceProjector`/`ArtifactStore`: raw evidence exceeded 300K while the next request remained **9,858 active chars / 11,139 bytes**; exact raw text was read back from durable artifact handles and raw tails were absent from the prompt. The source guard also requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentContextManager` and production `ArtifactStore` evidence wiring. Final functional source commit `826180fce10b14ebdc5397af5d2611d653d418e6`, GitHub Actions run `35440797910`: MB-102 **3 passed, 0 failed**; MB-100/101, H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-101, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `a99bd9ee5b7a73bc0dc832b6529bfb8f5eb14220`; repository portable ZIP SHA256 `d31337421e8327ff820a435b89b3bd8eca1a49bba892512b0badbf7d89fd6b10`.
 
 ---
 
