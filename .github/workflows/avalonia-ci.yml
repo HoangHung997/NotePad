@@ -374,6 +374,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-package-retriever-boundary-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-package-retriever-boundary-tests.txt')
 
+      - name: Run H2 Agent MB-82 end-to-end install-and-continue test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-end-to-end-install-continue'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-end-to-end-install-continue-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-end-to-end-install-continue-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
