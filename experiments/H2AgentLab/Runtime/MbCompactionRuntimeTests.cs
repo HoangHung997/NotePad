@@ -182,9 +182,9 @@ public static class MbCompactionRuntimeTests
                 "Recent historical state was lost after automatic compaction.");
             Check(!combined.Contains("OLD-RAW-0000", StringComparison.Ordinal),
                 "Oldest raw history was replayed after automatic compaction.");
-            Check(inspection.TraceEvents.Any(x =>
+            Check(inspection.ProgressEvents.Any(x =>
                     x.Code == "context-compacted"
-                    && x.Kind == AgentTraceEventKind.Evidence),
+                    && x.Kind == AgentProgressEventKind.Evidence),
                 "Normal runtime typed trace did not expose the compaction evidence event.");
         });
 
