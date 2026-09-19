@@ -276,9 +276,7 @@ public static class V2ExtensibilityRefinementTests
                 "9.0.0"));
 
             var unified = new H2AgentLab.Skills.SkillCatalog();
-            unified.Register(new PluginSkillSource(
-                manager,
-                new PluginSkillCatalog(manager)));
+            unified.Register(new PluginSkillSource(manager));
             var selectedV1 = unified.Search(
                 "audit dynamic block parameters actions",
                 5).Single();
@@ -498,8 +496,7 @@ public static class V2ExtensibilityRefinementTests
                 registry,
                 new FixturePluginResolver());
             var unified = new H2AgentLab.Skills.SkillCatalog();
-            unified.Register(new BuiltInSkillSource(
-                new global::H2AgentLab.SkillCatalog(builtInRoot)));
+            unified.Register(new BuiltInSkillSource(builtInRoot));
             unified.Register(new PluginSkillSource(pluginManager));
 
             var installed = new InstalledCapabilityIndex();
