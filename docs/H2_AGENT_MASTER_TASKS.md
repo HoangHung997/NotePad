@@ -1101,12 +1101,14 @@ Evidence: `Acceptance/MbPermissionScopeGateTests.cs` is the consolidated host-bo
 
 ---
 
-## [ ] MB-105 — Core correctness gate
+## [~] MB-105 — Core correctness gate
 
 Target:
 
 - >=90% supported-task correctness on the agreed core corpus;
 - no false “completed” on known verifier failures.
+
+Implementation under verification: `Acceptance/MbCoreCorrectnessGateTests.cs` scores the accepted core task corpus from MB-100 (12 task cases) plus the two task-level normal UI scenarios from MB-101, producing a machine-readable correctness percentage with a hard >=90% threshold. It separately re-runs the MB-44 host completion invariants and counts model-only completion and required-verifier-failure cases as false-completion violations; any violation fails the gate. CI emits both text and JSON evidence.
 
 ---
 
