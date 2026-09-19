@@ -1068,7 +1068,7 @@ Evidence: `Acceptance/MbContextBoundednessGateTests.cs` drives the exact `AgentO
 
 ---
 
-## [ ] MB-103 — Extension-bus gate
+## [~] MB-103 — Extension-bus gate
 
 Acceptance:
 
@@ -1076,6 +1076,8 @@ Acceptance:
 - register tools and optionally skill;
 - model discovers/uses it;
 - uninstall/disable removes it cleanly.
+
+Implementation under verification: the generic extension bus now records per-extension contributions across ToolRegistry, SkillCatalog, ArtifactVerifierRegistry and CapabilityProviderManager. Minimal unregister primitives were added to those host-owned registries, and `AgentExtensionRegistry.DisableAsync(...)` / `UnregisterAsync(...)` remove only the owning extension's contributions. `MbExtensionBusGateTests` adds a brand-new test extension outside AgentRuntime, proves deferred model discovery/execution, proves disabled tool/skill schemas disappear, and verifies full calculator tool/skill/verifier/provider cleanup through the same lifecycle.
 
 ---
 
