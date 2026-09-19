@@ -36,11 +36,16 @@ public static class SkillTests
         int Exit(object result) => JsonSerializer.SerializeToElement(result).GetProperty("exitCode").GetInt32();
         await Test("Skill discovery is metadata-only and path escape is denied", () =>
         {
-            var catalog = new SkillCatalog(); Check(catalog.Skills.Count == 5, "Expected 5 skills");
-            Check(catalog.Discovery.Contains("spreadsheets") && !catalog.Discovery.Contains("copy.copy"), "Discovery leaked full instructions");
-            Check(catalog.Read("spreadsheets", "SKILL.md").Contains("copy"), "Missing body");
-            Check(catalog.Read("documents", "references/runtime.md").Contains("run_python"), "Missing runtime reference");
-            try { catalog.Read("spreadsheets", "../../AgentTools.cs"); throw new Exception("Traversal accepted"); } catch (IOException) { }
+            var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
+            var skills = catalog.SnapshotMetadata();
+            Check(skills.Count == 5, "Expected 5 skills");
+            var discovery = string.Join("\n", skills.Select(x => $"- {x.Name}: {x.Description}"));
+            Check(discovery.Contains("spreadsheets") && !discovery.Contains("copy.copy"), "Discovery leaked full instructions");
+            var spreadsheet = skills.Single(x => x.Name == "spreadsheets");
+            var documents = skills.Single(x => x.Name == "documents");
+            Check(catalog.Read(spreadsheet.Identity).EntryPoint.Contains("copy"), "Missing body");
+            Check(catalog.ReadResource(documents.Identity, "references/runtime.md").Content.Contains("run_python"), "Missing runtime reference");
+            try { catalog.ReadResource(spreadsheet.Identity, "../../AgentTools.cs"); throw new Exception("Traversal accepted"); } catch (UnauthorizedAccessException) { }
             return Task.CompletedTask;
         });
         await Test("AppContainer loads Office libraries; original files, network and child processes are denied", async () =>
