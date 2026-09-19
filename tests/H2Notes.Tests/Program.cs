@@ -552,6 +552,7 @@ Test("Viewport visual count stays bounded for 10,000 tasks", () =>
     window.Close();
 });
 WorkspaceTests.Run(Test);
+H2AgentAdapterContractTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {
