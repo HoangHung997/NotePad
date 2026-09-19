@@ -100,7 +100,7 @@ Evidence: future authority is now explicit in `H2_PRODUCT_MASTER_SPEC.md` / `H2_
 
 # Stage H1 — Storage/data integrity before new shared state
 
-## [ ] H2M-010 — Triage all non-AI storage bugs
+## [x] H2M-010 — Triage all non-AI storage bugs
 
 Read every entry in:
 
@@ -118,6 +118,8 @@ Acceptance:
 
 - all HIGH/CRITICAL entries have an explicit path;
 - implementation evidence is linked.
+
+Evidence: `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` now carries the H2M-010 resolution table. All **7 HIGH** entries target FIXED with an owning implementation/real-device task (H2M-011/012/013/014), **0 CRITICAL** entries exist, and both MEDIUM entries have explicit follow-up paths. No HIGH/CRITICAL item was relabeled fixed, accepted, or not-reproducible without the required evidence. The next active task is H2M-011.
 
 ---
 
