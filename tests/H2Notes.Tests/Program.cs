@@ -73,6 +73,29 @@ Test("Selected formatting reports shared and mixed properties independently", ()
     Equal(true, doc.SelectionStyleAt(2, 0).Bold);
 });
 
+Test("Local configuration preserves friendly path and resolved workspace endpoint metadata", () =>
+{
+    var id = Guid.NewGuid();
+    var config = new H2Notes.Avalonia.LocalConfiguration
+    {
+        DataFolder = @"X:\Dữ liệu Hưng\.Note",
+        WorkspaceLocation = new WorkspaceLocationProfile(
+            id,
+            WorkspaceLocationKind.MappedNetwork,
+            @"X:\Dữ liệu Hưng\.Note",
+            @"\\NAS-SERVER\Share\Dữ liệu Hưng\.Note",
+            @"\\NAS-SERVER\Share\Dữ liệu Hưng\.Note",
+            DateTime.UtcNow)
+    };
+    var json = JsonSerializer.Serialize(config);
+    var restored = JsonSerializer.Deserialize<H2Notes.Avalonia.LocalConfiguration>(json)!;
+    Equal(config.DataFolder, restored.DataFolder);
+    Equal(id, restored.WorkspaceLocation!.WorkspaceId);
+    Equal(WorkspaceLocationKind.MappedNetwork, restored.WorkspaceLocation.Kind);
+    Equal(config.WorkspaceLocation.DisplayPath, restored.WorkspaceLocation.DisplayPath);
+    Equal(config.WorkspaceLocation.CanonicalPath, restored.WorkspaceLocation.CanonicalPath);
+});
+
 Test("Project move preserves identity and child order", () =>
 {
     var board = SheetStorage.Demo().Notes[0]; var project = board.Projects[2]; var ids = project.ChecklistItems.Select(t => t.Id).ToArray();
