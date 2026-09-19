@@ -94,7 +94,7 @@ public static class MbSkillCatalogTests
             return Task.CompletedTask;
         });
 
-        await Test("MB-50 legacy catalog and deferred session are compatibility adapters over canonical catalog", () =>
+        await Test("MB-50 canonical built-in factory preserves facade-era read parity", () =>
         {
             var skillsRoot = Path.Combine(root, "legacy-skills");
             WriteSkill(
@@ -105,58 +105,41 @@ public static class MbSkillCatalogTests
                 "references/detail.md",
                 "Canonical detail resource.");
 
-            var legacy = new global::H2AgentLab.SkillCatalog(skillsRoot);
-            Check(legacy.Canonical.SourceIds.SequenceEqual(new[] { "built-in" }),
-                "Legacy SkillCatalog did not delegate to canonical catalog.");
-            Check(legacy.Read("compatibility", "SKILL.md")
+            var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn(skillsRoot);
+            Check(catalog.SourceIds.SequenceEqual(new[] { "built-in" }),
+                "Canonical built-in factory did not register the built-in source.");
+            var selected = catalog.SnapshotMetadata().Single();
+            Check(catalog.Read(selected.Identity).EntryPoint
                     .Contains("Canonical compatibility body.", StringComparison.Ordinal)
-                && legacy.Read("compatibility", "references/detail.md")
+                && catalog.ReadResource(selected.Identity, "references/detail.md").Content
                     .Contains("Canonical detail resource.", StringComparison.Ordinal),
-                "Legacy facade did not delegate entry/resource reads.");
-
-            var session = new DeferredSkillSession(legacy);
-            Check(ReferenceEquals(session.Catalog, legacy.Canonical),
-                "DeferredSkillSession created a competing skill catalog.");
-            var first = session.Read("compatibility", "SKILL.md");
-            var second = session.Read("compatibility", "SKILL.md");
-            Check(!first.Unchanged
-                && first.Content?.Contains("Canonical compatibility body.", StringComparison.Ordinal) == true
-                && second.Unchanged
-                && second.Content is null
-                && first.Sha256 == second.Sha256,
-                "Deferred compatibility cache did not reuse canonical selected content.");
+                "Canonical catalog lost entry/resource read parity.");
             return Task.CompletedTask;
         });
 
-        await Test("MB-50 source guard leaves no duplicate built-in parser/catalog implementation", () =>
+        await Test("MB-50 source guard leaves one canonical catalog implementation", () =>
         {
             var repo = FindRepoRoot();
-            var legacySource = File.ReadAllText(
-                Path.Combine(repo, "experiments", "H2AgentLab", "SkillCatalog.cs"));
-            var deferredSource = File.ReadAllText(
-                Path.Combine(repo, "experiments", "H2AgentLab", "Tools", "DeferredSkillSession.cs"));
+            var legacyPath = Path.Combine(repo, "experiments", "H2AgentLab", "SkillCatalog.cs");
+            var deferredPath = Path.Combine(repo, "experiments", "H2AgentLab", "Tools", "DeferredSkillSession.cs");
             var canonicalSource = File.ReadAllText(
                 Path.Combine(repo, "experiments", "H2AgentLab", "Skills", "UnifiedSkillCatalog.cs"));
             var indexesSource = File.ReadAllText(
                 Path.Combine(repo, "experiments", "H2AgentLab", "Capabilities", "CapabilityIndexes.cs"));
 
-            Check(legacySource.Contains("Skills.SkillCatalog", StringComparison.Ordinal)
-                && legacySource.Contains("BuiltInSkillSource", StringComparison.Ordinal)
-                && !legacySource.Contains("RegularExpressions", StringComparison.Ordinal)
-                && !legacySource.Contains("Regex.", StringComparison.Ordinal),
-                "Legacy SkillCatalog still owns duplicate built-in metadata parsing.");
-            Check(deferredSource.Contains("H2AgentLab.Skills.SkillCatalog", StringComparison.Ordinal)
-                && !deferredSource.Contains("SafeWorkspace", StringComparison.Ordinal)
-                && !deferredSource.Contains("FileInfo", StringComparison.Ordinal),
-                "DeferredSkillSession still owns a competing filesystem skill path.");
+            Check(!File.Exists(legacyPath),
+                "Root legacy SkillCatalog facade still exists.");
+            Check(!File.Exists(deferredPath),
+                "DeferredSkillSession compatibility cache still exists.");
             Check(canonicalSource.Contains("public class SkillCatalog", StringComparison.Ordinal)
-                && canonicalSource.Contains(
-                    "public sealed class UnifiedSkillCatalog : SkillCatalog",
-                    StringComparison.Ordinal),
-                "UnifiedSkillCatalog is not a thin compatibility name over canonical SkillCatalog.");
+                && canonicalSource.Contains("CreateBuiltIn(", StringComparison.Ordinal)
+                && !canonicalSource.Contains("class UnifiedSkillCatalog", StringComparison.Ordinal)
+                && !canonicalSource.Contains("global::H2AgentLab.SkillCatalog", StringComparison.Ordinal)
+                && !canonicalSource.Contains("global::H2AgentLab.LabSkill", StringComparison.Ordinal),
+                "Canonical skill source still retains a duplicate facade/type path.");
             Check(indexesSource.Contains("SkillCatalog skills", StringComparison.Ordinal)
                 && !indexesSource.Contains("UnifiedSkillCatalog skills", StringComparison.Ordinal),
-                "Installed capability projection still requires the historical unified catalog type.");
+                "Installed capability projection does not use canonical SkillCatalog.");
             return Task.CompletedTask;
         });
 
