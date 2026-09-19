@@ -969,13 +969,15 @@ Evidence: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession.cs`, and the
 
 ---
 
-## [ ] MB-94 — Retire legacy ComputerTools after DesktopHost parity
+## [~] MB-94 — Retire legacy ComputerTools after DesktopHost parity
 
 Do not remove until:
 
 - selected-window read/action parity exists;
 - permission tests pass;
 - real runtime uses DesktopHost/provider tools.
+
+Implementation under verification: `ComputerTools.cs` and the `--computer-worker` path are removed. `SelectedDesktopWindowController` preserves the narrow selected-window inspect/click/type contract over the isolated `DesktopHostClient`, requires host approval for every read/action, uses DesktopHost state IDs/short-lived tokens and performs observe-after-act verification. AgentTools, normal ToolRegistry execution and LabWindow selection now use that controller; Agent Lab build output also includes DesktopHost. The legacy H2 Agent Lab self-target block was moved into `DesktopSafetyPolicy` and locked by DesktopHost self-tests. `MbRetireComputerToolsTests` exercises fixture parity, denial-before-mutation, normal runtime wiring and repository source guards.
 
 ---
 
