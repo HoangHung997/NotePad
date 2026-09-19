@@ -213,7 +213,7 @@ H2M-014 evidence: Schema **6** adds one stable shared `WorkspaceId` while preser
 
 ---
 
-## [ ] H2M-015 — Offline durability decision
+## [x] H2M-015 — Offline durability decision
 
 Target:
 
@@ -227,6 +227,10 @@ Choose and implement or explicitly accept limitation for:
 - remaining H2-NONAI-008 endpoint policy: whether/how a configured secure remote/VPN alias may be used when the preferred LAN/mapped endpoint is unavailable, always requiring matching WorkspaceId and supported storage semantics.
 
 Do not accidentally expand scope into full distributed database synchronization.
+
+H2M-015 evidence: `ProjectWorkspaceStore` now writes an immutable machine-local pending snapshot **before** attempting the shared commit. Pending records carry a stable operation ID, WorkspaceId, base generation, local/base state and dirty project IDs; the cache is bounded to eight append-only records. On restart/reconnect H2 first reads the current remote generation, then replays the newest valid pending record through the existing three-way merge, preserving remote changes, auditing same-field conflicts and keeping replay idempotent. A successful remote commit acknowledges/removes pending snapshots; corrupt pending records are quarantined instead of replayed. `App.SaveNow` automatically retries while pending data exists and surfaces that the local pending copy is durable. Exact source `cc2b03ddec6e9fd3524e376c7013426308b70ef4`, Actions run `35476297321` SUCCESS, H2 Notes **348/348**, dedicated offline replay/conflict/bounded-pending tests PASS, full Agent/reference-extension/provider pipeline and both Windows publishes PASS. Publish commit `38f0975622bf0191017356fbec41dde11e8d8f99`; ZIP SHA256 `5e2514dae1de9e478c80b05c486fb8badc6a090d54def8ff5ba1fad0107ad660`. H2-NONAI-007 is FIXED.
+
+Endpoint policy at this stage is deliberately fail-safe rather than distributed failover: H2 may select the friendly configured endpoint or its resolved alias only when reachable and, once known, the candidate exposes the same WorkspaceId. It does not discover arbitrary Internet endpoints, store network credentials, or switch endpoints in the middle of a transaction. If no accepted endpoint is reachable, H2 keeps durable pending work locally and retries after reconnect. The broader optional user-configured secure remote/VPN alias requirement from H2-NONAI-008 remains explicitly deferred to the final data-integrity/product acceptance gate rather than being falsely marked complete.
 
 ---
 
