@@ -100,6 +100,14 @@ public sealed class ArtifactVerifierRegistry
             throw new InvalidOperationException($"Artifact verifier '{id}' is already registered.");
     }
 
+    public bool Unregister(string verifierId)
+    {
+        var id = VerificationFailure.NormalizeId(
+            verifierId,
+            nameof(verifierId));
+        return _verifiers.Remove(id);
+    }
+
     public IReadOnlyList<IArtifactVerifier> Resolve(ArtifactVerificationTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
