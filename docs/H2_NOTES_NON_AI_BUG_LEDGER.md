@@ -36,6 +36,31 @@ Exclude:
 
 ---
 
+## H2M-010 resolution triage — 2026-09-19
+
+No HIGH/CRITICAL issue is accepted as a limitation at this gate. No issue is marked fixed without implementation/real-device evidence.
+
+| ID | Current severity/status | Target disposition | Owning task(s) | Required closure evidence |
+|---|---|---|---|---|
+| H2-NONAI-001 | HIGH / OPEN | **FIXED** | H2M-012 + H2M-013 | deterministic mixed-generation recovery tests + real two-PC/NAS convergence evidence |
+| H2-NONAI-002 | HIGH / OPEN | **FIXED** | H2M-011 | fault-injection proving final-validation failure retains a recoverable transaction journal |
+| H2-NONAI-003 | MEDIUM / OPEN | **FIXED** | H2M-012 follow-up | structured bounded sync diagnostic evidence; generic user status may remain |
+| H2-NONAI-004 | HIGH / OPEN-RISK | **FIXED** or fail-closed unsupported-share classification | H2M-013 | real two-PC lock/rename/flush/read-after-commit capability matrix |
+| H2-NONAI-005 | HIGH / OPEN | **FIXED** | H2M-012 | last-known-good/guided recovery path; no destructive hash rewrite |
+| H2-NONAI-006 | HIGH / OPEN | **FIXED** | H2M-013 | real NAS/SMB acceptance evidence, not local temp-folder tests |
+| H2-NONAI-007 | MEDIUM / OPEN-KNOWN-GAP | **FIXED unless later explicitly accepted by user** | H2M-015 | durable local pending-operation/draft recovery decision + tests |
+| H2-NONAI-008 | HIGH / OPEN | **FIXED** | H2M-014 | Local/Mapped/UNC classification, logical workspace identity and safe endpoint behavior |
+| H2-NONAI-009 | HIGH / OPEN | **FIXED** | H2M-014 | alias-safe WorkspaceId locking/transfer validation tests |
+
+Triage result:
+
+- **7 HIGH** issues all have an explicit FIX path.
+- **0 CRITICAL** issues currently exist.
+- **2 MEDIUM** issues also have explicit follow-up paths.
+- No HIGH/CRITICAL item is silently deferred.
+- No ACCEPTED_LIMITATION disposition is used without a later explicit user decision.
+- Real NAS-dependent issues remain OPEN until real NAS evidence exists.
+
 ## Summary
 
 | ID | Severity | Area | Status | Short description |
