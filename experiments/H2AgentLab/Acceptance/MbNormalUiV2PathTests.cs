@@ -282,9 +282,9 @@ public static class MbNormalUiV2PathTests
                 "fixture",
                 "1.0.0"),
             resourceScope: new ToolResourceScope(
-                "mb101:fixture",
-                "mb101:fixture"),
-            serializationKey: "mb101:fixture",
+                "mb101.fixture",
+                "mb101.fixture"),
+            serializationKey: "mb101.fixture",
             canProvideVerificationEvidence: true);
     }
 
