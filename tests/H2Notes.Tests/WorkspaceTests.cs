@@ -142,9 +142,14 @@ internal static class WorkspaceTests
             var corrupt = File.ReadAllBytes(projectPath);
 
             var reader = new ProjectWorkspaceStore(root, writerId: "PC-2", recoveryRoot: recoveryRoot);
-            Fails(() => reader.LoadOrImport());
-            Check(reader.LastSyncDiagnostic is { IsPersistent: true, RecoveryAvailable: true, Recovered: false, RelativeFile: not null });
-            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath))); // background read must not overwrite NAS
+            var fallback = reader.LoadOrImport();
+            Check(fallback.Notes[0].Projects[0].Id == project.Id);
+            Check(reader.IsRecoveryFallbackActive);
+            Check(reader.LastSyncDiagnostic is { Code: "persistent_generation_using_last_good", IsPersistent: true, RecoveryAvailable: true, Recovered: false, RelativeFile: not null });
+            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath))); // fallback read must not overwrite NAS
+            fallback.Notes[0].Projects[0].NameRich = RichDocument.Plain("local draft while NAS invalid");
+            Fails(() => reader.Save(fallback));
+            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath))); // fallback mode is strictly write-blocked
 
             Check(reader.TryRecoverLastKnownGood(out var recoveredDiagnostic));
             Check(recoveredDiagnostic is { Code: "persistent_generation_recovered", IsPersistent: true, RecoveryAvailable: true, Recovered: true });
@@ -184,11 +189,20 @@ internal static class WorkspaceTests
             Check(json.Contains("PC-NO-CACHE") && json.Contains(project.Id.ToString("N")) && !json.Contains(project.DisplayName));
         });
 
-        test("Workspace rejects external modification without overwriting it", () =>
+        test("Workspace rejects external modification, preserves bytes and opens only validated last-good read-only", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
             var path = Directory.GetFiles(Path.Combine(store.Root, "projects"))[0]; File.AppendAllText(path, " "); var altered = File.ReadAllBytes(path);
-            Fails(() => store.Save(state)); Check(altered.SequenceEqual(File.ReadAllBytes(path))); Fails(() => new ProjectWorkspaceStore(store.Root).LoadOrImport());
+            Fails(() => store.Save(state)); Check(altered.SequenceEqual(File.ReadAllBytes(path)));
+
+            var reader = new ProjectWorkspaceStore(store.Root);
+            var fallback = reader.LoadOrImport();
+            Check(reader.IsRecoveryFallbackActive);
+            Check(reader.LastSyncDiagnostic is { Code: "persistent_generation_using_last_good", IsPersistent: true, RecoveryAvailable: true });
+            Check(fallback.Notes[0].Projects.Count == state.Notes[0].Projects.Count);
+            Check(altered.SequenceEqual(File.ReadAllBytes(path)));
+            Fails(() => reader.Save(fallback));
+            Check(altered.SequenceEqual(File.ReadAllBytes(path)));
         });
         test("Workspace prevents nested roots, foreign overwrite and duplicate IDs", () =>
         {
