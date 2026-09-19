@@ -866,7 +866,7 @@ Evidence: `ICatalogSource` now exposes one small external-package seam: source i
 
 ---
 
-## [ ] MB-81 — Keep IPackageRetriever + PluginManager separation
+## [x] MB-81 — Keep IPackageRetriever + PluginManager separation
 
 Flow:
 
@@ -884,6 +884,8 @@ Acceptance:
 - oversize rejected;
 - cancel/timeout works;
 - package bytes never execute before PluginManager verification.
+
+Evidence: `Catalog/PackageRetriever.cs` remains a byte-staging boundary only: `LocalPackageRetriever` copies from approved source roots into private staging, enforces a total retrieval deadline, explicit cancellation, configured maximum size and exact expected archive SHA256, deletes failed staging artifacts, and never references or invokes plugin installation. `PluginManager` remains the sole verification/install/activation authority and has no dependency on `IPackageRetriever`. `Catalog/MbPackageRetrieverBoundaryTests.cs` proves successful immutable staging/hash verification, bad archive hash rejection with no staged survivor, oversize rejection, explicit cancellation, deterministic total timeout, and that merely staging a plugin cannot register a tool, resolve an executor or activate a plugin. The invalid-payload fixture reaches `PluginManager` only after retrieval and is rejected on payload verification before executor resolution or registry activation. A source guard prevents retrieval/install responsibility from being merged. Exact functional source commit `9f846d260146f380af309e5aa865491adf9160eb` (including the MB-81 guard refinement), GitHub Actions run `35417590780`: MB-81 **5 passed, 0 failed**; MB-70 through MB-80, H2 Notes, architecture guard, Phase 10/11/extensibility, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `11e383b3aaf6de3793d22e2b66b44b94c702b89a`; repository portable ZIP SHA256 `699d0df13eff2e62452ea4a83765d99a7d1ec0adef30b6d6b09561c9c14d3808`.
 
 ---
 
