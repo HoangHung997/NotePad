@@ -1316,6 +1316,8 @@ MB-101 proves the normal UI path itself is fully V2. `Acceptance/MbNormalUiV2Pat
 
 MB-102 adds the hard context-boundedness gate on that same normal UI facade. `Acceptance/MbContextBoundednessGateTests.cs` measures 10/100/1000-turn histories and records active-context characters plus serialized provider-request bytes: 10 turns = 4,872 chars / 6,091 bytes; 100 turns = 5,821 chars / 7,053 bytes; 1000 turns = 5,837 chars / 7,069 bytes, while candidate history continues to grow. A repeated-large-output case stores sixteen ~24K-character tool results as durable `ArtifactStore` evidence and produces only 9,858 active characters / 11,139 request bytes; exact raw payloads remain available by artifact handle and raw tails do not enter the prompt. This is deterministic evidence that total history/raw evidence growth is decoupled from active model-context growth.
 
+MB-104 adds a consolidated zero-boundary-violation permission/scope gate without creating a second permission system. `Acceptance/MbPermissionScopeGateTests.cs` combines the host-owned MB-40 runtime policy with direct filesystem/process-shell probes, Phase-10 plugin/package trust boundaries, provider read-vs-mutation scope checks, DesktopHost and OfficeHost permission/stale-state corpora, WebResearchHost connected/HTTP-only/public-scope checks, native-helper current-user-only IPC isolation, and secrets-safe MCP/Python metadata checks. The machine-readable gate reports `boundaryViolations` and passes only when it is zero.
+
 ---
 
 ## 36. Reference extension acceptance gate
