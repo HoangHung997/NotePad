@@ -1143,7 +1143,7 @@ Evidence: `Web/MbWebFreshnessLegalAcceptanceTests.cs` passed all five determinis
 
 ---
 
-## [~] MB-112 — Desktop/computer-use acceptance
+## [x] MB-112 — Desktop/computer-use acceptance
 
 Cover:
 
@@ -1155,7 +1155,7 @@ Cover:
 - vision fallback;
 - sensitive-app blocks.
 
-Implementation under verification: `Acceptance/MbDesktopComputerUseAcceptanceTests.cs` adds one explicit seven-case acceptance gate over the isolated DesktopHost fixture. It checks safe enumeration, bounded UIA tokens, typed click/type actions, stale element/state rejection, `DesktopEvidenceGate` observe-after-act semantics, transport-gated vision fallback, and the DesktopHost sensitive-app/self-target safety self-test. The gate emits TXT/JSON evidence and is wired into CI before the existing V2 DesktopHost regression suite.
+Evidence: `Acceptance/MbDesktopComputerUseAcceptanceTests.cs` is a dedicated seven-case acceptance gate over the isolated DesktopHost fixture. It proves safe window enumeration, bounded UIA element/token observation, state-bound typed click/type actions, stale element/state rejection, `DesktopEvidenceGate` observe-after-act completion evidence, transport-gated UIA/vision fallback, and the DesktopHost sensitive-app/self-target policy self-test. The gate writes machine-readable TXT/JSON evidence and runs before the existing V2 DesktopHost regression suite. Final functional source commit `dd9d74b9cfaf23a069ba0fc48d3e32d3fa0adba4`, GitHub Actions run `35444556813`: MB-112 **7 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-111, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `b68a828d42d2b90492452b0445885c1f45980a17`; repository portable ZIP SHA256 `f30e89bad9ecefd53e6acec5ec9b88697db51a7004213a659853f89a9ef570bf`.
 
 ---
 
