@@ -1049,7 +1049,7 @@ Evidence: `Acceptance/MbNormalUiV2PathTests.cs` drives the exact `AgentOrchestra
 
 ---
 
-## [ ] MB-102 — Context boundedness gate
+## [~] MB-102 — Context boundedness gate
 
 Run long deterministic cases equivalent to:
 
@@ -1063,6 +1063,8 @@ Acceptance:
 - active context bounded;
 - bytes/request do not grow linearly with total history;
 - artifact/raw evidence retained out of prompt.
+
+Implementation under verification: `Acceptance/MbContextBoundednessGateTests.cs` drives the exact `AgentOrchestratedRun` UI facade with deterministic 10/100/1000-turn histories, records active-context characters and serialized request bytes, and requires request growth to remain bounded while candidate history grows. A second case projects sixteen ~24K-character tool outputs through `AgentRuntimeEvidenceProjector`/`ArtifactStore`, verifies exact raw readback from durable artifact files, and proves only bounded summaries/opaque handles reach the next UI request. A source guard requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentContextManager` and the production `ArtifactStore` evidence projector on the normal path.
 
 ---
 
