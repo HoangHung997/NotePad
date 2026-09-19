@@ -28,13 +28,15 @@ public static class LabTests
         await Test("Read-only prevents writes without asking", async () =>
         { var response = await tools.Execute(Call("write_text", new { path = "a.txt", text = "hello", expectedHash = "" }), default); Check(response.Contains("false") && approvals == 0 && !File.Exists(Path.Combine(workspace, "a.txt"))); });
         tools.ReadOnly = false;
-        await Test("Sensitive windows and the app approval UI cannot become computer targets", () =>
+        await Test("Desktop control is unavailable until one DesktopHost window is explicitly selected", async () =>
         {
-            foreach (var process in new[] { "pwsh", "WindowsTerminal", "Codex", "Code", "SystemSettings", "Bitwarden", "H2AgentLab" })
-                Check(!ComputerTools.IsWindowAllowed(process, "ordinary title"), process);
-            Check(!ComputerTools.IsWindowAllowed("chrome", "Password manager"));
-            Check(ComputerTools.IsWindowAllowed("H2AgentLab", "H2 Agent Lab · Vùng thử an toàn"));
-            Check(ComputerTools.IsWindowAllowed("notepad", "Untitled")); return Task.CompletedTask;
+            Check(tools.Desktop is null, "Desktop controller was created without a selected window.");
+            var response = await tools.Execute(
+                Call("inspect_window", new { reason = "fixture" }),
+                default);
+            Check(response.Contains("\"success\":false", StringComparison.Ordinal)
+                  && response.Contains("unavailable", StringComparison.Ordinal),
+                "Unselected desktop scope did not fail closed.");
         });
         await Test("Create then read returns exact text and hash", async () =>
         {
