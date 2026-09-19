@@ -1068,7 +1068,7 @@ Evidence: `Acceptance/MbContextBoundednessGateTests.cs` drives the exact `AgentO
 
 ---
 
-## [~] MB-103 — Extension-bus gate
+## [x] MB-103 — Extension-bus gate
 
 Acceptance:
 
@@ -1077,7 +1077,7 @@ Acceptance:
 - model discovers/uses it;
 - uninstall/disable removes it cleanly.
 
-Implementation under verification: the generic extension bus now records per-extension contributions across ToolRegistry, SkillCatalog, ArtifactVerifierRegistry and CapabilityProviderManager. Minimal unregister primitives were added to those host-owned registries, and `AgentExtensionRegistry.DisableAsync(...)` / `UnregisterAsync(...)` remove only the owning extension's contributions. `MbExtensionBusGateTests` adds a brand-new test extension outside AgentRuntime, proves deferred model discovery/execution, proves disabled tool/skill schemas disappear, and verifies full calculator tool/skill/verifier/provider cleanup through the same lifecycle.
+Evidence: the generic extension bus records per-extension ownership across ToolRegistry, SkillCatalog, ArtifactVerifierRegistry and CapabilityProviderManager. Minimal unregister primitives now exist in those host-owned registries, while `AgentExtensionRegistry.DisableAsync(...)` / `UnregisterAsync(...)` remove only the owning extension's contributions and advance ToolRegistry version so deferred search invalidates normally. `Acceptance/MbExtensionBusGateTests.cs` adds a brand-new `mb103.echo` extension outside AgentRuntime, proves the model discovers/loads/executes it through ordinary deferred ToolRegistry flow, proves disabling removes both tool and skill from model discovery, and proves unregistering the existing calculator extension cleans its tool, skill, verifier and provider lifecycle. Final functional source commit `f90f79abce13da85cfc5a56d4db0fd0f3b81626b`, GitHub Actions run `35441410756`: MB-103 **4 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-102, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `fb8c2a8c10ef07b236dc5cce2f4e1a070f25173e`; repository portable ZIP SHA256 `f8aaa431424dd353f1bee51158f3936f4e709b308fcdcf15291d9b1933fe855c`.
 
 ---
 
