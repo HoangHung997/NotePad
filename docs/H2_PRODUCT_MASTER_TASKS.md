@@ -13,7 +13,7 @@ Architecture source of truth: `docs/H2_PRODUCT_MASTER_SPEC.md`
 > - `docs/H2_AGENT_MASTER_SPEC.md`
 > - `docs/H2_AGENT_MASTER_TASKS.md`
 >
-> H2 Agent integration remains blocked until the Agent user-acceptance gate is explicitly passed.
+> H2 Agent integration gate **was explicitly passed by the user on 2026-09-19 (MB-122)**. Product work may proceed, subject to this tracker's storage/data-integrity and migration gates.
 
 ---
 
@@ -68,7 +68,7 @@ Evidence: `docs/H2_PRODUCT_CURRENT_BASELINE.md` freezes main HEAD `8a45794b15a79
 
 ---
 
-## [ ] H2M-001 — Mark future product documentation authority
+## [x] H2M-001 — Mark future product documentation authority
 
 Goal:
 
@@ -93,6 +93,8 @@ Acceptance:
 
 - every old future-redesign document links to the master spec;
 - no conflicting “current future architecture” document remains.
+
+Evidence: future authority is now explicit in `H2_PRODUCT_MASTER_SPEC.md` / `H2_PRODUCT_MASTER_TASKS.md`; `APPROVED_PRODUCT_SPEC.md`, `RESPONSIVE_IMPLEMENTATION.md`, `UI_ACCEPTANCE.md`, `AI_PROJECT_ASSISTANT_PROPOSAL.md` and `H2_AI_PROJECT_COMMAND_CENTER_REDESIGN.md` are retained but clearly marked historical/current-baseline evidence. `H2_AGENT_MASTER_SPEC.md` was corrected so it no longer treats the superseded Command Center draft as current H2 architecture. The independent bug ledger remains canonical and separate. Documentation-only change; no runtime/data behavior changed.
 
 ---
 
