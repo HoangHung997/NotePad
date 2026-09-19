@@ -424,6 +424,40 @@ public static class V2OfficeHostTests
             Check(patched.After.StateToken != excel.StateToken, "Safety fixture did not create a stale-state boundary.");
         });
 
+        await Test("0816 Word language evidence is state-bound and exposes spelling/citation protocol", async () =>
+        {
+            using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);
+            var session = (await client.DiscoverWordAsync()).ActiveSessionId!;
+            var snapshot = await client.SnapshotWordAsync(session);
+            var evidence = await client.InspectWordLanguageAsync(
+                new WordLanguageEvidenceRequest(session, snapshot.StateToken));
+
+            Check(evidence.SessionId == session
+                && evidence.StateToken == snapshot.StateToken
+                && evidence.Provider == "fixture-office-host",
+                "Word language evidence lost session/state/provider identity.");
+            Check(evidence.Spelling.Any(x =>
+                    x.Text == "mispell"
+                    && x.Suggestions.Contains("misspell", StringComparer.OrdinalIgnoreCase)),
+                "Fixture spelling evidence did not traverse OfficeHost protocol.");
+            Check(evidence.Citations.Any(x =>
+                    x.DocumentId == "214/2025/NĐ-CP"
+                    && x.CitationText.Contains("Nghị định", StringComparison.OrdinalIgnoreCase)),
+                "Fixture legal citation evidence did not traverse OfficeHost protocol.");
+
+            var patched = await client.PatchWordAsync(new WordPatchRequest(
+                session,
+                snapshot.StateToken,
+                true,
+                [new WordParagraphPatch(0, Text: "LANGUAGE-STATE-CHANGED")]));
+            Check(patched.After.StateToken != snapshot.StateToken,
+                "Word language fixture did not establish a changed state.");
+            await ExpectCode(
+                "stale_state",
+                () => client.InspectWordLanguageAsync(
+                    new WordLanguageEvidenceRequest(session, snapshot.StateToken)));
+        });
+
         lines.Add($"RESULT: {lines.Count - failed} passed, {failed} failed.");
         var report = Path.Combine(root, "v2-office-host-tests.txt");
         await File.WriteAllLinesAsync(report, lines);
