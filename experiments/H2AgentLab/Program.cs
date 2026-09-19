@@ -74,6 +74,7 @@ public static class Program
         if (args.Contains("--mb-end-to-end-install-continue-test")) return H2AgentLab.Capabilities.MbEndToEndInstallContinueTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-agent-runner-test")) return H2AgentLab.Runtime.MbRetireAgentRunnerTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-agent-tools-switch-test")) return H2AgentLab.Runtime.MbRetireAgentToolsSwitchTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-retire-v1-tool-registry-adapter-test")) return H2AgentLab.Runtime.MbRetireV1ToolRegistryAdapterTests.Run(args[^1]).GetAwaiter().GetResult();
         var desktopTest = Array.IndexOf(args, "--v2-desktop-host-test");
         if (desktopTest >= 0)
         {
