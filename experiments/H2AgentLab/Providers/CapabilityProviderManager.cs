@@ -129,6 +129,29 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
                 StringComparison.Ordinal));
     }
 
+    public async Task<bool> UnregisterProviderAsync(
+        string providerId,
+        CancellationToken cancellationToken)
+    {
+        var normalized = Normalize(providerId);
+        if (!_providers.Remove(normalized, out var provider))
+            return false;
+
+        RemoveProviderTools(normalized);
+        try
+        {
+            if (provider.Health.Status != ProviderHealthStatus.Disconnected)
+                await provider.DisconnectAsync(cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        finally
+        {
+            await provider.DisposeAsync().ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
     private ICapabilityProvider Provider(string providerId)
     {
         var normalized = Normalize(providerId);
