@@ -263,7 +263,7 @@ Evidence: `docs/H2_AGENT_INTEGRATION_GATE.md` maps every H2 lifecycle need to th
 
 # Stage H3 — Add H2AgentAdapter, no UI redesign yet
 
-## [ ] H2M-030 — Define H2AgentAdapter
+## [x] H2M-030 — Define H2AgentAdapter
 
 Create one H2-facing service boundary over the accepted Agent engine.
 
@@ -287,6 +287,8 @@ Acceptance:
 - H2 code does not reference model-specific HTTP payloads;
 - H2 code does not execute ToolRegistry directly;
 - adapter can be fake-tested.
+
+Evidence: `src/H2Notes.Core/H2AgentAdapter.cs` defines the provider-neutral `IH2AgentAdapter` plus bounded H2 task/progress/approval/evidence DTOs. The interface covers start/observe/cancel/approval/summary/recent/evidence/attach-project and explicitly supports `ProjectId = null`. `docs/H2_AGENT_ADAPTER_CONTRACT.md` freezes ownership boundaries. `H2AgentAdapterContractTests` proves a pure fake can exercise scoped/unscoped tasks, recent queries, evidence, attachment, approval and cancellation, and source/signature guards reject Agent runtime/transport/ToolRegistry/provider types. Exact functional source `84d7b23bf19ea2a96d1ca743d0ec1b1e7a034905`, Actions run `35477060220` SUCCESS, H2 Notes **352/352**, all four H2AgentAdapter contract tests PASS, NAS harness and full Agent/reference-extension/provider/publish pipeline PASS.
 
 ---
 
