@@ -1189,7 +1189,7 @@ Evidence: `Acceptance/MbMcpAcceptanceTests.cs` provides six deterministic offlin
 
 ---
 
-## [~] MB-115 — Plugin package lifecycle acceptance
+## [x] MB-115 — Plugin package lifecycle acceptance
 
 Cover:
 
@@ -1204,7 +1204,7 @@ Cover:
 
 This remains valuable, but it is an extension-system test, not the definition of Agent core.
 
-Implementation under verification: `Acceptance/MbPluginPackageLifecycleAcceptanceTests.cs` adds an independent lifecycle gate over the real `PluginManager`. Five end-to-end cases verify install/hot registration with exact ToolRegistry provenance, update blocking during in-flight tool execution plus permission-delta reapproval, archive SHA-256 and declarative self-test fail-closed behavior, rollback restoring both active manifest and runtime descriptor/executor, and quarantine diagnostics with automatic runtime rollback.
+Evidence: `Acceptance/MbPluginPackageLifecycleAcceptanceTests.cs` runs the real `PluginManager` and closes the lifecycle gate with five deterministic cases: `PLUGIN-INSTALL-HOT`, `PLUGIN-UPDATE-SAFE-BOUNDARY-PERMISSION`, `PLUGIN-INTEGRITY-SELFTEST`, `PLUGIN-ROLLBACK`, and `PLUGIN-QUARANTINE`. Together they prove staged install/hot registration with exact ToolRegistry provenance/execution; update refusal during in-flight tool execution; fresh approval for broader permission deltas; archive SHA-256 and declarative self-test failures leaving the working version untouched; rollback restoring both active manifest and runtime descriptor/executor; and quarantine diagnostics with automatic rollback. Final functional source commit `a075c65b223ca312fc3a5a2cfe398e59824a015a`, GitHub Actions run `35446625544`: MB-115 **5 passed, 0 failed** and the entire H2 Notes/Agent Lab regression, MB-100 through MB-114 acceptance gates, DesktopHost/OfficeHost suites, provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `59e3a72b7231f04a904f957db15d20db34d25918`; repository portable ZIP SHA256 `43cf43f842a557c0b78c9fc74ef5a7f0ad08d58cfdb2e2251248434145c5cac9`.
 
 ---
 
