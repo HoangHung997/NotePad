@@ -65,17 +65,17 @@ public static class V2Phase11Tests
 
         await Test("1102 typed UI trace events expose phase tool verifier evidence progress without chain-of-thought", () =>
         {
-            var trace = new AgentTraceEventStream();
-            trace.Add(AgentTraceEventKind.Phase, "grounded", "Scope grounded.");
-            trace.Add(AgentTraceEventKind.Tool, "tool", "web.search completed.");
-            trace.Add(AgentTraceEventKind.Verification, "verify", "Criterion C1 passed.");
-            trace.Add(AgentTraceEventKind.Evidence, "evidence", "evidence:web:1");
+            var trace = new AgentProgressEventStream();
+            trace.Add(AgentProgressEventKind.Phase, "grounded", "Scope grounded.");
+            trace.Add(AgentProgressEventKind.Tool, "tool", "web.search completed.");
+            trace.Add(AgentProgressEventKind.Verification, "verify", "Criterion C1 passed.");
+            trace.Add(AgentProgressEventKind.Evidence, "evidence", "evidence:web:1");
             Check(trace.Events.Select(x => x.Kind).SequenceEqual(new[]
             {
-                AgentTraceEventKind.Phase,
-                AgentTraceEventKind.Tool,
-                AgentTraceEventKind.Verification,
-                AgentTraceEventKind.Evidence
+                AgentProgressEventKind.Phase,
+                AgentProgressEventKind.Tool,
+                AgentProgressEventKind.Verification,
+                AgentProgressEventKind.Evidence
             }), "Typed trace event order/kinds are wrong.");
             Check(trace.Events.All(x => !x.Code.Contains("thinking", StringComparison.OrdinalIgnoreCase)),
                 "Typed progress trace exposes thinking/chain-of-thought code.");
