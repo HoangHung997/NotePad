@@ -80,6 +80,33 @@ internal static class WorkspaceTests
             Fails(() => broken.Save(state)); var read = new ProjectWorkspaceStore(root).LoadOrImport();
             Check(read.Notes[0].Projects.Select(p => p.DisplayName).SequenceEqual(originals));
         });
+        test("Workspace final validation failure retains recovery journal until rollback", () =>
+        {
+            var root = Folder();
+            var seed = new ProjectWorkspaceStore(root); seed.LoadOrImport(); var original = SheetStorage.Demo(); seed.Save(original);
+            var projectId = original.Notes[0].Projects[0].Id;
+            var projectPath = Path.Combine(root, "projects", projectId.ToString("N") + ".h2project.json");
+            var journalPath = Path.Combine(root, ".h2-transaction.json");
+            var journalSeenAtFault = false;
+
+            var broken = new ProjectWorkspaceStore(root, n =>
+            {
+                if (n != 2) return; // changed project then workspace index: corrupt only after publication is complete
+                journalSeenAtFault = File.Exists(journalPath);
+                File.AppendAllText(projectPath, " ");
+            });
+            var state = broken.LoadOrImport();
+            var previousName = state.Notes[0].Projects[0].DisplayName;
+            state.Notes[0].Projects[0].NameRich = RichDocument.Plain("new generation must roll back");
+
+            Fails(() => broken.SaveIncremental(state, new HashSet<Guid> { projectId }));
+            Check(journalSeenAtFault);
+            Check(!File.Exists(journalPath));
+
+            var recovered = new ProjectWorkspaceStore(root).LoadOrImport();
+            Check(recovered.Notes[0].Projects[0].DisplayName == previousName);
+        });
+
         test("Workspace rejects external modification without overwriting it", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
