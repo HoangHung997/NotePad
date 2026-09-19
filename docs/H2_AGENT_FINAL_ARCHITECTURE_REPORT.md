@@ -174,12 +174,13 @@ Observations:
 
 The accepted normal built-in registry contains **19 callable descriptors**.
 
-The current normal UI acceptance requires the **initial model-visible tool surface to contain only `tool_search`**. Detailed tool schemas are loaded only after selection and only for the same task continuation.
+The canonical runtime initial exposure is **`tool_search` plus the optional minimum stable core `update_plan` schema**. Because the normal built-in registry contains `update_plan`, its built-in initial callable schema count is **2**. MB-30 additionally requires the serialized initial schema bytes to be less than half of the full canonical registry schema bytes. Detailed capability schemas are loaded only after selection and only for the same task continuation.
 
-This yields two different counts by design:
+This yields different counts by design:
 
 - registry inventory: 19 built-in normal descriptors;
-- initial provider schema exposure: 1 deferred-discovery schema (`tool_search`);
+- normal built-in initial provider schema exposure: 2 schemas (`tool_search` + `update_plan`);
+- MB-101 focused UI fixtures: `tool_search` only because their fixture registry intentionally omits `update_plan`;
 - selected schemas: loaded on demand and coalesced.
 
 The model therefore does not receive the full Office/Desktop/Python/file schema inventory at task start.
