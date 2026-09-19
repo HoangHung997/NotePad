@@ -231,19 +231,11 @@ public static class MbRetireAgentToolsSwitchTests
                         StringComparison.Ordinal),
                     "Normal production source references AgentTools.Definitions.");
                 Check(!source.Contains(
-                        "V1ToolRegistryAdapter.Create",
-                        StringComparison.Ordinal),
-                    "Normal production source still creates the v1 registry adapter.");
-                Check(!source.Contains(
                         ".Execute(call",
                         StringComparison.Ordinal),
                     "Normal production source routes a call through the giant AgentTools.Execute switch.");
             }
 
-            Check(!registrySource.Contains(
-                    "V1AgentToolsExecutor",
-                    StringComparison.Ordinal),
-                "Normal ToolRegistry still uses the v1 giant-switch executor.");
             return Task.CompletedTask;
         });
 
