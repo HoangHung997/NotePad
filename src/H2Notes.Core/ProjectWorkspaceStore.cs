@@ -4,12 +4,11 @@ using System.Text.Json;
 
 namespace H2Notes.Core;
 
-// Schema 5 keeps the existing project/note JSON layout but changes the write protocol:
-// multiple devices may open the same NAS workspace, every commit takes only a short
-// workspace transaction lock, and remote changes are merged by stable entity IDs.
+// Schema 6 keeps the schema-5 multi-device protocol and adds a stable WorkspaceId
+// to the shared index so mapped-drive/UNC aliases identify the same logical workspace.
 public sealed class ProjectWorkspaceStore : INoteStorage
 {
-    public const int SchemaVersion = 5;
+    public const int SchemaVersion = 6;
     private int _sourceVersion = SchemaVersion;
     internal static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private Dictionary<string, string> _known = new(StringComparer.OrdinalIgnoreCase);
@@ -20,9 +19,12 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private readonly string _recoveryRoot;
     private SheetState? _baseState;
     private bool _recoveryFallbackActive;
+    private Guid _workspaceId;
     private const int ConsistencyReadAttempts = 3;
 
     public string Root { get; }
+    public WorkspaceLocationInfo Location { get; }
+    public Guid WorkspaceId => _workspaceId;
     public string FilePath => Path.Combine(Root, "workspace.h2index.json");
     public string WriterId { get; }
     public string RecoveryCacheRoot => _recoveryRoot;
@@ -42,11 +44,13 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         string? recoveryRoot = null,
         Action<int>? consistencyCheckpoint = null)
     {
-        Root = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+        Location = WorkspaceLocation.Inspect(root);
+        Root = Location.DisplayPath;
+        _workspaceId = TryGetWorkspaceId(Root) ?? Guid.Empty;
         _checkpoint = checkpoint;
         _consistencyCheckpoint = consistencyCheckpoint;
         WriterId = string.IsNullOrWhiteSpace(writerId) ? Environment.MachineName : writerId.Trim();
-        var recoveryKey = Hash(Encoding.UTF8.GetBytes(Root))[..32];
+        var recoveryKey = Hash(Encoding.UTF8.GetBytes(Location.CanonicalPath))[..32];
         _recoveryRoot = Path.GetFullPath(recoveryRoot
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "H2Notes", "workspace-recovery", recoveryKey));
@@ -59,9 +63,16 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     {
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes", "instance-locks");
         Directory.CreateDirectory(folder);
-        var key = Hash(Encoding.UTF8.GetBytes(Root))[..32];
+        // Existing schema-6 workspaces lock by logical identity. Legacy/new workspaces use
+        // canonical endpoint identity until their first schema-6 save publishes WorkspaceId.
+        var identity = _workspaceId == Guid.Empty ? Location.CanonicalPath : _workspaceId.ToString("N");
+        var key = Hash(Encoding.UTF8.GetBytes(identity))[..32];
         return new FileStream(Path.Combine(folder, key + ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
     }
+
+    public WorkspaceLocationProfile CreateLocationProfile()
+        => new(_workspaceId == Guid.Empty ? null : _workspaceId, Location.Kind, Location.DisplayPath,
+            Location.CanonicalPath, Location.ResolvedNetworkPath, DateTime.UtcNow);
 
     private FileStream AcquireCommitLock()
     {
@@ -84,6 +95,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         if (FindDataFiles().Any()) throw new InvalidDataException("Có tệp dự án nhưng thiếu chỉ mục kho. Không tạo kho trống đè lên dữ liệu.");
 
         _loaded = true; _known.Clear(); _entries.Clear(); _sourceVersion = SchemaVersion;
+        if (_workspaceId == Guid.Empty) _workspaceId = Guid.NewGuid();
         var empty = new SheetState(); _baseState = Clone(empty);
         if (legacyPath is null || !File.Exists(legacyPath)) return empty;
 
@@ -136,7 +148,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         using var commit = AcquireCommitLock();
         RecoverUnderLock();
         var hasRemote = File.Exists(FilePath);
-        var remote = hasRemote ? ReadStableSnapshotUnderLock() : WorkspaceSnapshot.Empty();
+        var remote = hasRemote ? ReadStableSnapshotUnderLock() : WorkspaceSnapshot.Empty(_workspaceId);
         if (_recoveryFallbackActive)
             throw new InvalidOperationException("Kho NAS vẫn lỗi generation. Chưa ghi đè dữ liệu; hãy phục hồi từ last-known-good trước.");
         var baseline = _baseState is null ? Clone(remote.State) : Clone(_baseState);
@@ -597,8 +609,10 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     {
         Directory.CreateDirectory(Root);
         var data = new Dictionary<string, byte[]?>(StringComparer.OrdinalIgnoreCase);
+        if (_workspaceId == Guid.Empty) _workspaceId = Guid.NewGuid();
         var index = new WorkspaceIndex
         {
+            WorkspaceId = _workspaceId,
             State = new SheetState
             {
                 SheetSchemaVersion = state.SheetSchemaVersion,
@@ -692,10 +706,13 @@ public sealed class ProjectWorkspaceStore : INoteStorage
                 "workspace.h2index.json", actualHash: indexHash, indexHash: indexHash, inner: ex);
         }
 
-        if (index.SchemaVersion is not 2 and not 3 and not 4 and not SchemaVersion)
+        if (index.SchemaVersion is not 2 and not 3 and not 4 and not 5 and not SchemaVersion)
             throw new InvalidDataException("Kho thuộc phiên bản không được hỗ trợ. Không ghi đè.");
         if (index.State is null || index.Files is null) throw new InvalidDataException("Chỉ mục kho không đầy đủ.");
 
+        var snapshotWorkspaceId = index.WorkspaceId == Guid.Empty
+            ? (_workspaceId == Guid.Empty ? Guid.NewGuid() : _workspaceId)
+            : index.WorkspaceId;
         var state = index.State;
         foreach (var board in state.Notes.Where(n => n.IsBoard)) board.Projects.Clear();
         var fingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -764,7 +781,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             throw new WorkspaceConsistencyException("invalid_snapshot_state",
                 "Generation kho không vượt qua kiểm tra trạng thái.", indexHash: indexHash, inner: ex);
         }
-        return new(state, fingerprints, index.Files.ToDictionary(e => e.Id), index.SchemaVersion);
+        return new(state, fingerprints, index.Files.ToDictionary(e => e.Id), index.SchemaVersion, snapshotWorkspaceId);
     }
 
     private void ApplySnapshot(WorkspaceSnapshot snapshot)
@@ -772,6 +789,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         _known = snapshot.Fingerprints;
         _entries = snapshot.Entries;
         _sourceVersion = snapshot.SchemaVersion;
+        _workspaceId = snapshot.WorkspaceId;
         _loaded = true;
     }
 
@@ -883,13 +901,40 @@ public sealed class ProjectWorkspaceStore : INoteStorage
 
     public static void ValidateDestination(string source, string target)
     {
-        var a = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar);
-        var b = Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar);
+        var sourceLocation = WorkspaceLocation.Inspect(source);
+        var targetLocation = WorkspaceLocation.Inspect(target);
+        var a = sourceLocation.CanonicalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var b = targetLocation.CanonicalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        var sourceId = TryGetWorkspaceId(sourceLocation.DisplayPath);
+        var targetId = TryGetWorkspaceId(targetLocation.DisplayPath);
+        if (sourceId is { } sid && targetId is { } tid && sid == tid)
+            throw new IOException("Nguồn và đích là cùng một H2 workspace (WorkspaceId trùng nhau).");
+
         if (a.Equals(b, StringComparison.OrdinalIgnoreCase)
             || (a + Path.DirectorySeparatorChar).StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || (b + Path.DirectorySeparatorChar).StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Không chuyển vào chính kho đang dùng hoặc thư mục lồng nhau.");
-        for (var path = b; path is not null; path = Path.GetDirectoryName(path)) RejectReparse(path);
+
+        var actualTarget = Path.GetFullPath(targetLocation.DisplayPath).TrimEnd(Path.DirectorySeparatorChar);
+        for (var path = actualTarget; path is not null; path = Path.GetDirectoryName(path)) RejectReparse(path);
+    }
+
+    public static Guid? TryGetWorkspaceId(string root)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar), "workspace.h2index.json");
+            if (!File.Exists(path)) return null;
+            using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+            if (!document.RootElement.TryGetProperty("WorkspaceId", out var id) || id.ValueKind != JsonValueKind.String)
+                return null;
+            return Guid.TryParse(id.GetString(), out var parsed) && parsed != Guid.Empty ? parsed : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+        {
+            return null;
+        }
     }
 
     // Retained for compatibility with old imports/tests. Schema 5 uses the GUID-only
@@ -961,6 +1006,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private sealed class WorkspaceIndex
     {
         public int SchemaVersion { get; set; } = ProjectWorkspaceStore.SchemaVersion;
+        public Guid WorkspaceId { get; set; }
         public SheetState State { get; set; } = new();
         public List<FileEntry> Files { get; set; } = [];
     }
@@ -971,8 +1017,14 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private sealed class SaveJournal { public List<JournalEntry> Entries { get; set; } = []; }
     private sealed record JournalEntry(string File, bool Existed, string Backup);
     private sealed record WritePackage(Dictionary<string, byte[]?> Data, WorkspaceIndex Index);
-    private sealed record WorkspaceSnapshot(SheetState State, Dictionary<string, string> Fingerprints, Dictionary<Guid, FileEntry> Entries, int SchemaVersion)
+    private sealed record WorkspaceSnapshot(
+        SheetState State,
+        Dictionary<string, string> Fingerprints,
+        Dictionary<Guid, FileEntry> Entries,
+        int SchemaVersion,
+        Guid WorkspaceId)
     {
-        public static WorkspaceSnapshot Empty() => new(new SheetState(), new(StringComparer.OrdinalIgnoreCase), [], ProjectWorkspaceStore.SchemaVersion);
+        public static WorkspaceSnapshot Empty(Guid workspaceId)
+            => new(new SheetState(), new(StringComparer.OrdinalIgnoreCase), [], ProjectWorkspaceStore.SchemaVersion, workspaceId);
     }
 }
