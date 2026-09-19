@@ -84,6 +84,7 @@ public static class Program
         if (args.Contains("--mb-web-freshness-legal-acceptance-test")) return H2AgentLab.Web.MbWebFreshnessLegalAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-autocad-acceptance-test")) return H2AgentLab.Acceptance.MbAutoCadAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-mcp-acceptance-test")) return H2AgentLab.Acceptance.MbMcpAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-plugin-package-lifecycle-acceptance-test")) return H2AgentLab.Acceptance.MbPluginPackageLifecycleAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
         var mb104 = Array.IndexOf(args, "--mb-permission-scope-gate-test");
         if (mb104 >= 0)
         {
