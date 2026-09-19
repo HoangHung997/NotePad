@@ -916,7 +916,7 @@ Evidence: `Capabilities/MbEndToEndInstallContinueTests.cs` exercises the complet
 
 # Stage J — Legacy cleanup
 
-## [ ] MB-90 — Retire AgentRunner from normal runtime
+## [x] MB-90 — Retire AgentRunner from normal runtime
 
 After real runtime parity:
 
@@ -927,6 +927,8 @@ After real runtime parity:
 Acceptance:
 
 repository guard fails if production UI path references AgentRunner.
+
+Evidence: normal `LabWindow` execution remains `LabWindow -> AgentOrchestratedRun -> AgentOrchestrator -> AgentRuntime`; production `AgentOrchestrator` no longer stores or accepts an `AgentRunner` factory and no longer exposes `CreateCompatibilityRunner()`. The frozen v1 `AgentRunner` implementation remains available only to baseline/test/live-evaluation harnesses so the existing A/B baseline can still run while later legacy cleanup proceeds. `Runtime/MbRetireAgentRunnerTests.cs` adds a repository source guard that rejects real C# `AgentRunner` code tokens outside the allowed legacy harness files, plus explicit normal-UI/source assertions and reflection checks that the production orchestrator API cannot construct or return `AgentRunner`. Existing MB-11, V2 architecture and Phase 11 test 1101 were aligned so they now enforce the retired production seam rather than requiring it. Final functional source commit `ef1d1438f9058aef77ec3a3bce746407038c36cd`, GitHub Actions run `35420762765`: MB-90 **3 passed, 0 failed**; H2 Notes, v1 self-test and A/B baseline, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-82, DesktopHost, OfficeHost, all provider transports, provider resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `646d11cdd462dc16af2921f6c634e8c1485fdf44`; repository portable ZIP SHA256 `7c56df4e9bee3b6723d28feda976f61c5745a8869a01deda218a53b1667c6e99`.
 
 ---
 
