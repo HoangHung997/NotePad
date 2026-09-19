@@ -496,6 +496,14 @@ jobs:
           Get-Content -LiteralPath (Join-Path $out 'mb-desktop-computer-use-acceptance-tests.txt')
           Get-Content -LiteralPath (Join-Path $out 'mb-desktop-computer-use-acceptance-tests.json')
 
+      - name: Run H2 Agent MB-113 AutoCAD extension acceptance gate
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-autocad-acceptance'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-autocad-acceptance-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-autocad-acceptance-tests.txt')
+          Get-Content -LiteralPath (Join-Path $out 'mb-autocad-acceptance-tests.json')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
