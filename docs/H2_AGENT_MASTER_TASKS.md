@@ -841,7 +841,7 @@ Evidence: `TaskCapabilitySnapshot.cs` now captures explicit task-local `TaskCapa
 
 # Stage I — Minimal external catalog/install path only
 
-## [ ] MB-80 — Keep one minimal ICatalogSource seam
+## [x] MB-80 — Keep one minimal ICatalogSource seam
 
 Goal:
 
@@ -861,6 +861,8 @@ Possible acceptance source:
 - simple HTTP/GitHub index fixture.
 
 Do not require full multi-source arbitration yet.
+
+Evidence: `ICatalogSource` now exposes one small external-package seam: source identity/provenance, compact metadata fetch/search, and exact `ResolvePackageLocationAsync(...)`; it does not retrieve, execute, verify or install package bytes. A deterministic `LocalFolderCatalogSource` reads compact `catalog.json` metadata from a configured root, validates bounded metadata and safe relative package paths, searches through the existing lightweight available-capability ranking, and resolves only an exact selected plugin/version/hash/location. The source root remains constructor/configuration data and is absent from `AgentOrchestrator`. `CatalogSourceManager.ResolvePackageLocationAsync(...)` routes an exact selected source and cross-checks resolved hash against cached metadata. The ordinary `plugin_install` runtime flow now re-resolves the selected package location through the catalog source before handing it to `IPackageRetriever`, preserving the catalog/retrieval boundary. Existing multi-source merge support remains compatible but is not required by this acceptance path. `Catalog/MbMinimalCatalogSourceTests.cs` proves configured local list/search/resolve, traversal rejection, location-only resolution with no retrieval/install side effect, and the architectural source guard. Exact functional source commit `08aae788829fe8cce9c7c14cf563b7993ede1041`, GitHub Actions run `35417188124`: MB-80 **4 passed, 0 failed**; H2 Notes, architecture guard, Phase 10/11/extensibility, MB-10 through MB-75, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `fb57bf6d475cace036e98c39733497c7ca3bebb3`; repository portable ZIP SHA256 `11a9c2a24bdbb6cbdbb39f799d86f9ca1c1e511f6156cf49d2206f3e195f29bc`.
 
 ---
 
