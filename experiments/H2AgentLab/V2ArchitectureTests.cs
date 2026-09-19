@@ -1078,14 +1078,18 @@ public static class V2ArchitectureTests
             var third = catalog.Search("", 10).Single();
             if (third.Identity.Sha256 == first.Identity.Sha256)
                 throw new InvalidOperationException("Changed skill source failed to invalidate canonical hash identity.");
+            var staleRejected = false;
             try
             {
                 _ = catalog.Read(first.Identity);
-                throw new InvalidOperationException("Stale selected skill identity remained readable after source mutation.");
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex) when (
+                ex.Message.Contains("changed after selection", StringComparison.Ordinal))
             {
+                staleRejected = true;
             }
+            if (!staleRejected)
+                throw new InvalidOperationException("Stale selected skill identity remained readable after source mutation.");
 
             var executor = new DelegatingToolExecutor(
                 "skill-registry-fixture",
