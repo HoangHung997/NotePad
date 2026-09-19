@@ -269,7 +269,9 @@ Test("Settings exposes manual import without changing state on open or close", (
 {
     var app = new H2Notes.Avalonia.App(); typeof(H2Notes.Avalonia.App).GetField("_storage", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(app, new SheetStorage(Path.Combine(folder, "settings-data.json")));
     var before = JsonSerializer.Serialize(app.State); var window = new H2Notes.Avalonia.SettingsWindow(app); window.Show(); Dispatcher.UIThread.RunJobs();
-    True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ImportLegacyButton" && b.IsEnabled)); window.Close(); Equal(before, JsonSerializer.Serialize(app.State));
+    True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ImportLegacyButton" && b.IsEnabled));
+    True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "RecoverWorkspaceButton" && !b.IsEnabled));
+    window.Close(); Equal(before, JsonSerializer.Serialize(app.State));
 });
 void Pump() => Dispatcher.UIThread.RunJobs();
 H2Notes.Avalonia.App SessionApp(SheetState state, string file)
