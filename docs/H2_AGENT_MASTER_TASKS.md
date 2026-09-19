@@ -981,7 +981,7 @@ Evidence: `ComputerTools.cs` and the `--computer-worker` path are removed. `Desk
 
 ---
 
-## [~] MB-95 — Review trace/journal duplication
+## [x] MB-95 — Review trace/journal duplication
 
 Review:
 
@@ -1001,7 +1001,7 @@ without multiple competing truth sources.
 
 Do not merge types just for aesthetics.
 
-Implementation under verification: `Metrics.AgentTrace` remains the bounded machine-telemetry stream persisted by `AgentTraceStore`; Tasking's user-visible stream is renamed to `AgentProgressEventStream` / `AgentProgressEvent` / `AgentProgressEventKind`, exposed as `AgentInspectionSnapshot.ProgressEvents` and sent to the UI on the `progress` channel. `LabSession` remains the durable conversation/tool journal, rejects ephemeral UI kinds (`status/progress/thinking/delta`) and stores only a safe `telemetry-reference` filename instead of duplicating telemetry content. `MbTraceJournalBoundaryTests` locks these three responsibilities and source naming boundaries.
+Evidence: `Metrics.AgentTrace` remains the bounded machine telemetry stream and `AgentTraceStore` persists its safe event labels/metrics separately. The former Tasking `AgentTraceEventStream` is now `AgentProgressEventStream` with `AgentProgressEvent` / `AgentProgressEventKind`; `AgentInspectionSnapshot.ProgressEvents` and the UI `progress` channel make it explicitly ephemeral user-visible orchestration state rather than telemetry. `LabSession` remains durable conversation/tool/error history, rejects ephemeral `status/progress/thinking/thinking-clear/delta` event kinds, and `AddTelemetryReference(...)` persists only the trace filename instead of duplicating telemetry content/path data. `Tasking/MbTraceJournalBoundaryTests.cs` proves bounded typed progress, ephemeral-event rejection, durable journal round-trip, independent telemetry persistence and repository naming/channel separation. Final functional source commit `454ba8c76886e4173ce6f760d8955aaca362a444`, GitHub Actions run `35438608216`: MB-95 **5 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-94, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `0b97cb942db5e4d9046ef626b0c98123ff39fac5`; repository portable ZIP SHA256 `b92c71091f561aae1fb1c34c8ce1c86401d35e152cdbc361d93c91532ca1bc2f`.
 
 ---
 
