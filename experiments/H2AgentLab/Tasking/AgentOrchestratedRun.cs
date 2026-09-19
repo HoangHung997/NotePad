@@ -8,7 +8,7 @@ using H2AgentLab.Verification;
 
 namespace H2AgentLab.Tasking;
 
-public enum AgentTraceEventKind
+public enum AgentProgressEventKind
 {
     Phase = 0,
     Tool = 1,
@@ -18,27 +18,31 @@ public enum AgentTraceEventKind
     Final = 5
 }
 
-public sealed record AgentTraceEvent(
+public sealed record AgentProgressEvent(
     long Sequence,
     DateTime AtUtc,
-    AgentTraceEventKind Kind,
+    AgentProgressEventKind Kind,
     string Code,
     string Message);
 
-public sealed class AgentTraceEventStream
+/// <summary>
+/// Ephemeral, typed user-facing progress for one orchestration run.
+/// This is not machine telemetry and is not persisted as the durable LabSession journal.
+/// </summary>
+public sealed class AgentProgressEventStream
 {
     private readonly List<AgentTraceEvent> _events = [];
     public IReadOnlyList<AgentTraceEvent> Events => _events.ToArray();
 
     public AgentTraceEvent Add(
-        AgentTraceEventKind kind,
+        AgentProgressEventKind kind,
         string code,
         string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         message ??= "";
         var bounded = message.Length <= 2_000 ? message : message[..2_000];
-        var item = new AgentTraceEvent(
+        var item = new AgentProgressEvent(
             _events.Count,
             DateTime.UtcNow,
             kind,
@@ -55,7 +59,7 @@ public sealed record AgentInspectionSnapshot(
     AgentTaskState State,
     AgentTaskRouteClass Route,
     IReadOnlyList<AgentAcceptanceCriterion> Criteria,
-    IReadOnlyList<AgentTraceEvent> TraceEvents,
+    IReadOnlyList<AgentProgressEvent> ProgressEvents,
     int ActiveContextCharacters,
     bool ContextUnderPressure,
     AgentDiagnosticsSnapshot Diagnostics);
@@ -128,13 +132,13 @@ public sealed class AgentOrchestratedRun
             NeedsAction: !readOnly,
             NeedsComplexPlanning: true);
         var session = _orchestrator.Receive(contract, routing);
-        var trace = new AgentTraceEventStream();
+        var trace = new AgentProgressEventStream();
 
-        Emit(trace, output, AgentTraceEventKind.Phase, "received", "Đã tiếp nhận tác vụ.");
+        Emit(trace, output, AgentProgressEventKind.Phase, "received", "Đã tiếp nhận tác vụ.");
         _orchestrator.Ground(session, "UI request and workspace are grounded.");
-        Emit(trace, output, AgentTraceEventKind.Phase, "grounded", "Đã xác định phạm vi và trạng thái hiện tại.");
+        Emit(trace, output, AgentProgressEventKind.Phase, "grounded", "Đã xác định phạm vi và trạng thái hiện tại.");
         _orchestrator.Plan(session, "Real AgentRuntime will execute the task.");
-        Emit(trace, output, AgentTraceEventKind.Phase, "planned", "Đã lập kế hoạch thực thi qua AgentRuntime.");
+        Emit(trace, output, AgentProgressEventKind.Phase, "planned", "Đã lập kế hoạch thực thi qua AgentRuntime.");
 
         var contextAdapter = new LabSessionContextAdapter(_orchestrator.ContextManager);
         var contextInput = contextAdapter.BuildInput(
@@ -157,7 +161,7 @@ public sealed class AgentOrchestratedRun
             Emit(
                 trace,
                 output,
-                AgentTraceEventKind.Evidence,
+                AgentProgressEventKind.Evidence,
                 compaction.CreatedCheckpoint ? "context-compacted" : "context-checkpoint-reused",
                 "Bounded historical checkpoint="
                 + compaction.CheckpointId
@@ -206,7 +210,7 @@ public sealed class AgentOrchestratedRun
             Emit(
                 trace,
                 output,
-                AgentTraceEventKind.Verification,
+                AgentProgressEventKind.Verification,
                 "runtime-state",
                 "AgentRuntime kết thúc; host state=" + session.StateMachine.State + ".");
 
@@ -221,7 +225,7 @@ public sealed class AgentOrchestratedRun
                 Emit(
                     trace,
                     output,
-                    AgentTraceEventKind.Evidence,
+                    AgentProgressEventKind.Evidence,
                     "runtime-evidence",
                     evidence.Kind + ":" + evidence.ReferenceId + hash + summary);
             }
@@ -230,7 +234,7 @@ public sealed class AgentOrchestratedRun
             {
                 labSession.Add("assistant", result.FinalText);
                 save();
-                Emit(trace, output, AgentTraceEventKind.Final, "runtime-final", Bound(result.FinalText));
+                Emit(trace, output, AgentProgressEventKind.Final, "runtime-final", Bound(result.FinalText));
                 output("final", result.FinalText);
             }
 
@@ -239,7 +243,7 @@ public sealed class AgentOrchestratedRun
                 Emit(
                     trace,
                     output,
-                    AgentTraceEventKind.Warning,
+                    AgentProgressEventKind.Warning,
                     "verification-blocked",
                     "Tác vụ có thay đổi chưa được hoàn tất vì verifier miền chưa tạo được bằng chứng PASS cho thay đổi hiện tại.");
             }
@@ -260,7 +264,7 @@ public sealed class AgentOrchestratedRun
         {
             if (!session.StateMachine.IsTerminal)
                 _orchestrator.Cancel(session, "User cancelled the orchestrated runtime.");
-            Emit(trace, output, AgentTraceEventKind.Warning, "cancelled", "Tác vụ đã bị hủy.");
+            Emit(trace, output, AgentProgressEventKind.Warning, "cancelled", "Tác vụ đã bị hủy.");
             throw;
         }
         catch (AgentVerificationRequiredException ex)
@@ -270,7 +274,7 @@ public sealed class AgentOrchestratedRun
             Emit(
                 trace,
                 output,
-                AgentTraceEventKind.Warning,
+                AgentProgressEventKind.Warning,
                 "verification-required",
                 "Tác vụ có thay đổi chưa được đánh dấu hoàn tất vì chưa có bằng chứng xác minh đạt yêu cầu.");
 
@@ -304,14 +308,14 @@ public sealed class AgentOrchestratedRun
             "");
 
     private static void Emit(
-        AgentTraceEventStream trace,
+        AgentProgressEventStream trace,
         Action<string, string> output,
-        AgentTraceEventKind kind,
+        AgentProgressEventKind kind,
         string code,
         string message)
     {
         var item = trace.Add(kind, code, message);
-        output("trace", $"{item.Kind}: {item.Message}");
+        output("progress", $"{item.Kind}: {item.Message}");
     }
 
     private static string Bound(string? value)
