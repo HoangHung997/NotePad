@@ -1,25 +1,26 @@
+using H2AgentLab.Skills;
 using System.Text.Json;
 
 namespace H2AgentLab;
 
 public static class LabEnvironment
 {
-    public static string[] Problems(SkillCatalog catalog)
+    public static string[] Problems(H2AgentLab.Skills.SkillCatalog catalog)
     {
         var issues = new List<string>();
         foreach (var name in new[] { "documents", "spreadsheets", "pdf", "coding", "computer-use" })
-            if (!catalog.Skills.Any(s => s.Name == name)) issues.Add("Thiếu skill: " + name);
+            if (!catalog.SnapshotMetadata().Any(s => s.Name == name)) issues.Add("Thiếu skill: " + name);
         foreach (var file in new[] { "runtime/worker.py", "runtime-guide.md" })
             if (!File.Exists(Path.Combine(AppContext.BaseDirectory, file))) issues.Add("Thiếu tệp đi kèm: " + file);
         if (WindowsPythonSandbox.RuntimeProblem() is { } problem) issues.Add(problem);
         return issues.ToArray();
     }
 
-    public static string Summary(SkillCatalog catalog)
+    public static string Summary(H2AgentLab.Skills.SkillCatalog catalog)
     {
         var issues = Problems(catalog);
         return issues.Length == 0
-            ? $"Đã tìm thấy {catalog.Skills.Count} skill và bộ Python riêng. Thực thi vẫn cần Windows AppContainer; chưa chứng nhận chất lượng model."
+            ? $"Đã tìm thấy {catalog.SnapshotMetadata().Count} skill và bộ Python riêng. Thực thi vẫn cần Windows AppContainer; chưa chứng nhận chất lượng model."
             : "Bản chương trình chưa đủ thành phần:\n" + string.Join("\n", issues) + "\nDùng gói Portable đầy đủ hoặc xem PORTABLE.md. Không tải ngầm hoặc bỏ sandbox.";
     }
 
@@ -34,13 +35,13 @@ public static class LabEnvironment
             "Portable Python selected: " + (Path.GetFullPath(WindowsPythonSandbox.RuntimeRoot) == Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "python"))) };
         try
         {
-            var catalog = new SkillCatalog();
+            var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
             var problems = Problems(catalog);
             if (problems.Length != 0) throw new IOException(string.Join("\n", problems));
-            foreach (var skill in catalog.Skills)
+            foreach (var skill in catalog.SnapshotMetadata())
             {
-                _ = catalog.Read(skill.Name, "SKILL.md");
-                _ = catalog.Read(skill.Name, "references/runtime.md");
+                _ = catalog.Read(skill.Identity).EntryPoint;
+                _ = catalog.ReadResource(skill.Identity, "references/runtime.md").Content;
             }
             log.Add("PASS 5 bundled skills and runtime guidance readable");
             var workspace = Path.Combine(output, "workspace"); Directory.CreateDirectory(workspace);
