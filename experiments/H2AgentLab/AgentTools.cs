@@ -22,10 +22,6 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     public ComputerTools? Computer { get; set; }
     public H2AgentLab.Skills.SkillCatalog Skills { get; } = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
     public string SkillDiscovery
-        => string.Join(
-            "\n",
-            Skills.SnapshotMetadata().Select(x => $"- {x.Name}: {x.Description}"));
-    public string SkillDiscovery
         => string.Join("\n", Skills.SnapshotMetadata().Select(x => $"- {x.Name}: {x.Description}"));
     private ScriptWorkspace? _scripts;
     private ScriptWorkspace Scripts => _scripts ??= new(workspace, stateRoot, approve);
