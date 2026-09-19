@@ -1228,7 +1228,7 @@ Evidence: `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` freezes the accepted post
 
 ---
 
-## [ ] MB-121 — Freeze Agent public integration boundary
+## [~] MB-121 — Freeze Agent public integration boundary
 
 Define what H2 Notes may call:
 
@@ -1241,6 +1241,8 @@ Define what H2 Notes may call:
 - receive final result.
 
 Do not expose internal model/provider details unnecessarily to H2 UI.
+
+Implementation under verification: `H2AgentLab.Integration.IAgentIntegrationBoundary` freezes exactly seven H2-facing operations for project context, task start, progress, inspection, cancellation, approval and final-result delivery. Public DTOs project only host-facing task/progress/approval/evidence state; provider/model/transport/ToolRegistry/runtime objects are excluded. `AgentIntegrationCoordinator` implements deterministic task/context/progress/approval/cancel/final lifecycle behind an internal executor seam so later Phase 13 composition can bind the accepted AgentRuntime without changing the H2 UI contract. `docs/H2_AGENT_PUBLIC_INTEGRATION_BOUNDARY.md` explicitly keeps H2 Notes production integration blocked until MB-122, and `MbAgentPublicIntegrationBoundaryTests` guards the exact public method set, lifecycle semantics and absence of premature H2 Notes references.
 
 ---
 
