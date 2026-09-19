@@ -755,8 +755,8 @@ public static class V2ArchitectureTests
 
             var expectedNames = new[]
             {
-                "click_control",
                 "check_word",
+                "click_control",
                 "find_files",
                 "inspect_artifact",
                 "inspect_window",
