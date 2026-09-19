@@ -190,7 +190,7 @@ H2M-013 closure: the real-device harness remains available at `tools/H2Notes.Nas
 
 ---
 
-## [ ] H2M-014 — Workspace identity and network location model
+## [x] H2M-014 — Workspace identity and network location model
 
 Targets:
 
@@ -209,6 +209,8 @@ Acceptance:
 
 - same physical NAS workspace via aliases is recognized as the same workspace.
 
+H2M-014 evidence: Schema **6** adds one stable shared `WorkspaceId` while preserving read/migration support for schemas 2–5. `WorkspaceLocation` classifies LocalFixed/LocalRemovable/MappedNetwork/UncNetwork/Unsupported, resolves Windows mapped drives through `WNetGetConnection`, preserves the friendly mapped path for UI, and uses the resolved network path as canonical endpoint identity when available. Same-machine instance locks and transfer validation use `WorkspaceId` once known; recovery cache identity uses the canonical endpoint. `WorkspaceEndpointSelector` prefers the friendly endpoint, falls back to the resolved alias only when reachable **and** the candidate exposes the same WorkspaceId, and never changes endpoint mid-transaction. LocalConfiguration persists endpoint metadata without credentials; Settings displays storage kind/network target/WorkspaceId. Regression cases prove mapped↔UNC canonicalization, schema-5→6 atomic migration, duplicate alias lock/self-transfer rejection, distinct-workspace allowance, endpoint fallback identity checking, and local endpoint-profile persistence. Exact functional source `15adb9f3f188943ad9397a349805fe010a590119`, Actions `35475729264` SUCCESS, H2 Notes **345/345**, NAS harness self-test PASS, complete Agent/reference-extension/provider pipeline and both Windows publishes PASS. Publish commit `b11ef7ffaddcae2861c6302ea3ed9ac8d56bdf98`; ZIP SHA256 `98f774d01ee4214ecd0fc9ce591d574655d787af3d9e165017c0e41a17f9fd08`. H2-NONAI-009 is FIXED. The broader optional remote/VPN multi-endpoint policy from H2-NONAI-008 is not falsely claimed complete and moves to H2M-015 alongside offline/reconnect behavior.
+
 ---
 
 ## [ ] H2M-015 — Offline durability decision
@@ -221,7 +223,8 @@ Choose and implement or explicitly accept limitation for:
 
 - durable local pending operations;
 - draft durability while NAS unavailable;
-- conflict behavior after reconnect.
+- conflict behavior after reconnect;
+- remaining H2-NONAI-008 endpoint policy: whether/how a configured secure remote/VPN alias may be used when the preferred LAN/mapped endpoint is unavailable, always requiring matching WorkspaceId and supported storage semantics.
 
 Do not accidentally expand scope into full distributed database synchronization.
 
