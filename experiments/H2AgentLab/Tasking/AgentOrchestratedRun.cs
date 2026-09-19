@@ -31,10 +31,10 @@ public sealed record AgentProgressEvent(
 /// </summary>
 public sealed class AgentProgressEventStream
 {
-    private readonly List<AgentTraceEvent> _events = [];
-    public IReadOnlyList<AgentTraceEvent> Events => _events.ToArray();
+    private readonly List<AgentProgressEvent> _events = [];
+    public IReadOnlyList<AgentProgressEvent> Events => _events.ToArray();
 
-    public AgentTraceEvent Add(
+    public AgentProgressEvent Add(
         AgentProgressEventKind kind,
         string code,
         string message)
