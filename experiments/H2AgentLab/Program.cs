@@ -75,6 +75,7 @@ public static class Program
         if (args.Contains("--mb-retire-agent-tools-switch-test")) return H2AgentLab.Runtime.MbRetireAgentToolsSwitchTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-v1-tool-registry-adapter-test")) return H2AgentLab.Runtime.MbRetireV1ToolRegistryAdapterTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-retire-duplicate-skill-catalog-test")) return H2AgentLab.Skills.MbSkillCatalogRetirementTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-trace-journal-boundary-test")) return H2AgentLab.Tasking.MbTraceJournalBoundaryTests.Run(args[^1]).GetAwaiter().GetResult();
         var mb94 = Array.IndexOf(args, "--mb-retire-computer-tools-test");
         if (mb94 >= 0)
         {
