@@ -66,7 +66,7 @@ Triage result:
 | ID | Severity | Area | Status | Short description |
 |---|---|---|---|---|
 | H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN | Project file and workspace index can be observed with mismatched hashes, blocking PC2 refresh |
-| H2-NONAI-002 | HIGH | Persistence / recovery | OPEN | Save journal is deleted before final snapshot verification, weakening rollback after a bad committed generation |
+| H2-NONAI-002 | HIGH | Persistence / recovery | FIXED | Journal now survives through final snapshot validation; fault-injection proves rollback after a bad committed generation |
 | H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | OPEN | Background NAS refresh swallows actionable exception detail and only shows a generic sync-failed status |
 | H2-NONAI-004 | HIGH | NAS protocol compatibility | OPEN-RISK | Multi-PC protocol assumes locking/rename semantics without proving the selected shared filesystem supports them |
 | H2-NONAI-005 | HIGH | Recovery / availability | OPEN | Persistent index/file mismatch has no automatic last-known-good or guided self-heal path |
@@ -154,7 +154,7 @@ Candidates to verify:
 # H2-NONAI-002 — Journal deleted before final snapshot verification
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** FIXED  
 **First confirmed:** 2026-09-18  
 **Area:** persistence / rollback
 
@@ -193,6 +193,25 @@ Preferred designs include:
 - recovery that can deterministically choose old or new complete generation after a crash.
 
 Exact design remains implementation work; do not paper over the issue by simply ignoring hash mismatches.
+
+
+## Resolution evidence — 2026-09-19
+
+Implementation:
+
+- source commit `4deeb435442b38fda9ceb4e4763ffd95e79ef5c3` moves deletion of `.h2-transaction.json` until after the newly published generation passes full `ReadSnapshot()` hash/schema/state validation;
+- regression commit `7d50fc7631bf3aab225d68faebb7ff0db7f4cbc5` adds deterministic fault injection that corrupts the changed project only after both project payload and workspace index were published;
+- the injected final validation fails, the still-present journal restores the previous generation, the journal is then retired by recovery, and a fresh store can reopen the original valid project state.
+
+Verification:
+
+- GitHub Actions run `35450998329`: **SUCCESS**;
+- H2 Notes: **337 passed, 0 failed**;
+- dedicated regression: `PASS Workspace final validation failure retains recovery journal until rollback`;
+- all Agent regression/acceptance, DesktopHost, OfficeHost, provider transport/resilience, self-contained Windows x64 publish and repository ZIP publication completed successfully;
+- publish commit: `c1784dc2a592c7e28d48594858cf5fe02504f797`;
+- portable ZIP SHA256: `ba1df4fa00dcf8d870963a20b8b028513972c2b8574608d1fc4ae865f3e484c3`.
+
 
 ---
 
