@@ -37,6 +37,54 @@ public sealed class SettingsWindow : Window
         var defaultFolder = new Button { Content = "Trở về thư mục mặc định" };
         var openFolder = new Button { Content = "Mở thư mục đang dùng" };
         openFolder.Click += (_, _) => { if (Directory.Exists(app.DataFolder)) Process.Start(new ProcessStartInfo(app.DataFolder) { UseShellExecute = true }); };
+
+        string RecoveryStatusText(WorkspaceSyncDiagnostic? diagnostic)
+        {
+            if (diagnostic is null) return "Chưa có lỗi generation NAS được ghi nhận trên máy này.";
+            if (diagnostic.Recovered)
+                return "Đã phục hồi generation an toàn. Bản lỗi được cách ly tại: " + (diagnostic.QuarantinePath ?? "(không rõ)");
+            if (diagnostic.IsPersistent && diagnostic.RecoveryAvailable)
+                return "Phát hiện lỗi generation kéo dài"
+                    + (diagnostic.RelativeFile is { Length: > 0 } file ? " ở " + file : "")
+                    + ". Máy này có last-known-good hợp lệ để phục hồi có kiểm soát.";
+            if (diagnostic.IsPersistent)
+                return "Phát hiện lỗi generation kéo dài nhưng máy này chưa có last-known-good hợp lệ.";
+            return "Lần đồng bộ gần nhất ghi nhận: " + diagnostic.Code
+                + (diagnostic.RelativeFile is { Length: > 0 } relative ? " · " + relative : "");
+        }
+
+        var recoveryStatus = new TextBlock
+        {
+            Text = RecoveryStatusText(app.LastWorkspaceSyncDiagnostic),
+            TextWrapping = global::Avalonia.Media.TextWrapping.Wrap,
+            FontSize = 12
+        };
+        var recoverWorkspace = new Button
+        {
+            Name = "RecoverWorkspaceButton",
+            Content = "Phục hồi từ bản an toàn gần nhất…",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            IsEnabled = app.LastWorkspaceSyncDiagnostic is { IsPersistent: true, RecoveryAvailable: true, Recovered: false }
+        };
+        recoverWorkspace.Click += async (_, _) =>
+        {
+            var current = app.LastWorkspaceSyncDiagnostic;
+            var detail = current?.RelativeFile is { Length: > 0 } file ? "\n\nTệp phát hiện lệch generation: " + file : "";
+            if (!await Dialogs.Confirm(this, "Phục hồi kho NAS?",
+                    "H2 Notes sẽ sao chép đầy đủ generation lỗi vào quarantine cục bộ trước, sau đó mới khôi phục bản last-known-good đã kiểm hash."
+                    + detail + "\n\nKhông sửa hash để hợp thức hóa dữ liệu lỗi.", "Cách ly và phục hồi")) return;
+
+            recoverWorkspace.IsEnabled = false;
+            var diagnostic = await app.RecoverSharedWorkspaceAsync();
+            recoveryStatus.Text = RecoveryStatusText(diagnostic);
+            recoverWorkspace.IsEnabled = diagnostic is { IsPersistent: true, RecoveryAvailable: true, Recovered: false };
+            if (diagnostic.Recovered)
+                await Dialogs.Message(this, "Đã phục hồi kho",
+                    "Generation lỗi đã được giữ lại để kiểm tra.\n\nQuarantine:\n" + (diagnostic.QuarantinePath ?? "(không rõ)"));
+            else
+                await Dialogs.Message(this, "Chưa phục hồi kho", diagnostic.Message);
+        };
+
         async Task ChangeFolder(string? target = null)
         {
             if (_importInProgress) return;
@@ -167,7 +215,9 @@ public sealed class SettingsWindow : Window
             new TextBlock { Text = "Cài đặt", FontSize = 24, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
             new TextBlock { Text = "Dữ liệu và lưu trữ", FontSize = 18, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
             new TextBlock { Text = app.DataFolder, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            changeFolder, defaultFolder, openFolder, aiSettings,
+            changeFolder, defaultFolder, openFolder,
+            recoverWorkspace, recoveryStatus,
+            aiSettings,
             import, importStatus, new Separator(),
             startup, restore, snap, new Separator(), label, opacity,
             new TextBlock { Text = "Cửa sổ đang active luôn rõ 100%. Click ra ngoài không ẩn cửa sổ.", TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
