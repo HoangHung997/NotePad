@@ -1336,6 +1336,8 @@ Separately prove first-party extension quality:
 - MCP lifecycle/scope;
 - plugin install/update/rollback/quarantine.
 
+MB-110 closes the Office reference-extension gate with `Acceptance/MbOfficeAcceptanceTests.cs`. The six-case gate requires observable unsaved Excel state, observable unsaved Word state, structured Word/Excel mutation, preservation of non-target content/structure, a state-bound Word language/citation evidence path, and live verifier PASS. OfficeHost now exposes `word.languageEvidence`; the fixture proves the RPC/state-token contract while the real COM backend reads Word native `SpellingErrors` / `GrammaticalErrors` and current document content for legal citation evidence. `V2OfficeHostTests` also carries deterministic case 0816 so the language-evidence path remains part of the regular OfficeHost acceptance suite.
+
 These tests prove the extension bus is useful.
 
 They do not redefine the core architecture.
