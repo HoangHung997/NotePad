@@ -31,33 +31,20 @@ public sealed class PythonSandboxFirstPartyExtension : IAgentExtension
     {
         ArgumentNullException.ThrowIfNull(registration);
 
-        // Reuse the existing v1-compatible Python tool schemas, risk/scope metadata and executor.
-        // The temporary registry prevents unrelated compatibility tools from leaking onto the bus.
+        // Reuse the canonical normal-runtime Python schemas/risk/scope metadata while keeping
+        // the supplied sandbox executor and first-party provenance.
         var temporary = new ToolRegistry();
-        V1ToolRegistryAdapter.Populate(temporary, _executor);
+        NormalRuntimeToolRegistry.PopulateNamespace(
+            temporary,
+            "python",
+            _executor,
+            new ToolProvenance(
+                "firstparty.python-sandbox",
+                _version,
+                "windows-appcontainer",
+                "2.0.0"));
 
         foreach (var existing in temporary.GetNamespace("python"))
-        {
-            registration.RegisterTool(new ToolDescriptor(
-                existing.Name,
-                existing.Namespace,
-                existing.Description,
-                existing.Risk,
-                existing.Access,
-                existing.SupportsParallel,
-                existing.SchemaVersion,
-                existing.CallableSchema,
-                existing.Executor,
-                provenance: new ToolProvenance(
-                    "firstparty.python-sandbox",
-                    _version,
-                    "windows-appcontainer",
-                    existing.Provenance?.ToolVersion ?? "v1"),
-                resourceScope: existing.ResourceScope,
-                serializationKey: existing.SerializationKey,
-                canProvideVerificationEvidence:
-                    existing.CanProvideVerificationEvidence,
-                preference: existing.Preference));
-        }
+            registration.RegisterTool(existing);
     }
 }
