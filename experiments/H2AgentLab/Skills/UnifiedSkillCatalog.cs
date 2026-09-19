@@ -57,6 +57,11 @@ public interface IInstalledSkillMetadataSource
     IReadOnlyList<SkillSummary> SnapshotMetadata();
 }
 
+internal sealed record BuiltInSkillRecord(
+    string Name,
+    string Description,
+    string Directory);
+
 public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSource
 {
     private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
@@ -65,14 +70,7 @@ public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSo
         "this", "that", "is", "are", "be", "as", "by", "from",
         "và", "hoặc", "các", "cho", "của", "trong", "với", "là", "một", "những"
     };
-    private readonly global::H2AgentLab.LabSkill[] _skills;
-
-    public BuiltInSkillSource(global::H2AgentLab.SkillCatalog catalog, string sourceId = "built-in")
-    {
-        ArgumentNullException.ThrowIfNull(catalog);
-        _skills = catalog.Skills.ToArray();
-        SourceId = NormalizeId(sourceId);
-    }
+    private readonly BuiltInSkillRecord[] _skills;
 
     public BuiltInSkillSource(string root, string sourceId = "built-in")
     {
@@ -83,8 +81,6 @@ public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSo
 
     public string SourceId { get; }
     public SkillSourceKind SourceKind => SkillSourceKind.BuiltIn;
-    public IReadOnlyList<global::H2AgentLab.LabSkill> InstalledSkills
-        => Array.AsReadOnly(_skills.ToArray());
 
     public IReadOnlyList<SkillSummary> Search(string query, int maxResults = 20)
     {
@@ -144,12 +140,12 @@ public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSo
         return new SkillResourceContent(identity, relative, HashText(content), content);
     }
 
-    private static global::H2AgentLab.LabSkill[] ScanMetadataOnly(string root)
+    private static BuiltInSkillRecord[] ScanMetadataOnly(string root)
     {
         if (!Directory.Exists(root))
             return [];
 
-        var skills = new List<global::H2AgentLab.LabSkill>();
+        var skills = new List<BuiltInSkillRecord>();
         foreach (var directory in Directory.EnumerateDirectories(root).OrderBy(x => x, StringComparer.Ordinal))
         {
             var path = Path.Combine(directory, "SKILL.md");
@@ -178,7 +174,7 @@ public sealed class BuiltInSkillSource : ISkillSource, IInstalledSkillMetadataSo
                 || skills.Any(x => x.Name == name))
                 throw new IOException("Invalid or duplicate built-in skill metadata: " + directory);
 
-            skills.Add(new global::H2AgentLab.LabSkill(name, description, directory));
+            skills.Add(new BuiltInSkillRecord(name, description, directory));
         }
 
         return skills.ToArray();
@@ -487,6 +483,17 @@ public class SkillCatalog
 {
     private readonly List<ISkillSource> _sources = [];
 
+    public static SkillCatalog CreateBuiltIn(
+        string? root = null,
+        string sourceId = "built-in")
+    {
+        var catalog = new SkillCatalog();
+        catalog.Register(new BuiltInSkillSource(
+            root ?? Path.Combine(AppContext.BaseDirectory, "skills"),
+            sourceId));
+        return catalog;
+    }
+
     public void Register(ISkillSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -544,10 +551,3 @@ public class SkillCatalog
                 $"Skill source '{identity.SourceId}' is not registered.");
 }
 
-/// <summary>
-/// Historical Phase-11 name kept only as a source-compatible adapter.
-/// New code must use <see cref="SkillCatalog"/>.
-/// </summary>
-public sealed class UnifiedSkillCatalog : SkillCatalog
-{
-}
