@@ -147,7 +147,26 @@ H2 Notes must not directly depend on `AiProfile`, transports, `AgentRuntime`, `A
 
 ---
 
-## 7. User decision
+## 7. Frozen evidence snapshot
+
+The user-review package is frozen against the last functional Agent source and its full green pipeline:
+
+- final functional source commit: `0a7ea1e6586bc5e70e336536603a8044fab654d6`;
+- GitHub Actions run: `35448436223` — **SUCCESS**;
+- MB-121 public integration boundary: **5 passed, 0 failed**;
+- all accepted Agent regression/acceptance suites through MB-120: green in the same run;
+- DesktopHost / OfficeHost / provider transport / resilience suites: green;
+- publish bot commit: `22f5861f5c2c9d1a9d3f8d1aff7f2d6327f88bdc`;
+- repository portable ZIP SHA256: `408fc95425ba0d67ec0b091ecf24ce61ec0e3945e47688513797afb2a6e54760`;
+- repository `bin/LATEST.txt` points to the same functional source and SHA256.
+
+After that functional run, the branch received only MB-121 closure and MB-122 acceptance-package documentation commits marked `[skip ci]`; no Agent runtime/extension/integration implementation changed before this review gate.
+
+Review conclusion: **the acceptance package is internally consistent with the latest functional green artifact**.
+
+---
+
+## 8. User decision
 
 Current machine state:
 
