@@ -629,7 +629,7 @@ public static class V2Phase10Tests
                 .SequenceEqual(new[] { "2.0.0" }),
                 "Plugin update discovery did not find newer compatible metadata.");
 
-            var skills = new PluginSkillSource(manager);
+            var skills = new H2AgentLab.Skills.PluginSkillSource(manager);
             var first = skills.Search("", 10).Single(x => x.Name == "audit");
             var firstRead = skills.Read(first.Identity);
             var repeated = skills.Read(first.Identity);
