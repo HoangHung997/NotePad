@@ -13,13 +13,14 @@ public sealed record ToolCall(string Id, string Name, JsonElement Arguments);
 public sealed record Approval(string Title, string Details);
 public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     Func<Approval, CancellationToken, Task<bool>> approve, Action<string, string> journal)
+    : IDisposable
 {
     public SafeWorkspace Workspace { get; } = workspace ?? throw new ArgumentNullException(nameof(workspace));
     public string StateRoot { get; } = Path.GetFullPath(stateRoot ?? throw new ArgumentNullException(nameof(stateRoot)));
 
     private static readonly JsonSerializerOptions ToolJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All) };
     public bool ReadOnly { get; set; } = true;
-    public ComputerTools? Computer { get; set; }
+    public H2AgentLab.Desktop.SelectedDesktopWindowController? Desktop { get; set; }
     public H2AgentLab.Skills.SkillCatalog Skills { get; } = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
     public string SkillDiscovery
         => string.Join("\n", Skills.SnapshotMetadata().Select(x => $"- {x.Name}: {x.Description}"));
@@ -186,11 +187,11 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
                     await Permit("Mở tài liệu", full + "\nMở bằng ứng dụng mặc định. Chỉ mở tài liệu bạn tin cậy.", ct);
                     Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); result = new { requestedOpen = path, openedContentVerified = false }; break;
                 case "inspect_window":
-                    if (Computer is null) throw new AgentFaultException("unavailable", "Bạn chưa chọn cửa sổ được phép điều khiển.", false);
-                    result = await Computer.Inspect(approve, ct); break;
+                    if (Desktop is null) throw new AgentFaultException("unavailable", "Bạn chưa chọn cửa sổ được phép điều khiển.", false);
+                    result = await Desktop.Inspect(approve, ct); break;
                 case "click_control": case "type_control":
-                    if (ReadOnly || Computer is null) throw new AgentFaultException("permission_required", "Chưa cấp quyền thao tác cửa sổ.", false);
-                    result = await Computer.Act(call.Name, Arg("token"), call.Name == "type_control" ? Arg("text") : "", approve, ct); break;
+                    if (ReadOnly || Desktop is null) throw new AgentFaultException("permission_required", "Chưa cấp quyền thao tác cửa sổ.", false);
+                    result = await Desktop.Act(call.Name, Arg("token"), call.Name == "type_control" ? Arg("text") : "", approve, ct); break;
                 default: throw new IOException("Công cụ không được hỗ trợ: " + call.Name);
             }
             var node = JsonSerializer.SerializeToNode(result, ToolJson);
@@ -280,4 +281,7 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     {
         var text = new UTF8Encoding(false, true).GetString(data); if (text.Contains('\0')) throw new IOException("Không phải văn bản UTF-8."); return text;
     }
+
+    public void Dispose()
+        => Desktop?.Dispose();
 }
