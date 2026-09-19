@@ -123,7 +123,7 @@ public sealed class AutoCadNativeToolExecutor : IAgentToolExecutor
                 await _bridge.ListDocumentsAsync(cancellationToken).ConfigureAwait(false),
 
             "autocad.get_active_document" =>
-                await _bridge.GetActiveDocumentAsync(cancellationToken).ConfigureAwait(false)
+                (object?)await _bridge.GetActiveDocumentAsync(cancellationToken).ConfigureAwait(false)
                     ?? new { unavailable = true },
 
             "autocad.query_entities" =>
