@@ -1143,7 +1143,7 @@ Evidence: `Web/MbWebFreshnessLegalAcceptanceTests.cs` passed all five determinis
 
 ---
 
-## [ ] MB-112 — Desktop/computer-use acceptance
+## [~] MB-112 — Desktop/computer-use acceptance
 
 Cover:
 
@@ -1154,6 +1154,8 @@ Cover:
 - observe-after-act;
 - vision fallback;
 - sensitive-app blocks.
+
+Implementation under verification: `Acceptance/MbDesktopComputerUseAcceptanceTests.cs` adds one explicit seven-case acceptance gate over the isolated DesktopHost fixture. It checks safe enumeration, bounded UIA tokens, typed click/type actions, stale element/state rejection, `DesktopEvidenceGate` observe-after-act semantics, transport-gated vision fallback, and the DesktopHost sensitive-app/self-target safety self-test. The gate emits TXT/JSON evidence and is wired into CI before the existing V2 DesktopHost regression suite.
 
 ---
 
