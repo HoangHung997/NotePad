@@ -353,6 +353,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-runtime-capability-install-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-runtime-capability-install-tests.txt')
 
+      - name: Run H2 Agent MB-75 task capability pinning tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-task-capability-pinning'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-task-capability-pinning-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-task-capability-pinning-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |

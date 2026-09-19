@@ -247,7 +247,7 @@ public static class V2ExtensibilityRefinementTests
                 "Resolver did not return package-level compact metadata for model-side capability selection.");
         });
 
-        await Test("1120 task capability snapshot pins versions hashes and requires explicit revision after update", () =>
+        await Test("1120 task capability snapshot records only selected usage and ignores unrelated registry changes", () =>
         {
             var stateRoot = Path.Combine(root, "1120-state");
             var packageRoot = Path.Combine(root, "1120-packages");
@@ -255,54 +255,148 @@ public static class V2ExtensibilityRefinementTests
             Directory.CreateDirectory(packageRoot);
 
             var registry = new ToolRegistry();
-            var manager = new PluginManager(stateRoot, registry, new FixturePluginResolver());
-            var v1 = BuildCadPlugin(packageRoot, "1.4.0", "Skill version one.");
-            _ = manager.InstallFromArchive(v1.Path, CatalogEntry(v1), DeveloperPolicy(), true);
+            var manager = new PluginManager(
+                stateRoot,
+                registry,
+                new FixturePluginResolver());
+            var v1 = BuildCadPlugin(
+                packageRoot,
+                "1.4.0",
+                "Skill version one.");
+            _ = manager.InstallFromArchive(
+                v1.Path,
+                CatalogEntry(v1),
+                DeveloperPolicy(),
+                true);
+
+            registry.Register(FixtureTool(
+                "unrelated.read",
+                "unrelated",
+                "Installed but unused capability.",
+                "unrelated.provider",
+                "9.0.0"));
 
             var unified = new UnifiedSkillCatalog();
-            unified.Register(new PluginSkillSource(manager, new PluginSkillCatalog(manager)));
-            var selectedV1 = unified.Search("audit dynamic block parameters actions", 5).Single();
+            unified.Register(new PluginSkillSource(
+                manager,
+                new PluginSkillCatalog(manager)));
+            var selectedV1 = unified.Search(
+                "audit dynamic block parameters actions",
+                5).Single();
             var providersV1 = ProvidersFor(manager);
+            var model = new TaskModelPin(
+                "fixture-model-provider",
+                "1.0.0",
+                "fixture-model");
+            var policies = new[]
+            {
+                new TaskPolicyPin(
+                    "plugin-install-policy",
+                    "developer-local-v1")
+            };
+            var selectionV1 = new TaskCapabilitySelection(
+                model,
+                ["autocad.find_blocks"],
+                ["autocad.native"],
+                ["h2.autocad.productivity"],
+                [selectedV1],
+                policies);
 
-            var snapshot = TaskCapabilitySnapshotBuilder.Capture(
+            var snapshot = TaskCapabilitySnapshotBuilder.CaptureUsed(
                 Guid.NewGuid(),
                 1,
                 registry,
                 providersV1,
                 manager.ActivePlugins(),
-                [selectedV1],
+                selectionV1,
                 "task-start");
             var guard = new TaskCapabilityPinGuard(snapshot);
-            guard.EnsureStillPinned(registry, manager.ActivePlugins());
 
-            var v2 = BuildCadPlugin(packageRoot, "1.5.0", "Skill version two changed.");
-            _ = manager.InstallFromArchive(v2.Path, CatalogEntry(v2), DeveloperPolicy(), true);
+            registry.Register(FixtureTool(
+                "another.unrelated.read",
+                "unrelated",
+                "New unrelated capability installed at safe boundary.",
+                "unrelated.provider",
+                "10.0.0"));
+            guard.EnsureStillPinned(
+                registry,
+                providersV1,
+                manager.ActivePlugins(),
+                unified.SnapshotMetadata(),
+                model,
+                policies);
+
+            var v2 = BuildCadPlugin(
+                packageRoot,
+                "1.5.0",
+                "Skill version two changed.");
+            _ = manager.InstallFromArchive(
+                v2.Path,
+                CatalogEntry(v2),
+                DeveloperPolicy(),
+                true);
 
             try
             {
-                guard.EnsureStillPinned(registry, manager.ActivePlugins());
-                throw new InvalidOperationException("Plugin/tool update silently replaced pinned task capabilities.");
+                guard.EnsureStillPinned(
+                    registry,
+                    ProvidersFor(manager),
+                    manager.ActivePlugins(),
+                    unified.SnapshotMetadata(),
+                    model,
+                    policies);
+                throw new InvalidOperationException(
+                    "Used plugin/tool update silently replaced pinned task capabilities.");
             }
             catch (InvalidOperationException)
             {
             }
 
-            var selectedV2 = unified.Search("audit dynamic block parameters actions", 5).Single();
-            var revision = TaskCapabilitySnapshotBuilder.ReviseAfterExplicitInstall(
+            var selectedV2 = unified.Search(
+                "audit dynamic block parameters actions",
+                5).Single();
+            var selectionV2 = selectionV1 with
+            {
+                SelectedSkills = [selectedV2]
+            };
+            var revision = TaskCapabilitySnapshotBuilder.ReviseUsed(
                 snapshot,
                 registry,
                 ProvidersFor(manager),
                 manager.ActivePlugins(),
-                [selectedV2],
-                "h2.autocad.productivity");
+                selectionV2,
+                "used AutoCAD extension explicitly updated");
             guard.ReplaceWithExplicitRevision(revision);
+            guard.EnsureStillPinned(
+                registry,
+                ProvidersFor(manager),
+                manager.ActivePlugins(),
+                unified.SnapshotMetadata(),
+                model,
+                policies);
 
-            var evidence = TaskCapabilitySnapshotBuilder.Evidence(guard.Current);
+            var evidence = TaskCapabilitySnapshotBuilder.Evidence(
+                guard.Current);
             Check(guard.Current.Revision == 2
-                && evidence.PluginVersions.Contains("h2.autocad.productivity@1.5.0", StringComparer.Ordinal)
-                && evidence.ProviderVersions.Contains("autocad.native@1.5.0", StringComparer.Ordinal)
-                && evidence.SkillHashes.Single().Contains(selectedV2.Identity.Sha256, StringComparison.Ordinal),
-                "Task capability evidence did not pin exact revised plugin/provider/skill versions.");
+                && guard.Current.Tools.Count == 1
+                && guard.Current.Plugins.Count == 1
+                && evidence.PluginVersions.Contains(
+                    "h2.autocad.productivity@1.5.0",
+                    StringComparer.Ordinal)
+                && evidence.ProviderVersions.Contains(
+                    "autocad.native@1.5.0",
+                    StringComparer.Ordinal)
+                && evidence.ToolVersions.Single().StartsWith(
+                    "autocad.find_blocks@",
+                    StringComparison.Ordinal)
+                && evidence.SkillHashes.Single().Contains(
+                    selectedV2.Identity.Sha256,
+                    StringComparison.Ordinal)
+                && evidence.ModelIdentity
+                    == "fixture-model-provider@1.0.0;model=fixture-model"
+                && evidence.PolicyVersions.SequenceEqual(
+                    ["plugin-install-policy@developer-local-v1"]),
+                "Task capability evidence did not retain exact used/selected identities.");
             return Task.CompletedTask;
         });
 
