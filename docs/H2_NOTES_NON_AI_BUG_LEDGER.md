@@ -61,6 +61,12 @@ Triage result:
 - No ACCEPTED_LIMITATION disposition is used without a later explicit user decision.
 - Real NAS-dependent issues remain OPEN until real NAS evidence exists.
 
+## H2M-013 probe readiness — 2026-09-19
+
+A dedicated real-device acceptance harness now exists at `tools/H2Notes.NasAcceptance`, with execution instructions in `docs/H2_NAS_REAL_ACCEPTANCE.md`.
+
+This changes neither H2-NONAI-004 nor H2-NONAI-006 to FIXED. Their statuses remain open until two physical PCs execute the same session against the intended NAS/share and preserve the coordinator/peer JSON evidence. GitHub-hosted/local self-tests prove harness behavior only, not SMB/NAS semantics.
+
 ## Summary
 
 | ID | Severity | Area | Status | Short description |
