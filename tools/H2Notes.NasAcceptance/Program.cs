@@ -71,15 +71,13 @@ internal static class Program
         Directory.CreateDirectory(peerOut);
         Directory.CreateDirectory(coordinatorOut);
 
-        using var peer = StartSelf("--node", "peer", root, session, peerOut);
-        var code = await RunCoordinator(root, session, coordinatorOut);
-        if (!peer.WaitForExit(30_000))
-        {
-            try { peer.Kill(true); } catch { }
-            throw new TimeoutException("Self-test peer did not exit.");
-        }
-        if (code != 0 || peer.ExitCode != 0)
-            throw new InvalidOperationException($"Self-test failed: coordinator={code}, peer={peer.ExitCode}.");
+        // CI validates the protocol state machine locally without depending on how dotnet/apphost
+        // relaunches a second copy. Real acceptance still requires two separately launched physical PCs.
+        var peerTask = RunPeer(root, session, peerOut);
+        var coordinatorTask = RunCoordinator(root, session, coordinatorOut);
+        var codes = await Task.WhenAll(coordinatorTask, peerTask);
+        if (codes.Any(code => code != 0))
+            throw new InvalidOperationException($"Self-test failed: coordinator={codes[0]}, peer={codes[1]}.");
 
         var marker = Path.Combine(output, "self-test-result.txt");
         File.WriteAllText(marker, "PASS H2 NAS acceptance harness self-test" + Environment.NewLine);
