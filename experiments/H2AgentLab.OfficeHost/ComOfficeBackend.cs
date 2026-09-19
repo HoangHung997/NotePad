@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
@@ -10,6 +11,10 @@ public sealed class ComOfficeBackend : IOfficeBackend
     private const int MaxWordParagraphs = 2_000;
     private const int MaxWordRuns = 5_000;
     private const int MaxWordTables = 200;
+    private const int MaxWordLanguageItems = 200;
+    private static readonly Regex LegalCitationPattern = new(
+        @"\b(?:Luật|Nghị định|Thông tư|Quyết định)\s+(?:số\s+)?(?<id>[0-9]+(?:/[0-9]{4})?/[A-ZĐ0-9-]+(?:-[A-ZĐ0-9]+)?)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public ExcelDiscovery DiscoverExcel()
     {
@@ -245,6 +250,33 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 changed.Distinct().OrderBy(x => x).ToArray());
         }
         finally { Release(document); Release(app); }
+    }
+
+    public WordLanguageEvidenceResult InspectWordLanguage(WordLanguageEvidenceRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var (app, document) = FindWord(request.SessionId);
+        try
+        {
+            var snapshot = SnapshotWordInternal(app, document);
+            OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
+
+            var spelling = ReadWordSpellingEvidence(app, document);
+            var grammar = ReadWordGrammarEvidence(document);
+            var citations = ReadWordCitationEvidence(document);
+            return new WordLanguageEvidenceResult(
+                snapshot.SessionId,
+                snapshot.StateToken,
+                spelling,
+                grammar,
+                citations,
+                "word-com-native");
+        }
+        finally
+        {
+            Release(document);
+            Release(app);
+        }
     }
 
     public OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest request)
@@ -487,6 +519,163 @@ public sealed class ComOfficeBackend : IOfficeBackend
             headers,
             footers,
             OfficeHostSafety.StableToken(basis));
+    }
+
+    private static IReadOnlyList<WordSpellingEvidence> ReadWordSpellingEvidence(
+        dynamic app,
+        dynamic document)
+    {
+        var results = new List<WordSpellingEvidence>();
+        dynamic? errors = null;
+        try
+        {
+            errors = document.SpellingErrors;
+            var count = Math.Min(
+                Convert.ToInt32(errors.Count, CultureInfo.InvariantCulture),
+                MaxWordLanguageItems);
+            for (var i = 1; i <= count; i++)
+            {
+                dynamic? range = null;
+                try
+                {
+                    range = errors[i];
+                    var raw = SafeString(() => range.Text);
+                    var text = CleanWordText(raw);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+                    var suggestions = ReadSpellingSuggestions(app, text);
+                    var start = Convert.ToInt32(range.Start, CultureInfo.InvariantCulture);
+                    var end = Convert.ToInt32(range.End, CultureInfo.InvariantCulture);
+                    results.Add(new WordSpellingEvidence(
+                        start,
+                        Math.Max(0, end - start),
+                        text,
+                        suggestions,
+                        NativeEvidence: true));
+                }
+                catch
+                {
+                    // One inaccessible proofing range must not invalidate all other native evidence.
+                }
+                finally
+                {
+                    Release(range);
+                }
+            }
+        }
+        finally
+        {
+            Release(errors);
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<string> ReadSpellingSuggestions(dynamic app, string text)
+    {
+        dynamic? suggestions = null;
+        try
+        {
+            suggestions = app.GetSpellingSuggestions(text);
+            var count = Math.Min(
+                Convert.ToInt32(suggestions.Count, CultureInfo.InvariantCulture),
+                12);
+            var result = new List<string>();
+            for (var i = 1; i <= count; i++)
+            {
+                dynamic? suggestion = null;
+                try
+                {
+                    suggestion = suggestions[i];
+                    var value = SafeString(() => suggestion.Name).Trim();
+                    if (value.Length > 0 && !result.Contains(value, StringComparer.OrdinalIgnoreCase))
+                        result.Add(value);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    Release(suggestion);
+                }
+            }
+            return result;
+        }
+        catch
+        {
+            return [];
+        }
+        finally
+        {
+            Release(suggestions);
+        }
+    }
+
+    private static IReadOnlyList<WordGrammarEvidence> ReadWordGrammarEvidence(dynamic document)
+    {
+        var results = new List<WordGrammarEvidence>();
+        dynamic? errors = null;
+        try
+        {
+            errors = document.GrammaticalErrors;
+            var count = Math.Min(
+                Convert.ToInt32(errors.Count, CultureInfo.InvariantCulture),
+                MaxWordLanguageItems);
+            for (var i = 1; i <= count; i++)
+            {
+                dynamic? range = null;
+                try
+                {
+                    range = errors[i];
+                    var text = CleanWordText(SafeString(() => range.Text));
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+                    var start = Convert.ToInt32(range.Start, CultureInfo.InvariantCulture);
+                    var end = Convert.ToInt32(range.End, CultureInfo.InvariantCulture);
+                    results.Add(new WordGrammarEvidence(
+                        start,
+                        Math.Max(0, end - start),
+                        text,
+                        "Word native grammar candidate.",
+                        NativeEvidence: true));
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    Release(range);
+                }
+            }
+        }
+        finally
+        {
+            Release(errors);
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<WordLegalCitationEvidence> ReadWordCitationEvidence(dynamic document)
+    {
+        dynamic? content = null;
+        try
+        {
+            content = document.Content;
+            var raw = SafeString(() => content.Text);
+            return LegalCitationPattern.Matches(raw)
+                .Cast<Match>()
+                .Take(MaxWordLanguageItems)
+                .Select(match => new WordLegalCitationEvidence(
+                    match.Value.Trim(),
+                    match.Groups["id"].Value.ToUpperInvariant(),
+                    match.Index,
+                    match.Length,
+                    NativeDocumentEvidence: true))
+                .ToArray();
+        }
+        finally
+        {
+            Release(content);
+        }
     }
 
     private static IReadOnlyList<WordParagraphState> ReadWordParagraphs(dynamic document)
