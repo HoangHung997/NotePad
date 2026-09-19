@@ -15,5 +15,26 @@
     <ProjectReference Include="../../src/H2Notes.Core/H2Notes.Core.csproj" />
     <ProjectReference Include="../H2AgentLab.OfficeProtocol/H2AgentLab.OfficeProtocol.csproj" />
     <ProjectReference Include="../H2AgentLab.DesktopProtocol/H2AgentLab.DesktopProtocol.csproj" />
+    <ProjectReference Include="../H2AgentLab.DesktopHost/H2AgentLab.DesktopHost.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyDesktopHostAfterBuild" AfterTargets="Build">
+    <ItemGroup>
+      <DesktopHostArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.exe" />
+      <DesktopHostArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.dll" />
+      <DesktopHostArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.deps.json" />
+      <DesktopHostArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DesktopHostArtifacts)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyDesktopHostAfterPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <DesktopHostPublishArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.exe" />
+      <DesktopHostPublishArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.dll" />
+      <DesktopHostPublishArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.deps.json" />
+      <DesktopHostPublishArtifacts Include="../H2AgentLab.DesktopHost/bin/$(Configuration)/net10.0-windows/H2AgentLab.DesktopHost.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DesktopHostPublishArtifacts)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
