@@ -604,7 +604,15 @@ jobs:
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
       - name: Publish H2 NAS acceptance probe Windows x64
-        run: dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
+        shell: pwsh
+        run: |
+          dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
+          @"
+          Source branch: ${{ github.ref_name }}
+          Source commit: ${{ github.sha }}
+          Actions run: ${{ github.run_id }}
+          Built UTC: $([DateTime]::UtcNow.ToString('O'))
+          "@ | Set-Content -LiteralPath .\artifacts\H2Notes-NasAcceptance\SOURCE.txt -Encoding UTF8
 
       - name: Upload H2 NAS acceptance probe
         if: always()
