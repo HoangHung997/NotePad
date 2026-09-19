@@ -20,7 +20,7 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     private static readonly JsonSerializerOptions ToolJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All) };
     public bool ReadOnly { get; set; } = true;
     public ComputerTools? Computer { get; set; }
-    public SkillCatalog Skills { get; } = new();
+    public H2AgentLab.Skills.SkillCatalog Skills { get; } = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
     private ScriptWorkspace? _scripts;
     private ScriptWorkspace Scripts => _scripts ??= new(workspace, stateRoot, approve);
 
@@ -116,8 +116,8 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
             {
                 case "list_skills":
                     var q = call.Arguments.TryGetProperty("query", out _) ? Arg("query").Trim() : "";
-                    result = Skills.Discover(q); break;
-                case "read_skill": result = new { name = Arg("name"), path, content = Skills.Read(Arg("name"), path) }; break;
+                    result = DiscoverSkills(q); break;
+                case "read_skill": result = new { name = Arg("name"), path, content = ReadSkill(Arg("name"), path) }; break;
                 case "update_plan":
                     var plan = Arg("plan"); if (plan.Length > 6000) throw new IOException("Plan too long."); journal("plan", plan); result = new { saved = true }; break;
                 case "run_python":
@@ -219,6 +219,55 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
             var error = result.ToJsonString(ToolJson); journal("tool-error", call.Name + ": " + error); return error;
         }
     }
+    private object DiscoverSkills(string query)
+    {
+        var installed = Skills.SnapshotMetadata();
+        if (installed.Count == 0)
+            throw new AgentFaultException(
+                "unavailable",
+                "Không tìm thấy skill trong gói Portable. Giải nén cả thư mục skills cạnh ứng dụng; không tự tải hoặc bịa tên skill.",
+                false);
+
+        var matches = Skills.Search(query ?? "", 100)
+            .Select(x => new { x.Name, x.Description })
+            .ToArray();
+        if (matches.Length != 0 || string.IsNullOrWhiteSpace(query))
+            return matches;
+
+        return new
+        {
+            matches,
+            availableSkills = installed
+                .Select(x => new { x.Name, x.Description })
+                .ToArray(),
+            note = "No skill matched this topic. Select an actual name from availableSkills, or call list_skills with {} to list all. This is not evidence that skills are missing."
+        };
+    }
+
+    private string ReadSkill(string name, string relativePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        var installed = Skills.SnapshotMetadata();
+        if (installed.Count == 0)
+            _ = DiscoverSkills("");
+
+        var matches = installed
+            .Where(x => string.Equals(x.Name, name.Trim(), StringComparison.Ordinal))
+            .ToArray();
+        if (matches.Length != 1)
+            throw new AgentFaultException(
+                "skill_not_found",
+                "Unknown or ambiguous skill. Use list_skills. Available names: "
+                + string.Join(", ", installed.Select(x => x.Name)),
+                false);
+
+        var relative = relativePath.Trim().Replace('\\', '/');
+        return relative == "SKILL.md"
+            ? Skills.Read(matches[0].Identity).EntryPoint
+            : Skills.ReadResource(matches[0].Identity, relative).Content;
+    }
+
     private async Task Permit(string title, string details, CancellationToken ct)
     {
         if (ReadOnly) throw new AgentFaultException("permission_required", "Chế độ Chỉ đọc: chưa thực hiện thao tác.", false);
