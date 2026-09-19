@@ -165,6 +165,7 @@ public sealed class OfficeHostServer
             "word.discover" => _backend.DiscoverWord(),
             "word.snapshot" => _backend.SnapshotWord(Parameters<WordSnapshotRequest>(request).SessionId),
             "word.patch" => _backend.PatchWord(Parameters<WordPatchRequest>(request)),
+            "word.languageEvidence" => _backend.InspectWordLanguage(Parameters<WordLanguageEvidenceRequest>(request)),
             "word.saveCopy" => _backend.SaveWordCopy(Parameters<OfficeSaveCopyRequest>(request)),
 
             "fixture.delay" when _fixtureMode => FixtureDelay(request, cancellationToken),
