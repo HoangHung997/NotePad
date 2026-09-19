@@ -179,6 +179,101 @@ internal static class WorkspaceTests
             ProjectWorkspaceStore.ValidateDestination(source, otherRoot);
         });
 
+        test("Offline pending workspace snapshot survives restart and merges remote changes before replay", () =>
+        {
+            var root = Folder();
+            var pendingRoot = Folder();
+            var seed = new ProjectWorkspaceStore(root); seed.LoadOrImport(); var initial = SheetStorage.Demo(); seed.Save(initial);
+
+            var localStore = new ProjectWorkspaceStore(root, writerId: "OFFLINE-PC", pendingRoot: pendingRoot);
+            var local = localStore.LoadOrImport();
+            var baseGeneration = localStore.CurrentGenerationId;
+            var localProject = local.Notes[0].Projects[0];
+            localProject.ChecklistItems[0].Comment = "offline local comment";
+            localProject.UpdatedAtUtc = DateTime.UtcNow;
+            var pending = localStore.PersistPendingChanges(local, new HashSet<Guid> { localProject.Id });
+            Check(localStore.HasPendingChanges && File.Exists(pending.FilePath));
+            Check(pending.BaseGenerationId == baseGeneration && pending.WorkspaceId == localStore.WorkspaceId);
+
+            // Another device advances the remote generation while this machine is offline.
+            var remoteStore = new ProjectWorkspaceStore(root, writerId: "REMOTE-PC");
+            var remote = remoteStore.LoadOrImport();
+            var remoteProject = remote.Notes[0].Projects[1];
+            remoteProject.ChecklistItems.Add(new TaskRecord { Text = "remote while offline", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            remoteProject.UpdatedAtUtc = DateTime.UtcNow;
+            remoteStore.SaveIncremental(remote, new HashSet<Guid> { remoteProject.Id });
+
+            // A fresh process observes remote first, then restores/merges the durable pending snapshot.
+            var restarted = new ProjectWorkspaceStore(root, writerId: "OFFLINE-PC", pendingRoot: pendingRoot);
+            var observedRemote = restarted.LoadOrImport();
+            Check(restarted.TryRestoreLatestPending(observedRemote, out var restored));
+            Check(restored.BaseGenerationId == baseGeneration && restored.ObservedRemoteGenerationId == restarted.CurrentGenerationId);
+            Check(restored.State.Notes[0].Projects[0].ChecklistItems[0].Comment == "offline local comment");
+            Check(restored.State.Notes[0].Projects[1].ChecklistItems.Any(t => t.Text == "remote while offline"));
+
+            // Re-reading the same append-only pending operation is idempotent.
+            Check(restarted.TryRestoreLatestPending(observedRemote, out var replayed));
+            Check(replayed.State.Notes[0].Projects[0].ChecklistItems[0].Comment == "offline local comment");
+            Check(replayed.State.Notes[0].Projects[1].ChecklistItems.Count(t => t.Text == "remote while offline") == 1);
+
+            restarted.SaveIncremental(restored.State, restored.DirtyProjectIds);
+            restarted.AcknowledgePendingChanges();
+            Check(!restarted.HasPendingChanges);
+            var final = new ProjectWorkspaceStore(root).LoadOrImport();
+            Check(final.Notes[0].Projects[0].ChecklistItems[0].Comment == "offline local comment");
+            Check(final.Notes[0].Projects[1].ChecklistItems.Count(t => t.Text == "remote while offline") == 1);
+        });
+
+        test("Offline pending replay keeps local same-field edit and audits remote conflict", () =>
+        {
+            var root = Folder();
+            var pendingRoot = Folder();
+            var seed = new ProjectWorkspaceStore(root); seed.LoadOrImport(); var initial = SheetStorage.Demo(); seed.Save(initial);
+
+            var offline = new ProjectWorkspaceStore(root, writerId: "OFFLINE-PC", pendingRoot: pendingRoot);
+            var local = offline.LoadOrImport();
+            var projectId = local.Notes[0].Projects[0].Id;
+            local.Notes[0].Projects[0].NameRich = RichDocument.Plain("offline local name");
+            local.Notes[0].Projects[0].UpdatedAtUtc = DateTime.UtcNow;
+            offline.PersistPendingChanges(local, new HashSet<Guid> { projectId });
+
+            var other = new ProjectWorkspaceStore(root, writerId: "REMOTE-PC");
+            var remote = other.LoadOrImport();
+            remote.Notes[0].Projects[0].NameRich = RichDocument.Plain("remote online name");
+            remote.Notes[0].Projects[0].UpdatedAtUtc = DateTime.UtcNow.AddSeconds(1);
+            other.SaveIncremental(remote, new HashSet<Guid> { projectId });
+
+            var restarted = new ProjectWorkspaceStore(root, writerId: "OFFLINE-PC", pendingRoot: pendingRoot);
+            var current = restarted.LoadOrImport();
+            Check(restarted.TryRestoreLatestPending(current, out var restored));
+            Check(restored.State.Notes[0].Projects[0].DisplayName == "offline local name");
+            Check(restored.Conflicts.Any(c => c.Path.Contains(projectId.ToString(), StringComparison.OrdinalIgnoreCase)
+                && c.Resolution.Contains("kept local", StringComparison.OrdinalIgnoreCase)));
+
+            restarted.SaveIncremental(restored.State, restored.DirtyProjectIds);
+            Check(restarted.LastMergeConflicts.Count > 0);
+            restarted.AcknowledgePendingChanges();
+            Check(Directory.Exists(Path.Combine(root, "conflicts")));
+            var final = new ProjectWorkspaceStore(root).LoadOrImport();
+            Check(final.Notes[0].Projects[0].DisplayName == "offline local name");
+        });
+
+        test("Pending workspace snapshots stay append-only but bounded", () =>
+        {
+            var root = Folder();
+            var pendingRoot = Folder();
+            var store = new ProjectWorkspaceStore(root, writerId: "PC", pendingRoot: pendingRoot);
+            store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
+            for (var i = 0; i < 12; i++)
+            {
+                state.Notes[0].Projects[0].ChecklistItems[0].Comment = "pending-" + i;
+                store.PersistPendingChanges(state, new HashSet<Guid> { state.Notes[0].Projects[0].Id });
+            }
+            var files = Directory.GetFiles(pendingRoot, "*.pending.json");
+            Check(files.Length == 8);
+            Check(files.Select(Path.GetFileName).Distinct().Count() == files.Length);
+        });
+
         test("Workspace rename keeps a stable GUID file path and project identity", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
