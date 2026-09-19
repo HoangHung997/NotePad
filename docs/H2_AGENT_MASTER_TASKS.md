@@ -1246,7 +1246,7 @@ Evidence: `H2AgentLab.Integration.IAgentIntegrationBoundary` freezes exactly sev
 
 ---
 
-## [ ] MB-122 — User acceptance gate
+## [~] MB-122 — User acceptance gate
 
 User reviews:
 
@@ -1257,6 +1257,8 @@ User reviews:
 - safety.
 
 No H2 Notes production integration without explicit user approval.
+
+Acceptance package prepared: `docs/H2_AGENT_USER_ACCEPTANCE_GATE.md` consolidates the accepted deterministic evidence for MBA/core correctness, reference extensions, boundedness/performance, safety and the known limitations that require conscious human acceptance. Machine state remains `MB-122 = PENDING_USER_APPROVAL`, `H2_NOTES_PRODUCTION_INTEGRATION_ALLOWED = NO`, and `MB-123_PHASE13_PREPARATION_ALLOWED = NO`. This task must not be marked `[x]` until the user explicitly states approval; a generic instruction to continue work is not substituted for the required acceptance decision.
 
 ---
 
