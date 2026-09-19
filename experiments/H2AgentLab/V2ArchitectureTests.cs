@@ -654,7 +654,7 @@ public static class V2ArchitectureTests
                 throw new InvalidOperationException("Direct route exposed Office/Desktop/Python schemas.");
         });
 
-        Test("AgentOrchestrator skeleton preserves v1 compatibility path and host boundaries", () =>
+        Test("AgentOrchestrator preserves host boundaries without a legacy compatibility seam", () =>
         {
             var contract = new AgentTaskContract(
                 Guid.NewGuid(),
@@ -682,9 +682,8 @@ public static class V2ArchitectureTests
             if (session.StateMachine.State != AgentTaskState.Planned)
                 throw new InvalidOperationException("Orchestrator did not advance through host-owned state transitions.");
 
-            using var compatibility = orchestrator.CreateCompatibilityRunner();
-            if (compatibility.GetType() != typeof(AgentRunner))
-                throw new InvalidOperationException("Existing AgentRunner v1 compatibility path was not retained.");
+            if (typeof(AgentOrchestrator).GetMethod("CreateCompatibilityRunner") is not null)
+                throw new InvalidOperationException("Production AgentOrchestrator still exposes the retired compatibility seam.");
         });
 
         Test("Tool registry descriptors preserve risk access parallel schema and executor metadata", () =>

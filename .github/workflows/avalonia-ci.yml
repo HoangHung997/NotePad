@@ -381,6 +381,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-end-to-end-install-continue-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-end-to-end-install-continue-tests.txt')
 
+      - name: Run H2 Agent MB-90 retire AgentRunner tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-retire-agent-runner'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-retire-agent-runner-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-retire-agent-runner-tests.txt')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |

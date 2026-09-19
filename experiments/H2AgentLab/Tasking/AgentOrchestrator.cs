@@ -32,27 +32,23 @@ public sealed class AgentOrchestrationSession
 }
 
 /// <summary>
-/// Phase-04 orchestration shell. It owns host-side routing/state/context boundaries while the
-/// existing AgentRunner remains available as a separate v1 compatibility path for A/B comparison.
-/// Provider transport/tool execution migration is intentionally deferred to later phases.
+/// Host-side orchestration shell for the normal AgentRuntime path. Legacy baseline execution is
+/// intentionally kept outside this production orchestration type.
 /// </summary>
 public sealed class AgentOrchestrator
 {
     private readonly AgentFastPathRouter _router;
-    private readonly Func<global::H2AgentLab.AgentRunner> _compatibilityRunnerFactory;
     private readonly IAgentRuntimeFactory _runtimeFactory;
     private readonly AgentCapabilityRefreshCoordinator? _capabilityRefresh;
 
     public AgentOrchestrator(
         AgentFastPathRouter? router = null,
         AgentContextManager? contextManager = null,
-        Func<global::H2AgentLab.AgentRunner>? compatibilityRunnerFactory = null,
         AgentCapabilityRefreshCoordinator? capabilityRefresh = null,
         IAgentRuntimeFactory? runtimeFactory = null)
     {
         _router = router ?? new AgentFastPathRouter();
         ContextManager = contextManager ?? new AgentContextManager();
-        _compatibilityRunnerFactory = compatibilityRunnerFactory ?? (() => new global::H2AgentLab.AgentRunner());
         _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory();
         _capabilityRefresh = capabilityRefresh;
     }
@@ -235,12 +231,6 @@ public sealed class AgentOrchestrator
 
         session.ReplaceContract(expandedOrEvidenceUpdatedContract);
     }
-
-    /// <summary>
-    /// Explicitly retained v1 path. The v2 orchestrator does not silently route through it.
-    /// </summary>
-    public global::H2AgentLab.AgentRunner CreateCompatibilityRunner()
-        => _compatibilityRunnerFactory();
 
     private static AgentOrchestrationSession Session(AgentOrchestrationSession? session)
         => session ?? throw new ArgumentNullException(nameof(session));

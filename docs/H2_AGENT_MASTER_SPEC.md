@@ -78,30 +78,26 @@ At the 2026-09-18 audit, Agent Lab contains many accepted V2 components:
 - PluginManager;
 - skill/plugin extension work.
 
-However, the interactive UI path still fundamentally executes through the preserved v1 compatibility runner:
+The interactive UI path now executes through the real V2 runtime:
 
 ```text
 LabWindow
   -> AgentOrchestratedRun
   -> AgentOrchestrator
-  -> CreateCompatibilityRunner()
-  -> AgentRunner v1
-  -> direct HTTP
-  -> full AgentTools.Definitions
+  -> AgentRuntime
+  -> IAgentTransport
+  -> deferred ToolRegistry / verifier / evidence flow
 ```
 
-This means several V2 components are tested but are not yet the actual runtime used by a normal user request.
+MB-90 removes `AgentRunner` from the production orchestration graph. The v1 runner remains only as a frozen baseline/test/live-evaluation harness while legacy cleanup continues.
 
-Examples of the gap:
+The remaining migration gap is narrower:
 
-- `IAgentTransport` implementations exist but the primary UI execution path still uses `AgentRunner`.
-- `ToolRegistry` and `DeferredToolDiscovery` exist, while the v1 runner still sends the full `AgentTools.Definitions` surface.
-- `AgentContextManager` exists, but the v1 model path still relies on legacy session context assembly.
-- `VerificationReport` / repair components exist, but the interactive mutating path is not yet a complete observe -> act -> verify -> repair -> final loop.
+- `AgentRuntimeFactory` still accepts the legacy `AgentTools` object and projects it through `V1ToolRegistryAdapter`;
+- `AgentTools.Definitions` / the giant legacy execution switch still need migration into real providers/executors;
+- the duplicate legacy skill/catalog and computer-tool paths still require cleanup after their parity gates.
 
-Therefore the next architectural priority is **not more marketplace intelligence**.
-
-The priority is to make the already-built V2 components form one real bootable runtime.
+Therefore the next architectural priority is **legacy cleanup behind the already-bootable AgentRuntime**, not a return to the v1 model loop.
 
 ---
 
@@ -276,7 +272,7 @@ It should not:
 - carry remote catalog ranking logic;
 - know all future plugin types.
 
-After migration, `CreateCompatibilityRunner()` is baseline/testing only, not the main execution path.
+`AgentRunner` is no longer reachable from the normal production runtime. Frozen v1 baseline/test/live-evaluation harnesses may retain it temporarily until their dedicated cleanup task.
 
 ---
 

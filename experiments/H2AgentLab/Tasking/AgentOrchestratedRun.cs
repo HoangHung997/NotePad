@@ -61,8 +61,8 @@ public sealed record AgentInspectionSnapshot(
     AgentDiagnosticsSnapshot Diagnostics);
 
 /// <summary>
-/// UI-facing v2 run facade. AgentOrchestrator owns contract/route/state. The preserved v1 runner is
-/// only the temporary compatibility executor until the end-to-end transport loop is fully migrated.
+/// UI-facing v2 run facade. AgentOrchestrator owns contract/route/state and all normal execution
+/// goes through AgentRuntime; legacy baseline harnesses are outside this path.
 /// </summary>
 public sealed class AgentOrchestratedRun
 {

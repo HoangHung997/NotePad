@@ -39,17 +39,10 @@ public static class MbOrchestratorRuntimeTests
             if (!condition) throw new InvalidOperationException(message);
         }
 
-        await Test("MB-11 normal AgentOrchestratedRun executes through AgentRuntime without compatibility runner", async () =>
+        await Test("MB-11 normal AgentOrchestratedRun executes through the AgentRuntime-only production path", async () =>
         {
             var factory = new FixtureRuntimeFactory("Runtime final");
-            var compatibilityCalls = 0;
-            var orchestrator = new AgentOrchestrator(
-                compatibilityRunnerFactory: () =>
-                {
-                    compatibilityCalls++;
-                    throw new InvalidOperationException("Compatibility runner must not be created by normal MB-11 path.");
-                },
-                runtimeFactory: factory);
+            var orchestrator = new AgentOrchestrator(runtimeFactory: factory);
 
             var workspace = Path.Combine(root, "read-only-workspace");
             var state = Path.Combine(root, "read-only-state");
@@ -84,8 +77,6 @@ public static class MbOrchestratorRuntimeTests
 
             Check(factory.CreateCount == 1,
                 "Normal run did not construct exactly one AgentRuntime.");
-            Check(compatibilityCalls == 0,
-                "Normal run created the compatibility AgentRunner.");
             Check(result.State == AgentTaskState.Completed,
                 "Read-only AgentRuntime task did not reach host Completed state.");
             Check(output.Any(x => x.Kind == "final" && x.Text == "Runtime final"),
@@ -145,14 +136,15 @@ public static class MbOrchestratorRuntimeTests
             Check(facade.Contains("RunRuntimeAsync", StringComparison.Ordinal)
                 && facade.Contains("CreateRuntime", StringComparison.Ordinal),
                 "AgentOrchestratedRun is not wired to AgentRuntime.");
-            Check(!facade.Contains("CreateCompatibilityRunner", StringComparison.Ordinal)
-                && !facade.Contains("new AgentRunner", StringComparison.Ordinal),
-                "Normal AgentOrchestratedRun source still references compatibility AgentRunner.");
-            Check(!window.Contains("new AgentRunner", StringComparison.Ordinal)
+            Check(!facade.Contains("AgentRunner", StringComparison.Ordinal)
+                && !facade.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
+                "Normal AgentOrchestratedRun source references legacy execution.");
+            Check(!window.Contains("AgentRunner", StringComparison.Ordinal)
                 && !window.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
-                "LabWindow normal path references AgentRunner compatibility execution.");
-            Check(orchestrator.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
-                "Explicit diagnostic/A-B compatibility seam was removed prematurely.");
+                "LabWindow normal path references legacy execution.");
+            Check(!orchestrator.Contains("AgentRunner", StringComparison.Ordinal)
+                && !orchestrator.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
+                "Production AgentOrchestrator still exposes a legacy runner seam.");
             Check(orchestrator.Contains("RunRuntimeAsync", StringComparison.Ordinal),
                 "AgentOrchestrator does not coordinate AgentRuntime lifecycle.");
             return Task.CompletedTask;
