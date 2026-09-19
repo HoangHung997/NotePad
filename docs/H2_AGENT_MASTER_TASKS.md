@@ -1174,7 +1174,7 @@ Evidence: `AutoCadNativeToolExecutor` now adapts the public AutoCAD tool surface
 
 ---
 
-## [~] MB-114 — MCP acceptance
+## [x] MB-114 — MCP acceptance
 
 Cover:
 
@@ -1185,7 +1185,7 @@ Cover:
 - provider version/provenance;
 - cancellation/timeout.
 
-Implementation under verification: `Acceptance/MbMcpAcceptanceTests.cs` adds six deterministic offline cases covering lifecycle/reconnect, tool+resource discovery, deferred selected-schema loading, tool/resource scope enforcement, provider/server/tool provenance/version evidence, and cancellation/timeout. MCP resource reads now enforce discovered resource scope through `CapabilityProviderPolicy`; terminal RPC failures stop the transport and move `McpServerConnection.Health` to `Failed` after the reconnect budget is exhausted.
+Evidence: `Acceptance/MbMcpAcceptanceTests.cs` provides six deterministic offline cases. `MCP-LIFECYCLE` proves explicit connect/disconnect/reconnect plus automatic transient RPC recovery; `MCP-DISCOVERY` proves normalized tool/resource metadata and allowed resource reads; `MCP-DEFERRED-SCHEMAS` proves provider discovery does not eagerly inject schemas and only the selected MCP tool is loaded into ToolRegistry; `MCP-SCOPE-PERMISSION` proves denied mutation and private-resource scopes fail before `tools/call`/`resources/read`; `MCP-PROVENANCE` proves provider/server/tool versions and scope survive descriptor/evidence projection without leaking environment values; `MCP-CANCEL-TIMEOUT` proves caller cancellation is not retried and configured timeout stops the transport with terminal `Failed` health. `McpToolProvider` now enforces discovered resource scope through `CapabilityProviderPolicy`, and `McpServerConnection` records terminal RPC failure correctly after exhausting reconnects. Final functional source commit `ee549cfcf59ee39254dad4ef001a62efa6825bf6`, GitHub Actions run `35446103467`: MB-114 **6 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-113, DesktopHost, OfficeHost, all provider transports, provider resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `f65cbcbcaff72bebe734948c83114accc071a118`; repository portable ZIP SHA256 `3f8b6a23a09975a3d4d6bd8975122a18e77d1fb3207d52e13614818fb0d546d9`.
 
 ---
 
