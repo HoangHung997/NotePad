@@ -467,15 +467,26 @@ internal static class Program
 
     private static Process StartSelf(params string[] args)
     {
-        var arg0 = Environment.GetCommandLineArgs()[0];
-        var exe = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate current process.");
+        var arg0 = Path.GetFullPath(Environment.GetCommandLineArgs()[0]);
+        var processPath = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate current process.");
         var info = new ProcessStartInfo { UseShellExecute = false, CreateNoWindow = true };
+
         if (Path.GetExtension(arg0).Equals(".dll", StringComparison.OrdinalIgnoreCase))
         {
-            info.FileName = exe;
+            var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+            if (string.IsNullOrWhiteSpace(host))
+                host = Path.GetFileNameWithoutExtension(processPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
+                    ? processPath
+                    : "dotnet";
+            info.FileName = host;
             info.ArgumentList.Add(arg0);
         }
-        else info.FileName = exe;
+        else
+        {
+            // Published/self-contained and normal apphost builds relaunch the executable directly.
+            info.FileName = processPath;
+        }
+
         foreach (var arg in args) info.ArgumentList.Add(arg);
         return Process.Start(info) ?? throw new InvalidOperationException("Could not start probe child process.");
     }
