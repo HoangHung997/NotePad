@@ -957,7 +957,7 @@ Evidence: `Tools/V1ToolRegistryAdapter.cs` and `V1AgentToolsExecutor` are remove
 
 ---
 
-## [~] MB-93 — Retire duplicate SkillCatalog path
+## [x] MB-93 — Retire duplicate SkillCatalog path
 
 After canonical skill parity:
 
@@ -965,7 +965,7 @@ After canonical skill parity:
 - `DeferredSkillSession` merged/removed if redundant;
 - PluginSkillCatalog remains only if useful internally to PluginSkillSource.
 
-Implementation under verification: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession`, and the behavior-free `UnifiedSkillCatalog` alias are retired. The first CI compile regression was repaired by preserving frozen-v1 discovery as a projection from the canonical catalog and fully qualifying the architecture guard type. `H2AgentLab.Skills.SkillCatalog` now owns built-in construction through `CreateBuiltIn(...)`, AgentTools/Lab UI/environment/normal runtime all consume that single catalog, and `PluginSkillCatalog` is internal and constructed only inside `PluginSkillSource`. `MbSkillCatalogRetirementTests` plus updated MB-50/V2/Phase-11 regressions guard parity and forbid duplicate catalog construction.
+Evidence: root `SkillCatalog.cs`, `LabSkill`, `DeferredSkillSession.cs`, and the behavior-free `UnifiedSkillCatalog` alias are removed. `H2AgentLab.Skills.SkillCatalog` is the single host-facing catalog and owns built-in construction through `CreateBuiltIn(...)`; AgentTools, frozen v1 AgentRunner discovery, Lab UI/environment/readiness, normal runtime skill tools, Phase-10/11 regressions and capability projections all consume that catalog directly. `PluginSkillCatalog` and its records are now internal implementation details instantiated only by `PluginSkillSource`. `Skills/MbSkillCatalogRetirementTests.cs` proves canonical discovery/progressive reads, absence of duplicate facade/session/alias paths, internal-only plugin catalog ownership, and shared AgentTools/runtime catalog wiring. Final functional source commit `eff0a73e6f73d22ebfbe59aa4583425d208909d8`, GitHub Actions run `35431203291`: MB-93 **4 passed, 0 failed**; H2 Notes, v1 self-tests/baseline, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-92, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `13a69b113ef0bf640471affa2c1f02cdfffbba44`; repository portable ZIP SHA256 `0602daac7e01294f697f87bfd333109523680679a3f1b30c26a380a87db1fad2`.
 
 ---
 
