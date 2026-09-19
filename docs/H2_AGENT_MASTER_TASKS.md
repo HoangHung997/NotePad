@@ -1210,7 +1210,7 @@ Evidence: `Acceptance/MbPluginPackageLifecycleAcceptanceTests.cs` runs the real 
 
 # Stage M — H2 Notes integration readiness
 
-## [~] MB-120 — Produce final architecture report
+## [x] MB-120 — Produce final architecture report
 
 Report:
 
@@ -1224,7 +1224,7 @@ Report:
 - provider matrix;
 - known limitations.
 
-Implementation under verification: `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` freezes the accepted post-MB-115 architecture/evidence baseline, including exact runtime call graph, core/extension split, retired compatibility paths, MB-102 measured context envelopes, 19-descriptor/2-initial-schema tool metrics, MB-100/104/105 correctness and safety results, synthetic-vs-operational verification failure-rate distinction, transport/provider matrices and explicit integration limitations. `Acceptance/MbFinalArchitectureReportTests.cs` binds those claims back to current source constants, registry exposure, provider factory behavior and removed legacy paths.
+Evidence: `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` freezes the accepted post-MB-115 architecture/evidence baseline, including the real V2 UI/runtime call graph, core/extension split, retired/retained compatibility paths, MB-102 measured context envelopes, 19-descriptor/2-initial-schema tool metrics, MB-100/104/105 correctness and safety results, an explicit distinction between synthetic verifier failures and an as-yet-unmeasured production failure rate, model transport/provider matrices, reference-extension acceptance and known integration limitations. `Acceptance/MbFinalArchitectureReportTests.cs` binds those claims back to current source constants, registry exposure, provider factory behavior and removed legacy paths. Final functional source commit `3fb3ca0a388fb3ab328bd33fec19f6abc972a36f`, GitHub Actions run `35447613695`: MB-120 **4 passed, 0 failed**; H2 Notes, v1/V2 regression suites, MB-10 through MB-115, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `b060014cba991a87c22dfe86e1eecadf9b38dac8`; repository portable ZIP SHA256 `40455382d8a7e23700e571c1a4d3c6829ee05a2f5435dc85364ca1b95b54e739`.
 
 ---
 
