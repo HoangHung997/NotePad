@@ -10,8 +10,8 @@ namespace H2AgentLab.Tools;
 
 /// <summary>
 /// MB-91 normal callable surface. ToolRegistry owns dispatch and each capability family has a
-/// dedicated executor. Legacy AgentTools remains only as temporary host state/approval/journal
-/// storage; no normal call is routed through AgentTools.Definitions or AgentTools.Execute.
+/// dedicated executor. Legacy host state/approval/journal storage remains temporary, while
+/// callable schemas and execution are owned entirely by this registry and its domain executors.
 /// </summary>
 public static class NormalRuntimeToolRegistry
 {
