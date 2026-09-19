@@ -1228,7 +1228,7 @@ Evidence: `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` freezes the accepted post
 
 ---
 
-## [~] MB-121 — Freeze Agent public integration boundary
+## [x] MB-121 — Freeze Agent public integration boundary
 
 Define what H2 Notes may call:
 
@@ -1242,7 +1242,7 @@ Define what H2 Notes may call:
 
 Do not expose internal model/provider details unnecessarily to H2 UI.
 
-Implementation under verification: `H2AgentLab.Integration.IAgentIntegrationBoundary` freezes exactly seven H2-facing operations for project context, task start, progress, inspection, cancellation, approval and final-result delivery. Public DTOs project only host-facing task/progress/approval/evidence state; provider/model/transport/ToolRegistry/runtime objects are excluded. `AgentIntegrationCoordinator` implements deterministic task/context/progress/approval/cancel/final lifecycle behind an internal executor seam so later Phase 13 composition can bind the accepted AgentRuntime without changing the H2 UI contract. `docs/H2_AGENT_PUBLIC_INTEGRATION_BOUNDARY.md` explicitly keeps H2 Notes production integration blocked until MB-122, and `MbAgentPublicIntegrationBoundaryTests` guards the exact public method set, lifecycle semantics and absence of premature H2 Notes references.
+Evidence: `H2AgentLab.Integration.IAgentIntegrationBoundary` freezes exactly seven H2-facing operations: `LoadProjectContext`, `StartTaskAsync`, `ObserveProgress`, `InspectTask`, `Cancel`, `ProvideApproval`, and `WaitForFinalResultAsync`. Public DTOs expose only project/task/progress/approval/evidence/final state; `AiProfile`, transports, AgentRuntime/AgentOrchestrator, AgentTools, ToolRegistry and provider/model objects do not cross the boundary. Internal `AgentIntegrationCoordinator` provides versioned project-context capture, task lifecycle/progress, task-scoped approval IDs, cancellation propagation, bounded evidence projection and terminal-result delivery behind an internal executor seam. `docs/H2_AGENT_PUBLIC_INTEGRATION_BOUNDARY.md` freezes the API and explicitly forbids H2 Notes production integration before MB-122. Final functional source commit `0a7ea1e6586bc5e70e336536603a8044fab654d6`, GitHub Actions run `35448436223`: MB-121 **5 passed, 0 failed**; H2 Notes, v1/V2 regressions, MB-10 through MB-120, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `22f5861f5c2c9d1a9d3f8d1aff7f2d6327f88bdc`; repository portable ZIP SHA256 `408fc95425ba0d67ec0b091ecf24ce61ec0e3945e47688513797afb2a6e54760`.
 
 ---
 
