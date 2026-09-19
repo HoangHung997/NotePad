@@ -74,7 +74,10 @@ public partial class App : Application
                 }
                 else
                 {
-                    var projectStore = new ProjectWorkspaceStore(_local.DataFolder ?? LocalConfiguration.DefaultDataFolder, writerId: _local.DeviceId);
+                    var configuredRoot = _local.WorkspaceLocation?.DisplayPath
+                        ?? _local.DataFolder
+                        ?? LocalConfiguration.DefaultDataFolder;
+                    var projectStore = new ProjectWorkspaceStore(configuredRoot, writerId: _local.DeviceId);
                     _instanceLock = projectStore.AcquireLock(); _storage = projectStore;
                 }
             }
@@ -87,6 +90,12 @@ public partial class App : Application
                     : _storage.LoadOrImport(UsesProjectFiles && File.Exists(dataPath) ? dataPath : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nodepad", "state.json"));
                 if (UsesProjectFiles && _local.DesktopSession is not null)
                     State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
+                if (_storage is ProjectWorkspaceStore loadedStore)
+                {
+                    _local.DataFolder = loadedStore.Root;
+                    _local.WorkspaceLocation = loadedStore.CreateLocationProfile();
+                    _local.Save();
+                }
                 _storageReady = true;
             }
             catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidDataException or UnauthorizedAccessException)
@@ -330,13 +339,25 @@ public partial class App : Application
         var next = transfer.Prepare(mode, choices);
         if (mode == WorkspaceTransferMode.UseExisting && File.Exists(destination.FilePath)) next = destination.Read();
         var oldRoot = _local.DataFolder;
+        var oldWorkspaceLocation = _local.WorkspaceLocation;
         if (_storage is ProjectWorkspaceStore old) old.BackupSnapshot(State);
         if (mode != WorkspaceTransferMode.UseExisting) destination.BackupSnapshot(existing);
         // Machine preferences are not imported from the selected data store.
         next.SheetPreferences = State.SheetPreferences;
         if (mode != WorkspaceTransferMode.UseExisting) destination.Save(next);
-        try { _local.DataFolder = destination.Root; _local.Save(); }
-        catch { _local.DataFolder = oldRoot; if (mode != WorkspaceTransferMode.UseExisting) destination.Save(existing); throw; }
+        try
+        {
+            _local.DataFolder = destination.Root;
+            _local.WorkspaceLocation = destination.CreateLocationProfile();
+            _local.Save();
+        }
+        catch
+        {
+            _local.DataFolder = oldRoot;
+            _local.WorkspaceLocation = oldWorkspaceLocation;
+            if (mode != WorkspaceTransferMode.UseExisting) destination.Save(existing);
+            throw;
+        }
         _restoring = IsChangingStore = true; _saveTimer.Stop(); _syncTimer.Stop();
         try
         {
