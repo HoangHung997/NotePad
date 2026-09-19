@@ -95,7 +95,7 @@ public sealed class LabWindow : Window
             Position = new PixelPoint(area.X + Math.Max(0, (area.Width - (int)(Width * RenderScaling)) / 2), area.Y + 4);
         };
         if (!_historyHealthy) _actions.IsEnabled = false;
-        else if (LabEnvironment.Problems(new SkillCatalog()).Length != 0)
+        else if (LabEnvironment.Problems(H2AgentLab.Skills.SkillCatalog.CreateBuiltIn()).Length != 0)
             _status.Text = "Thiếu thành phần chạy · Mở Kỹ năng & môi trường để xem; cần giải nén gói Portable đầy đủ.";
     }
     private static string? Arg(string name) { var i = Array.IndexOf(Program.Arguments, name); return i >= 0 && i + 1 < Program.Arguments.Length ? Program.Arguments[i + 1] : null; }
@@ -247,16 +247,16 @@ public sealed class LabWindow : Window
     }
     private async Task ShowSkills()
     {
-        var catalog = new SkillCatalog();
+        var catalog = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 12 };
         panel.Children.Add(Label("Kỹ năng theo cấu trúc Codex", 23));
         panel.Children.Add(Label("AI tự chọn theo yêu cầu; chỉ nạp nội dung khi cần. Word/Excel/PDF được chuyển thể từ skill Codex đã cài, thay các công cụ riêng không có trong Lab.", 13));
         panel.Children.Add(Label(LabEnvironment.Summary(catalog), 13));
         panel.Children.Add(Label("Mang sang máy khác: giải nén toàn bộ gói Portable, không chỉ chép exe. Python đi kèm nằm trong thư mục python cạnh app; không cần Python/.NET cài sẵn. Ollama/model hoặc endpoint API vẫn cần cấu hình riêng. Xem PORTABLE.md.", 13));
-        foreach (var skill in catalog.Skills)
+        foreach (var skill in catalog.SnapshotMetadata())
         {
             var button = Button(skill.Name + " · Xem skill");
-            button.Click += async (_, _) => await Message(skill.Name, catalog.Read(skill.Name, "SKILL.md"));
+            button.Click += async (_, _) => await Message(skill.Name, catalog.Read(skill.Identity).EntryPoint);
             panel.Children.Add(button); panel.Children.Add(Label(skill.Description, 12));
         }
         panel.Children.Add(Label("Bản gốc và nguồn: " + Path.Combine(AppContext.BaseDirectory, "skill-sources") + "\nRuntime: " + WindowsPythonSandbox.RuntimeRoot + "\nKhông sao chép tài khoản, API key hoặc bộ máy Codex.", 12));
