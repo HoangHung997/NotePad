@@ -123,7 +123,7 @@ Evidence: `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` now carries the H2M-010 resolutio
 
 ---
 
-## [ ] H2M-011 — Fix/close journal final-verification ordering risk
+## [x] H2M-011 — Fix/close journal final-verification ordering risk
 
 Target:
 
@@ -138,6 +138,8 @@ Required direction:
 Acceptance:
 
 - bad committed generation can be recovered without relying on already-deleted journal state.
+
+Evidence: `ProjectWorkspaceStore.SaveIncremental` now retains the recovery journal until `ReadSnapshot()` validates the complete new generation. Deterministic fault injection corrupts the project after payload+index publication and proves the catch path restores the old generation. Source/test head `7d50fc7631bf3aab225d68faebb7ff0db7f4cbc5`, GitHub Actions run `35450998329` SUCCESS, H2 Notes **337/337**, full Agent/extension/transport/publish pipeline green. Publish commit `c1784dc2a592c7e28d48594858cf5fe02504f797`; ZIP SHA256 `ba1df4fa00dcf8d870963a20b8b028513972c2b8574608d1fc4ae865f3e484c3`. H2-NONAI-002 is FIXED.
 
 ---
 
