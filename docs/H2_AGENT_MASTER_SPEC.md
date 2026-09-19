@@ -95,7 +95,7 @@ The remaining migration gap is narrower:
 
 - normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry`, and callable execution is split across domain executors rather than `AgentTools.Definitions` / the giant `AgentTools.Execute` switch;
 - the legacy `AgentTools` object remains temporarily as host state/approval/journal storage and for frozen v1 tests; `V1ToolRegistryAdapter` has been retired, and reusable canonical schema/risk/scope/preference metadata now comes directly from `NormalRuntimeToolRegistry`;
-- the duplicate legacy skill/catalog and computer-tool paths still require cleanup after their parity gates.
+- the duplicate legacy skill/catalog path is retired in MB-93; the legacy computer-tool path still requires cleanup after its parity gate.
 
 Therefore the next architectural priority is **legacy cleanup behind the already-bootable AgentRuntime**, not a return to the v1 model loop.
 
@@ -1055,10 +1055,10 @@ LabWindow.cs
   -> use real V2 runtime and typed progress
 
 Skills/UnifiedSkillCatalog.cs
-  -> simplify into canonical skill catalog
+  -> now contains the single canonical SkillCatalog; the historical UnifiedSkillCatalog alias is retired
 
 Plugins/PluginSkillCatalog.cs
-  -> become one source/adapter, not competing catalog
+  -> internal helper owned only by PluginSkillSource, not a competing host-facing catalog
 
 Tools/DocumentToolPreference.cs
 Tools/InteractionAdapterPreference.cs
@@ -1110,10 +1110,10 @@ Tools/V1ToolRegistryAdapter.cs
   -> retired in MB-92 after canonical descriptor consumers moved to NormalRuntimeToolRegistry
 
 SkillCatalog.cs
-  -> retire after canonical SkillCatalog parity
+  -> retired in MB-93 after built-in/UI/v1 parity moved to H2AgentLab.Skills.SkillCatalog
 
 Tools/DeferredSkillSession.cs
-  -> merge behavior into canonical skill session/catalog if still useful
+  -> retired in MB-93; progressive reads/hash identity are owned by canonical SkillCatalog/runtime skill tools
 
 ComputerTools.cs
   -> retire after DesktopHost covers accepted behavior
