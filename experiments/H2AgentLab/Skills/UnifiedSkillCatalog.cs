@@ -501,6 +501,15 @@ public class SkillCatalog
         _sources.Add(source);
     }
 
+    public bool UnregisterSource(string sourceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceId);
+        var normalized = sourceId.Trim();
+        var removed = _sources.RemoveAll(x =>
+            string.Equals(x.SourceId, normalized, StringComparison.Ordinal));
+        return removed > 0;
+    }
+
     public IReadOnlyList<SkillSummary> Search(string query, int maxResults = 20)
     {
         if (maxResults is < 1 or > 100)
