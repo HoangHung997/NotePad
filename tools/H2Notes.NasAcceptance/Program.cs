@@ -226,15 +226,21 @@ internal static class Program
     {
         var temp = Path.Combine(session, "rename.tmp");
         var final = Path.Combine(session, "rename.published");
-        var bytes = Encoding.UTF8.GetBytes("rename-" + Guid.NewGuid().ToString("N") + "-" + new string('R', 8192));
+        WriteDurable(final, Encoding.UTF8.GetBytes("old-generation-" + Guid.NewGuid().ToString("N")));
+        var oldHash = Hash(final);
+
+        var bytes = Encoding.UTF8.GetBytes("replacement-" + Guid.NewGuid().ToString("N") + "-" + new string('R', 8192));
         WriteDurable(temp, bytes);
         File.Move(temp, final, true);
-        WriteJson(Path.Combine(session, "rename.marker.json"), new PayloadMarker(Hash(final), new FileInfo(final).Length, DateTimeOffset.UtcNow));
+        var newHash = Hash(final);
+        if (newHash == oldHash) throw new InvalidDataException("Replacement payload did not change.");
+
+        WriteJson(Path.Combine(session, "rename.marker.json"), new PayloadMarker(newHash, new FileInfo(final).Length, DateTimeOffset.UtcNow));
         await WaitFile(Path.Combine(session, "rename.peer.json"));
         var peer = ReadJson<PayloadObservation>(Path.Combine(session, "rename.peer.json"));
-        if (peer.Hash != Hash(final) || peer.Length != new FileInfo(final).Length)
-            throw new InvalidDataException("Peer did not observe exact renamed bytes.");
-        evidence.Cases.Add(Pass("RENAME-REPLACE-VISIBILITY", $"Peer observed renamed publication; delayMs={peer.DelayMs}."));
+        if (peer.Hash != newHash || peer.Length != new FileInfo(final).Length)
+            throw new InvalidDataException("Peer did not observe exact replacement bytes.");
+        evidence.Cases.Add(Pass("RENAME-REPLACE-VISIBILITY", $"Peer observed exact replacement generation; delayMs={peer.DelayMs}."));
     }
 
     private static async Task PeerReadCase(string session, string prefix, string caseId, ProbeReport evidence)
