@@ -82,6 +82,7 @@ public static class Program
         if (args.Contains("--mb-extension-bus-gate-test")) return H2AgentLab.Acceptance.MbExtensionBusGateTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-core-correctness-gate-test")) return H2AgentLab.Acceptance.MbCoreCorrectnessGateTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-web-freshness-legal-acceptance-test")) return H2AgentLab.Web.MbWebFreshnessLegalAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--mb-autocad-acceptance-test")) return H2AgentLab.Acceptance.MbAutoCadAcceptanceTests.Run(args[^1]).GetAwaiter().GetResult();
         var mb104 = Array.IndexOf(args, "--mb-permission-scope-gate-test");
         if (mb104 >= 0)
         {
