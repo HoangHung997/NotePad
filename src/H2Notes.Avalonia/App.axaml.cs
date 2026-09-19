@@ -74,7 +74,8 @@ public partial class App : Application
                 }
                 else
                 {
-                    var configuredRoot = _local.WorkspaceLocation?.DisplayPath
+                    var configuredRoot = WorkspaceEndpointSelector.Select(_local.WorkspaceLocation)
+                        ?? _local.WorkspaceLocation?.DisplayPath
                         ?? _local.DataFolder
                         ?? LocalConfiguration.DefaultDataFolder;
                     var projectStore = new ProjectWorkspaceStore(configuredRoot, writerId: _local.DeviceId);
@@ -92,8 +93,22 @@ public partial class App : Application
                     State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
                 if (_storage is ProjectWorkspaceStore loadedStore)
                 {
-                    _local.DataFolder = loadedStore.Root;
-                    _local.WorkspaceLocation = loadedStore.CreateLocationProfile();
+                    var loadedProfile = loadedStore.CreateLocationProfile();
+                    if (_local.WorkspaceLocation is { } previous
+                        && previous.WorkspaceId == loadedProfile.WorkspaceId
+                        && !string.IsNullOrWhiteSpace(previous.DisplayPath))
+                    {
+                        // Preserve the user's friendly mapped path even if this launch had to use
+                        // the resolved UNC alias. The next startup will try the friendly endpoint first.
+                        loadedProfile = loadedProfile with
+                        {
+                            DisplayPath = previous.DisplayPath,
+                            CanonicalPath = previous.CanonicalPath,
+                            ResolvedNetworkPath = previous.ResolvedNetworkPath ?? loadedProfile.ResolvedNetworkPath
+                        };
+                    }
+                    _local.DataFolder = loadedProfile.DisplayPath;
+                    _local.WorkspaceLocation = loadedProfile;
                     _local.Save();
                 }
                 _storageReady = true;
