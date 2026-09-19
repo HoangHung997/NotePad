@@ -107,6 +107,83 @@ internal static class WorkspaceTests
             Check(recovered.Notes[0].Projects[0].DisplayName == previousName);
         });
 
+        test("Workspace transient mixed generation converges on bounded reread", () =>
+        {
+            var root = Folder(); var recoveryRoot = root + "-recovery";
+            var seed = new ProjectWorkspaceStore(root, recoveryRoot: recoveryRoot); seed.LoadOrImport();
+            var original = SheetStorage.Demo(); seed.Save(original);
+            var projectId = original.Notes[0].Projects[0].Id;
+            var projectPath = Path.Combine(root, "projects", projectId.ToString("N") + ".h2project.json");
+            var valid = File.ReadAllBytes(projectPath);
+            File.AppendAllText(projectPath, " ");
+            var attempts = 0;
+
+            var reader = new ProjectWorkspaceStore(root, recoveryRoot: recoveryRoot, consistencyCheckpoint: attempt =>
+            {
+                attempts = attempt;
+                if (attempt == 1) File.WriteAllBytes(projectPath, valid);
+            });
+            var loaded = reader.LoadOrImport();
+            Check(loaded.Notes[0].Projects[0].Id == projectId);
+            Check(attempts == 1);
+            Check(reader.LastSyncDiagnostic is { Code: "transient_generation_converged", IsPersistent: false, Recovered: false, Attempt: 2 });
+            Check(valid.SequenceEqual(File.ReadAllBytes(projectPath)));
+        });
+
+        test("Workspace persistent mixed generation offers guided last-known-good recovery with quarantine", () =>
+        {
+            var root = Folder(); var recoveryRoot = root + "-recovery";
+            var seed = new ProjectWorkspaceStore(root, recoveryRoot: recoveryRoot); seed.LoadOrImport();
+            var original = SheetStorage.Demo(); seed.Save(original);
+            var project = original.Notes[0].Projects[0];
+            var projectPath = Path.Combine(root, "projects", project.Id.ToString("N") + ".h2project.json");
+            var valid = File.ReadAllBytes(projectPath);
+            File.AppendAllText(projectPath, " ");
+            var corrupt = File.ReadAllBytes(projectPath);
+
+            var reader = new ProjectWorkspaceStore(root, writerId: "PC-2", recoveryRoot: recoveryRoot);
+            Fails(() => reader.LoadOrImport());
+            Check(reader.LastSyncDiagnostic is { IsPersistent: true, RecoveryAvailable: true, Recovered: false, RelativeFile: not null });
+            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath))); // background read must not overwrite NAS
+
+            Check(reader.TryRecoverLastKnownGood(out var recoveredDiagnostic));
+            Check(recoveredDiagnostic is { Code: "persistent_generation_recovered", IsPersistent: true, RecoveryAvailable: true, Recovered: true });
+            Check(recoveredDiagnostic.QuarantinePath is not null && Directory.Exists(recoveredDiagnostic.QuarantinePath));
+            var quarantinedProject = Path.Combine(recoveredDiagnostic.QuarantinePath!, "projects", project.Id.ToString("N") + ".h2project.json");
+            Check(File.Exists(quarantinedProject) && corrupt.SequenceEqual(File.ReadAllBytes(quarantinedProject)));
+            Check(valid.SequenceEqual(File.ReadAllBytes(projectPath)));
+
+            var reopened = new ProjectWorkspaceStore(root, recoveryRoot: recoveryRoot).LoadOrImport();
+            Check(reopened.Notes[0].Projects[0].Id == project.Id);
+        });
+
+        test("Workspace persistent mismatch without local recovery fails closed and persists bounded diagnostics", () =>
+        {
+            var root = Folder(); var seedRecovery = root + "-seed-recovery"; var emptyRecovery = root + "-empty-recovery";
+            var seed = new ProjectWorkspaceStore(root, recoveryRoot: seedRecovery); seed.LoadOrImport();
+            var original = SheetStorage.Demo(); seed.Save(original);
+            var project = original.Notes[0].Projects[0];
+            var projectPath = Path.Combine(root, "projects", project.Id.ToString("N") + ".h2project.json");
+            File.AppendAllText(projectPath, " ");
+            var corrupt = File.ReadAllBytes(projectPath);
+
+            var reader = new ProjectWorkspaceStore(root, writerId: "PC-NO-CACHE", recoveryRoot: emptyRecovery);
+            Fails(() => reader.LoadOrImport());
+            var diagnostic = reader.LastSyncDiagnostic;
+            Check(diagnostic is { Code: "hash_mismatch", IsPersistent: true, RecoveryAvailable: false, Recovered: false, Attempt: 3 });
+            Check(diagnostic!.WriterId == "PC-NO-CACHE" && diagnostic.RelativeFile!.StartsWith("projects/", StringComparison.Ordinal));
+            Check(diagnostic.ExpectedHash is { Length: 64 } && diagnostic.ActualHash is { Length: 64 } && diagnostic.IndexHash is { Length: 64 });
+            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath)));
+
+            Check(!reader.TryRecoverLastKnownGood(out var unavailable));
+            Check(unavailable.Code == "recovery_unavailable" && !unavailable.RecoveryAvailable && !unavailable.Recovered);
+            Check(corrupt.SequenceEqual(File.ReadAllBytes(projectPath)));
+            var diagnosticFile = Path.Combine(reader.RecoveryCacheRoot, "last-sync-diagnostic.json");
+            Check(File.Exists(diagnosticFile));
+            var json = File.ReadAllText(diagnosticFile);
+            Check(json.Contains("PC-NO-CACHE") && json.Contains(project.Id.ToString("N")) && !json.Contains(project.DisplayName));
+        });
+
         test("Workspace rejects external modification without overwriting it", () =>
         {
             var store = new ProjectWorkspaceStore(Folder()); store.LoadOrImport(); var state = SheetStorage.Demo(); store.Save(state);
