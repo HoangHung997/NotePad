@@ -1688,7 +1688,7 @@ public static class V2ArchitectureTests
             _ = typeof(SafeWorkspace);
             _ = typeof(ScriptWorkspace);
             _ = typeof(WindowsPythonSandbox);
-            _ = typeof(SkillCatalog);
+            _ = typeof(H2AgentLab.Skills.SkillCatalog);
             _ = typeof(RecoveryPolicy);
         });
 
