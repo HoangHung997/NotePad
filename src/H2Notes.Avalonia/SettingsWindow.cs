@@ -99,14 +99,17 @@ public sealed class SettingsWindow : Window
                 {
                     var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Chọn thư mục dữ liệu H2 Notes", AllowMultiple = false });
                     if (folders.Count == 0) return;
-                    using var selected = folders[0]; target = selected.TryGetLocalPath() ?? throw new IOException("Cần thư mục cục bộ đã tải về máy.");
+                    using var selected = folders[0]; target = selected.TryGetLocalPath() ?? throw new IOException("Cần thư mục Windows truy cập được (local, mapped network hoặc UNC).");
                 }
                 ProjectWorkspaceStore.ValidateDestination(app.DataFolder, target);
                 var destination = new ProjectWorkspaceStore(target); targetLock = destination.AcquireLock();
                 var existing = await Task.Run(() => destination.LoadOrImport());
                 var transfer = new WorkspaceTransfer(app.State, existing);
                 var hasData = existing.Notes.Count > 0;
-                var summary = $"Đang dùng: {app.DataFolder}\nĐích: {target}\n\nHiện tại: {transfer.SourceProjects} dự án, {transfer.SourceNotes} note.\nỞ đích: {transfer.DestinationProjects} dự án, {transfer.DestinationNotes} note.\nXung đột cần chọn: {transfer.Conflicts.Count}.\n\nBản sao lưu: {Path.Combine(target, "backups")}\nThư mục cũ luôn được giữ nguyên.";
+                var location = destination.Location;
+                var network = string.IsNullOrWhiteSpace(location.ResolvedNetworkPath) ? "" : $"\nNetwork target: {location.ResolvedNetworkPath}";
+                var identity = destination.WorkspaceId == Guid.Empty ? "chưa tạo" : destination.WorkspaceId.ToString();
+                var summary = $"Đang dùng: {app.DataFolder}\nĐích: {target}\nLoại: {location.Kind}{network}\nWorkspaceId: {identity}\n\nHiện tại: {transfer.SourceProjects} dự án, {transfer.SourceNotes} note.\nỞ đích: {transfer.DestinationProjects} dự án, {transfer.DestinationNotes} note.\nXung đột cần chọn: {transfer.Conflicts.Count}.\n\nBản sao lưu: {Path.Combine(target, "backups")}\nThư mục cũ luôn được giữ nguyên.";
                 var choice = hasData ? await ChoiceDialog.Show(this, "Thư mục đã có dữ liệu", summary,
                     ("merge", "Đồng bộ", "Hợp nhất hai kho. Chọn cách xử lý từng xung đột."),
                     ("overwrite", "Ghi đè", "Thay dữ liệu H2 Notes ở đích bằng dữ liệu hiện tại; có sao lưu và xác nhận riêng."),
