@@ -1318,6 +1318,8 @@ MB-102 adds the hard context-boundedness gate on that same normal UI facade. `Ac
 
 MB-104 adds a consolidated zero-boundary-violation permission/scope gate without creating a second permission system. `Acceptance/MbPermissionScopeGateTests.cs` combines the host-owned MB-40 runtime policy with direct filesystem/process-shell probes, Phase-10 plugin/package trust boundaries, provider read-vs-mutation scope checks, DesktopHost and OfficeHost permission/stale-state corpora, WebResearchHost connected/HTTP-only/public-scope checks, native-helper current-user-only IPC isolation, and secrets-safe MCP/Python metadata checks. The machine-readable gate reports `boundaryViolations` and passes only when it is zero.
 
+MB-105 closes the core correctness gate with `Acceptance/MbCoreCorrectnessGateTests.cs`. The scored supported-task corpus is the 12 accepted MB-100 task cases plus the two task-level normal UI scenarios from MB-101; the gate requires at least 90% correctness. Separately, the MB-44 model-only-completion and required-verifier-failure invariants are rerun as negative cases and the gate requires exactly zero false-completion violations. The accepted run scored 14/14 (100.00%) with zero false completions.
+
 ---
 
 ## 36. Reference extension acceptance gate
