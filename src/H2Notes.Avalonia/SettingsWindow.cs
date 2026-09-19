@@ -38,6 +38,13 @@ public sealed class SettingsWindow : Window
         var openFolder = new Button { Content = "Mở thư mục đang dùng" };
         openFolder.Click += (_, _) => { if (Directory.Exists(app.DataFolder)) Process.Start(new ProcessStartInfo(app.DataFolder) { UseShellExecute = true }); };
 
+        var currentWorkspace = app.LocalSettings.WorkspaceLocation;
+        var currentWorkspaceText = currentWorkspace is null
+            ? "Loại lưu trữ: chưa phân loại"
+            : "Loại lưu trữ: " + currentWorkspace.Kind
+                + (string.IsNullOrWhiteSpace(currentWorkspace.ResolvedNetworkPath) ? "" : "\nNetwork target: " + currentWorkspace.ResolvedNetworkPath)
+                + (currentWorkspace.WorkspaceId is { } workspaceId ? "\nWorkspaceId: " + workspaceId : "");
+
         string RecoveryStatusText(WorkspaceSyncDiagnostic? diagnostic)
         {
             if (diagnostic is null) return "Chưa có lỗi generation NAS được ghi nhận trên máy này.";
@@ -218,6 +225,7 @@ public sealed class SettingsWindow : Window
             new TextBlock { Text = "Cài đặt", FontSize = 24, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
             new TextBlock { Text = "Dữ liệu và lưu trữ", FontSize = 18, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
             new TextBlock { Text = app.DataFolder, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
+            new TextBlock { Text = currentWorkspaceText, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
             changeFolder, defaultFolder, openFolder,
             recoverWorkspace, recoveryStatus,
             aiSettings,
