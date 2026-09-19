@@ -981,7 +981,7 @@ Evidence: `ComputerTools.cs` and the `--computer-worker` path are removed. `Desk
 
 ---
 
-## [ ] MB-95 — Review trace/journal duplication
+## [~] MB-95 — Review trace/journal duplication
 
 Review:
 
@@ -1000,6 +1000,8 @@ Define:
 without multiple competing truth sources.
 
 Do not merge types just for aesthetics.
+
+Implementation under verification: `Metrics.AgentTrace` remains the bounded machine-telemetry stream persisted by `AgentTraceStore`; Tasking's user-visible stream is renamed to `AgentProgressEventStream` / `AgentProgressEvent` / `AgentProgressEventKind`, exposed as `AgentInspectionSnapshot.ProgressEvents` and sent to the UI on the `progress` channel. `LabSession` remains the durable conversation/tool journal, rejects ephemeral UI kinds (`status/progress/thinking/delta`) and stores only a safe `telemetry-reference` filename instead of duplicating telemetry content. `MbTraceJournalBoundaryTests` locks these three responsibilities and source naming boundaries.
 
 ---
 
