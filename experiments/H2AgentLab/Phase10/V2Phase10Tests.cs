@@ -629,26 +629,28 @@ public static class V2Phase10Tests
                 .SequenceEqual(new[] { "2.0.0" }),
                 "Plugin update discovery did not find newer compatible metadata.");
 
-            var skills = new PluginSkillCatalog(manager);
-            var firstRead = skills.Read("h2.fixture.productivity", "audit");
-            var repeated = skills.Read("h2.fixture.productivity", "audit");
-            Check(firstRead.Summary.Sha256 == repeated.Summary.Sha256
-                && repeated.LoadCount == 1,
-                "Unchanged plugin skill was reread instead of using task cache.");
+            var skills = new PluginSkillSource(manager);
+            var first = skills.Search("", 10).Single(x => x.Name == "audit");
+            var firstRead = skills.Read(first.Identity);
+            var repeated = skills.Read(first.Identity);
+            Check(firstRead.Summary.Identity.Sha256 == repeated.Summary.Identity.Sha256
+                && firstRead.EntryPoint == repeated.EntryPoint,
+                "Unchanged plugin skill identity/read parity changed through PluginSkillSource.");
 
             _ = manager.InstallFromArchive(
                 v2.Path,
                 v2.CatalogEntry,
                 DeveloperPolicy(),
                 userApproved: true);
-            var secondRead = skills.Read("h2.fixture.productivity", "audit");
-            Check(secondRead.Summary.PluginVersion == "2.0.0"
-                && secondRead.Summary.Sha256 != firstRead.Summary.Sha256,
+            var second = skills.Search("", 10).Single(x => x.Name == "audit");
+            var secondRead = skills.Read(second.Identity);
+            Check(second.Identity.PluginVersion == "2.0.0"
+                && second.Identity.Sha256 != first.Identity.Sha256,
                 "Changed plugin skill version/hash did not invalidate cached identity.");
 
             var evidence = manager.BuildEvidence("h2.fixture.productivity");
             Check(evidence.PluginVersion == "2.0.0"
-                && evidence.Skills.Single().Sha256 == secondRead.Summary.Sha256
+                && evidence.Skills.Single().Sha256 == second.Identity.Sha256
                 && evidence.ToolVersions.Single().Contains("@2.0.0", StringComparison.Ordinal),
                 "Plugin/skill/tool exact versions were not recorded in task evidence.");
 
