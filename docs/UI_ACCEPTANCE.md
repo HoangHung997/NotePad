@@ -1,5 +1,9 @@
 # H2 Notes: bảng nghiệm thu UI và yêu cầu mới
 
+> **HISTORICAL UI ACCEPTANCE / MIGRATION EVIDENCE**
+>
+> Bảng này tiếp tục được giữ để bảo toàn các cổng UX/native/DPI/IME và bộ ảnh cũ. Future product authority là `docs/H2_PRODUCT_MASTER_SPEC.md` + `docs/H2_PRODUCT_MASTER_TASKS.md`. Khi redesign, dùng bảng này làm bằng chứng migration/so sánh, không xem nó là kiến trúc tương lai.
+
 ## Thanh soạn một hàng · 15/09/2026
 
 Theo ảnh bổ sung của người dùng: +/quyền/model/mic/gửi cùng hàng; quyền chỉ còn khiên khi thanh nút hẹp dưới 460 DIP. Model và mức suy luận ở chung thẻ; slider chỉ dùng mức hỗ trợ và có đặt lại mặc định. Mốc riêng tư và xem dữ liệu gửi chỉ nằm trong Ngữ cảnh của +/@. Sửa Ctrl+Enter ở pha xử lý trước TextBox để không bị mất phím; chọn @ vẫn không tự gửi. Kiểm thử, ảnh thực tế và phần chưa kiểm native ghi tại [báo cáo](D:/VSstudio/Nodepad/docs/ui-verification/2026-09-15-composer-single-row/REPORT.md).
@@ -18,7 +22,7 @@ Bổ sung kiểm thử OCR: đã cài cả GOT-OCR 2.0, MinerU và Docling trên
 
 Đã thêm ngữ cảnh dự án đầy đủ, đính kèm ảnh/Word/Excel/văn bản và bản nháp tệp để người dùng lưu. Release build không lỗi/cảnh báo, 131 kiểm thử đạt. Đã đối chiếu render của app thật với UI-04/UI-07, chỉnh bố cục cửa sổ AI thấp. Chưa chứng nhận native Windows/DPI/file dialog hoặc chất lượng model thật. Xem [bằng chứng và giới hạn](D:/VSstudio/Nodepad/docs/ui-verification/2026-09-15-ai-documents/REPORT.md) và [hướng dẫn](D:/VSstudio/Nodepad/docs/AI_DOCUMENTS.md).
 
-Chuẩn đã được người dùng chốt ngày 15/09/2026. Đọc [đặc tả hiện hành](D:/VSstudio/Nodepad/docs/APPROVED_PRODUCT_SPEC.md) và [bộ 10 ảnh](D:/VSstudio/Nodepad/docs/ui-concepts/2026-09-15-responsive-hybrid/README.md) trước khi thay UI.
+Chuẩn ngày 15/09/2026 là baseline lịch sử của UI hiện tại. Đọc `docs/H2_PRODUCT_MASTER_SPEC.md` trước khi thay information architecture; dùng `docs/APPROVED_PRODUCT_SPEC.md` và bộ 10 ảnh cũ để kiểm migration/không mất hành vi quan trọng.
 
 **Cập nhật triển khai 15/09:** đã có bản chạy thử, 77/77 tests và render các control thật, nhưng chưa đủ cổng nghiệm thu native. [Báo cáo hiện hành](D:/VSstudio/Nodepad/docs/RESPONSIVE_IMPLEMENTATION.md) và [đối chiếu render](D:/VSstudio/Nodepad/docs/ui-verification/2026-09-15-responsive-final/REPORT.md) thay phần tiến độ "Chưa làm" trong bảng lịch sử dưới đây. Các ô đó không được xem là Đạt; giữ để tiếp tục nghiệm thu từng tình huống.
 
