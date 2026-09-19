@@ -1308,6 +1308,8 @@ A Minimum Bootable Agent passes only if the real runtime proves all of these:
 15. context remains bounded across long-running multi-tool tasks;
 16. provider/model can be changed without redesigning the loop.
 
+MB-100 adds `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` as the consolidated deterministic Minimum Bootable Agent corpus. It records text and machine-readable JSON evidence for 12 required scenarios: direct response, multi-tool execution, dynamic `tool_search` loading, tool-error recovery, verification pass, verification-fail/repair/pass, long bounded context, cancellation, provider switching, plugin tool registration, progressive skill loading, and install-and-continue. This corpus consolidates previously proven runtime capabilities into one repeatable gate; it does not replace the harder UI-path and core-gate tasks MB-101 through MB-105.
+
 ---
 
 ## 36. Reference extension acceptance gate
