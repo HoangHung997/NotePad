@@ -171,6 +171,39 @@ public sealed record WordPatchResult(
     WordLiveSnapshot After,
     IReadOnlyList<int> ChangedParagraphs);
 
+public sealed record WordLanguageEvidenceRequest(
+    string SessionId,
+    string StateToken);
+
+public sealed record WordSpellingEvidence(
+    int Start,
+    int Length,
+    string Text,
+    IReadOnlyList<string> Suggestions,
+    bool NativeEvidence);
+
+public sealed record WordGrammarEvidence(
+    int Start,
+    int Length,
+    string Text,
+    string Message,
+    bool NativeEvidence);
+
+public sealed record WordLegalCitationEvidence(
+    string CitationText,
+    string DocumentId,
+    int Start,
+    int Length,
+    bool NativeDocumentEvidence);
+
+public sealed record WordLanguageEvidenceResult(
+    string SessionId,
+    string StateToken,
+    IReadOnlyList<WordSpellingEvidence> Spelling,
+    IReadOnlyList<WordGrammarEvidence> Grammar,
+    IReadOnlyList<WordLegalCitationEvidence> Citations,
+    string Provider);
+
 public sealed record OfficePingResult(
     int ProcessId,
     string ProtocolVersion,
