@@ -745,25 +745,45 @@ public static class V2ArchitectureTests
             }
         });
 
-        Test("V1 tool registry adapter preserves every existing callable schema", () =>
+        Test("Canonical normal runtime registry preserves callable metadata", () =>
         {
             var executor = new DelegatingToolExecutor(
-                "v1-fixture",
+                "normal-runtime-fixture",
                 (call, ct) => ValueTask.FromResult("fixture:" + call.Name));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
 
-            var definitionNames = JsonSerializer.SerializeToElement(AgentTools.Definitions)
-                .EnumerateArray()
-                .Select(x => x.GetProperty("function").GetProperty("name").GetString()!)
+            var expectedNames = new[]
+            {
+                "click_control",
+                "check_word",
+                "find_files",
+                "inspect_artifact",
+                "inspect_window",
+                "list_files",
+                "list_skills",
+                "open_file",
+                "publish_artifact",
+                "read_file",
+                "read_run",
+                "read_skill",
+                "run_python",
+                "search_files",
+                "type_control",
+                "update_plan",
+                "view_artifact",
+                "word_paragraphs",
+                "write_text"
+            };
+            var registryNames = registry.Tools
+                .Select(x => x.Name)
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
-            var registryNames = registry.Tools.Select(x => x.Name).OrderBy(x => x, StringComparer.Ordinal).ToArray();
 
-            if (!registryNames.SequenceEqual(definitionNames))
-                throw new InvalidOperationException("V1 registry adapter deleted or invented tool definitions.");
-            if (registry.Tools.Any(x => x.SchemaVersion != "v1" || x.Executor != executor))
-                throw new InvalidOperationException("V1 registry adapter lost schema version or executor identity.");
+            if (!registryNames.SequenceEqual(expectedNames))
+                throw new InvalidOperationException("Canonical normal runtime registry deleted or invented callable tools.");
+            if (registry.Tools.Any(x => x.SchemaVersion != "v2" || x.Executor != executor))
+                throw new InvalidOperationException("Canonical normal runtime registry lost schema version or executor identity.");
             if (!registry.TryGet("read_file", out var readFile)
                 || readFile.Namespace.Name != "files"
                 || readFile.IsMutating
@@ -786,7 +806,7 @@ public static class V2ArchitectureTests
                 "search-fixture",
                 (call, ct) => ValueTask.FromResult("ok"));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
             var search = new ToolSearchIndex(registry);
 
             var read = search.Search("read_file workspace file");
@@ -832,7 +852,7 @@ public static class V2ArchitectureTests
                 "initial-exposure-fixture",
                 (call, ct) => ValueTask.FromResult("ok"));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
             var discovery = new DeferredToolDiscovery(registry);
             var initial = discovery.BuildInitialExposure();
 
@@ -869,7 +889,7 @@ public static class V2ArchitectureTests
                 "load-fixture",
                 (call, ct) => ValueTask.FromResult("ok"));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
             var discovery = new DeferredToolDiscovery(registry);
 
             var first = discovery.SearchAndLoad("read_file", 1);
@@ -1073,7 +1093,7 @@ public static class V2ArchitectureTests
                 "skill-registry-fixture",
                 (call, ct) => ValueTask.FromResult("ok"));
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(registry, executor);
+            NormalRuntimeToolRegistry.Populate(registry, executor);
             var skillTools = registry.GetNamespace("skills").Select(x => x.Name).ToArray();
             if (!skillTools.SequenceEqual(new[] { "list_skills", "read_skill" }))
                 throw new InvalidOperationException("SkillCatalog tools were not preserved in deferred registry namespace.");
