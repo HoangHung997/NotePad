@@ -124,7 +124,8 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         var operationId = Guid.NewGuid();
         var createdUtc = DateTime.UtcNow;
         var allProjects = state.Notes.Where(n => n.IsBoard).SelectMany(n => n.Projects).Select(p => p.Id);
-        var dirty = allProjects.Concat(dirtyProjects ?? Array.Empty<Guid>()).Distinct().OrderBy(id => id).ToList();
+        var explicitDirty = dirtyProjects is null ? Enumerable.Empty<Guid>() : dirtyProjects;
+        var dirty = allProjects.Concat(explicitDirty).Distinct().OrderBy(id => id).ToList();
         var record = new WorkspacePendingRecord
         {
             SchemaVersion = 1,
