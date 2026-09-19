@@ -8,6 +8,7 @@ public sealed class McpToolProvider : ICapabilityProvider
     private readonly McpServerConnection _connection;
     private readonly CapabilityProviderPolicy _policy;
     private readonly Dictionary<string, ProviderToolDefinition> _definitions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ProviderResourceSummary> _resources = new(StringComparer.Ordinal);
 
     public McpToolProvider(
         McpServerConnection connection,
@@ -168,21 +169,24 @@ public sealed class McpToolProvider : ICapabilityProvider
             || resources.ValueKind != JsonValueKind.Array)
             return Array.Empty<ProviderResourceSummary>();
 
-        return resources.EnumerateArray()
-            .Select(resource =>
-            {
-                var id = resource.TryGetProperty("uri", out var uri)
-                    && uri.ValueKind == JsonValueKind.String
-                    ? Bound(uri.GetString() ?? "", 512)
-                    : throw new IOException("MCP resource is missing uri.");
-                var description = OptionalString(resource, "description", 2_000)
-                    ?? OptionalString(resource, "name", 256)
-                    ?? id;
-                var ns = MetaString(resource, "h2.namespace", 64) ?? "resources";
-                var scope = MetaString(resource, "h2.scope", 256)
-                    ?? $"provider:{Provenance.ProviderId}";
-                return new ProviderResourceSummary(id, ns, description, scope);
-            })
+        _resources.Clear();
+        foreach (var resource in resources.EnumerateArray())
+        {
+            var id = resource.TryGetProperty("uri", out var uri)
+                && uri.ValueKind == JsonValueKind.String
+                ? Bound(uri.GetString() ?? "", 512)
+                : throw new IOException("MCP resource is missing uri.");
+            var description = OptionalString(resource, "description", 2_000)
+                ?? OptionalString(resource, "name", 256)
+                ?? id;
+            var ns = MetaString(resource, "h2.namespace", 64) ?? "resources";
+            var scope = MetaString(resource, "h2.scope", 256)
+                ?? $"provider:{Provenance.ProviderId}";
+            var summary = new ProviderResourceSummary(id, ns, description, scope);
+            _resources[id] = summary;
+        }
+
+        return _resources.Values
             .OrderBy(x => x.ResourceId, StringComparer.Ordinal)
             .ToArray();
     }
@@ -192,6 +196,18 @@ public sealed class McpToolProvider : ICapabilityProvider
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceId);
+        if (!_resources.TryGetValue(resourceId, out var resource))
+        {
+            _ = await ListResourcesAsync(cancellationToken).ConfigureAwait(false);
+            if (!_resources.TryGetValue(resourceId, out resource))
+                throw new KeyNotFoundException(
+                    $"MCP resource '{resourceId}' is not advertised by provider '{Provenance.ProviderId}'.");
+        }
+
+        if (!_policy.Allows(resource.Scope, AgentToolAccess.ReadOnly))
+            throw new UnauthorizedAccessException(
+                $"MCP provider resource scope '{resource.Scope}' is not allowed for read access.");
+
         var result = await _connection.CallAsync(
             "resources/read",
             new { uri = resourceId },
