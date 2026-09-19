@@ -1174,7 +1174,7 @@ Evidence: `AutoCadNativeToolExecutor` now adapts the public AutoCAD tool surface
 
 ---
 
-## [ ] MB-114 — MCP acceptance
+## [~] MB-114 — MCP acceptance
 
 Cover:
 
@@ -1184,6 +1184,8 @@ Cover:
 - scope/permission;
 - provider version/provenance;
 - cancellation/timeout.
+
+Implementation under verification: `Acceptance/MbMcpAcceptanceTests.cs` adds six deterministic offline cases covering lifecycle/reconnect, tool+resource discovery, deferred selected-schema loading, tool/resource scope enforcement, provider/server/tool provenance/version evidence, and cancellation/timeout. MCP resource reads now enforce discovered resource scope through `CapabilityProviderPolicy`; terminal RPC failures stop the transport and move `McpServerConnection.Health` to `Failed` after the reconnect budget is exhausted.
 
 ---
 
