@@ -84,6 +84,15 @@ public sealed class OfficeHostClient : IDisposable
     public Task<WordPatchResult> PatchWordAsync(WordPatchRequest request, CancellationToken cancellationToken = default)
         => CallAsync<WordPatchResult>("word.patch", request, null, cancellationToken);
 
+    public Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(
+        WordLanguageEvidenceRequest request,
+        CancellationToken cancellationToken = default)
+        => CallAsync<WordLanguageEvidenceResult>(
+            "word.languageEvidence",
+            request,
+            null,
+            cancellationToken);
+
     public Task<OfficeSaveCopyResult> SaveWordCopyAsync(OfficeSaveCopyRequest request, CancellationToken cancellationToken = default)
         => CallAsync<OfficeSaveCopyResult>("word.saveCopy", request, null, cancellationToken);
 
