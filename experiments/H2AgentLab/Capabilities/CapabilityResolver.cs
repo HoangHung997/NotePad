@@ -164,6 +164,26 @@ public sealed class CapabilityResolver
             InstallationAttempted: false);
     }
 
+    public async Task<CatalogPackageLocation> ResolvePackageLocationAsync(
+        AvailableCapabilityRecord package,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        var resolved = await _catalogs.ResolvePackageLocationAsync(
+            package.SourceId,
+            package.PluginId,
+            package.PluginVersion,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!string.Equals(
+                resolved.ArchiveSha256,
+                package.ArchiveSha256,
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException(
+                "Resolved package hash differs from selected catalog metadata.");
+        return resolved;
+    }
+
     private static string CompactDescription(
         AvailableCapabilityRecord package)
     {

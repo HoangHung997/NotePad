@@ -132,12 +132,15 @@ public sealed class CatalogRuntimeToolExecutor : IAgentToolExecutor
                 $"Host policy reports '{pluginId}@{pluginVersion}' as {candidate.Status}.");
 
         var package = candidate.AvailablePackage;
+        var resolved = await _resolver.ResolvePackageLocationAsync(
+            package,
+            cancellationToken).ConfigureAwait(false);
         var retrieval = await _retriever.RetrieveAsync(
             new PackageRetrievalRequest(
                 package.PluginId,
                 package.PluginVersion,
-                package.PackageLocation,
-                package.ArchiveSha256,
+                resolved.Location,
+                resolved.ArchiveSha256,
                 _maxPackageBytes,
                 _retrievalTimeout),
             cancellationToken).ConfigureAwait(false);
