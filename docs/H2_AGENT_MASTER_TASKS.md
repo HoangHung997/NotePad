@@ -1114,7 +1114,7 @@ Evidence: `Acceptance/MbCoreCorrectnessGateTests.cs` scores the accepted core ta
 
 # Stage L — Reference extension acceptance
 
-## [~] MB-110 — Office acceptance
+## [x] MB-110 — Office acceptance
 
 Cover:
 
@@ -1125,7 +1125,7 @@ Cover:
 - native spelling/citation path;
 - verifier.
 
-Implementation under verification: a consolidated MB-110 gate now covers all six acceptance requirements. OfficeHost gained a state-bound Word language-evidence RPC; the fixture verifies protocol behavior while the real COM backend reads Word proofing errors and current document content for citation evidence. Existing live Excel/Word verifiers remain the preservation/completion oracle.
+Evidence: `Acceptance/MbOfficeAcceptanceTests.cs` provides six explicit cases matching the six requirements above: `OFFICE-EXCEL-UNSAVED`, `OFFICE-WORD-UNSAVED`, `OFFICE-STRUCTURED-MUTATION`, `OFFICE-PRESERVATION`, `OFFICE-NATIVE-LANGUAGE`, and `OFFICE-VERIFIER`. OfficeHost now exposes the state-bound `word.languageEvidence` RPC through protocol/client/server/backend layers; fixture evidence proves protocol/state-token behavior while the real COM backend reads Word native `SpellingErrors` / `GrammaticalErrors` and current document content for legal citation extraction. Existing `LiveExcelVerifier` and `LiveWordVerifier` are the preservation/completion oracle, and regular `V2OfficeHostTests` case 0816 independently guards the language-evidence path. Final functional source commit `7233d500e1e62807939aae44bacaa823d33a6a14`, GitHub Actions run `35443312900`: MB-110 **6 passed, 0 failed**; V2 OfficeHost including 0816, H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-105, DesktopHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `1b7aee8fa7770418591292085a7927ed2f3fbbcd`; repository portable ZIP SHA256 `d65fb53624f174b729432e9865de2910a9f609d1c2beeab17c0a655dc094c90b`.
 
 ---
 
