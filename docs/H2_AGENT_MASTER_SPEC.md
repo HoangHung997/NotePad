@@ -1364,7 +1364,14 @@ The accepted integration-readiness architecture/evidence snapshot is:
 
 - `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md`
 
-This report is an evidence snapshot; this master spec remains the architecture source of truth.
+The frozen H2 Notes-facing Agent API is:
+
+- `docs/H2_AGENT_PUBLIC_INTEGRATION_BOUNDARY.md`
+- `H2AgentLab.Integration.IAgentIntegrationBoundary`
+
+H2 Notes may use only the frozen project-context/task/progress/approval/inspection/cancel/final-result contract after explicit user acceptance. Provider/model/transport/ToolRegistry/runtime composition remains behind the Agent boundary, and H2 Notes production source must not reference Agent Lab before MB-122.
+
+These documents are evidence/API snapshots; this master spec remains the architecture source of truth.
 
 At Phase 13, read:
 
