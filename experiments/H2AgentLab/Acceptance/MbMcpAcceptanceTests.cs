@@ -160,9 +160,11 @@ public static class MbMcpAcceptanceTests
                     ["mcp.read"],
                     CancellationToken.None).ConfigureAwait(false);
                 Check(loaded.Count == 1
-                    && registry.TryGet("mcp.read", out var descriptor)
                     && !registry.TryGet("mcp.write", out _),
                     "MCP selected-schema loading did not remain deferred/selective.");
+                if (!registry.TryGet("mcp.read", out var descriptor))
+                    throw new InvalidOperationException(
+                        "Selected MCP descriptor was not registered.");
 
                 var function = descriptor.CallableSchema.GetProperty("function");
                 var parameters = function.GetProperty("parameters");
