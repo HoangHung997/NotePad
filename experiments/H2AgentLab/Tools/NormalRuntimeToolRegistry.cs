@@ -226,37 +226,100 @@ public static class NormalRuntimeToolRegistry
             ["desktop"] = new DesktopExecutor(host)
         };
 
+        Populate(registry, executors);
+        return registry;
+    }
+
+    /// <summary>
+    /// Register the complete canonical normal-runtime descriptor surface with one supplied
+    /// executor. This is intended for deterministic metadata/search/scheduler tests; normal
+    /// production execution should use <see cref="Create"/>.
+    /// </summary>
+    public static void Populate(
+        ToolRegistry registry,
+        IAgentToolExecutor executor)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(executor);
+
+        foreach (var card in Cards)
+            RegisterCard(registry, card, executor, provenance: null);
+    }
+
+    /// <summary>
+    /// Register one canonical namespace with a supplied executor. First-party extension cards
+    /// use this to reuse the same schema/risk/scope metadata without depending on legacy v1
+    /// definitions or dispatch.
+    /// </summary>
+    public static void PopulateNamespace(
+        ToolRegistry registry,
+        string toolNamespace,
+        IAgentToolExecutor executor,
+        ToolProvenance? provenance = null)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(executor);
+        var normalized = ToolNamespace.NormalizeId(
+            toolNamespace,
+            nameof(toolNamespace));
+        var cards = Cards
+            .Where(x => x.Namespace == normalized)
+            .ToArray();
+        if (cards.Length == 0)
+            throw new InvalidOperationException(
+                "Unknown normal-runtime tool namespace '" + normalized + "'.");
+
+        foreach (var card in cards)
+            RegisterCard(registry, card, executor, provenance);
+    }
+
+    private static void Populate(
+        ToolRegistry registry,
+        IReadOnlyDictionary<string, IAgentToolExecutor> executors)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(executors);
+
         foreach (var card in Cards)
         {
-            var executor = executors[card.Namespace];
-            var mutationScope = card.Access == AgentToolAccess.Mutating
-                ? MutationScope(card.Name)
-                : null;
-            registry.Register(new ToolDescriptor(
-                card.Name,
-                new ToolNamespace(card.Namespace, NamespaceDescription(card.Namespace)),
-                card.Description,
-                card.Risk,
-                card.Access,
-                card.Parallel,
-                "v2",
-                Schema(card),
-                executor,
-                provenance: new ToolProvenance(
-                    "normal-runtime." + card.Namespace,
-                    "2.0.0",
-                    "in-process",
-                    "2.0.0"),
-                resourceScope: mutationScope is null
-                    ? null
-                    : new ToolResourceScope(mutationScope, mutationScope),
-                serializationKey: mutationScope ?? card.Namespace,
-                canProvideVerificationEvidence:
-                    card.Evidence || card.Access == AgentToolAccess.Mutating,
-                preference: card.Preference));
+            if (!executors.TryGetValue(card.Namespace, out var executor))
+                throw new InvalidOperationException(
+                    "Missing executor for normal-runtime namespace '" + card.Namespace + "'.");
+            RegisterCard(registry, card, executor, provenance: null);
         }
+    }
 
-        return registry;
+    private static void RegisterCard(
+        ToolRegistry registry,
+        Card card,
+        IAgentToolExecutor executor,
+        ToolProvenance? provenance)
+    {
+        var mutationScope = card.Access == AgentToolAccess.Mutating
+            ? MutationScope(card.Name)
+            : null;
+        registry.Register(new ToolDescriptor(
+            card.Name,
+            new ToolNamespace(card.Namespace, NamespaceDescription(card.Namespace)),
+            card.Description,
+            card.Risk,
+            card.Access,
+            card.Parallel,
+            "v2",
+            Schema(card),
+            executor,
+            provenance: provenance ?? new ToolProvenance(
+                "normal-runtime." + card.Namespace,
+                "2.0.0",
+                "in-process",
+                "2.0.0"),
+            resourceScope: mutationScope is null
+                ? null
+                : new ToolResourceScope(mutationScope, mutationScope),
+            serializationKey: mutationScope ?? card.Namespace,
+            canProvideVerificationEvidence:
+                card.Evidence || card.Access == AgentToolAccess.Mutating,
+            preference: card.Preference));
     }
 
     private static JsonElement Schema(Card card)
