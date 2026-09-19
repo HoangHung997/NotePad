@@ -1,5 +1,9 @@
 # H2 Notes responsive: bản triển khai đầu tiên
 
+> **CURRENT-IMPLEMENTATION EVIDENCE / HISTORICAL UI BASELINE**
+>
+> Giữ file này và các ảnh liên quan để so sánh migration/UX. Kiến trúc sản phẩm tương lai nằm tại `docs/H2_PRODUCT_MASTER_SPEC.md` và `docs/H2_PRODUCT_MASTER_TASKS.md`; tài liệu này không được dùng để phủ quyết information architecture mới.
+
 Ngày: 15/09/2026. Nhánh: `codex/project-sheet`.
 
 Đây là bản chạy thử có chức năng, **chưa phải bản nghiệm thu toàn bộ đặc tả**.
