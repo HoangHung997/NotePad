@@ -65,11 +65,11 @@ Triage result:
 
 | ID | Severity | Area | Status | Short description |
 |---|---|---|---|---|
-| H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN | Project file and workspace index can be observed with mismatched hashes, blocking PC2 refresh |
+| H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN-REAL-NAS | Code-side persistent-mismatch recovery is implemented; physical two-PC/NAS convergence/root-cause proof remains H2M-013 |
 | H2-NONAI-002 | HIGH | Persistence / recovery | FIXED | Journal now survives through final snapshot validation; fault-injection proves rollback after a bad committed generation |
-| H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | OPEN | Background NAS refresh swallows actionable exception detail and only shows a generic sync-failed status |
+| H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | FIXED | Structured bounded sync diagnostics are persisted locally and surfaced as transient/persistent/recovery status |
 | H2-NONAI-004 | HIGH | NAS protocol compatibility | OPEN-RISK | Multi-PC protocol assumes locking/rename semantics without proving the selected shared filesystem supports them |
-| H2-NONAI-005 | HIGH | Recovery / availability | OPEN | Persistent index/file mismatch has no automatic last-known-good or guided self-heal path |
+| H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
 | H2-NONAI-006 | HIGH | Test coverage | OPEN | Multi-PC tests use local filesystem fixtures and do not prove real SMB/NAS lock/visibility behavior |
 | H2-NONAI-007 | MEDIUM | Offline durability | OPEN-KNOWN-GAP | No durable local pending-operation queue while NAS is unavailable; crash durability remains incomplete |
 | H2-NONAI-008 | HIGH | Storage location / network failover | OPEN | DataFolder is stored as one path string; no Local vs Mapped Network vs UNC classification or LAN/remote endpoint failover |
@@ -80,7 +80,7 @@ Triage result:
 # H2-NONAI-001 — NAS project/index hash mismatch blocks second-PC refresh
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** OPEN-REAL-NAS  
 **First confirmed:** 2026-09-18  
 **Area:** multi-PC NAS synchronization / data integrity
 
@@ -148,6 +148,13 @@ Candidates to verify:
 - record the corresponding hash in `workspace.h2index.json`;
 - record file timestamps and whether `.h2-transaction.json` exists;
 - prove the repaired protocol never exposes a persistent mixed generation.
+
+
+## H2M-012 mitigation evidence — 2026-09-19
+
+The former permanent-PC2 trap is removed at the application layer: bounded reread distinguishes short visibility skew from persistent mismatch; a previously validated machine-local generation may be opened read-only; writes remain blocked; explicit recovery quarantines the invalid generation before restoring last-known-good; no-cache cases fail closed. Exact source `d3937e501b50220c6688d336a84e5b58ac1539a4`, Actions run `35452160225`, H2 Notes **340/340**.
+
+This does **not** close H2-NONAI-001. The physical NAS root cause and proof that the repaired protocol converges across two actual PCs remain mandatory under H2M-013.
 
 ---
 
@@ -218,7 +225,7 @@ Verification:
 # H2-NONAI-003 — Background sync hides useful failure diagnostics
 
 **Severity:** MEDIUM  
-**Status:** OPEN  
+**Status:** FIXED  
 **First confirmed:** 2026-09-18  
 **Area:** diagnostics / multi-PC UX
 
@@ -253,6 +260,15 @@ Keep the safe user-facing status, but also persist bounded diagnostics:
 - retry count / transient-vs-persistent classification.
 
 Do not expose secrets or unrelated file contents.
+
+
+## Resolution evidence — 2026-09-19
+
+- `WorkspaceSyncDiagnostic` persists a bounded local record under the machine-local workspace recovery cache.
+- The record includes event/failure code, exception type, offending relative file, expected/actual SHA-256, observed index SHA-256, local writer/device ID, UTC timestamp, attempt count, transient/persistent classification, recovery availability, recovery result/snapshot ID and quarantine path where applicable.
+- No project/note body, attachment bytes, API key or unrelated file contents are copied into the diagnostic record.
+- `App.RefreshSharedWorkspace()` now distinguishes transient convergence, persistent generation failure with/without safe recovery, and read-only last-known-good fallback instead of collapsing all cases to one generic message.
+- Exact source `d3937e501b50220c6688d336a84e5b58ac1539a4`, GitHub Actions run `35452160225`: H2 Notes **340 passed, 0 failed**, full Agent/reference-extension/transport/publish pipeline SUCCESS.
 
 ---
 
@@ -290,7 +306,7 @@ If the share fails the capability probe, fail closed with a clear warning instea
 # H2-NONAI-005 — No self-healing path after a persistent mixed generation
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** FIXED  
 **First confirmed:** 2026-09-18  
 **Area:** recovery / availability
 
@@ -309,6 +325,34 @@ However, if the mismatch does not disappear on a later poll, the workspace has n
 Maintain fail-closed data protection, but add deterministic recovery based on durable transaction/generation evidence.
 
 Never “repair” by rewriting the index to whatever bytes happen to be visible without proving which generation is authoritative.
+
+
+## Resolution evidence — 2026-09-19
+
+The repaired path is fail-safe rather than hash-rewriting:
+
+1. every fully validated shared generation is copied to a machine-local immutable last-known-good generation keyed by the validated workspace-index SHA-256;
+2. an inconsistent read is retried a bounded three times, allowing short NAS visibility skew to converge without intervention;
+3. if the mismatch remains persistent and a validated local snapshot exists, H2 opens that last-known-good snapshot so PC2 can still start/use the app, but `ProjectWorkspaceStore.IsRecoveryFallbackActive` blocks all writes;
+4. background refresh and Save status explicitly tell the user the workspace is in safe read-only fallback;
+5. Settings exposes **Phục hồi từ bản an toàn gần nhất…** only when persistent failure + safe recovery evidence exist;
+6. explicit recovery first copies the complete currently referenced invalid generation into a local quarantine (including actual bytes and bounded hash diagnostics), then restores the verified last-known-good files with the index published last;
+7. if no valid last-known-good exists, recovery is unavailable and the shared bytes remain untouched.
+
+Deterministic regression cases in `WorkspaceTests.cs` prove:
+
+- transient mixed generation converges on bounded reread;
+- persistent mixed generation enters last-known-good fallback without changing corrupt NAS bytes;
+- Save is rejected while fallback is active;
+- explicit guided recovery quarantines the exact corrupt project bytes before restoring;
+- persistent mismatch with no recovery cache fails closed and persists bounded diagnostics;
+- externally modified bytes are preserved and never silently overwritten.
+
+Exact functional source: `d3937e501b50220c6688d336a84e5b58ac1539a4`.  
+GitHub Actions: `35452160225` — **SUCCESS**.  
+H2 Notes: **340 passed, 0 failed**.  
+Publish commit: `819ab68bcf73174282df98e68ef726d81b0ad82b`.  
+Portable ZIP SHA256: `4a27bf96882a7518baa87e0feeb91a577415f3a957e85435210e9bd741acdbfd`.
 
 ---
 
