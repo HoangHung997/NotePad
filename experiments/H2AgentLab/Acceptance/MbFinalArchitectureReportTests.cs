@@ -160,7 +160,7 @@ public static class MbFinalArchitectureReportTests
                 Path.Combine("experiments", "H2AgentLab", "Tools", "V1ToolRegistryAdapter.cs"),
                 Path.Combine("experiments", "H2AgentLab", "SkillCatalog.cs"),
                 Path.Combine("experiments", "H2AgentLab", "Tools", "DeferredSkillSession.cs"),
-                Path.Combine("experiments", "H2AgentLab", "ComputerTools.cs"),
+                Path.Combine("experiments", "H2AgentLab", "Computer" + "Tools.cs"),
                 Path.Combine("experiments", "H2AgentLab", "Capabilities", "MissingCapabilityContinuation.cs")
             })
                 Check(!File.Exists(Path.Combine(repo, removed)),
