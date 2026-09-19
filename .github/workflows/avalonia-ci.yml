@@ -463,6 +463,14 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-permission-scope-gate-test $out $desktopHostExe $officeHostExe
           Get-Content -LiteralPath (Join-Path $out 'mb-permission-scope-gate-tests.txt')
 
+      - name: Run H2 Agent MB-105 core correctness gate
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-core-correctness-gate'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-core-correctness-gate-test $out
+          Get-Content -LiteralPath (Join-Path $out 'mb-core-correctness-gate-tests.txt')
+          Get-Content -LiteralPath (Join-Path $out 'mb-core-correctness-gate-tests.json')
+
       - name: Run H2 Agent Lab v2 DesktopHost acceptance tests
         shell: pwsh
         run: |
