@@ -1,5 +1,9 @@
 # H2 Notes: đặc tả sản phẩm đã chốt
 
+> **HISTORICAL / CURRENT-IMPLEMENTATION BASELINE**
+>
+> Tài liệu này được giữ để bảo toàn yêu cầu, hành vi và bằng chứng UI của bản H2 Notes hiện tại. Nó không còn là kiến trúc tương lai chuẩn. Kiến trúc tương lai hiện hành: `docs/H2_PRODUCT_MASTER_SPEC.md`; tracker thực hiện: `docs/H2_PRODUCT_MASTER_TASKS.md`; lỗi dữ liệu/NAS độc lập: `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`.
+
 Bổ sung 16/09/2026 (Word giữ bố cục và chờ máy yếu): thêm thao tác **Word giữ bố cục từ PDF/ảnh** trong +/@ và bản nháp AI tham chiếu ID tệp nguồn, không dựng bố cục từ Markdown hoặc tự tạo tệp rỗng. Dựng trên máy bằng MinerU, dùng bộ nhận chữ vi/en đã cài nếu có; không tự tải model, không gửi tài liệu lên dịch vụ khác. Bản thử tối đa 10 trang, chữ nằm trong các khung chỉnh sửa được; bảng, dấu/chữ ký và vùng chưa nhận dạng giữ ảnh, không hứa giống 100% hay bảng đã sửa được. Cho đối chiếu/sửa chữ, font/cỡ/đậm/nghiêng trước khi người dùng chọn nơi lưu; nguồn gốc không bị sửa. Phông scan chỉ ước lượng (hiện Times New Roman/Arial). Bản Markdown lịch sử thiếu nguồn phải chọn lại tệp gốc và kiểm hash. AI chat mặc định chờ hoàn tất, không tự ngắt vì model nạp/suy nghĩ lâu; Dừng và mất kết nối vẫn kết thúc phiên. Khi tắt tùy chọn chờ, chỉ dùng giới hạn im lặng, có đặt lại khi nhận suy nghĩ, câu trả lời hoặc heartbeat. Không thay bộ ảnh chuẩn và không thay chính sách quyền/ghi đè.
 
 Bổ sung 15/09/2026 (sửa OCR ảnh và cuộn suy nghĩ): người dùng chọn bật OCR cho ảnh tài liệu. Thêm tùy chọn máy-local **OCR cả ảnh đính kèm** bên cạnh engine PDF; không âm thầm áp dụng cho cấu hình khác. Khi bật, ảnh mới được trích thành Markdown trước khi gửi LLM, giữ nguyên ảnh và chữ OCR trong lịch sử; ảnh cũ chuyển cho lượt gửi, không sửa lịch sử. Chặn gửi thiếu nội dung khi OCR lỗi/hủy. Cần ghi rõ OCR chỉ trích chữ/bảng, không thay phân tích ảnh và không bảo đảm đúng tiếng Việt. Khung suy nghĩ phải theo dòng mới khi dài, mở lại hoặc đổi kích thước; tiếp tục xóa tiến trình khi trả lời/dừng/lỗi. Không đổi bố cục chuẩn hoặc các quy tắc dữ liệu/quyền trước đó.
@@ -14,7 +18,7 @@ Bổ sung theo yêu cầu 15/09/2026: AI nhận ảnh/Word/Excel/tệp văn bả
 
 Ngày chốt: 15/09/2026. Trạng thái: **đã có bản triển khai đầu tiên responsive/AI/kho dữ liệu mới; chưa nghiệm thu đầy đủ**. Xem [tiến độ và giới hạn thực tế](D:/VSstudio/Nodepad/docs/RESPONSIVE_IMPLEMENTATION.md). Các yêu cầu bên dưới vẫn giữ nguyên, không tự bỏ yêu cầu chưa hoàn thành.
 
-Tài liệu này là nguồn yêu cầu hiện hành. [Mô tả bản thử đang có](D:/VSstudio/Nodepad/docs/PROJECT_SHEET_IMPLEMENTATION.md) là lịch sử triển khai, không phải bằng chứng đã hoàn thành các yêu cầu dưới đây. Giữ Avalonia/.NET và chỉ tận dụng chọn lọc Nera; không chuyển lại WPF/WinForms hay nhúng nguyên engine bảng tính.
+Tài liệu này là nguồn yêu cầu lịch sử/current-baseline của bản cũ; không ghi đè Product Master. [Mô tả bản thử đang có](D:/VSstudio/Nodepad/docs/PROJECT_SHEET_IMPLEMENTATION.md) là lịch sử triển khai, không phải bằng chứng đã hoàn thành các yêu cầu dưới đây. Giữ Avalonia/.NET và chỉ tận dụng chọn lọc Nera; không chuyển lại WPF/WinForms hay nhúng nguyên engine bảng tính.
 
 ## 1. Chuẩn giao diện bắt buộc
 
