@@ -96,7 +96,15 @@ internal static class Program
         WriteJson(Path.Combine(session, "coordinator.ready.json"), NodeInfo("coordinator"));
 
         await WaitFile(Path.Combine(session, "peer.ready.json"));
-        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS", "Both nodes observed the same acceptance-session directory."));
+        var peerReady = ReadJson<NodeReady>(Path.Combine(session, "peer.ready.json"));
+        evidence.PeerMachine = peerReady.Machine;
+        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal) &&
+            string.Equals(peerReady.Machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Real NAS acceptance requires two different physical machine names. Use --self-test for same-machine harness verification.");
+        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
+            sessionId.StartsWith("selftest-", StringComparison.Ordinal)
+                ? "Local harness self-test rendezvous completed."
+                : $"Two distinct machines observed the same acceptance session: {Environment.MachineName} <-> {peerReady.Machine}."));
 
         await CoordinatorLockCase(session, evidence);
         await CoordinatorFlushCase(session, evidence);
@@ -121,8 +129,16 @@ internal static class Program
         Directory.CreateDirectory(session);
         var evidence = NewReport("peer", sharedRoot, sessionId);
         await WaitFile(Path.Combine(session, "coordinator.ready.json"));
+        var coordinatorReady = ReadJson<NodeReady>(Path.Combine(session, "coordinator.ready.json"));
+        evidence.PeerMachine = coordinatorReady.Machine;
+        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal) &&
+            string.Equals(coordinatorReady.Machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Real NAS acceptance requires two different physical machine names. Use --self-test for same-machine harness verification.");
         WriteJson(Path.Combine(session, "peer.ready.json"), NodeInfo("peer"));
-        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS", "Peer observed coordinator marker through the shared path."));
+        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
+            sessionId.StartsWith("selftest-", StringComparison.Ordinal)
+                ? "Local harness self-test rendezvous completed."
+                : $"Peer observed coordinator on distinct machine {coordinatorReady.Machine}."));
 
         await PeerLockCase(session, evidence);
         await PeerReadCase(session, "flush", "FLUSH-VISIBILITY", evidence);
@@ -383,20 +399,28 @@ internal static class Program
         Os = Environment.OSVersion.VersionString,
         Runtime = Environment.Version.ToString(),
         SharedRoot = root,
+        SourceStamp = ReadSourceStamp(),
         StartedUtc = DateTimeOffset.UtcNow
     };
 
     private static ProbeCase Pass(string id, string details) => new(id, "PASS", details, DateTimeOffset.UtcNow);
 
-    private static object NodeInfo(string role) => new
-    {
+    private static NodeReady NodeInfo(string role) => new(
         role,
-        machine = Environment.MachineName,
-        user = Environment.UserName,
-        os = Environment.OSVersion.VersionString,
-        runtime = Environment.Version.ToString(),
-        utc = DateTimeOffset.UtcNow
-    };
+        Environment.MachineName,
+        Environment.UserName,
+        Environment.OSVersion.VersionString,
+        Environment.Version.ToString(),
+        ReadSourceStamp(),
+        DateTimeOffset.UtcNow);
+
+    private static string ReadSourceStamp()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "SOURCE.txt");
+        if (!File.Exists(path)) return "unpackaged/local-build";
+        var value = File.ReadAllText(path).Trim();
+        return value.Length <= 4096 ? value : value[..4096];
+    }
 
     private static string SessionRoot(string sharedRoot, string sessionId)
         => Path.Combine(sharedRoot, ".h2-nas-acceptance", SafeId(sessionId));
@@ -466,12 +490,15 @@ internal static class Program
         public string Os { get; set; } = "";
         public string Runtime { get; set; } = "";
         public string SharedRoot { get; set; } = "";
+        public string SourceStamp { get; set; } = "";
+        public string? PeerMachine { get; set; }
         public DateTimeOffset StartedUtc { get; set; }
         public DateTimeOffset? CompletedUtc { get; set; }
         public string Overall { get; set; } = "RUNNING";
         public List<ProbeCase> Cases { get; set; } = [];
     }
 
+    private sealed record NodeReady(string Role, string Machine, string User, string Os, string Runtime, string SourceStamp, DateTimeOffset Utc);
     private sealed record ProbeCase(string CaseId, string Status, string Details, DateTimeOffset Utc);
     private sealed record PeerResult(bool Success, DateTimeOffset Utc, string Machine);
     private sealed record PayloadMarker(string Hash, long Length, DateTimeOffset PublishedUtc);
