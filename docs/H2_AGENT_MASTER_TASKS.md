@@ -1258,7 +1258,7 @@ User reviews:
 
 No H2 Notes production integration without explicit user approval.
 
-Acceptance package prepared: `docs/H2_AGENT_USER_ACCEPTANCE_GATE.md` consolidates the accepted deterministic evidence for MBA/core correctness, reference extensions, boundedness/performance, safety and the known limitations that require conscious human acceptance. Machine state remains `MB-122 = PENDING_USER_APPROVAL`, `H2_NOTES_PRODUCTION_INTEGRATION_ALLOWED = NO`, and `MB-123_PHASE13_PREPARATION_ALLOWED = NO`. This task must not be marked `[x]` until the user explicitly states approval; a generic instruction to continue work is not substituted for the required acceptance decision.
+Acceptance package prepared and evidence-frozen: `docs/H2_AGENT_USER_ACCEPTANCE_GATE.md` consolidates the accepted deterministic evidence for MBA/core correctness, reference extensions, boundedness/performance, safety, known limitations, and the exact last functional green snapshot (source `0a7ea1e6586bc5e70e336536603a8044fab654d6`, Actions run `35448436223`, publish `22f5861f5c2c9d1a9d3f8d1aff7f2d6327f88bdc`, portable ZIP SHA256 `408fc95425ba0d67ec0b091ecf24ce61ec0e3945e47688513797afb2a6e54760`). Machine state remains `MB-122 = PENDING_USER_APPROVAL`, `H2_NOTES_PRODUCTION_INTEGRATION_ALLOWED = NO`, and `MB-123_PHASE13_PREPARATION_ALLOWED = NO`. This task must not be marked `[x]` until the user explicitly states approval; a generic instruction to continue work is not substituted for the required acceptance decision.
 
 ---
 
