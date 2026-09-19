@@ -99,6 +99,12 @@ public static class Program
             if (desktopTest + 2 >= args.Length) throw new ArgumentException("--v2-desktop-host-test requires <output-directory> <desktop-host-exe>.");
             return V2DesktopHostTests.Run(args[desktopTest + 1], args[desktopTest + 2]).GetAwaiter().GetResult();
         }
+        var mb110 = Array.IndexOf(args, "--mb-office-acceptance-test");
+        if (mb110 >= 0)
+        {
+            if (mb110 + 2 >= args.Length) throw new ArgumentException("--mb-office-acceptance-test requires <output-directory> <office-host-exe>.");
+            return H2AgentLab.Acceptance.MbOfficeAcceptanceTests.Run(args[mb110 + 1], args[mb110 + 2]).GetAwaiter().GetResult();
+        }
         var officeTest = Array.IndexOf(args, "--v2-office-host-test");
         if (officeTest >= 0)
         {
