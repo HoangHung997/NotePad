@@ -52,7 +52,7 @@ public static class MbInitialToolExposureTests
                 (_, _) => Task.FromResult(true),
                 (_, _) => { });
 
-            var registry = V1ToolRegistryAdapter.Create(tools);
+            var registry = NormalRuntimeToolRegistry.Create(tools);
             AgentTransportStartRequest? captured = null;
             await using var runtime = new AgentRuntime(
                 new CaptureTransport(request => captured = request),
@@ -110,10 +110,11 @@ public static class MbInitialToolExposureTests
                     "Heavy tool schema leaked into initial V2 request: " + heavy);
             }
 
-            var fullBytes = JsonSerializer.SerializeToUtf8Bytes(global::H2AgentLab.AgentTools.Definitions).Length;
+            var fullBytes = JsonSerializer.SerializeToUtf8Bytes(
+                registry.Tools.Select(x => x.CallableSchema).ToArray()).Length;
             var initialBytes = JsonSerializer.SerializeToUtf8Bytes(start.Tools).Length;
             Check(initialBytes < fullBytes,
-                $"Initial V2 tool schema bytes ({initialBytes}) are not smaller than full v1 definitions ({fullBytes}).");
+                $"Initial V2 tool schema bytes ({initialBytes}) are not smaller than the full canonical registry ({fullBytes}).");
             Check(initialBytes * 2 < fullBytes,
                 $"Initial V2 tool surface was not materially smaller: {initialBytes} vs {fullBytes} bytes.");
 
