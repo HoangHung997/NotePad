@@ -1028,7 +1028,7 @@ Evidence: `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` is the consolida
 
 ---
 
-## [~] MB-101 — Prove normal UI path is fully V2
+## [x] MB-101 — Prove normal UI path is fully V2
 
 Hard acceptance:
 
@@ -1045,7 +1045,7 @@ AgentOrchestrator
 
 No hidden fallback to v1 except an explicit diagnostic mode.
 
-Implementation under verification: `Acceptance/MbNormalUiV2PathTests.cs` drives the same `AgentOrchestratedRun.RunAsync` facade used by `LabWindow`. One deterministic read-only UI run proves exactly one `AgentRuntime` is created with the orchestrator-owned `AgentContextManager`, initial model exposure is `tool_search` only, bounded V2 context reaches `IAgentTransport`, and the host-owned UI state reaches `Completed`. A mutating UI run proves `tool_search -> loaded schema -> verifier FAIL -> bounded repair -> verifier PASS -> final` through the same facade. A repository guard requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentRuntimeFactory`, `AgentTransportFactory`, `NormalRuntimeToolRegistry`, deferred discovery, scheduler and repair controller while rejecting `AgentRunner` / `CreateCompatibilityRunner` from the normal UI chain.
+Evidence: `Acceptance/MbNormalUiV2PathTests.cs` drives the exact `AgentOrchestratedRun.RunAsync` facade used by `LabWindow`. The read-only case proves one `AgentRuntime` is created with the orchestrator-owned `AgentContextManager`, the first model surface is `tool_search` only, bounded V2 context reaches `IAgentTransport`, typed V2 progress is emitted, and host state reaches `Completed`. The mutating case proves `tool_search -> deferred fixture.write schema -> first mutation -> verifier FAIL -> bounded repair continuation -> corrected mutation -> verifier PASS -> host-owned Completed -> final`. The repository guard requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentRuntimeFactory`, `AgentTransportFactory`, `NormalRuntimeToolRegistry`, `DeferredToolDiscovery`, `ToolExecutionScheduler`, and `AgentRepairController`, while rejecting `AgentRunner` and `CreateCompatibilityRunner` from the normal UI chain. Final functional source commit `a37b5d078965619e98f259c13b93aaf68ef30fe0`, GitHub Actions run `35440225953`: MB-101 **3 passed, 0 failed**; MB-100 **12 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-100, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `c033a7a3a887e3d3b9b10e3879bb688b0c82b789`; repository portable ZIP SHA256 `29e3c97e12dfac0e4a58c08bf8f6e439a32a2b6e39f5bfe3102f9de03b7d66e3`.
 
 ---
 
