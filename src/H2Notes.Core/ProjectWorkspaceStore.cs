@@ -34,6 +34,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private readonly Action<int>? _checkpoint;
     private readonly Action<int>? _consistencyCheckpoint;
     private readonly string _recoveryRoot;
+    private readonly string? _pendingRootOverride;
     private SheetState? _baseState;
     private bool _recoveryFallbackActive;
     private Guid _workspaceId;
@@ -69,6 +70,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(_pendingRootOverride)) return _pendingRootOverride;
             var identity = _workspaceId == Guid.Empty
                 ? "path-" + Hash(Encoding.UTF8.GetBytes(Location.CanonicalPath))[..32]
                 : _workspaceId.ToString("N");
@@ -82,13 +84,15 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         Action<int>? checkpoint = null,
         string? writerId = null,
         string? recoveryRoot = null,
-        Action<int>? consistencyCheckpoint = null)
+        Action<int>? consistencyCheckpoint = null,
+        string? pendingRoot = null)
     {
         Location = WorkspaceLocation.Inspect(root);
         Root = Location.DisplayPath;
         _workspaceId = TryGetWorkspaceId(Root) ?? Guid.Empty;
         _checkpoint = checkpoint;
         _consistencyCheckpoint = consistencyCheckpoint;
+        _pendingRootOverride = string.IsNullOrWhiteSpace(pendingRoot) ? null : Path.GetFullPath(pendingRoot);
         WriterId = string.IsNullOrWhiteSpace(writerId) ? Environment.MachineName : writerId.Trim();
         var recoveryKey = Hash(Encoding.UTF8.GetBytes(Location.CanonicalPath))[..32];
         _recoveryRoot = Path.GetFullPath(recoveryRoot
