@@ -1159,7 +1159,7 @@ Evidence: `Acceptance/MbDesktopComputerUseAcceptanceTests.cs` is a dedicated sev
 
 ---
 
-## [~] MB-113 — AutoCAD extension acceptance
+## [x] MB-113 — AutoCAD extension acceptance
 
 Cover:
 
@@ -1170,7 +1170,7 @@ Cover:
 - verify;
 - no arbitrary command execution as default path.
 
-Implementation under verification: `AutoCadNativeToolExecutor` now adapts the public tool surface to `IAutoCadNativeBridge`, with host-owned mutation authorization rather than model-supplied permission. AutoCAD descriptors are typed v2/fail-closed schemas with structured preference metadata; mutation/plot payloads are bounded and reject command/script/sendkeys/LISP/macro fields. The bridge contract now carries document state into entity refs and exposes typed attribute/layer reads. `Acceptance/MbAutoCadAcceptanceTests.cs` is a deterministic six-case gate covering structured surface, document/entity discovery, attribute/layer reads, host-denied and bounded mutation, stale state tokens, explicit entity verification, and source guards against arbitrary command execution.
+Evidence: `AutoCadNativeToolExecutor` now adapts the public AutoCAD tool surface to `IAutoCadNativeBridge` while mutation authorization remains host-owned rather than model-supplied. AutoCAD descriptors are typed v2/fail-closed schemas with structured preference metadata; mutation/plot payloads are bounded by byte/property/string/depth limits and reject command/script/sendkeys/LISP/macro fields. Entity refs carry both document and entity state tokens, and the bridge contract exposes typed attribute/layer reads. `Acceptance/MbAutoCadAcceptanceTests.cs` proves six cases: structured surface, document/entity discovery plus attribute/layer reads, host-denied and bounded mutation before bridge execution, state-token advancement/stale rejection, explicit current-state entity verification, and source/schema guards against arbitrary command execution. Final functional source commit `e3a2b6876d4f3fb71c38a54589404ea4c1bbdc03`, GitHub Actions run `35445296322`: MB-113 **6 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-112, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `c4cb0641fc5be6b297c55a6d67a4c2606dd3bc2c`; repository portable ZIP SHA256 `e1551de20af2d3834b0b2bcbb1550522ceb7fe46f45aa00e02fcac6508be2551`.
 
 ---
 
