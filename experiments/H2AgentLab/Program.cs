@@ -80,6 +80,12 @@ public static class Program
         if (args.Contains("--mb-normal-ui-v2-path-test")) return H2AgentLab.Acceptance.MbNormalUiV2PathTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-context-boundedness-gate-test")) return H2AgentLab.Acceptance.MbContextBoundednessGateTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-extension-bus-gate-test")) return H2AgentLab.Acceptance.MbExtensionBusGateTests.Run(args[^1]).GetAwaiter().GetResult();
+        var mb104 = Array.IndexOf(args, "--mb-permission-scope-gate-test");
+        if (mb104 >= 0)
+        {
+            if (mb104 + 3 >= args.Length) throw new ArgumentException("--mb-permission-scope-gate-test requires <output-directory> <desktop-host-exe> <office-host-exe>.");
+            return H2AgentLab.Acceptance.MbPermissionScopeGateTests.Run(args[mb104 + 1], args[mb104 + 2], args[mb104 + 3]).GetAwaiter().GetResult();
+        }
         var mb94 = Array.IndexOf(args, "--mb-retire-computer-tools-test");
         if (mb94 >= 0)
         {
