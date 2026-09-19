@@ -1114,7 +1114,7 @@ Evidence: `Acceptance/MbCoreCorrectnessGateTests.cs` scores the accepted core ta
 
 # Stage L — Reference extension acceptance
 
-## [ ] MB-110 — Office acceptance
+## [~] MB-110 — Office acceptance
 
 Cover:
 
@@ -1124,6 +1124,8 @@ Cover:
 - preservation;
 - native spelling/citation path;
 - verifier.
+
+Implementation under verification: a consolidated MB-110 gate now covers all six acceptance requirements. OfficeHost gained a state-bound Word language-evidence RPC; the fixture verifies protocol behavior while the real COM backend reads Word proofing errors and current document content for citation evidence. Existing live Excel/Word verifiers remain the preservation/completion oracle.
 
 ---
 
