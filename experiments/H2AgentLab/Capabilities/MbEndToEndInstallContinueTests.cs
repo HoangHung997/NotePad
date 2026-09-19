@@ -81,9 +81,7 @@ public static class MbEndToEndInstallContinueTests
                     pluginResolver);
 
                 var skills = new H2AgentLab.Skills.SkillCatalog();
-                skills.Register(new PluginSkillSource(
-                    pluginManager,
-                    new PluginSkillCatalog(pluginManager)));
+                skills.Register(new PluginSkillSource(pluginManager));
 
                 var installed = new InstalledCapabilityIndex();
                 installed.Bind(
