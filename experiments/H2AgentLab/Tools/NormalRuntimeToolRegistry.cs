@@ -603,7 +603,7 @@ public static class NormalRuntimeToolRegistry
                     var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
                         ? Decode(data)
                         : ext is ".docx" or ".xlsx" or ".pdf"
-                            ? global::H2AgentLab.AiDocuments.Read(path, data).Text
+                            ? H2Notes.Core.AiDocuments.Read(path, data).Text
                             : "Binary output. Use run_python with previous_run to inspect, or view_artifact for images.";
                     return new
                     {
@@ -767,7 +767,7 @@ public static class NormalRuntimeToolRegistry
                     var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
                         ? Decode(bytes)
                         : ext is ".docx" or ".xlsx"
-                            ? global::H2AgentLab.AiDocuments.Read(path, bytes).Text
+                            ? H2Notes.Core.AiDocuments.Read(path, bytes).Text
                             : throw new IOException(
                                 "Chưa có adapter OCR/vision trong Lab. Không coi tên tệp là nội dung.");
                     if (!int.TryParse(Arg(call, "offset"), out var offset)
@@ -877,7 +877,7 @@ public static class NormalRuntimeToolRegistry
             cancellationToken.ThrowIfCancellationRequested();
             var path = Arg(call, "path");
             var source = Host.Workspace.Read(path);
-            _ = global::H2AgentLab.AiDocuments.Read(path, source);
+            _ = H2Notes.Core.AiDocuments.Read(path, source);
 
             if (call.Name == "word_paragraphs")
             {
