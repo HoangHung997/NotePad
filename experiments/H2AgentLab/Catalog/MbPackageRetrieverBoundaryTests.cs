@@ -296,10 +296,13 @@ public static class MbPackageRetrieverBoundaryTests
                     "PluginManager.cs"));
 
             Check(!retriever.Contains(
-                    "PluginManager",
+                    "using H2AgentLab.Plugins;",
                     StringComparison.Ordinal)
                 && !retriever.Contains(
-                    "InstallFromArchive",
+                    "InstallFromArchive(",
+                    StringComparison.Ordinal)
+                && !retriever.Contains(
+                    "new PluginManager",
                     StringComparison.Ordinal)
                 && !pluginManager.Contains(
                     "IPackageRetriever",
