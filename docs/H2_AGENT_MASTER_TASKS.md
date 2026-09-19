@@ -932,7 +932,7 @@ Evidence: normal `LabWindow` execution remains `LabWindow -> AgentOrchestratedRu
 
 ---
 
-## [ ] MB-91 — Retire AgentTools giant switch
+## [x] MB-91 — Retire AgentTools giant switch
 
 Migrate any remaining useful tool implementation into real providers/executors.
 
@@ -944,6 +944,8 @@ Then:
 Acceptance:
 
 ToolRegistry is sole normal callable surface.
+
+Evidence: normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry.Create(tools)` and no longer routes model calls through `V1ToolRegistryAdapter.Create`, `AgentTools.Definitions`, or the giant `AgentTools.Execute` switch. `Tools/NormalRuntimeToolRegistry.cs` owns the normal callable schemas and dispatches the retained surface through six focused executors (`skills`, `core`, `python`, `files`, `office`, `desktop`) while preserving the existing host workspace/approval/journal state as temporary plumbing for later cleanup. The registry exposes the 19 retained callable names directly through `ToolRegistry`, including progressive skill discovery, plan/status, sandboxed Python/artifact flow, workspace file operations, structured Word inspection, and selected-window accessibility actions. `Runtime/MbRetireAgentToolsSwitchTests.cs` proves the complete normal callable surface is registered through domain executors, callable schemas are independent of `AgentTools.Definitions`, direct file mutation/read and skill/plan execution work through the new registry, and a production source guard rejects `AgentTools.Definitions`, `V1ToolRegistryAdapter.Create`, and giant-switch `.Execute(call)` routing from the normal runtime path. Final functional source commit `006d1b76c144d85eb977b5f6e7c9101ddd1c35e8`, GitHub Actions run `35421916078`: MB-91 **3 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-90, DesktopHost, OfficeHost, all provider transports, provider resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `91ff59616e92a146ef3f603e96a23c7b0728feeb`; repository portable ZIP SHA256 `86b4bd6a54e92f98c6be78fb6484e85e5054f4367415044ffe114e5c15235ed5`.
 
 ---
 
