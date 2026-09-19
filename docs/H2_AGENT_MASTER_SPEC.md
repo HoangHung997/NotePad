@@ -817,6 +817,8 @@ Examples:
 
 No full H2 UI restart should be required for a safe extension refresh when avoidable.
 
+At such a safe boundary, the host extension registry may disable or uninstall an extension by removing only the tool, skill-source, verifier and provider contributions recorded as owned by that extension. Removal must invalidate the relevant registry/search view without adding extension-specific logic to AgentRuntime.
+
 ---
 
 ## 25. Permission, safety and sandbox
