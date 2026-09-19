@@ -19,10 +19,13 @@ Scope: H2 Agent Lab core architecture, extension architecture, migration and acc
 >
 > They remain useful evidence/history but are no longer independent normative specifications.
 >
-> The following H2 Notes documents remain separate and are **not superseded**:
+> H2 Notes/product architecture is now governed separately by:
 >
-> - `docs/H2_AI_PROJECT_COMMAND_CENTER_REDESIGN.md`
-> - `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
+> - `docs/H2_PRODUCT_MASTER_SPEC.md`
+> - `docs/H2_PRODUCT_MASTER_TASKS.md`
+> - `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` (independent canonical non-AI defect/data-integrity ledger)
+>
+> `docs/H2_AI_PROJECT_COMMAND_CENTER_REDESIGN.md` remains historical design evidence and is superseded for future H2 product architecture by the Product Master specification.
 
 ---
 
