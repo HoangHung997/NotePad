@@ -8,6 +8,7 @@ internal static class Program
 {
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(3);
+    private static TimeSpan _waitTimeout = DefaultTimeout;
 
     public static async Task<int> Main(string[] args)
     {
@@ -89,6 +90,7 @@ internal static class Program
 
     private static async Task<int> RunCoordinator(string sharedRoot, string sessionId, string outputDir)
     {
+        _waitTimeout = sessionId.StartsWith("selftest-", StringComparison.Ordinal) ? TimeSpan.FromSeconds(30) : DefaultTimeout;
         Directory.CreateDirectory(outputDir);
         var session = SessionRoot(sharedRoot, sessionId);
         Directory.CreateDirectory(session);
@@ -124,6 +126,7 @@ internal static class Program
 
     private static async Task<int> RunPeer(string sharedRoot, string sessionId, string outputDir)
     {
+        _waitTimeout = sessionId.StartsWith("selftest-", StringComparison.Ordinal) ? TimeSpan.FromSeconds(30) : DefaultTimeout;
         Directory.CreateDirectory(outputDir);
         var session = SessionRoot(sharedRoot, sessionId);
         Directory.CreateDirectory(session);
@@ -193,7 +196,7 @@ internal static class Program
 
         await WaitFile(Path.Combine(session, "lock.released"));
         var acquired = false;
-        var deadline = DateTime.UtcNow + DefaultTimeout;
+        var deadline = DateTime.UtcNow + _waitTimeout;
         do
         {
             try
@@ -253,7 +256,7 @@ internal static class Program
         string? hash = null;
         long length = -1;
         Exception? last = null;
-        var deadline = DateTime.UtcNow + DefaultTimeout;
+        var deadline = DateTime.UtcNow + _waitTimeout;
         do
         {
             try
@@ -440,7 +443,7 @@ internal static class Program
 
     private static async Task WaitFile(string path)
     {
-        var deadline = DateTime.UtcNow + DefaultTimeout;
+        var deadline = DateTime.UtcNow + _waitTimeout;
         while (DateTime.UtcNow < deadline)
         {
             if (File.Exists(path)) return;
