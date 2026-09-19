@@ -232,9 +232,14 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException or InvalidOperationException)
         {
-            _main?.SetSaveStatus("Lỗi lưu · xem cài đặt");
+            var fallback = _storage is ProjectWorkspaceStore projectStore && projectStore.IsRecoveryFallbackActive;
+            var status = fallback
+                ? "NAS lỗi generation · bản đang soạn chưa ghi đè · mở Cài đặt để phục hồi"
+                : "Lỗi lưu · xem cài đặt";
+            _main?.SetSaveStatus(status);
             LastSaveError = ex.Message;
-            foreach (var window in _aiWindows.Values) window.SetSaveStatus("Chưa lưu được · kiểm tra thư mục dữ liệu");
+            foreach (var window in _aiWindows.Values)
+                window.SetSaveStatus(fallback ? "NAS đang ở chế độ chỉ đọc an toàn · chưa ghi đè" : "Chưa lưu được · kiểm tra thư mục dữ liệu");
         }
         finally { _saving = false; }
     }
@@ -244,7 +249,15 @@ public partial class App : Application
         if (_saving || !_storageReady || _restoring || IsExiting || _storage is not ProjectWorkspaceStore projectStore) return;
         try
         {
-            if (!projectStore.RefreshFromDisk(State, _dirtyProjects)) return;
+            var changed = projectStore.RefreshFromDisk(State, _dirtyProjects);
+            if (projectStore.IsRecoveryFallbackActive)
+            {
+                var status = "NAS lỗi generation kéo dài · đang dùng bản tốt gần nhất ở chế độ chỉ đọc · mở Cài đặt để phục hồi";
+                _main?.SetSaveStatus(status);
+                foreach (var window in _aiWindows.Values) window.SetSaveStatus(status);
+                return;
+            }
+            if (!changed) return;
             LastSaveError = null;
             _main?.RefreshAfterExternalSync();
             foreach (var window in _aiWindows.Values) window.RefreshFromModel();
