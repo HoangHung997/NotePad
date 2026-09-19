@@ -97,6 +97,49 @@ Deferred evidence still mandatory before final production acceptance:
 
 Reopen this limitation no later than H2M-116 / H2M-133. Do not advertise real multi-PC NAS support as certified until that evidence exists.
 
+## H2M-014 resolution evidence — 2026-09-20
+
+Implemented:
+
+- shared workspace schema 6 with stable `WorkspaceId`;
+- backward read/migration support for schema 2/3/4/5;
+- `WorkspaceLocationKind` classification for local fixed/removable, mapped network, UNC and unsupported/unknown providers;
+- Windows mapped-drive resolution through `WNetGetConnection`;
+- friendly mapped display path retained while canonical network identity uses the resolved endpoint;
+- machine-local `WorkspaceLocationProfile` persistence without network credentials;
+- same-machine lock keyed by WorkspaceId once known;
+- transfer validation rejects matching WorkspaceIds even when path strings differ;
+- recovery cache keyed by canonical endpoint;
+- startup endpoint fallback uses only reachable aliases exposing the expected WorkspaceId;
+- Storage settings show location kind, network target and WorkspaceId.
+
+Deterministic regression evidence at source `15adb9f3f188943ad9397a349805fe010a590119`:
+
+- mapped-network and UNC aliases normalize to one canonical endpoint;
+- schema 5 migrates atomically to schema 6 without project-data loss;
+- cloned alias paths with one WorkspaceId cannot obtain a second local instance lock;
+- source/target aliases with one WorkspaceId are rejected as self-transfer;
+- genuinely different WorkspaceIds remain valid transfer targets;
+- mapped endpoint is preferred when reachable;
+- resolved alias is selected only when it has the same WorkspaceId;
+- mismatched endpoint identity is rejected;
+- LocalConfiguration round-trips friendly path + resolved/canonical metadata.
+
+CI:
+
+- Actions run `35475729264`: SUCCESS;
+- H2 Notes: **345 passed, 0 failed**;
+- NAS harness self-test: PASS;
+- full Agent/reference-extension/provider matrix: PASS;
+- self-contained Windows app and NAS probe publish: PASS;
+- publish commit: `b11ef7ffaddcae2861c6302ea3ed9ac8d56bdf98`;
+- portable ZIP SHA256: `98f774d01ee4214ecd0fc9ce591d574655d787af3d9e165017c0e41a17f9fd08`.
+
+Disposition:
+
+- **H2-NONAI-009 = FIXED.**
+- **H2-NONAI-008 = PARTIAL-FIX-H2M015-FOLLOWUP.** The core identity/classification and mapped↔UNC behavior are fixed. A broader configured secure remote/VPN endpoint/failover policy remains intentionally unresolved and is assigned to H2M-015 together with offline/reconnect durability. No raw SMB-over-public-Internet behavior is introduced.
+
 ## Summary
 
 | ID | Severity | Area | Status | Short description |
@@ -108,8 +151,8 @@ Reopen this limitation no later than H2M-116 / H2M-133. Do not advertise real mu
 | H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
 | H2-NONAI-006 | HIGH | Test coverage | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Real two-PC harness is ready, but user explicitly deferred physical run until the app is more complete |
 | H2-NONAI-007 | MEDIUM | Offline durability | OPEN-KNOWN-GAP | No durable local pending-operation queue while NAS is unavailable; crash durability remains incomplete |
-| H2-NONAI-008 | HIGH | Storage location / network failover | OPEN | DataFolder is stored as one path string; no Local vs Mapped Network vs UNC classification or LAN/remote endpoint failover |
-| H2-NONAI-009 | HIGH | Workspace identity / locking | OPEN | Path aliases to the same NAS workspace can be treated as different roots, weakening instance lock and destination validation |
+| H2-NONAI-008 | HIGH | Storage location / network failover | PARTIAL-FIX-H2M015-FOLLOWUP | Local/mapped/UNC classification, canonical mapped→UNC resolution, WorkspaceId and identity-checked alias fallback are implemented; optional secure remote/VPN endpoint policy remains H2M-015 |
+| H2-NONAI-009 | HIGH | Workspace identity / locking | FIXED | Schema 6 WorkspaceId drives logical alias identity, same-machine locking and self-transfer rejection; mapped/UNC alias regressions are green |
 
 ---
 
