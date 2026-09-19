@@ -1007,7 +1007,7 @@ Evidence: `Metrics.AgentTrace` remains the bounded machine telemetry stream and 
 
 # Stage K — Core acceptance gate
 
-## [ ] MB-100 — Build Minimum Bootable Agent acceptance corpus
+## [~] MB-100 — Build Minimum Bootable Agent acceptance corpus
 
 At least cover:
 
@@ -1023,6 +1023,8 @@ At least cover:
 - plugin tool registration;
 - progressive skill loading;
 - install-and-continue.
+
+Implementation under verification: `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` defines one 12-case Minimum Bootable Agent corpus and emits both text and machine-readable JSON reports. Direct-response and unknown-tool recovery are exercised directly through `AgentRuntime`; the other cases rerun the existing deterministic V2 suites for multi-tool/deferred loading, verification/repair, bounded context, cancellation, provider switching, extension registration, progressive skills and install-and-continue. Shared suites are cached within the corpus so one evidence suite is not redundantly rerun for multiple acceptance cases. The corpus is wired into `Program` and the full GitHub Actions pipeline.
 
 ---
 
