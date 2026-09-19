@@ -245,61 +245,101 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         }
 
         if (last is null) throw new InvalidOperationException("Không xác định được lỗi generation.");
-        if (TryLoadLastKnownGood(out var recoveryId, out var recoveryFolder, out var recoverySnapshot))
+        SetSyncDiagnostic(DiagnosticFrom(last, ConsistencyReadAttempts, true, HasValidLastKnownGood(), false));
+        throw last;
+    }
+
+    public bool TryRecoverLastKnownGood(out WorkspaceSyncDiagnostic diagnostic)
+    {
+        using var commit = AcquireCommitLock();
+        RecoverUnderLock();
+
+        WorkspaceConsistencyException failure;
+        try
         {
-            try
+            var current = ReadSnapshot();
+            TryCaptureLastKnownGood(current);
+            diagnostic = new WorkspaceSyncDiagnostic
             {
-                var quarantine = QuarantineCurrentGeneration(last);
-                RestoreRecoveryGeneration(recoveryFolder, recoverySnapshot);
-                var restored = ReadSnapshot();
-                TryCaptureLastKnownGood(restored);
-                SetSyncDiagnostic(new WorkspaceSyncDiagnostic
-                {
-                    Code = "persistent_generation_recovered",
-                    FailureCode = last.Code,
-                    ExceptionType = last.GetType().Name,
-                    Message = "Đã phục hồi generation NAS từ bản last-known-good sau khi cách ly generation lỗi.",
-                    WriterId = WriterId,
-                    RelativeFile = last.RelativeFile,
-                    ExpectedHash = last.ExpectedHash,
-                    ActualHash = last.ActualHash,
-                    IndexHash = last.IndexHash,
-                    Attempt = ConsistencyReadAttempts,
-                    IsPersistent = true,
-                    RecoveryAvailable = true,
-                    Recovered = true,
-                    RecoverySnapshotId = recoveryId,
-                    QuarantinePath = quarantine
-                });
-                return restored;
-            }
-            catch (Exception recoveryError) when (recoveryError is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
-            {
-                SetSyncDiagnostic(new WorkspaceSyncDiagnostic
-                {
-                    Code = "persistent_recovery_failed",
-                    FailureCode = last.Code,
-                    ExceptionType = recoveryError.GetType().Name,
-                    Message = BoundDiagnosticMessage(recoveryError.Message),
-                    WriterId = WriterId,
-                    RelativeFile = last.RelativeFile,
-                    ExpectedHash = last.ExpectedHash,
-                    ActualHash = last.ActualHash,
-                    IndexHash = last.IndexHash,
-                    Attempt = ConsistencyReadAttempts,
-                    IsPersistent = true,
-                    RecoveryAvailable = true,
-                    Recovered = false,
-                    RecoverySnapshotId = recoveryId
-                });
-            }
+                Code = "recovery_not_needed",
+                ExceptionType = "",
+                Message = "Generation NAS hiện tại đã hợp lệ; không cần phục hồi.",
+                WriterId = WriterId,
+                Attempt = 1,
+                IsPersistent = false,
+                RecoveryAvailable = HasValidLastKnownGood(),
+                Recovered = false
+            };
+            SetSyncDiagnostic(diagnostic);
+            return false;
         }
-        else
+        catch (WorkspaceConsistencyException ex)
         {
-            SetSyncDiagnostic(DiagnosticFrom(last, ConsistencyReadAttempts, true, false, false));
+            failure = ex;
         }
 
-        throw last;
+        if (!TryLoadLastKnownGood(out var recoveryId, out var recoveryFolder, out var recoverySnapshot))
+        {
+            diagnostic = DiagnosticFrom(failure, ConsistencyReadAttempts, true, false, false) with
+            {
+                Code = "recovery_unavailable",
+                Message = "Generation NAS vẫn lỗi nhưng máy này chưa có last-known-good hợp lệ để phục hồi."
+            };
+            SetSyncDiagnostic(diagnostic);
+            return false;
+        }
+
+        try
+        {
+            var quarantine = QuarantineCurrentGeneration(failure);
+            RestoreRecoveryGeneration(recoveryFolder, recoverySnapshot);
+            var restored = ReadSnapshot();
+            ApplySnapshot(restored);
+            _baseState = Clone(restored.State);
+            TryCaptureLastKnownGood(restored);
+            diagnostic = new WorkspaceSyncDiagnostic
+            {
+                Code = "persistent_generation_recovered",
+                FailureCode = failure.Code,
+                ExceptionType = failure.GetType().Name,
+                Message = "Đã phục hồi generation NAS từ last-known-good sau khi cách ly đầy đủ generation lỗi.",
+                WriterId = WriterId,
+                RelativeFile = failure.RelativeFile,
+                ExpectedHash = failure.ExpectedHash,
+                ActualHash = failure.ActualHash,
+                IndexHash = failure.IndexHash,
+                Attempt = ConsistencyReadAttempts,
+                IsPersistent = true,
+                RecoveryAvailable = true,
+                Recovered = true,
+                RecoverySnapshotId = recoveryId,
+                QuarantinePath = quarantine
+            };
+            SetSyncDiagnostic(diagnostic);
+            return true;
+        }
+        catch (Exception recoveryError) when (recoveryError is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            diagnostic = new WorkspaceSyncDiagnostic
+            {
+                Code = "persistent_recovery_failed",
+                FailureCode = failure.Code,
+                ExceptionType = recoveryError.GetType().Name,
+                Message = BoundDiagnosticMessage(recoveryError.Message),
+                WriterId = WriterId,
+                RelativeFile = failure.RelativeFile,
+                ExpectedHash = failure.ExpectedHash,
+                ActualHash = failure.ActualHash,
+                IndexHash = failure.IndexHash,
+                Attempt = ConsistencyReadAttempts,
+                IsPersistent = true,
+                RecoveryAvailable = true,
+                Recovered = false,
+                RecoverySnapshotId = recoveryId
+            };
+            SetSyncDiagnostic(diagnostic);
+            return false;
+        }
     }
 
     private WorkspaceSyncDiagnostic DiagnosticFrom(
