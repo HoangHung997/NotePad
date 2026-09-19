@@ -167,10 +167,13 @@ public sealed class ProjectWorkspaceStore : INoteStorage
                 else File.Delete(target);
                 _checkpoint?.Invoke(++count);
             }
-            File.Delete(JournalPath);
             if (LastMergeConflicts.Count > 0) WriteConflictAudit(LastMergeConflicts);
 
+            // Keep the recovery journal until the newly published generation has passed
+            // complete hash/schema/state validation. If validation fails, the catch path
+            // still has the backups/journal needed to restore the previous generation.
             var final = ReadSnapshot();
+            File.Delete(JournalPath);
             ApplySnapshot(final);
             _baseState = Clone(final.State);
             _sourceVersion = SchemaVersion;
