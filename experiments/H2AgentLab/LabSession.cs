@@ -4,13 +4,46 @@ using System.Security.Cryptography;
 namespace H2AgentLab;
 
 public sealed record JournalEvent(DateTime At, string Kind, string Text);
+
+/// <summary>
+/// Durable user/task journal. Ephemeral UI progress and machine telemetry events are separate:
+/// progress stays in AgentProgressEventStream, while telemetry is persisted by AgentTraceStore.
+/// </summary>
 public sealed class LabSession
 {
+    private static readonly HashSet<string> EphemeralUiKinds = new(StringComparer.Ordinal)
+    {
+        "status",
+        "progress",
+        "thinking",
+        "thinking-clear",
+        "delta"
+    };
+
     public int Schema { get; set; } = 1;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Workspace { get; set; } = "";
     public List<JournalEvent> Events { get; set; } = [];
-    public void Add(string kind, string text) => Events.Add(new(DateTime.UtcNow, kind, text));
+
+    public void Add(string kind, string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        if (EphemeralUiKinds.Contains(kind))
+            throw new InvalidOperationException(
+                "Ephemeral UI progress belongs in AgentProgressEventStream, not the durable LabSession journal.");
+        Events.Add(new(
+            DateTime.UtcNow,
+            kind.Trim(),
+            text ?? ""));
+    }
+
+    public void AddTelemetryReference(string tracePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tracePath);
+        Add(
+            "telemetry-reference",
+            "Turn telemetry: " + Path.GetFileName(tracePath));
+    }
     public string Context()
     {
         var text = string.Join("\n", Events.Where(e => e.Kind != "script").TakeLast(40).Select(e => $"[{e.At:O}] {e.Kind}: {e.Text}"));
