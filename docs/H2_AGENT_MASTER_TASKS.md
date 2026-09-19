@@ -949,11 +949,11 @@ Evidence: normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry
 
 ---
 
-## [~] MB-92 — Retire V1ToolRegistryAdapter
+## [x] MB-92 — Retire V1ToolRegistryAdapter
 
 Delete only after AgentTools no longer supplies normal tools.
 
-Implementation under verification: the adapter source has been deleted; canonical schemas/risk/scope/preference metadata now come from reusable `NormalRuntimeToolRegistry.Populate(...)` / `PopulateNamespace(...)` paths. Remaining regression tests and the Python first-party extension were migrated to those canonical descriptors, and `MbRetireV1ToolRegistryAdapterTests` plus CI source guards reject any C# dependency on the retired adapter.
+Evidence: `Tools/V1ToolRegistryAdapter.cs` and `V1AgentToolsExecutor` are removed. Canonical schemas/risk/access/resource-scope/evidence/preference metadata are now reused directly from `NormalRuntimeToolRegistry.Populate(...)` / `PopulateNamespace(...)`; the Python first-party extension and the affected V2/MB regression fixtures no longer depend on the retired adapter or `AgentTools.Definitions`. `Runtime/MbRetireV1ToolRegistryAdapterTests.cs` proves the exact 19-tool canonical surface, Python namespace-only reuse with supplied executor/provenance, and a repository source guard against calls to the retired adapter/executor. Final functional source commit `0e06e39d96d2cd798d8f07c05cf39aa394cc70f4`, GitHub Actions run `35426587329`: MB-92 **3 passed, 0 failed**; H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-91, DesktopHost, OfficeHost, all provider transports, provider resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `a16c58e53ce5c646aebf4d7c086abab1153cfd1d`; repository portable ZIP SHA256 `43fe7f9ee88d7bf7209af10933b45879b4d9816b6c137b2266cc76ccacdb5a72`.
 
 ---
 
