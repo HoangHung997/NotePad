@@ -293,7 +293,7 @@ public static class MbFirstPartyExtensionCardsTests
                 [Path.Combine("FirstPartyExtensions", "Mcp", "McpFirstPartyExtension.cs")]
                     = "McpToolProvider",
                 [Path.Combine("FirstPartyExtensions", "Python", "PythonSandboxFirstPartyExtension.cs")]
-                    = "V1ToolRegistryAdapter"
+                    = "NormalRuntimeToolRegistry.PopulateNamespace"
             };
             foreach (var pair in references)
             {
