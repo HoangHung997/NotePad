@@ -135,6 +135,41 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         return new WordPatchResult(before, after, changed.Distinct().OrderBy(x => x).ToArray());
     }
 
+    public WordLanguageEvidenceResult InspectWordLanguage(WordLanguageEvidenceRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var snapshot = SnapshotWord(request.SessionId);
+        OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
+
+        var text = string.Join("\n", snapshot.Paragraphs.Select(x => x.Text));
+        var spellingText = "mispell";
+        var spellingStart = text.IndexOf(spellingText, StringComparison.Ordinal);
+        var citationText = "Nghị định số 214/2025/NĐ-CP";
+        var citationStart = text.IndexOf(citationText, StringComparison.Ordinal);
+
+        return new WordLanguageEvidenceResult(
+            snapshot.SessionId,
+            snapshot.StateToken,
+            spellingStart >= 0
+                ? [new WordSpellingEvidence(
+                    spellingStart,
+                    spellingText.Length,
+                    spellingText,
+                    ["misspell"],
+                    NativeEvidence: false)]
+                : [],
+            [],
+            citationStart >= 0
+                ? [new WordLegalCitationEvidence(
+                    citationText,
+                    "214/2025/NĐ-CP",
+                    citationStart,
+                    citationText.Length,
+                    NativeDocumentEvidence: false)]
+                : [],
+            "fixture-office-host");
+    }
+
     public OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -356,7 +391,8 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         public List<WordParagraphFixture> Paragraphs { get; } =
         [
             new("UNSAVED-WORD", true, false, false),
-            new("Preserve me", false, true, false)
+            new("Preserve me", false, true, false),
+            new("mispell · Nghị định số 214/2025/NĐ-CP", false, false, false)
         ];
     }
 
