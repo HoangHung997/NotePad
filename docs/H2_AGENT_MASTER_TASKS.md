@@ -813,7 +813,7 @@ Evidence: the one-off `Capabilities/MissingCapabilityContinuation.cs` workflow w
 
 ---
 
-## [ ] MB-75 — Simplify task capability pinning
+## [x] MB-75 — Simplify task capability pinning
 
 Review:
 
@@ -834,6 +834,8 @@ Evidence still records:
 - used plugin version;
 - used skill hash;
 - model/provider identity.
+
+Evidence: `TaskCapabilitySnapshot.cs` now captures explicit task-local `TaskCapabilitySelection` rather than treating the full installed machine as task state. `CaptureUsed(...)` resolves exact versions only for used tool names, used provider IDs, used/selected plugin IDs and selected skill hashes; model/provider identity plus important policy/version identifiers are recorded alongside them. `TaskCapabilityPinGuard` no longer compares `ToolRegistry.Version` as a correctness condition: unrelated registry/provider/plugin/skill additions are ignored, while a changed used tool schema/version, used provider, used plugin, selected skill hash, model identity or pinned policy is rejected until an explicit usage revision. The old capture/revision overloads remain only as compatibility helpers and scope themselves to selected plugin capability rather than whole-machine inventory. `Capabilities/MbTaskCapabilityPinningTests.cs` proves used-only capture/evidence, proves an unrelated plugin/registry change does not invalidate the active task, proves a used capability change is rejected until revision, and source-guards against reintroducing whole-registry version pinning. Historical Phase-11 acceptance 1120 was updated to the same usage-based semantics. Exact functional source commit `8cf8b9a3ad55e247a5a3ace8a1f059de1da90ba1`, GitHub Actions run `35416789846`: MB-75 **4 passed, 0 failed**; H2 Notes, architecture guard, Phase 10/11/extensibility, MB-10 through MB-74, DesktopHost, OfficeHost, all provider transports, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `355f7f65b5700e17cf3891f3b6855a813d7e1d44`; repository portable ZIP SHA256 `ebddc4fe9de13f747dfdfdd248bbb5e402d9dc8d7d3a5666d55dd6a0a1dda612`.
 
 ---
 
