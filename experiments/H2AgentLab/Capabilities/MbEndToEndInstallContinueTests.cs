@@ -462,7 +462,7 @@ public static class MbEndToEndInstallContinueTests
                 "packages/verified-state.h2pkg",
                 ToolSummaries:
                 [
-                    "Set the fixture value atomically and expose state for deterministic verification."
+                    ToolName + ": Set the fixture value atomically and expose state for deterministic verification."
                 ],
                 Skills:
                 [
