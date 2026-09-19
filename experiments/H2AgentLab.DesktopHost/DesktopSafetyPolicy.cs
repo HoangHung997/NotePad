@@ -21,7 +21,13 @@ public static class DesktopSafetyPolicy
     {
         if (string.IsNullOrWhiteSpace(processName) || string.IsNullOrWhiteSpace(title))
             return false;
-        if (BlockedProcesses.Contains(processName.Trim()))
+        var normalizedProcess = processName.Trim();
+        if (BlockedProcesses.Contains(normalizedProcess))
+            return false;
+        if (normalizedProcess.Equals("H2AgentLab", StringComparison.OrdinalIgnoreCase)
+            && !title.Equals(
+                "H2 Agent Lab · Vùng thử an toàn",
+                StringComparison.Ordinal))
             return false;
         if (SensitiveTitleTerms.Any(term => title.Contains(term, StringComparison.OrdinalIgnoreCase)))
             return false;
