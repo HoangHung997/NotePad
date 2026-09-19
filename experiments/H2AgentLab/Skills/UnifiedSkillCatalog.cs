@@ -364,11 +364,10 @@ public sealed class PluginSkillSource : ISkillSource, IInstalledSkillMetadataSou
 
     public PluginSkillSource(
         PluginManager plugins,
-        PluginSkillCatalog catalog,
         string sourceId = "plugins")
     {
         _plugins = plugins ?? throw new ArgumentNullException(nameof(plugins));
-        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        _catalog = new PluginSkillCatalog(_plugins);
         SourceId = sourceId.Trim().ToLowerInvariant();
     }
 
