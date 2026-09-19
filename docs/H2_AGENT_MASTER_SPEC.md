@@ -1338,6 +1338,8 @@ Separately prove first-party extension quality:
 
 MB-110 closes the Office reference-extension gate with `Acceptance/MbOfficeAcceptanceTests.cs`. The six-case gate requires observable unsaved Excel state, observable unsaved Word state, structured Word/Excel mutation, preservation of non-target content/structure, a state-bound Word language/citation evidence path, and live verifier PASS. OfficeHost now exposes `word.languageEvidence`; the fixture proves the RPC/state-token contract while the real COM backend reads Word native `SpellingErrors` / `GrammaticalErrors` and current document content for legal citation evidence. `V2OfficeHostTests` also carries deterministic case 0816 so the language-evidence path remains part of the regular OfficeHost acceptance suite.
 
+MB-111 closes the Web/freshness/legal reference-extension gate with `Web/MbWebFreshnessLegalAcceptanceTests.cs`. The five deterministic cases require a current structured web lookup for freshness-sensitive intent, authoritative/primary evidence for legal effect claims, durable full web bodies behind bounded hash/artifact context projections, typed `LegalDocumentRelationship` evidence for replacement/amendment-style status, and an explicit rejection of the inference that a merely newer official document proves replacement. The fixture backend keeps the gate offline and deterministic while exercising the same `WebResearchHost`, `FreshnessPolicy`, `WebEvidenceStore`, `FreshnessCompletionGate`, and `LegalStatusVerifier` contracts used by the canonical Word+legal scenario.
+
 These tests prove the extension bus is useful.
 
 They do not redefine the core architecture.
