@@ -1360,6 +1360,12 @@ Do not integrate Agent Lab into H2 Notes until:
 2. required reference extension acceptance passes;
 3. user explicitly accepts integration.
 
+The accepted integration-readiness architecture/evidence snapshot is:
+
+- `docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md`
+
+This report is an evidence snapshot; this master spec remains the architecture source of truth.
+
 At Phase 13, read:
 
 - `docs/H2_AI_PROJECT_COMMAND_CENTER_REDESIGN.md`
