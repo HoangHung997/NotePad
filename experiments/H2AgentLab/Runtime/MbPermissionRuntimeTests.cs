@@ -143,17 +143,17 @@ public static class MbPermissionRuntimeTests
             Check(executions == 0, "Untrusted model/skill text granted mutation permission.");
         });
 
-        await Test("MB-40 v1 registry bridge scopes every mutation and shares workspace write scope", () =>
+        await Test("MB-40 canonical registry scopes every mutation and shares workspace write scope", () =>
         {
             var registry = new ToolRegistry();
-            V1ToolRegistryAdapter.Populate(
+            NormalRuntimeToolRegistry.Populate(
                 registry,
-                new DelegatingToolExecutor("fixture-v1", (call, ct) => ValueTask.FromResult("{}")));
+                new DelegatingToolExecutor("fixture-normal", (call, ct) => ValueTask.FromResult("{}")));
 
             var mutations = registry.Tools.Where(x => x.IsMutating).ToArray();
-            Check(mutations.Length > 0, "V1 bridge exposes no mutations.");
+            Check(mutations.Length > 0, "Canonical registry exposes no mutations.");
             Check(mutations.All(x => x.ResourceScope is not null),
-                "At least one v1 mutation lacks host resource scope.");
+                "At least one canonical mutation lacks host resource scope.");
 
             var write = registry.Tools.Single(x => x.Name == "write_text");
             var publish = registry.Tools.Single(x => x.Name == "publish_artifact");
