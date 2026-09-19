@@ -94,7 +94,7 @@ MB-90 removes `AgentRunner` from the production orchestration graph. The v1 runn
 The remaining migration gap is narrower:
 
 - normal `AgentRuntimeFactory` now constructs `NormalRuntimeToolRegistry`, and callable execution is split across domain executors rather than `AgentTools.Definitions` / the giant `AgentTools.Execute` switch;
-- the legacy `AgentTools` object remains temporarily as host state/approval/journal storage and for frozen v1 tests, while `V1ToolRegistryAdapter` is retained only for its dedicated retirement task;
+- the legacy `AgentTools` object remains temporarily as host state/approval/journal storage and for frozen v1 tests; `V1ToolRegistryAdapter` has been retired, and reusable canonical schema/risk/scope/preference metadata now comes directly from `NormalRuntimeToolRegistry`;
 - the duplicate legacy skill/catalog and computer-tool paths still require cleanup after their parity gates.
 
 Therefore the next architectural priority is **legacy cleanup behind the already-bootable AgentRuntime**, not a return to the v1 model loop.
@@ -1107,7 +1107,7 @@ AgentTools.cs
   -> split/migrate responsibilities into registry providers; retire giant switch
 
 Tools/V1ToolRegistryAdapter.cs
-  -> remove after no normal runtime depends on AgentTools.Definitions
+  -> retired in MB-92 after canonical descriptor consumers moved to NormalRuntimeToolRegistry
 
 SkillCatalog.cs
   -> retire after canonical SkillCatalog parity
