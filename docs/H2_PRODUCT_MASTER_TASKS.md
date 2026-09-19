@@ -36,7 +36,7 @@ Architecture source of truth: `docs/H2_PRODUCT_MASTER_SPEC.md`
 
 # Stage H0 — Freeze current H2 baseline
 
-## [ ] H2M-000 — Record current implementation baseline
+## [x] H2M-000 — Record current implementation baseline
 
 Goal:
 
@@ -63,6 +63,8 @@ Acceptance:
 - no runtime behavior changed;
 - exact code paths documented;
 - data compatibility risks listed.
+
+Evidence: `docs/H2_PRODUCT_CURRENT_BASELINE.md` freezes main HEAD `8a45794b15a791f761d3f43372e6d397cdb6ab7b`, active-branch inspection HEAD `c22c0e5a5091d95e91f773ac25991a7cc771d29f`, last full functional CI source `0a7ea1e6586bc5e70e336536603a8044fab654d6` / Actions run `35448436223`, H2 Notes **336 passed, 0 failed**, Schema 5 storage/file layout, current Task+Notes+AI information architecture, legacy `AiChatPanel -> AiClient -> AiProjectContext/AiProjectActions` execution path, project/chat persisted models, UI evidence set, nine open non-AI defects/risks, and migration/data-compatibility constraints. H2M-000 changed documentation only.
 
 ---
 
