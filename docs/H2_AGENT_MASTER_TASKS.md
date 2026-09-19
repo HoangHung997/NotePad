@@ -1246,7 +1246,7 @@ Evidence: `H2AgentLab.Integration.IAgentIntegrationBoundary` freezes exactly sev
 
 ---
 
-## [~] MB-122 — User acceptance gate
+## [x] MB-122 — User acceptance gate
 
 User reviews:
 
@@ -1258,11 +1258,11 @@ User reviews:
 
 No H2 Notes production integration without explicit user approval.
 
-Acceptance package prepared and evidence-frozen: `docs/H2_AGENT_USER_ACCEPTANCE_GATE.md` consolidates the accepted deterministic evidence for MBA/core correctness, reference extensions, boundedness/performance, safety, known limitations, and the exact last functional green snapshot (source `0a7ea1e6586bc5e70e336536603a8044fab654d6`, Actions run `35448436223`, publish `22f5861f5c2c9d1a9d3f8d1aff7f2d6327f88bdc`, portable ZIP SHA256 `408fc95425ba0d67ec0b091ecf24ce61ec0e3945e47688513797afb2a6e54760`). Machine state remains `MB-122 = PENDING_USER_APPROVAL`, `H2_NOTES_PRODUCTION_INTEGRATION_ALLOWED = NO`, and `MB-123_PHASE13_PREPARATION_ALLOWED = NO`. This task must not be marked `[x]` until the user explicitly states approval; a generic instruction to continue work is not substituted for the required acceptance decision.
+Acceptance package was evidence-frozen against source `0a7ea1e6586bc5e70e336536603a8044fab654d6`, Actions run `35448436223`, publish `22f5861f5c2c9d1a9d3f8d1aff7f2d6327f88bdc`, portable ZIP SHA256 `408fc95425ba0d67ec0b091ecf24ce61ec0e3945e47688513797afb2a6e54760`. The user explicitly approved MB-122 on 2026-09-19. `docs/H2_AGENT_USER_ACCEPTANCE_GATE.md` now records `MB-122 = APPROVED_BY_USER`, Agent integration gate PASS, and Phase 13 preparation authorization. Product implementation remains subject to the canonical H2 Product Master gates.
 
 ---
 
-## [ ] MB-123 — Phase 13 preparation
+## [x] MB-123 — Phase 13 preparation
 
 Only after MB-122:
 
@@ -1272,6 +1272,8 @@ Read:
 2. `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
 
 Then plan H2 Notes integration.
+
+Evidence: `docs/H2_AGENT_PHASE13_PREPARATION.md` records the authority reconciliation, required documents and blob identities, non-AI storage blockers, staged integration plan and handoff into the canonical H2 Product tracker. `H2_PRODUCT_MASTER_SPEC.md`, `H2_PRODUCT_MASTER_TASKS.md` and `H2_NOTES_NON_AI_BUG_LEDGER.md` were selectively synced unchanged from `main` to the active branch. Agent master execution is complete through MB-123; the next active task is **H2M-000 — Record current implementation baseline**.
 
 ---
 
