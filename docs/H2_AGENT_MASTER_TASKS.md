@@ -1028,7 +1028,7 @@ Evidence: `Acceptance/MbMinimumBootableAgentAcceptanceTests.cs` is the consolida
 
 ---
 
-## [ ] MB-101 — Prove normal UI path is fully V2
+## [~] MB-101 — Prove normal UI path is fully V2
 
 Hard acceptance:
 
@@ -1044,6 +1044,8 @@ AgentOrchestrator
 ```
 
 No hidden fallback to v1 except an explicit diagnostic mode.
+
+Implementation under verification: `Acceptance/MbNormalUiV2PathTests.cs` drives the same `AgentOrchestratedRun.RunAsync` facade used by `LabWindow`. One deterministic read-only UI run proves exactly one `AgentRuntime` is created with the orchestrator-owned `AgentContextManager`, initial model exposure is `tool_search` only, bounded V2 context reaches `IAgentTransport`, and the host-owned UI state reaches `Completed`. A mutating UI run proves `tool_search -> loaded schema -> verifier FAIL -> bounded repair -> verifier PASS -> final` through the same facade. A repository guard requires `LabSessionContextAdapter`, `RuntimeCompactionCoordinator`, `AgentRuntimeFactory`, `AgentTransportFactory`, `NormalRuntimeToolRegistry`, deferred discovery, scheduler and repair controller while rejecting `AgentRunner` / `CreateCompatibilityRunner` from the normal UI chain.
 
 ---
 
