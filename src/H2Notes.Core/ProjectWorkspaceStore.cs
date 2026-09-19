@@ -19,6 +19,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private readonly Action<int>? _consistencyCheckpoint;
     private readonly string _recoveryRoot;
     private SheetState? _baseState;
+    private bool _recoveryFallbackActive;
     private const int ConsistencyReadAttempts = 3;
 
     public string Root { get; }
@@ -26,6 +27,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     public string WriterId { get; }
     public string RecoveryCacheRoot => _recoveryRoot;
     public WorkspaceSyncDiagnostic? LastSyncDiagnostic { get; private set; }
+    public bool IsRecoveryFallbackActive => _recoveryFallbackActive;
     public IReadOnlyList<WorkspaceMergeConflict> LastMergeConflicts { get; private set; } = Array.Empty<WorkspaceMergeConflict>();
 
     private string JournalPath => Path.Combine(Root, ".h2-transaction.json");
@@ -127,12 +129,16 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     public void SaveIncremental(SheetState state, IReadOnlySet<Guid>? changedProjects)
     {
         if (!_loaded) throw new InvalidOperationException("Đọc kho trước khi lưu để kiểm tra xung đột.");
+        if (_recoveryFallbackActive)
+            throw new InvalidOperationException("Kho NAS đang dùng last-known-good cục bộ. Hãy phục hồi hoặc đổi kho trước khi lưu.");
         ValidateState(state);
 
         using var commit = AcquireCommitLock();
         RecoverUnderLock();
         var hasRemote = File.Exists(FilePath);
         var remote = hasRemote ? ReadStableSnapshotUnderLock() : WorkspaceSnapshot.Empty();
+        if (_recoveryFallbackActive)
+            throw new InvalidOperationException("Kho NAS vẫn lỗi generation. Chưa ghi đè dữ liệu; hãy phục hồi từ last-known-good trước.");
         var baseline = _baseState is null ? Clone(remote.State) : Clone(_baseState);
 
         LastMergeConflicts = hasRemote
@@ -211,6 +217,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             try
             {
                 var snapshot = ReadSnapshot();
+                _recoveryFallbackActive = false;
                 if (last is null) LastSyncDiagnostic = null;
                 else
                 {
@@ -245,7 +252,31 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         }
 
         if (last is null) throw new InvalidOperationException("Không xác định được lỗi generation.");
-        SetSyncDiagnostic(DiagnosticFrom(last, ConsistencyReadAttempts, true, HasValidLastKnownGood(), false));
+        if (TryLoadLastKnownGood(out var fallbackId, out _, out var fallbackSnapshot))
+        {
+            _recoveryFallbackActive = true;
+            SetSyncDiagnostic(new WorkspaceSyncDiagnostic
+            {
+                Code = "persistent_generation_using_last_good",
+                FailureCode = last.Code,
+                ExceptionType = last.GetType().Name,
+                Message = "NAS đang lỗi generation kéo dài. App mở bản last-known-good cục bộ và khóa ghi cho tới khi phục hồi được xác nhận.",
+                WriterId = WriterId,
+                RelativeFile = last.RelativeFile,
+                ExpectedHash = last.ExpectedHash,
+                ActualHash = last.ActualHash,
+                IndexHash = last.IndexHash,
+                Attempt = ConsistencyReadAttempts,
+                IsPersistent = true,
+                RecoveryAvailable = true,
+                Recovered = false,
+                RecoverySnapshotId = fallbackId
+            });
+            return fallbackSnapshot;
+        }
+
+        _recoveryFallbackActive = false;
+        SetSyncDiagnostic(DiagnosticFrom(last, ConsistencyReadAttempts, true, false, false));
         throw last;
     }
 
@@ -258,6 +289,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         try
         {
             var current = ReadSnapshot();
+            _recoveryFallbackActive = false;
             TryCaptureLastKnownGood(current);
             diagnostic = new WorkspaceSyncDiagnostic
             {
@@ -296,6 +328,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
             var restored = ReadSnapshot();
             ApplySnapshot(restored);
             _baseState = Clone(restored.State);
+            _recoveryFallbackActive = false;
             TryCaptureLastKnownGood(restored);
             diagnostic = new WorkspaceSyncDiagnostic
             {
