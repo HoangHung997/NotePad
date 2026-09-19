@@ -1081,7 +1081,7 @@ Evidence: the generic extension bus records per-extension ownership across ToolR
 
 ---
 
-## [~] MB-104 — Permission/scope gate
+## [x] MB-104 — Permission/scope gate
 
 Require zero known boundary violations in corpus.
 
@@ -1097,7 +1097,7 @@ Cover:
 - native helper;
 - secrets metadata.
 
-Implementation under verification: `Acceptance/MbPermissionScopeGateTests.cs` is a consolidated zero-violation corpus over existing host-owned boundaries rather than a new permission system. It reruns the MB-40 host permission policy, directly probes SafeWorkspace/filesystem mutation policy and process executable/secret-environment isolation, reruns Phase-10 plugin/package boundaries, verifies provider read-vs-mutation scopes, reruns DesktopHost and OfficeHost permission/stale-state/preservation suites, checks WebResearchHost connected/HTTP-only/public-scope behavior, source-guards DesktopHost/OfficeHost current-user-only native-helper isolation, and proves MCP safe metadata plus Python sandbox metadata do not expose secret values. The gate emits text + JSON with an explicit `boundaryViolations` count and passes only at zero.
+Evidence: `Acceptance/MbPermissionScopeGateTests.cs` is the consolidated host-boundary corpus and emits text plus machine-readable JSON. It reruns the MB-40 host permission policy; directly proves SafeWorkspace/filesystem mutation fail-closed behavior; process executable allow-list/start denial and API-secret environment stripping; Phase-10 plugin/package trust and unsafe native-helper path rejection; provider read-vs-mutation scope separation; full DesktopHost permission/stale-state/observe-after-act corpus; full OfficeHost permission/stale-state/preservation corpus; WebResearchHost connected-state, `web:public` scope and HTTP/HTTPS-only boundary; DesktopHost/OfficeHost current-user-only native-helper IPC isolation; and MCP/Python safe metadata that omits secret values. Final functional source commit `19ae2cb01fd81f90b2e357509c04374dc2e2fdfd`, GitHub Actions run `35441961184`: MB-104 **10 passed, 0 failed; Boundary violations: 0**. MB-100/101/102/103, H2 Notes, v1 baseline/self-tests, V2 architecture/Phase 10/11/extensibility, MB-10 through MB-95, DesktopHost, OfficeHost, all provider transports, resilience matrix, self-contained publish and repository ZIP publication all succeeded. Publish bot commit `50e983345164d5d04ee30e3867b71f11ded0aef3`; repository portable ZIP SHA256 `71a5d733570f4bcba2bd4b9a6d8812eecc64b0053d5607d6fd995a3bbd91ccd5`.
 
 ---
 
