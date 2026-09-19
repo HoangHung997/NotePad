@@ -43,7 +43,7 @@ public static class V2Phase11Tests
             if (!condition) throw new InvalidOperationException(message);
         }
 
-        await Test("1101 Lab UI send path is routed through AgentOrchestratedRun and v1 remains compatibility executor", () =>
+        await Test("1101 Lab UI send path is routed through AgentOrchestratedRun with no legacy runner seam", () =>
         {
             var repo = FindRepoRoot();
             var source = File.ReadAllText(Path.Combine(repo, "experiments", "H2AgentLab", "LabWindow.cs"));
@@ -51,12 +51,15 @@ public static class V2Phase11Tests
                 "Lab UI does not construct AgentOrchestratedRun.");
             Check(source.Contains("orchestrated.RunAsync", StringComparison.Ordinal),
                 "Lab UI send path does not invoke AgentOrchestratedRun.");
-            Check(!source.Contains("using var runner = new AgentRunner();", StringComparison.Ordinal),
-                "Lab UI still directly owns AgentRunner instead of orchestrator facade.");
+            Check(!source.Contains("AgentRunner", StringComparison.Ordinal)
+                    && !source.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
+                "Lab UI still references legacy runner execution.");
 
             var orchestratorSource = File.ReadAllText(Path.Combine(repo, "experiments", "H2AgentLab", "Tasking", "AgentOrchestrator.cs"));
-            Check(orchestratorSource.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
-                "Temporary v1 diagnostic compatibility path was not retained.");
+            Check(orchestratorSource.Contains("RunRuntimeAsync", StringComparison.Ordinal)
+                    && !orchestratorSource.Contains("AgentRunner", StringComparison.Ordinal)
+                    && !orchestratorSource.Contains("CreateCompatibilityRunner", StringComparison.Ordinal),
+                "Production orchestrator still exposes a legacy runner seam.");
             return Task.CompletedTask;
         });
 
