@@ -1159,7 +1159,7 @@ Evidence: `Acceptance/MbDesktopComputerUseAcceptanceTests.cs` is a dedicated sev
 
 ---
 
-## [ ] MB-113 — AutoCAD extension acceptance
+## [~] MB-113 — AutoCAD extension acceptance
 
 Cover:
 
@@ -1169,6 +1169,8 @@ Cover:
 - state token;
 - verify;
 - no arbitrary command execution as default path.
+
+Implementation under verification: `AutoCadNativeToolExecutor` now adapts the public tool surface to `IAutoCadNativeBridge`, with host-owned mutation authorization rather than model-supplied permission. AutoCAD descriptors are typed v2/fail-closed schemas with structured preference metadata; mutation/plot payloads are bounded and reject command/script/sendkeys/LISP/macro fields. The bridge contract now carries document state into entity refs and exposes typed attribute/layer reads. `Acceptance/MbAutoCadAcceptanceTests.cs` is a deterministic six-case gate covering structured surface, document/entity discovery, attribute/layer reads, host-denied and bounded mutation, stale state tokens, explicit entity verification, and source guards against arbitrary command execution.
 
 ---
 
