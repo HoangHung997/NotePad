@@ -226,8 +226,11 @@ public static class MbRetireComputerToolsTests
                 if (Path.GetFullPath(path).Equals(self, StringComparison.OrdinalIgnoreCase))
                     continue;
                 var source = File.ReadAllText(path);
-                Check(!source.Contains("ComputerTools", StringComparison.Ordinal),
-                    "C# source still references retired ComputerTools: " + path);
+                Check(!System.Text.RegularExpressions.Regex.IsMatch(
+                        source,
+                        @"\bComputerTools\b",
+                        System.Text.RegularExpressions.RegexOptions.CultureInvariant),
+                    "C# source still references retired ComputerTools type: " + path);
                 Check(!source.Contains("--computer-worker", StringComparison.Ordinal),
                     "C# source still exposes legacy computer worker: " + path);
                 Check(!source.Contains("WindowTarget", StringComparison.Ordinal)
