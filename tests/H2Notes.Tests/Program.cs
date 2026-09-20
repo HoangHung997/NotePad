@@ -555,6 +555,7 @@ WorkspaceTests.Run(Test);
 H2AgentAdapterContractTests.Run(Test);
 H2AgentTaskCorrelationTests.Run(Test);
 H2ProductProjectionTests.Run(Test);
+H2ProjectDataBoundaryTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {
