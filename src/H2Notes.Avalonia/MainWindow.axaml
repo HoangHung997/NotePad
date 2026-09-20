@@ -244,7 +244,7 @@
                       <TextBlock x:Name="ProjectEvidenceProvenanceText" FontSize="10" Foreground="#796C62" TextWrapping="Wrap"/>
                       <TextBlock x:Name="ProjectEvidenceTargetText" FontSize="10" Foreground="#796C62" TextWrapping="Wrap"/>
                       <TextBlock x:Name="ProjectEvidenceHashText" FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap"/>
-                      <TextBlock Text="Identity/provenance được đọc trực tiếp từ Agent; H2 không lưu ResearchStore riêng." FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                      <TextBlock Text="Identity/provenance được đọc trực tiếp từ Agent; H2 không lưu kho nghiên cứu riêng." FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap" Margin="0,6,0,0"/>
                     </StackPanel>
                   </Border>
                 </Grid>
