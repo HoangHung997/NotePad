@@ -20,8 +20,8 @@ internal static class PdfComposerTests
                 var original = image ? AiDocuments.Read("fixture.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=="))
                     : AiDocuments.Read("fixture.pdf", Encoding.ASCII.GetBytes("%PDF-1.7\nfixture\n%%EOF"));
                 var conversation = new AiConversation { Draft = "Đọc tài liệu", DraftAttachments = [original] };
-                var project = new ProjectRecord { Conversations = [conversation] };
-                var calls = 0; var panel = new AiChatPanel(app, () => { calls++; throw new Exception("Must not call network"); }); panel.SetProject(project);
+                var notebook = new NoteRecord { NoteKind = "ai-chat", AiConversations = [conversation] };
+                var calls = 0; var panel = new AiChatPanel(app, () => { calls++; throw new Exception("Must not call network"); }); panel.SetStandalone(notebook);
                 var window = new Window { Width = 420, Height = 700, Content = panel }; window.Show(); Dispatcher.UIThread.RunJobs();
                 try
                 {
