@@ -79,6 +79,7 @@ internal static class IconResizeTests
             var project = board.Projects[2];
             var window = new H2Notes.Avalonia.MainWindow(new H2Notes.Avalonia.App(), board);
             window.Show(); Pump();
+            H2UiTestNavigation.OpenProjectWorkspace(window, project.Id); Pump();
             foreach (var name in new[] { "PinButton", "CloseButton", "MenuButton", "ProjectsNavButton", "NotesNavButton", "AiNavButton", "SettingsNavButton", "AskAiButton", "PriorityButton" })
                 Check(window.FindControl<Button>(name)!.GetVisualDescendants().OfType<AppIcon>().Any(), "Missing vector: " + name);
             var splitter = window.FindControl<ResizeSplitter>("NotesSplitter")!;
