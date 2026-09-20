@@ -259,6 +259,7 @@ public partial class App : Application
                 IsExiting = true;
                 _saveTimer.Stop();
                 _syncTimer.Stop();
+                _workAssistantTaskTimer.Stop();
                 _workAssistantHotkey?.Dispose();
                 _workAssistantCompact?.Close();
                 _workAssistantBubble?.Close();
@@ -356,7 +357,8 @@ public partial class App : Application
             {
                 _local.WorkAssistant.Normalize();
                 _local.Save();
-            });
+            },
+            ShowCurrentWorkAssistantTaskDetails);
         return _workAssistantBubble;
     }
 
@@ -490,6 +492,10 @@ public partial class App : Application
 
         _workAssistantCompact = new WorkAssistantCompactWindow(_local.WorkAssistant);
         _workAssistantCompact.SubmitRequested += StartWorkAssistantQuickTaskAsync;
+        _workAssistantCompact.CancelTaskRequested += CancelCurrentWorkAssistantTask;
+        _workAssistantCompact.RetryTaskRequested += PrepareRetryCurrentWorkAssistantTask;
+        _workAssistantCompact.LinkProjectRequested += LinkCurrentWorkAssistantTaskFromUi;
+        _workAssistantCompact.OpenWorkspaceRequested += OpenCurrentWorkAssistantWorkspace;
         return _workAssistantCompact;
     }
 
@@ -576,14 +582,11 @@ public partial class App : Application
                 readOnly: permission.ReadOnly,
                 cancellationToken: CancellationToken.None);
 
-            _workAssistantQuickTaskId = taskId;
             compact.ClearPrompt();
             compact.SetStatus("Tác vụ đã gửi cho Agent.");
             HideWorkAssistantCompact();
             ShowWorkAssistantBubble();
-            SetWorkAssistantBubbleState(
-                WorkAssistantBubbleState.Working,
-                "Đang làm");
+            BeginWorkAssistantTaskMonitor(taskId, prompt);
         }
         catch (Exception ex)
         {
