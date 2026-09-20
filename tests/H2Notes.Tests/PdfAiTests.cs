@@ -14,7 +14,7 @@ internal static class PdfAiTests
         test("Image OCR is opt-in; converted images keep originals but send text across history", () =>
         {
             var image = AiDocuments.Read("scan.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=="));
-            var turns = AiProjectContext.Prepare(new(), new() { Attachments = [image] }, "");
+            var turns = AiLegacyRequestContext.Prepare(new(), new() { Attachments = [image] }, "");
             var settings = new AiPdfSettings { Engine = AiPdfEngine.MinerU };
             Check(!settings.OcrImages && !AiPdfProcessor.NeedsPreparation(turns, settings));
             Check(ReferenceEquals(image, AiPdfProcessor.PrepareAttachmentAsync(image, settings, "missing").GetAwaiter().GetResult()));
@@ -27,7 +27,7 @@ internal static class PdfAiTests
             var stored = ProjectWorkspaceStore.Clone(image);
             Check(stored.HasImageOcr && stored.Data.SequenceEqual(bytes));
             var conversation = new AiConversation { Messages = [new() { Attachments = [stored] }] };
-            var prepared = AiProjectContext.Prepare(conversation, new() { Content = "Summarize", Attachments = [stored] }, "");
+            var prepared = AiLegacyRequestContext.Prepare(conversation, new() { Content = "Summarize", Attachments = [stored] }, "");
             Check(prepared.Skip(1).Take(prepared.Count - 2).All(t => (t.Images?.Count ?? 0) == 0));
             Check(prepared.Count(t => t.Content.Contains("OCR fixture text")) == 2);
             Check((prepared[^1].Images?.Count ?? 0) == 0, "Cached OCR image should send text rather than image bytes");
@@ -41,7 +41,7 @@ internal static class PdfAiTests
             var turn = AiHistory.RequestTurns(copy).Single();
             Check((turn.Files?.Count ?? 0) == 0 && (turn.Images?.Count ?? 0) == 0);
             Check(turn.Content.Contains("document.PDF") && turn.Content.Contains("PDF gốc"));
-            var pending = AiProjectContext.Prepare(new(), new() { Attachments = [pdf] }, "").Last();
+            var pending = AiLegacyRequestContext.Prepare(new(), new() { Attachments = [pdf] }, "").Last();
             Check(pending.Files!.Count == 1 && pending.Files[0].Data.SequenceEqual(Pdf));
         });
         test("PDF validates signature and 8MB bound without trusting MIME or history", () =>
