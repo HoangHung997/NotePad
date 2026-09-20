@@ -146,6 +146,104 @@ internal static class H2CommandCenterUiTests
             }
         });
 
+        test("Command Center derived classifier covers all five groups without persisted board status", () =>
+        {
+            ProjectOverviewProjection P(
+                int done,
+                int total,
+                H2AgentTaskStatus? status = null,
+                int attention = 0)
+                => new(
+                    Guid.NewGuid(),
+                    "fixture",
+                    done,
+                    total,
+                    null,
+                    null,
+                    status,
+                    attention,
+                    null,
+                    H2WorkspaceSyncState.Healthy);
+
+            Check(H2CommandCenterQueryService.GroupFor(P(0, 2, H2AgentTaskStatus.WaitingForApproval, attention: 1))
+                == H2CommandCenterGroup.NeedsAttention, "NeedsAttention classifier failed.");
+            Check(H2CommandCenterQueryService.GroupFor(P(0, 2, H2AgentTaskStatus.Running))
+                == H2CommandCenterGroup.Working, "Working classifier failed.");
+            Check(H2CommandCenterQueryService.GroupFor(P(0, 2, H2AgentTaskStatus.Queued))
+                == H2CommandCenterGroup.Waiting, "Waiting classifier failed.");
+            Check(H2CommandCenterQueryService.GroupFor(P(1, 2))
+                == H2CommandCenterGroup.Normal, "Normal classifier failed.");
+            Check(H2CommandCenterQueryService.GroupFor(P(2, 2, H2AgentTaskStatus.Completed))
+                == H2CommandCenterGroup.Completed, "Completed classifier failed.");
+
+            foreach (var type in new[] { typeof(ProjectRecord), typeof(TaskRecord) })
+                foreach (var name in new[] { "BoardStatus", "CommandCenterGroup", "GroupStatus", "DashboardStatus" })
+                    Check(type.GetProperty(name) is null && type.GetField(name) is null,
+                        $"Persisted grouping field leaked into {type.Name}: {name}");
+        });
+
+        test("Command Center group filter changes only the projection and never project JSON", () =>
+        {
+            var now = DateTime.UtcNow;
+            var attention = Project("Needs review", now, 0, 1);
+            var completed = Project("Done", now.AddMinutes(1), 2, 2);
+            var normal = Project("Normal", now.AddMinutes(2), 1, 2);
+            var board = new NoteRecord
+            {
+                Title = "Grouping board",
+                NoteKind = "project-hub",
+                Projects = [attention, completed, normal]
+            };
+
+            var agent = new CommandCenterAgentFake(attention.Id, now.AddMinutes(5));
+            var app = new App { AgentAdapter = agent };
+            app.State.Notes.Add(board);
+            var before = System.Text.Json.JsonSerializer.Serialize(board);
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                var filter = window.FindControl<ComboBox>("CommandCenterGroupFilter")!;
+                var list = window.FindControl<ListBox>("CommandCenterList")!;
+                Check(filter.ItemsSource!.Cast<object>().Count() == 6,
+                    "Expected All plus five derived group filters.");
+
+                var completedFilter = filter.ItemsSource!.Cast<object>()
+                    .Single(item => Text(item, "Text") == "Hoàn thành");
+                filter.SelectedItem = completedFilter;
+                Pump();
+
+                var completedItems = list.ItemsSource!.Cast<object>().ToArray();
+                Check(completedItems.Length == 1 && Text(completedItems[0], "Name") == "Done",
+                    "Completed filter did not derive from project/Agent truth.");
+
+                var attentionFilter = filter.ItemsSource!.Cast<object>()
+                    .Single(item => Text(item, "Text") == "Cần xử lý");
+                filter.SelectedItem = attentionFilter;
+                Pump();
+
+                var attentionItems = list.ItemsSource!.Cast<object>().ToArray();
+                Check(attentionItems.Length == 1 && Text(attentionItems[0], "Name") == "Needs review",
+                    "Needs-attention filter did not derive from source projection.");
+
+                var allFilter = filter.ItemsSource!.Cast<object>()
+                    .Single(item => Text(item, "Text") == "Tất cả");
+                filter.SelectedItem = allFilter;
+                Pump();
+                Check(list.ItemsSource!.Cast<object>().Count() == 3,
+                    "All filter did not restore all projected projects.");
+
+                var after = System.Text.Json.JsonSerializer.Serialize(board);
+                Check(before == after, "Filtering mutated persisted project/board truth.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
         test("Command Center XAML binds only the required high-value overview fields", () =>
         {
             var repo = FindRepoRoot();
@@ -168,10 +266,13 @@ internal static class H2CommandCenterUiTests
             Check(source.Contains("GetNeedsAttention", StringComparison.Ordinal)
                 && source.Contains("_commandCenterRefreshTimer", StringComparison.Ordinal),
                 "Command Center attention is not rebuilt from live projection sources.");
+            Check(source.Contains("CommandCenterGroupFilter", StringComparison.Ordinal)
+                && source.Contains("H2CommandCenterQueryService.GroupFor", StringComparison.Ordinal),
+                "Command Center grouping/filtering is not projection-derived.");
             Check(source.Contains("AgentTaskId", StringComparison.Ordinal)
                 && source.Contains("ProjectId", StringComparison.Ordinal),
                 "Attention deep-link source identifiers are missing.");
-            foreach (var forbidden in new[] { "ToolRegistry", "AgentRuntime", "IAgentTransport", "File.Write", "AtomicWrite(", "AttentionDatabase", "AiInboxStore" })
+            foreach (var forbidden in new[] { "ToolRegistry", "AgentRuntime", "IAgentTransport", "File.Write", "AtomicWrite(", "AttentionDatabase", "AiInboxStore", "BoardStatus =", "CommandCenterGroup =" })
                 Check(!source.Contains(forbidden, StringComparison.Ordinal),
                     "Command Center UI contains forbidden runtime/persistence marker: " + forbidden);
         });
