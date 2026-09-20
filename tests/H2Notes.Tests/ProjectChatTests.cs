@@ -28,7 +28,11 @@ internal static class ProjectChatTests
             typeof(App).GetField("_main", Private)!.SetValue(app, main);
             typeof(App).GetField("_storageReady", Private)!.SetValue(app, true);
             typeof(App).GetMethod("TrackWindow", Private)!.Invoke(app, [main]);
-            app.ShowMain(); Pump(); return (app, main);
+            app.ShowMain(); Pump();
+            var board = state.Notes.First(n => n.IsBoard);
+            var project = board.Projects.FirstOrDefault(p => p.Id == board.SelectedProjectId) ?? board.Projects.FirstOrDefault();
+            if (project is not null) { H2UiTestNavigation.OpenProjectWorkspace(main, project.Id); Pump(); }
+            return (app, main);
         }
         void Stop(App app)
         {
