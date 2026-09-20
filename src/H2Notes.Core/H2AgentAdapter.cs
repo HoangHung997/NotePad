@@ -36,7 +36,10 @@ public sealed record H2AgentEvidence(
     string EvidenceId,
     string Kind,
     string? Sha256,
-    string? Summary);
+    string? Summary,
+    string? SourceUri = null,
+    string? LocalPath = null,
+    string? Provenance = null);
 
 public sealed record H2AgentTaskSummary(
     Guid TaskId,
