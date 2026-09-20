@@ -24,6 +24,11 @@ public partial class App : Application
     public bool IsChangingStore { get; private set; }
     public bool UsesProjectFiles => _storage is ProjectWorkspaceStore;
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
+    public IH2AgentAdapter AgentAdapter { get; set; } = H2UnavailableAgentAdapter.Instance;
+    public H2WorkspaceHealthSnapshot CurrentWorkspaceHealth
+        => _storage is ProjectWorkspaceStore project
+            ? H2ProductProjectionService.CaptureWorkspaceHealth(project)
+            : H2WorkspaceHealthSnapshot.Healthy;
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly Dictionary<Guid, NoteWindow> _notes = [];
