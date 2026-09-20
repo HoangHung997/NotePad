@@ -20,6 +20,28 @@ public sealed class SettingsWindow : Window
         var settings = app.State.SheetPreferences;
         var aiSettings = new Button { Content = "Thiết lập AI: Ollama / API…", Name = "AiSettingsButton" };
         aiSettings.Click += async (_, _) => { await app.StopAiAsync(); await new AiSettingsWindow(app).ShowDialog(this); };
+
+        var workAssistantEnabled = new CheckBox
+        {
+            Name = "WorkAssistantEnabled",
+            Content = "Bật Work Assistant",
+            IsChecked = app.LocalSettings.WorkAssistant.Enabled
+        };
+        var workAssistantHotkey = new TextBox
+        {
+            Name = "WorkAssistantHotkey",
+            Text = app.LocalSettings.WorkAssistant.Hotkey,
+            Watermark = "Ctrl+Shift+Space"
+        };
+        var workAssistantHotkeyStatus = new TextBlock
+        {
+            Name = "WorkAssistantHotkeyStatus",
+            Text = string.IsNullOrWhiteSpace(app.WorkAssistantHotkeyError)
+                ? "Hotkey chỉ mở trợ lý; không tự thực hiện thay đổi."
+                : "Hotkey: " + app.WorkAssistantHotkeyError,
+            TextWrapping = global::Avalonia.Media.TextWrapping.Wrap,
+            FontSize = 11
+        };
         var startup = new CheckBox { Content = "Chạy bản Avalonia khi khởi động Windows", IsChecked = settings.RunOnSystemStart, IsEnabled = OperatingSystem.IsWindows() };
         var restore = new CheckBox { Content = "Khôi phục cửa sổ và bố cục khi mở lại app", IsChecked = settings.RestoreVisibleNotes };
         var snap = new CheckBox { Content = "Bám viền màn hình và viền các ghi chú", IsChecked = settings.SnapWindows };
@@ -209,6 +231,29 @@ public sealed class SettingsWindow : Window
                     }
                     else key.DeleteValue("H2Notes.Avalonia", false);
                 }
+                if (workAssistantEnabled.IsChecked == true
+                    && !WorkAssistantHotkeyParser.TryParse(
+                        workAssistantHotkey.Text,
+                        out var parsedHotkey,
+                        out var hotkeyParseError))
+                {
+                    workAssistantHotkeyStatus.Text = "Hotkey: " + hotkeyParseError;
+                    return;
+                }
+
+                app.LocalSettings.WorkAssistant.Enabled = workAssistantEnabled.IsChecked == true;
+                if (workAssistantEnabled.IsChecked == true)
+                    app.LocalSettings.WorkAssistant.Hotkey = parsedHotkey.Normalized;
+                else if (!string.IsNullOrWhiteSpace(workAssistantHotkey.Text))
+                    app.LocalSettings.WorkAssistant.Hotkey = workAssistantHotkey.Text.Trim();
+                app.ApplyWorkAssistantSettings();
+                if (workAssistantEnabled.IsChecked == true
+                    && !string.IsNullOrWhiteSpace(app.WorkAssistantHotkeyError))
+                {
+                    workAssistantHotkeyStatus.Text = "Hotkey: " + app.WorkAssistantHotkeyError;
+                    return;
+                }
+
                 settings.RunOnSystemStart = startup.IsChecked == true; settings.RestoreVisibleNotes = restore.IsChecked == true;
                 settings.SnapWindows = snap.IsChecked == true; settings.InactiveOpacity = opacity.Value / 100;
                 settings.AutoHeightTitle = autoTitle.IsChecked == true;
@@ -229,6 +274,12 @@ public sealed class SettingsWindow : Window
             changeFolder, defaultFolder, openFolder,
             recoverWorkspace, recoveryStatus,
             aiSettings,
+            new Separator(),
+            new TextBlock { Text = "Work Assistant", FontSize = 18, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
+            workAssistantEnabled,
+            new TextBlock { Text = "Global hotkey", FontSize = 12, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
+            workAssistantHotkey,
+            workAssistantHotkeyStatus,
             import, importStatus, new Separator(),
             startup, restore, snap, new Separator(), label, opacity,
             new TextBlock { Text = "Cửa sổ đang active luôn rõ 100%. Click ra ngoài không ẩn cửa sổ.", TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
