@@ -451,7 +451,7 @@ Evidence: Command Center now renders a dedicated `CommandCenterAttentionSection`
 
 ---
 
-## [ ] H2M-052 — Command Center grouping/filtering
+## [x] H2M-052 — Command Center grouping/filtering
 
 Initial groups:
 
@@ -466,6 +466,8 @@ Grouping must be derived.
 Acceptance:
 
 - moving between groups does not require an unrelated persisted “board status” update.
+
+Evidence: `H2CommandCenterQueryService.GroupFor(...)` derives the five required groups directly from attention count, Agent lifecycle state, and deterministic project-task completion: **Needs Attention / Working / Waiting / Normal / Completed**. `CommandCenterGroupFilter` offers All plus those five groups and filters disposable `CommandCenterProjectItem` projections only. No BoardStatus/CommandCenterGroup/GroupStatus/DashboardStatus field exists on ProjectRecord or TaskRecord. Dedicated regressions cover all five classifier outputs and prove switching UI filters leaves serialized ProjectRecord/TaskRecord truth byte-equivalent after window initialization. Exact functional source `a91ce7d83054a2e096997975382c7c514d8e36f8`, Actions run `35487219021` SUCCESS, H2 Notes **381/381**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `e9929c69fce588ca7fd377c41e172ad4e8be4d92`; portable ZIP SHA256 `6f148d2a64053e88d9bf79261d26d16c13bfdd6bbfb8347ee6b0e8e6f0d42e1b`.
 
 ---
 
