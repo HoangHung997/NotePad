@@ -7,6 +7,32 @@ public sealed record WorkAssistantBubblePosition(
     double XDip,
     double YDip);
 
+
+public sealed class LocalProjectLayout
+{
+    public double NotesFraction { get; set; } = .5;
+    public bool HasCustomSplit { get; set; }
+    public double AiWidth { get; set; } = 360;
+    public double AiHeight { get; set; } = 510;
+    public double AiX { get; set; } = -1;
+    public double AiY { get; set; } = -1;
+
+    internal void Normalize()
+    {
+        if (!double.IsFinite(NotesFraction))
+        {
+            NotesFraction = .5;
+            HasCustomSplit = false;
+        }
+        NotesFraction = Math.Clamp(NotesFraction, .15, .85);
+
+        AiWidth = double.IsFinite(AiWidth) ? Math.Clamp(AiWidth, 300, 4_000) : 360;
+        AiHeight = double.IsFinite(AiHeight) ? Math.Clamp(AiHeight, 350, 4_000) : 510;
+        AiX = double.IsFinite(AiX) ? Math.Clamp(AiX, -1, 100_000) : -1;
+        AiY = double.IsFinite(AiY) ? Math.Clamp(AiY, -1, 100_000) : -1;
+    }
+}
+
 public sealed class WorkAssistantSettings
 {
     public bool Enabled { get; set; }
@@ -57,6 +83,7 @@ public sealed class LocalConfiguration
     public DesktopSessionState? DesktopSession { get; set; }
     public AiConnectionSettings Ai { get; set; } = new();
     public WorkAssistantSettings WorkAssistant { get; set; } = new();
+    public Dictionary<Guid, LocalProjectLayout> ProjectLayouts { get; set; } = [];
 
     public static string SettingsDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes");
     public static string DefaultDataFolder => Path.Combine(SettingsDirectory, "workspace-v2");
@@ -69,6 +96,14 @@ public sealed class LocalConfiguration
             : new LocalConfiguration();
         config.WorkAssistant ??= new WorkAssistantSettings();
         config.WorkAssistant.Normalize();
+        config.ProjectLayouts ??= [];
+        foreach (var key in config.ProjectLayouts
+                     .Where(pair => pair.Key == Guid.Empty || pair.Value is null)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+            config.ProjectLayouts.Remove(key);
+        foreach (var layout in config.ProjectLayouts.Values)
+            layout.Normalize();
 
         if (string.IsNullOrWhiteSpace(config.DeviceId))
         {
@@ -76,6 +111,27 @@ public sealed class LocalConfiguration
             config.Save();
         }
         return config;
+    }
+
+    public LocalProjectLayout GetProjectLayout(Guid projectId)
+    {
+        if (projectId == Guid.Empty)
+            throw new ArgumentException("Project id is required for local layout.", nameof(projectId));
+
+        if (!ProjectLayouts.TryGetValue(projectId, out var layout) || layout is null)
+        {
+            layout = new LocalProjectLayout();
+            ProjectLayouts[projectId] = layout;
+        }
+
+        layout.Normalize();
+        return layout;
+    }
+
+    public void ResetProjectLayout(Guid projectId)
+    {
+        if (projectId == Guid.Empty) return;
+        ProjectLayouts.Remove(projectId);
     }
 
     public void Save() => ProjectWorkspaceStore.AtomicWrite(ConfigPath,
