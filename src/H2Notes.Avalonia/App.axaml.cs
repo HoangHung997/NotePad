@@ -81,6 +81,7 @@ public partial class App : Application
     private WorkAssistantCompactWindow? _workAssistantCompact;
     private WorkAssistantHotkeyController? _workAssistantHotkey;
     private IWorkAssistantActiveContextCapture? _workAssistantContextCapture;
+    private Guid? _workAssistantQuickTaskId;
     private bool _saving;
     private bool _demo;
     private FileStream? _instanceLock;
@@ -461,6 +462,9 @@ public partial class App : Application
     public bool IsWorkAssistantCompactVisible
         => _workAssistantCompact?.IsVisible == true;
 
+    public Guid? CurrentWorkAssistantTaskId
+        => _workAssistantQuickTaskId;
+
     private void InitializeWorkAssistantHotkey()
     {
         if (_workAssistantHotkey is null)
@@ -485,6 +489,7 @@ public partial class App : Application
             return _workAssistantCompact;
 
         _workAssistantCompact = new WorkAssistantCompactWindow(_local.WorkAssistant);
+        _workAssistantCompact.SubmitRequested += StartWorkAssistantQuickTaskAsync;
         return _workAssistantCompact;
     }
 
@@ -504,6 +509,92 @@ public partial class App : Application
     {
         if (_workAssistantCompact?.IsVisible == true)
             _workAssistantCompact.Hide();
+    }
+
+    private async Task StartWorkAssistantQuickTaskAsync(
+        string prompt,
+        string selectedContextSummary)
+    {
+        var compact = EnsureWorkAssistantCompact();
+        prompt = (prompt ?? "").Trim();
+        if (prompt.Length == 0)
+        {
+            compact.SetStatus("Nhập yêu cầu trước khi gửi.", isError: true);
+            return;
+        }
+
+        // If context will be used, validate the original full target identity first.
+        // The UI scope mask narrows grounding only; it never weakens stale-target checks.
+        if (!string.IsNullOrWhiteSpace(selectedContextSummary)
+            && !TryGetValidatedWorkAssistantContext(out _))
+        {
+            compact.SetActiveContext(null);
+            compact.SetStatus(
+                "Context đã thay đổi hoặc không còn hợp lệ. Mở lại trợ lý để capture lại, hoặc gửi không kèm context.",
+                isError: true);
+            return;
+        }
+
+        var taskContext = new H2AgentTaskContext(
+            AgentWorkspaceRoot,
+            string.IsNullOrWhiteSpace(selectedContextSummary)
+                ? null
+                : selectedContextSummary,
+            Version: 0);
+
+        try
+        {
+            // H2M-085 deliberately starts through the one existing Agent adapter.
+            // Permission mapping for mutating quick work is introduced in H2M-086;
+            // until then quick work is read-only/fail-safe.
+            var taskId = await _agentAdapter.StartTaskAsync(
+                projectId: null,
+                goal: prompt,
+                context: taskContext,
+                readOnly: true,
+                cancellationToken: CancellationToken.None);
+
+            _workAssistantQuickTaskId = taskId;
+            compact.ClearPrompt();
+            compact.SetStatus("Tác vụ đã gửi cho Agent.");
+            HideWorkAssistantCompact();
+            ShowWorkAssistantBubble();
+            SetWorkAssistantBubbleState(
+                WorkAssistantBubbleState.Working,
+                "Đang làm");
+        }
+        catch (Exception ex)
+        {
+            compact.SetStatus(
+                "Không gửi được tác vụ: " + BoundUiError(ex.Message),
+                isError: true);
+        }
+    }
+
+    public bool LinkWorkAssistantTaskToProject(
+        Guid taskId,
+        Guid projectId)
+    {
+        if (taskId == Guid.Empty
+            || projectId == Guid.Empty
+            || ResolveProjectForAgentTools(projectId) is null)
+            return false;
+
+        if (!_agentAdapter.AttachProject(taskId, projectId))
+            return false;
+
+        _main?.RefreshAfterSave();
+        return true;
+    }
+
+    public bool LinkCurrentWorkAssistantTaskToProject(Guid projectId)
+        => _workAssistantQuickTaskId is { } taskId
+            && LinkWorkAssistantTaskToProject(taskId, projectId);
+
+    private static string BoundUiError(string? value)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return value.Length <= 300 ? value : value[..300];
     }
 
     public void ScheduleSave()
