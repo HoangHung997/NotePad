@@ -143,7 +143,7 @@ internal static class H2AgentPresentationTests
             foreach (var forbidden in new[]
             {
                 "new AiClient", "_createClient", "StreamEvents(", "SecretVault",
-                "AiProjectContext", "AiProjectActions", "ApplyAutomaticProjectActions"
+                "AiLegacyRequestContext", "AiProjectActions", "ApplyAutomaticProjectActions"
             })
                 Check(!agent.Contains(forbidden, StringComparison.Ordinal),
                     "Project Agent presentation references legacy execution marker: " + forbidden);
