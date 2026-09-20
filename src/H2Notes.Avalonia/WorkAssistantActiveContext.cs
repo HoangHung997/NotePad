@@ -52,11 +52,11 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
         var context = new H2ActiveWorkContext(
             snapshot.ProcessId,
             snapshot.ProcessStartUtcTicks,
-            H2ActiveWorkContext.Bound(snapshot.ProcessName, 120),
+            Bound(snapshot.ProcessName, 120),
             Classify(snapshot.ProcessName),
             snapshot.NativeWindowHandle,
             WindowIdentity(snapshot),
-            H2ActiveWorkContext.Bound(snapshot.WindowTitle, 500),
+            Bound(snapshot.WindowTitle, 500),
             DocumentSessionId: null,
             DocumentPath: null,
             Selection: null,
@@ -76,10 +76,10 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
             return context with
             {
                 ApplicationKind = enrichment.ApplicationKind ?? context.ApplicationKind,
-                DocumentSessionId = H2ActiveWorkContext.BoundOrNull(enrichment.DocumentSessionId, 240),
-                DocumentPath = H2ActiveWorkContext.BoundOrNull(enrichment.DocumentPath, 1_024),
-                Selection = H2ActiveWorkContext.BoundOrNull(enrichment.Selection, 1_200),
-                Provider = H2ActiveWorkContext.BoundOrNull(enrichment.Provider, 120)
+                DocumentSessionId = BoundOrNull(enrichment.DocumentSessionId, 240),
+                DocumentPath = BoundOrNull(enrichment.DocumentPath, 1_024),
+                Selection = BoundOrNull(enrichment.Selection, 1_200),
+                Provider = BoundOrNull(enrichment.Provider, 120)
             };
         }
         catch (Exception ex) when (ex is InvalidOperationException
@@ -133,6 +133,19 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
 
     private static string WindowIdentity(WorkAssistantWindowSnapshot snapshot)
         => $"win32:{snapshot.NativeWindowHandle:x}:{snapshot.ProcessId}:{snapshot.ProcessStartUtcTicks}";
+
+    private static string Bound(string? value, int max)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return value.Length <= max ? value : value[..max];
+    }
+
+    private static string? BoundOrNull(string? value, int max)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (value.Length == 0) return null;
+        return value.Length <= max ? value : value[..max];
+    }
 
     private static H2ApplicationKind Classify(string processName)
         => (processName ?? "").Trim().ToLowerInvariant() switch
