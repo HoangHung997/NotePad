@@ -24,21 +24,21 @@ internal static class AiDocumentTests
             var current = new AiConversation { Draft = "current draft" };
             var project = new ProjectRecord { Name = "Project A", Notes = "All project notes", ChecklistItems = [new() { Text = "Done task", IsCompleted = true, Comment = "Task detail" }, new() { Text = "Next task" }],
                 Links = [new(Guid.NewGuid(), "CAD", "C:/example/not-opened.dwg")], Conversations = [current, new() { Draft = "other private draft", Messages = [new() { Content = "Earlier decision" }, new() { Content = "private milestone", IsTimelineMarker = true }] }] };
-            var context = AiProjectContext.Build(project, current.Id);
+            var context = AiLegacyRequestContext.Build(project, current.Id);
             using var json = JsonDocument.Parse(context); var data = json.RootElement;
             Check(data.GetProperty("name").GetString() == "Project A" && data.GetProperty("tasks").GetArrayLength() == 2, "Missing identity/tasks");
             Check(context.Contains("All project notes") && context.Contains("Task detail") && context.Contains("Earlier decision") && context.Contains("not-opened.dwg"), "Incomplete context");
             Check(!context.Contains("private milestone") && !context.Contains("other private draft"), "Local-only data leaked");
-            Check(!AiProjectContext.Build(project, current.Id, false).Contains("Earlier decision"), "History opt-out ignored");
+            Check(!AiLegacyRequestContext.Build(project, current.Id, false).Contains("Earlier decision"), "History opt-out ignored");
         });
         test("Fresh context is sent once; old snapshots never override current project data", () =>
         {
             var conversation = new AiConversation { Messages = [new() { Content = "Previous question", Context = "STALE PROJECT SNAPSHOT" }, new() { Role = "assistant", Content = "Previous reply" }] };
-            var turns = AiProjectContext.Prepare(conversation, new() { Content = "Summarize" }, "LATEST CONTEXT");
+            var turns = AiLegacyRequestContext.Prepare(conversation, new() { Content = "Summarize" }, "LATEST CONTEXT");
             Check(turns.Count == 4 && turns[0].Role == "system" && turns[^1].Content.Contains("LATEST CONTEXT"), "Missing trusted instructions/current context");
             Check(turns.All(t => !t.Content.Contains("STALE PROJECT SNAPSHOT")), "Duplicated stale snapshots");
             Check(conversation.Messages.Count == 2, "Preview changed saved history");
-            Reject(() => AiProjectContext.Prepare(new(), new() { Content = "summary" }, new string('x', AiProjectContext.MaxRequestCharacters)));
+            Reject(() => AiLegacyRequestContext.Prepare(new(), new() { Content = "summary" }, new string('x', AiLegacyRequestContext.MaxRequestCharacters)));
         });
         foreach (var extension in new[] { ".docx", ".xlsx", ".csv", ".txt", ".md" })
             test("AI file " + extension + " generates valid actual bytes and reads Vietnamese content back", () =>
