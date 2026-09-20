@@ -19,7 +19,7 @@ public sealed partial class AiChatPanel
         {
             var context = BuildProjectContext();
             if (scope != _scope || conversation != _conversation) return;
-            var turns = AiProjectContext.Prepare(conversation ?? new AiConversation(),
+            var turns = AiLegacyRequestContext.Prepare(conversation ?? new AiConversation(),
                 new AiMessage { Content = _composer.Text ?? "", Attachments = conversation?.DraftAttachments.ToList() ?? [] }, context);
             var description = "Dự án / phạm vi: " + scope.Title + "\n"
                 + (_markerMode.IsChecked == true ? "Đang chỉ lưu mốc: không gửi AI. Đây là bản xem nếu chuyển sang hỏi AI.\n\n" : "\n")
@@ -35,7 +35,7 @@ public sealed partial class AiChatPanel
         PrepareProjectContext?.Invoke();
         if (_includeProject.IsChecked != true || _scope?.Project is not { } project) return "";
         var query = _composer.Text?.Trim() ?? "";
-        var workspaceScope = AiProjectContext.NeedsWorkspaceScope(_app.State, project, query);
+        var workspaceScope = AiLegacyRequestContext.NeedsWorkspaceScope(_app.State, project, query);
         var memory = AiMemoryContext.Empty;
         if (_app.UsesProjectFiles)
         {
@@ -56,7 +56,7 @@ public sealed partial class AiChatPanel
             }
         }
         else memory = new AiMemoryContext([], workspaceScope);
-        return AiProjectContext.BuildForRequest(_app.State, project, _conversation?.Id, query, memory, _includeHistory.IsChecked == true);
+        return AiLegacyRequestContext.BuildForRequest(_app.State, project, _conversation?.Id, query, memory, _includeHistory.IsChecked == true);
     }
 
     private Task PickAttachments() => PickAttachments(false);
