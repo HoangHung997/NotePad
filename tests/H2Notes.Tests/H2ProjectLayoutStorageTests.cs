@@ -14,16 +14,16 @@ internal static class H2ProjectLayoutStorageTests
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToArray();
 
-            Equal(
-                new[]
-                {
-                    nameof(ProjectLayout.AiDock),
-                    nameof(ProjectLayout.AiExplicitlyHidden),
-                    nameof(ProjectLayout.NotesCollapsed),
-                    nameof(ProjectLayout.Tab),
-                    nameof(ProjectLayout.TasksCollapsed)
-                },
-                names);
+            var expected = new[]
+            {
+                nameof(ProjectLayout.AiDock),
+                nameof(ProjectLayout.AiExplicitlyHidden),
+                nameof(ProjectLayout.NotesCollapsed),
+                nameof(ProjectLayout.Tab),
+                nameof(ProjectLayout.TasksCollapsed)
+            };
+            Check(expected.SequenceEqual(names, StringComparer.Ordinal),
+                "ProjectLayout contains unexpected shared fields: " + string.Join(", ", names));
 
             foreach (var machineLocal in new[]
             {
