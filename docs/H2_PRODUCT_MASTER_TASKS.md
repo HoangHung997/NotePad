@@ -532,7 +532,7 @@ Evidence: the existing `ProjectGrid` remains the sole Project Tasks detail/edito
 
 ---
 
-## [ ] H2M-062 — Project Notes detail
+## [x] H2M-062 — Project Notes detail
 
 Reuse current rich notes/editor.
 
@@ -544,6 +544,8 @@ Optional later:
 - link note paragraph to evidence.
 
 Do not build a knowledge graph now.
+
+Evidence: Project Notes continue to reuse the existing `RichEditor` + `NotesToolbar` and persist directly to `ProjectRecord.NotesRich` through `MainWindow.FlushNotes()`; no KnowledgeGraph/KnowledgeStore/ResearchStore/EvidenceStore/VectorDatabase/EmbeddingStore or parallel notes database was introduced. H2M-062 regression opens Notes from the Agent-first project workspace in one click, verifies existing rich formatting loads, edits human project knowledge with rich text, flushes it back into the same ProjectRecord, confirms the project timestamp advances, and round-trips Agent → Notes without losing content/formatting. Architecture guards keep ProjectRecord/ProjectLayout free of premature knowledge/research/evidence stores. Exact functional source `8c6953dc845a51e3661f8be97e8a7720b65d3ef3`, Actions run `35491870357` SUCCESS, H2 Notes **389/389**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `b67f333a5492122fdc6ba916b2c6bd15cfbbe838`; portable ZIP SHA256 `2345ea04bbc14d22f00db8edbaaf96da593b894a3a94aeaba5a3ee696dd77821`.
 
 ---
 
