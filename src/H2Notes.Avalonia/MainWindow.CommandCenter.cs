@@ -179,7 +179,7 @@ public partial class MainWindow
                 : "Nguồn: " + ProjectName(Project)
                     + (Projection.AgentTaskId is { } taskId ? $" · Agent {taskId.ToString("N")[..8]}" : "");
         public string TimeText => Projection.AtUtc is { } at
-            ? ToLocal(at).ToString("dd/MM HH:mm")
+            ? (at.Kind == DateTimeKind.Utc ? at.ToLocalTime() : at).ToString("dd/MM HH:mm")
             : "";
         public string Signature =>
             $"{ProjectId}:{AgentTaskId}:{Kind}:{Code}:{Title}:{Projection.AtUtc:O}";
