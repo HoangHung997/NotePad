@@ -276,7 +276,7 @@ public sealed partial class AiChatPanel
         }
 
         return new H2AgentTaskContext(
-            _app.DataFolder,
+            _app.AgentWorkspaceRoot,
             BoundAgentContext(summary.ToString(), 15_000),
             project.UpdatedAtUtc?.Ticks ?? 0);
     }
