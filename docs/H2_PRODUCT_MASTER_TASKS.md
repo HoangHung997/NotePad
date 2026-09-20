@@ -827,7 +827,7 @@ Evidence: the compact Work Assistant now submits through the existing `IH2AgentA
 
 ---
 
-## [ ] H2M-086 — Map Work Assistant permissions to Agent permissions
+## [x] H2M-086 — Map Work Assistant permissions to Agent permissions
 
 UI presets map to Agent scope.
 
@@ -837,6 +837,8 @@ Acceptance:
 
 - “allow this workbook” does not mean “full PC access”;
 - scope expires appropriately.
+
+Evidence: Work Assistant now exposes four per-send permission presets: Observe only, Ask before changes, Allow changes in the current document/session, and Use project policy. Presets map into the existing Agent task boundary through the optional `H2AgentTaskContext.PermissionScope`; no H2 permission engine/store was introduced. `H2AgentPermissionScope` is host-issued, task-local and time-bounded (mutation grants 10 minutes, project policy 15 minutes, observe-only 30 minutes; hard maximum one hour). Mutating grants require a concrete resource key and carry explicit approval semantics; ObserveOnly cannot mutate. `WorkAssistantPermissionScopeMapper` resolves only the selected current session/document/window/project identity, never a full-PC wildcard. “Allow changes in this workbook/session” fails closed if no document/session identity remains selected, and a grant no longer matches after expiry or when the active workbook/session changes. Capturing a new foreground context resets the UI preset to ObserveOnly so a previous mutation choice cannot silently cross targets. Quick tasks remain `ProjectId=null`; Use project policy therefore fails closed until a project association exists. Grants are RAM/task-context only and are absent from `LocalConfiguration`, ProjectRecord and shared workspace JSON. Exact functional source `f3a2d3698477b82d5b1707af6ebf7a8f9aaf06d2`, Actions run `35538761067` SUCCESS, H2 Notes **444/444**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `10af473b48f0600197be7dbf39805f66bbebd425`; portable ZIP SHA256 `6352719a0157979d3ee0656d8d043fd3a59827b1aac7ca0efb2b347f63ac0cdd`.
 
 ---
 
