@@ -3,8 +3,6 @@ using System.Text.RegularExpressions;
 
 namespace H2Notes.Core;
 
-public enum AiPermissionMode { ReadOnly, ConfirmChanges, ProjectAccess }
-
 public sealed record AiTextFormat(
     string Match,
     bool? Bold = null,
