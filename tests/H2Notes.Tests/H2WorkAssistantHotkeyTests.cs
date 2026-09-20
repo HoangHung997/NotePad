@@ -100,8 +100,13 @@ internal static class H2WorkAssistantHotkeyTests
             var compact = Compact(app);
             Check(compact.PromptText.Length == 0,
                 "Hotkey opening fabricated a prompt.");
-            Check(compact.FindControl<Avalonia.Controls.TextBlock>("WorkAssistantCompactStatus") is { Text: var text }
-                && text.Contains("chưa gửi", StringComparison.OrdinalIgnoreCase),
+            var statusField = typeof(WorkAssistantCompactWindow).GetField(
+                "_status",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new Exception("Compact assistant status field missing.");
+            var status = (Avalonia.Controls.TextBlock)(statusField.GetValue(compact)
+                ?? throw new Exception("Compact assistant status control missing."));
+            Check((status.Text ?? "").Contains("chưa gửi", StringComparison.OrdinalIgnoreCase),
                 "Compact assistant does not communicate non-mutating hotkey behavior.");
 
             compact.Close();
@@ -113,8 +118,10 @@ internal static class H2WorkAssistantHotkeyTests
             local.WorkAssistant.Enabled = true;
             local.WorkAssistant.Hotkey = "Alt+F8";
             var localJson = JsonSerializer.Serialize(local);
-            Check(localJson.Contains("Alt+F8", StringComparison.Ordinal),
-                "Local Work Assistant hotkey was not serializable.");
+            var restored = JsonSerializer.Deserialize<LocalConfiguration>(localJson)
+                ?? throw new Exception("Could not deserialize local configuration.");
+            Check(restored.WorkAssistant.Hotkey == "Alt+F8",
+                "Local Work Assistant hotkey did not round-trip.");
 
             var shared = JsonSerializer.Serialize(new SheetState());
             foreach (var marker in new[]
