@@ -103,6 +103,7 @@ public sealed class WorkAssistantBubbleWindow : Window
     private const double BubbleSize = 74;
     private readonly WorkAssistantSettings _settings;
     private readonly Action _saveLocal;
+    private readonly Action _activate;
     private readonly Border _shell;
     private readonly TextBlock _glyph;
     private readonly TextBlock _label;
@@ -117,10 +118,12 @@ public sealed class WorkAssistantBubbleWindow : Window
 
     public WorkAssistantBubbleWindow(
         WorkAssistantSettings settings,
-        Action saveLocal)
+        Action saveLocal,
+        Action? activate = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _saveLocal = saveLocal ?? throw new ArgumentNullException(nameof(saveLocal));
+        _activate = activate ?? (() => { });
 
         Width = Height = BubbleSize;
         MinWidth = MinHeight = BubbleSize;
@@ -164,6 +167,7 @@ public sealed class WorkAssistantBubbleWindow : Window
         };
         Content = _shell;
         DesktopWindowChrome.Attach(this, _shell);
+        _shell.Tapped += (_, _) => _activate();
         SetState(WorkAssistantBubbleState.Idle);
 
         _placementTimer.Tick += (_, _) =>
