@@ -50,7 +50,7 @@ internal static class WorkspaceTests
             var legacy = new NoteRecord { Title = "Legacy note", NoteKind = "general", Content = "legacy" };
             var state = new SheetState { Notes = [board, known, legacy] };
 
-            using var context = JsonDocument.Parse(AiProjectContext.Build(state, project, null, true));
+            using var context = JsonDocument.Parse(AiLegacyRequestContext.Build(state, project, null, true));
             var root = context.RootElement;
             Check(root.GetProperty("timeContext").GetProperty("currentLocalTime").GetString()!.Length > 10);
             Check(root.GetProperty("timeContext").GetProperty("dayParts").GetProperty("morning").GetString() == "05:00-11:59");
