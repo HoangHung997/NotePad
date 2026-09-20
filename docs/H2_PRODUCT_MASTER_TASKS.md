@@ -773,7 +773,7 @@ Evidence: Work Assistant global hotkey is host-owned through `WorkAssistantHotke
 
 ---
 
-## [ ] H2M-083 — Add ActiveWorkContext capture
+## [x] H2M-083 — Add ActiveWorkContext capture
 
 Capture bounded local context:
 
@@ -788,6 +788,8 @@ Do not persist as project truth.
 Acceptance:
 
 - stale target is revalidated before mutation.
+
+Evidence: `H2ActiveWorkContext` is a bounded H2-facing ephemeral record for process/window identity, application kind, optional document/session identity, optional document path/selection, provider label and capture time. `WorkAssistantActiveContextCapture` snapshots the foreground Win32 window/process **before** the compact assistant takes focus, classifies common apps, optionally enriches through the provider-neutral `IH2ActiveWorkContextProvider`, and bounds all user/provider strings. App stores the current context only in RAM; it is absent from `SheetState`, `ProjectRecord`, `ProjectLayout`, `LocalConfiguration` and shared JSON. `TryGetValidatedWorkAssistantContext(...)` rejects closed/reused windows by handle/PID/process-start identity and also requires provider session revalidation when enrichment exists; stale context is cleared before later mutation use. Dedicated acceptance tests cover Excel-like enrichment/bounds, stale PID/process/session rejection, AutoCAD-like capture before compact focus, App revalidation/clear behavior, and non-persistence. Exact functional source `99e2168a9a53eba69dcd674c22b7e6b54bcdbb53`, Actions run `35515530578` SUCCESS, H2 Notes **431/431**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `4087602fd43668aae02fea270e84868ec4b05a71`; portable ZIP SHA256 `1177dddaea4199920f9d3d07f4a081b25e1fc090a0f8075116b4fcb155708fd8`.
 
 ---
 
