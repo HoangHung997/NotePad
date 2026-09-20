@@ -119,6 +119,46 @@ internal static class H2AgentPresentationTests
             }
         });
 
+        test("Legacy AiClient execution is standalone-only and cannot regain project scope", () =>
+        {
+            var repo = FindRepoRoot();
+            var source = File.ReadAllText(Path.Combine(
+                repo, "src", "H2Notes.Avalonia", "Controls", "AiChatPanel.cs"));
+
+            var sendStart = source.IndexOf("private async Task Send()", StringComparison.Ordinal);
+            var legacyStart = source.IndexOf("private async Task SendLegacy()", StringComparison.Ordinal);
+            Check(sendStart >= 0 && legacyStart > sendStart,
+                "Send routing/legacy boundary is missing.");
+
+            var sendRoute = source[sendStart..legacyStart];
+            var projectBranch = sendRoute.IndexOf("_scope?.Project is not null", StringComparison.Ordinal);
+            var agentCall = sendRoute.IndexOf("SendProjectAgent()", StringComparison.Ordinal);
+            var legacyCall = sendRoute.IndexOf("SendLegacy()", StringComparison.Ordinal);
+            Check(projectBranch >= 0 && agentCall > projectBranch && legacyCall > agentCall,
+                "Project scope is not routed to Agent before legacy execution.");
+
+            var legacyEnd = source.IndexOf("private ", legacyStart + 1, StringComparison.Ordinal);
+            var legacyBody = legacyEnd > legacyStart
+                ? source[legacyStart..legacyEnd]
+                : source[legacyStart..];
+
+            var projectGuard = legacyBody.IndexOf("_scope.Project is not null", StringComparison.Ordinal);
+            var clientFactory = legacyBody.IndexOf("_createClient()", StringComparison.Ordinal);
+            Check(projectGuard >= 0 && clientFactory > projectGuard,
+                "Legacy AiClient path does not fail closed before client creation.");
+            Check(legacyBody.Contains("Project AI requests must use H2AgentAdapter", StringComparison.Ordinal),
+                "Legacy project-scope fail-closed message is missing.");
+
+            foreach (var forbidden in new[]
+            {
+                "ApplyAutomaticProjectActions(",
+                "scope.Project is",
+                "MarkProjectDirty("
+            })
+                Check(!legacyBody.Contains(forbidden, StringComparison.Ordinal),
+                    "Standalone legacy AiClient path regained project mutation marker: " + forbidden);
+        });
+
         test("Project Agent presentation source does not use legacy direct execution internals", () =>
         {
             var repo = FindRepoRoot();
