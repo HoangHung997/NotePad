@@ -23,6 +23,14 @@ public partial class MainWindow
         _commandCenterQuery = new H2CommandCenterQueryService(
             new H2ProductProjectionService(_app.AgentAdapter));
 
+        CommandCenterGroupFilter.ItemsSource = CommandCenterGroupFilterItem.All;
+        CommandCenterGroupFilter.SelectedIndex = 0;
+        CommandCenterGroupFilter.SelectionChanged += (_, _) =>
+        {
+            if (_showCommandCenter)
+                RefreshCommandCenter();
+        };
+
         CommandCenterAddProjectButton.Click += async (_, _) => await AddProject();
         CommandCenterList.SelectionChanged += (_, _) =>
         {
@@ -77,7 +85,7 @@ public partial class MainWindow
             pairs.Select(pair => pair.Project),
             health);
 
-        var items = projections
+        var allItems = projections
             .Where(projection => byProject.ContainsKey(projection.ProjectId))
             .Select(projection =>
             {
@@ -85,6 +93,11 @@ public partial class MainWindow
                 return new CommandCenterProjectItem(source.Board, source.Project, projection);
             })
             .ToArray();
+
+        var selectedGroup = (CommandCenterGroupFilter.SelectedItem as CommandCenterGroupFilterItem)?.Group;
+        var items = selectedGroup is null
+            ? allItems
+            : allItems.Where(item => item.Group == selectedGroup.Value).ToArray();
 
         var attentionItems = _commandCenterQuery.GetNeedsAttention(
                 pairs.Select(pair => pair.Project),
@@ -121,11 +134,17 @@ public partial class MainWindow
         }
 
         var attention = attentionItems.Length;
-        var active = items.Count(item => item.AgentStatus is
+        var active = allItems.Count(item => item.AgentStatus is
             H2AgentTaskStatus.Queued or H2AgentTaskStatus.Running or H2AgentTaskStatus.WaitingForApproval);
-        CommandCenterSummary.Text = $"{items.Length} dự án · {attention} cần xem"
+        var projectCount = selectedGroup is null
+            ? $"{allItems.Length} dự án"
+            : $"{items.Length}/{allItems.Length} dự án";
+        CommandCenterSummary.Text = $"{projectCount} · {attention} cần xem"
             + (active > 0 ? $" · {active} Agent đang hoạt động" : "");
         CommandCenterSync.Text = CommandCenterProjectItem.SyncTextFor(health.State);
+        CommandCenterEmpty.Text = allItems.Length == 0
+            ? "Chưa có dự án. Tạo dự án đầu tiên để bắt đầu."
+            : "Không có dự án trong nhóm đang lọc.";
         CommandCenterEmpty.IsVisible = items.Length == 0;
         CommandCenterList.IsVisible = items.Length != 0;
     }
@@ -149,6 +168,21 @@ public partial class MainWindow
         _drawerOpen = false;
         CommandCenterList.SelectedItem = null;
         ApplyResponsive();
+    }
+
+    private sealed record CommandCenterGroupFilterItem(
+        string Text,
+        H2CommandCenterGroup? Group)
+    {
+        public static IReadOnlyList<CommandCenterGroupFilterItem> All { get; } =
+        [
+            new("Tất cả", null),
+            new("Cần xử lý", H2CommandCenterGroup.NeedsAttention),
+            new("Đang làm", H2CommandCenterGroup.Working),
+            new("Đang chờ", H2CommandCenterGroup.Waiting),
+            new("Bình thường", H2CommandCenterGroup.Normal),
+            new("Hoàn thành", H2CommandCenterGroup.Completed)
+        ];
     }
 
     private sealed class CommandCenterAttentionItem
@@ -206,6 +240,15 @@ public partial class MainWindow
 
         public Guid ProjectId => Projection.ProjectId;
         public string Name => Projection.Name;
+        public H2CommandCenterGroup Group => H2CommandCenterQueryService.GroupFor(Projection);
+        public string GroupText => Group switch
+        {
+            H2CommandCenterGroup.NeedsAttention => "Cần xử lý",
+            H2CommandCenterGroup.Working => "Đang làm",
+            H2CommandCenterGroup.Waiting => "Đang chờ",
+            H2CommandCenterGroup.Completed => "Hoàn thành",
+            _ => "Bình thường"
+        };
         public int AttentionCount => Projection.AttentionCount;
         public H2AgentTaskStatus? AgentStatus => Projection.AgentStatus;
         public string ProgressText => $"{Projection.CompletedTasks}/{Projection.TotalTasks} công việc";
@@ -228,7 +271,7 @@ public partial class MainWindow
         public string BoardText => string.IsNullOrWhiteSpace(Board.Title) ? "" : Board.Title;
 
         public string Signature =>
-            $"{ProjectId:N}:{Name}:{Projection.CompletedTasks}:{Projection.TotalTasks}:"
+            $"{ProjectId:N}:{Name}:{Group}:{Projection.CompletedTasks}:{Projection.TotalTasks}:"
             + $"{Projection.NextTaskId}:{Projection.NextTask}:{Projection.AgentStatus}:"
             + $"{Projection.AttentionCount}:{Projection.LatestVerifiedActivityUtc:O}:{Projection.SyncState}";
 
