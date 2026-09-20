@@ -142,6 +142,10 @@ public partial class MainWindow
         CommandCenterSummary.Text = $"{projectCount} · {attention} cần xem"
             + (active > 0 ? $" · {active} Agent đang hoạt động" : "");
         CommandCenterSync.Text = CommandCenterProjectItem.SyncTextFor(health.State);
+        ToolTip.SetTip(CommandCenterSync,
+            string.IsNullOrWhiteSpace(health.Message)
+                ? CommandCenterProjectItem.SyncDetailFor(health.State)
+                : health.Message);
         CommandCenterEmpty.Text = allItems.Length == 0
             ? "Chưa có dự án. Tạo dự án đầu tiên để bắt đầu."
             : "Không có dự án trong nhóm đang lọc.";
@@ -278,13 +282,25 @@ public partial class MainWindow
         public static string SyncTextFor(H2WorkspaceSyncState state)
             => state switch
             {
-                H2WorkspaceSyncState.Healthy => "Đồng bộ: ổn",
-                H2WorkspaceSyncState.Busy => "Đồng bộ: đang bận",
-                H2WorkspaceSyncState.PendingLocal => "Đồng bộ: có bản chờ cục bộ",
-                H2WorkspaceSyncState.Warning => "Đồng bộ: cần kiểm tra",
-                H2WorkspaceSyncState.RecoveryRequired => "Đồng bộ: cần phục hồi",
-                H2WorkspaceSyncState.Offline => "Đồng bộ: ngoại tuyến",
-                _ => "Đồng bộ: chưa rõ"
+                H2WorkspaceSyncState.Healthy => "Đã đồng bộ",
+                H2WorkspaceSyncState.Busy => "Đang lưu",
+                H2WorkspaceSyncState.PendingLocal => "Chờ đồng bộ",
+                H2WorkspaceSyncState.Offline => "Ngoại tuyến",
+                H2WorkspaceSyncState.RecoveryRequired => "Lỗi · cần phục hồi",
+                H2WorkspaceSyncState.Warning => "Lỗi đồng bộ",
+                _ => "Trạng thái lưu trữ chưa rõ"
+            };
+
+        public static string SyncDetailFor(H2WorkspaceSyncState state)
+            => state switch
+            {
+                H2WorkspaceSyncState.Healthy => "Dữ liệu chia sẻ đang ở trạng thái đồng bộ.",
+                H2WorkspaceSyncState.Busy => "H2 Notes đang ghi dữ liệu.",
+                H2WorkspaceSyncState.PendingLocal => "Thay đổi đã giữ cục bộ và đang chờ ghi vào kho chia sẻ.",
+                H2WorkspaceSyncState.Offline => "Kho chia sẻ hiện không truy cập được; thay đổi cục bộ vẫn được giữ an toàn khi có pending snapshot.",
+                H2WorkspaceSyncState.RecoveryRequired => "Kho chia sẻ cần phục hồi trước khi tiếp tục ghi an toàn.",
+                H2WorkspaceSyncState.Warning => "Kho chia sẻ có cảnh báo đồng bộ cần kiểm tra.",
+                _ => "Không xác định được trạng thái lưu trữ."
             };
 
         private static string AgentStatusText(H2AgentTaskStatus status)
