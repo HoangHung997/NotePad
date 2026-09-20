@@ -5,7 +5,65 @@ public sealed class DesktopSessionState
     public Guid? SelectedBoardId { get; set; }
     // Back to front, including the board only when its window is visible.
     public List<Guid> OpenWindowIds { get; set; } = [];
+    // Machine-local placements keyed by stable note/notebook ID. In NAS mode this object is
+    // persisted only through LocalConfiguration; ProjectWorkspaceStore never publishes it.
+    public Dictionary<Guid, NoteWindowPlacementState> NoteWindows { get; set; } = [];
     public ProjectAiWindowState? ProjectAiWindow { get; set; }
+}
+
+public sealed class NoteWindowPlacementState
+{
+    public int Left { get; set; } = 120;
+    public int Top { get; set; } = 100;
+    public double Width { get; set; } = 1100;
+    public double Height { get; set; } = 740;
+    public bool IsPinned { get; set; }
+
+    public void Normalize(bool board)
+    {
+        var minWidth = board ? 640d : 320d;
+        var minHeight = board ? 480d : 300d;
+        Width = double.IsFinite(Width) ? Math.Clamp(Width, minWidth, 8_000) : (board ? 1160 : 1100);
+        Height = double.IsFinite(Height) ? Math.Clamp(Height, minHeight, 8_000) : (board ? 810 : 740);
+        Left = Math.Clamp(Left, -100_000, 100_000);
+        Top = Math.Clamp(Top, -100_000, 100_000);
+    }
+
+    public static NoteWindowPlacementState From(NoteRecord note)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        var placement = new NoteWindowPlacementState
+        {
+            Left = note.IsBoard ? note.SheetLeft ?? 120 : (int)Math.Round(note.Left),
+            Top = note.IsBoard ? note.SheetTop ?? 100 : (int)Math.Round(note.Top),
+            Width = note.IsBoard ? note.SheetWidth ?? 1160 : note.Width,
+            Height = note.IsBoard ? note.SheetHeight ?? 810 : note.Height,
+            IsPinned = note.IsPinned
+        };
+        placement.Normalize(note.IsBoard);
+        return placement;
+    }
+
+    public void ApplyTo(NoteRecord note)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        Normalize(note.IsBoard);
+        note.IsPinned = IsPinned;
+        if (note.IsBoard)
+        {
+            note.SheetLeft = Left;
+            note.SheetTop = Top;
+            note.SheetWidth = Width;
+            note.SheetHeight = Height;
+        }
+        else
+        {
+            note.Left = Left;
+            note.Top = Top;
+            note.Width = Width;
+            note.Height = Height;
+        }
+    }
 }
 
 // Window placement only. Conversations and drafts remain in the selected project.
