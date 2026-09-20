@@ -80,8 +80,12 @@ internal static class IconResizeTests
             var window = new H2Notes.Avalonia.MainWindow(new H2Notes.Avalonia.App(), board);
             window.Show(); Pump();
             H2UiTestNavigation.OpenProjectWorkspace(window, project.Id); Pump();
-            foreach (var name in new[] { "PinButton", "CloseButton", "MenuButton", "ProjectsNavButton", "NotesNavButton", "AiNavButton", "SettingsNavButton", "AskAiButton", "PriorityButton" })
+            foreach (var name in new[] { "PinButton", "CloseButton", "MenuButton", "ProjectsNavButton", "NotesNavButton", "AiNavButton", "SettingsNavButton", "AskAiButton", "PriorityButton", "AgentTabButton" })
                 Check(window.FindControl<Button>(name)!.GetVisualDescendants().OfType<AppIcon>().Any(), "Missing vector: " + name);
+
+            // The default project surface is Agent-first. Enter the Tasks detail before
+            // validating the mature task/note detail splitter.
+            window.FindControl<Button>("TasksTabButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
             var splitter = window.FindControl<ResizeSplitter>("NotesSplitter")!;
             Check(splitter.Bounds.Height >= ResizeSplitter.HitSize && splitter.Cursor is not null, "Splitter not discoverable");
             var point = splitter.TranslatePoint(new Point(splitter.Bounds.Width / 2, 1), window)!.Value;
