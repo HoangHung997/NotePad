@@ -389,7 +389,7 @@ Evidence: `H2CommandCenterQueryService` is the sole Command Center-facing query 
 
 ---
 
-## [ ] H2M-042 — Deterministic project progress only
+## [x] H2M-042 — Deterministic project progress only
 
 Keep current deterministic task completion progress.
 
@@ -399,6 +399,8 @@ Acceptance:
 
 - project progress shown on board can be traced to a deterministic formula;
 - Agent progress is separately shown as criteria/task execution state.
+
+Evidence: `ProjectProgressCalculator` is now the single canonical formula: completed durable `TaskRecord` items / total durable `TaskRecord` items. `ProjectRecord.Progress`, product/Command Center projections and navigator percent all delegate to this calculator. `ProjectRecord.Progress` remains read-only and the model has no free-form AI/Agent percentage field. Agent execution remains a separate `H2AgentTaskStatus/H2AgentProgress` projection and cannot mutate project checklist completion. `docs/H2_DETERMINISTIC_PROJECT_PROGRESS.md` freezes the rule. Exact functional source `7f1f740655da985a06c4fb8fbae5cfadd5050e31`, Actions run `35481246677` SUCCESS, H2 Notes **375/375**, all five deterministic-progress guards PASS, NAS harness + full Agent/reference-extension/provider/publish pipeline PASS.
 
 ---
 
