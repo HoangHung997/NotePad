@@ -45,7 +45,11 @@ internal static class H2WorkAssistantQuickTaskTests
             Check(agent.StartGoal == "Tóm tắt workbook hiện tại",
                 "Quick task goal changed before reaching Agent adapter.");
             Check(agent.StartReadOnly,
-                "H2M-085 quick task must remain read-only until H2M-086 permission mapping.");
+                "Default Work Assistant permission preset must remain observe-only.");
+            Check(agent.StartContext?.PermissionScope is { } defaultScope
+                && defaultScope.Mode == H2AgentPermissionMode.ObserveOnly
+                && !defaultScope.MutationAllowed,
+                "Default quick task did not carry an observe-only Agent permission scope.");
             Check(agent.StartContext?.Summary?.Contains("Document=C:\\Projects\\DuToan.xlsx", StringComparison.Ordinal) == true,
                 "Selected document context did not reach normal Agent task context.");
             Check(agent.StartContext?.Summary?.Contains("Selection=D51:F80", StringComparison.Ordinal) == false,
