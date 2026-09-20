@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using H2Notes.Avalonia;
 using H2Notes.Core;
