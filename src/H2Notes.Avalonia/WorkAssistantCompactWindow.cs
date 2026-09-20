@@ -282,22 +282,22 @@ public sealed class WorkAssistantCompactWindow : Window
         if ((scope & WorkAssistantContextScope.Application) != 0)
         {
             parts.Add("App=" + context.ApplicationKind);
-            parts.Add("Process=" + H2ActiveWorkContext.Bound(
+            parts.Add("Process=" + Bound(
                 context.ProcessName + "#" + context.ProcessId, 180));
             if (!string.IsNullOrWhiteSpace(context.WindowTitle))
-                parts.Add("Window=" + H2ActiveWorkContext.Bound(context.WindowTitle, 500));
+                parts.Add("Window=" + Bound(context.WindowTitle, 500));
         }
         if ((scope & WorkAssistantContextScope.Document) != 0
             && !string.IsNullOrWhiteSpace(context.DocumentPath))
-            parts.Add("Document=" + H2ActiveWorkContext.Bound(context.DocumentPath, 1_024));
+            parts.Add("Document=" + Bound(context.DocumentPath, 1_024));
         if ((scope & WorkAssistantContextScope.Session) != 0
             && !string.IsNullOrWhiteSpace(context.DocumentSessionId))
-            parts.Add("Session=" + H2ActiveWorkContext.Bound(context.DocumentSessionId, 240));
+            parts.Add("Session=" + Bound(context.DocumentSessionId, 240));
         if ((scope & WorkAssistantContextScope.Selection) != 0
             && !string.IsNullOrWhiteSpace(context.Selection))
-            parts.Add("Selection=" + H2ActiveWorkContext.Bound(context.Selection, 1_200));
+            parts.Add("Selection=" + Bound(context.Selection, 1_200));
 
-        return H2ActiveWorkContext.Bound(string.Join("\n", parts), 4_000);
+        return Bound(string.Join("\n", parts), 4_000);
     }
 
     private static string ApplicationLabel(H2ActiveWorkContext context)
@@ -319,7 +319,13 @@ public sealed class WorkAssistantCompactWindow : Window
 
     private static string BoundChip(string value)
     {
-        value = H2ActiveWorkContext.Bound(value, 160);
+        value = Bound(value, 160);
         return value.Length <= 54 ? value : value[..51] + "…";
+    }
+
+    private static string Bound(string? value, int max)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return value.Length <= max ? value : value[..max];
     }
 }
