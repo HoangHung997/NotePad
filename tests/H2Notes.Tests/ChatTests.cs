@@ -60,7 +60,8 @@ internal static class ChatTests
             var board = SheetStorage.Demo().Notes[0]; state.Notes.Add(board); store.Save(state);
             var read = new ProjectWorkspaceStore(store.Root).Read(); var chat = read.Notes.Single(n => n.IsChat);
             Check(chat.SelectedAiConversationId == conversation.Id && chat.AiConversations[0].Draft == "", "Conversation selection or device-local draft policy lost");
-            Check(chat.AiConversations[0].Messages[0].CreatedAt == conversation.Messages[0].CreatedAt && chat.IsPinned, "Time or pin lost");
+            Check(chat.AiConversations[0].Messages[0].CreatedAt == conversation.Messages[0].CreatedAt, "Message time lost");
+            Check(!chat.IsPinned, "Machine-local pin state leaked into the shared NAS note");
             Check(chat.Projects.Count == 0 && read.Notes.Where(n => n.IsBoard).Sum(n => n.Projects.Count) == board.Projects.Count, "Created a fake project");
             Check(Directory.GetFiles(Path.Combine(store.Root, "notes"), "*.h2note.json").Length == 1, "Chat has no independent file");
             Check(!File.ReadAllText(store.FilePath).Contains("Mốc công việc"), "Index duplicated chat contents");
