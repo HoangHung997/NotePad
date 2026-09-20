@@ -125,6 +125,7 @@
               <Button x:Name="NotesTabButton" Content="Ghi chú" Classes="quiet"/>
               <Button x:Name="ResourcesTabButton" Content="Tài nguyên" Classes="quiet"/>
               <Button x:Name="HistoryTabButton" Content="Lịch sử" Classes="quiet"/>
+              <Button x:Name="EvidenceTabButton" Content="Evidence" Classes="quiet"/>
             </StackPanel>
             <Grid x:Name="EditorSplit" Grid.Row="2" RowDefinitions="*,8,*">
               <Border x:Name="TasksPane" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
@@ -206,6 +207,46 @@
                     </ListBox.ItemTemplate>
                   </ListBox>
                   <TextBlock x:Name="ProjectHistoryEmpty" Text="Chưa có hoạt động có ý nghĩa để hiển thị." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="13"/>
+                </Grid>
+              </Grid>
+            </Border>
+            <Border x:Name="ProjectEvidencePane" Grid.Row="2" IsVisible="False" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
+              <Grid RowDefinitions="44,*">
+                <Grid ColumnDefinitions="*,Auto,Auto" Background="#FAF7F2">
+                  <StackPanel Orientation="Horizontal" Spacing="9" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock Text="Evidence / nghiên cứu" FontFamily="Georgia" FontSize="17" FontWeight="Bold"/>
+                    <TextBlock x:Name="ProjectEvidenceSummary" FontSize="11" Foreground="#8A7A6E" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <Button x:Name="ProjectEvidenceOpenButton" Grid.Column="1" Classes="outline" Content="Mở nguồn" IsEnabled="False" Margin="0,6,6,6"/>
+                  <Button x:Name="ProjectEvidenceRevealButton" Grid.Column="2" Classes="quiet" Content="Hiện tệp" IsEnabled="False" Margin="0,6,8,6"/>
+                </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="3*,2*" ColumnSpacing="8" Margin="8">
+                  <Grid>
+                    <ListBox x:Name="ProjectEvidenceList" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:CompileBindings="False">
+                          <Border BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
+                            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+                              <TextBlock Text="{Binding Summary}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                              <TextBlock Grid.Column="1" Text="{Binding KindText}" FontSize="9" Foreground="#A4573D" Margin="10,1,0,0"/>
+                              <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding MetaText}" FontSize="9" Foreground="#8A7A6E" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="ProjectEvidenceEmpty" Text="Chưa có evidence Agent cho dự án này." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="13"/>
+                  </Grid>
+                  <Border Grid.Column="1" Background="#FAF7F2" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4" Padding="12">
+                    <StackPanel Spacing="7">
+                      <TextBlock Text="Chi tiết evidence" FontSize="13" FontWeight="SemiBold"/>
+                      <TextBlock x:Name="ProjectEvidenceIdText" FontSize="10" Foreground="#796C62" TextWrapping="Wrap"/>
+                      <TextBlock x:Name="ProjectEvidenceProvenanceText" FontSize="10" Foreground="#796C62" TextWrapping="Wrap"/>
+                      <TextBlock x:Name="ProjectEvidenceTargetText" FontSize="10" Foreground="#796C62" TextWrapping="Wrap"/>
+                      <TextBlock x:Name="ProjectEvidenceHashText" FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap"/>
+                      <TextBlock Text="Identity/provenance được đọc trực tiếp từ Agent; H2 không lưu ResearchStore riêng." FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    </StackPanel>
+                  </Border>
                 </Grid>
               </Grid>
             </Border>
