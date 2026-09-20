@@ -739,7 +739,7 @@ Evidence: `LocalConfiguration` now owns a dedicated local-only `WorkAssistantSet
 
 ---
 
-## [ ] H2M-081 — Add floating bubble shell
+## [x] H2M-081 — Add floating bubble shell
 
 Implement:
 
@@ -754,6 +754,8 @@ Acceptance:
 
 - bubble does not require main H2 window visible;
 - disabled setting fully hides it.
+
+Evidence: `WorkAssistantBubbleWindow` is a borderless draggable local-only shell with edge-safe placement, preferred-monitor restore, per-screen DPI conversion and `Idle / Working / Attention / Completed` presentation states. `App` owns the shell independently from MainWindow/DesktopSession: startup honors local `Enabled` + `StartWithH2`, tray exposes a show/hide toggle, disabled mode fails closed, and the bubble is deliberately not passed through `TrackWindow` or shared project persistence. Position changes persist only the machine-local Work Assistant monitor/DIP position. H2M-081 acceptance tests prove preferred-monitor/DPI restore, off-edge clamping, four states, always-on-top setting, show/hide with no MainWindow, disabled fail-closed behavior, startup/tray wiring, chrome drag, and absence of ProjectRecord/ProjectLayout/shared-workspace persistence dependencies. Exact functional source `e84c7fe7b9c05ded027adc1f17d9c02af5bf8ce7`, Actions run `35509907759` SUCCESS, H2 Notes **423/423**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `166c4f366d83ad78861e72b704d30437ac4524be`; portable ZIP SHA256 `82907f67b5efe30a347e9bb0608c467d1e31ab6f960eaa615a0b1dd20e5e0fe1`.
 
 ---
 
