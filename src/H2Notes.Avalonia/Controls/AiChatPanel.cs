@@ -343,7 +343,7 @@ public sealed partial class AiChatPanel : UserControl
         if (prompt.Length == 0) prompt = "Phân tích các tệp đính kèm và tóm tắt nội dung chính.";
         try { key = SecretVault.Read(profile.Id); AiClient.Endpoint(profile, "models"); }
         catch (Exception) { _status.Text = "Không đọc được kết nối hoặc khóa. Mở Thiết lập AI để kiểm tra."; return; }
-        var conversation = EnsureConversation(); var sentPermission = CurrentPermission;
+        var conversation = EnsureConversation();
         profile = CreateRequestProfile(profile);
         string context; IReadOnlyList<AiTurn> turns;
         var runId = Guid.NewGuid();
