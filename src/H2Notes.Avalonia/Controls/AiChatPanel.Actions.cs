@@ -13,6 +13,9 @@ public sealed partial class AiChatPanel
     private void AddProjectActions(ChatMessageView bubble, AiMessage message)
     {
         if (_scope?.Project is null || message.Role != "assistant" || message.Status != "complete") return;
+        // New project Agent operations are typed host tools. Never reinterpret H2 Agent prose
+        // or fenced text as legacy project mutations.
+        if (string.Equals(message.Provider, "H2 Agent", StringComparison.Ordinal)) return;
         try
         {
             var actions = AiProjectActions.Parse(message.Content);
@@ -79,6 +82,7 @@ public sealed partial class AiChatPanel
     private async Task ApplyAutomaticProjectActionsAsync(AiChatScope scope, AiConversation conversation, AiMessage answer, AiPermissionMode sentPermission)
     {
         if (scope != _scope || conversation != _conversation || answer.Status != "complete" || sentPermission != CurrentPermission) return;
+        if (string.Equals(answer.Provider, "H2 Agent", StringComparison.Ordinal)) return;
         try
         {
             var actions = AiProjectActions.Parse(answer.Content);
