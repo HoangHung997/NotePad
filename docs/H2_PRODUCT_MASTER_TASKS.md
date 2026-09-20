@@ -604,7 +604,7 @@ Evidence: `H2EvidenceInspectionProjectionService` rebuilds inspector rows from r
 
 # Stage H7 — Replace legacy project AI execution
 
-## [ ] H2M-070 — Convert AiChatPanel into Agent presentation surface
+## [x] H2M-070 — Convert AiChatPanel into Agent presentation surface
 
 Reuse useful UI:
 
@@ -620,6 +620,8 @@ Replace direct send execution with `H2AgentAdapter`.
 Acceptance:
 
 - normal new project AI request does not call legacy direct `AiClient` project-chat path.
+
+Evidence: `AiChatPanel.Send()` now routes project scope exclusively to `SendProjectAgent()`; standalone/notebook scope temporarily retains `SendLegacy()` until later retirement work. The project Agent path calls only `IH2AgentAdapter.StartTaskAsync / ObserveTask / CancelTask`, renders bounded typed progress through the existing thinking/progress UI, keeps the existing composer/chat bubbles/history/file presentation, and records Agent task identity in presentation messages without making those messages authoritative task state. Its bounded `H2AgentTaskContext` is built directly from current project/user-visible context and does not call `AiProjectContext`, `AiProjectActions`, `SecretVault`, `AiClient` or `StreamEvents`. Existing provider-thinking/HTTP/PDF direct-client regressions were moved to standalone legacy chat where they still belong; the old h2-actions tests now exercise the legacy parser/apply subsystem directly instead of normal project send. Project stream/reparent/snapshot regressions were migrated to fake AgentAdapter execution and prove detach/hide does not cancel an in-flight Agent task, project context is flushed/grounded, cancel reaches `CancelTask`, and the direct `AiClient` factory is never invoked for project requests. Exact functional source `8b72de1fb0ea2ee25a2a46396b4e49952f56cc71`, Actions run `35496090164` SUCCESS, H2 Notes **402/402**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `63f4f1376da81f2b4f931bbeb2b0d22ff9e4b928`; portable ZIP SHA256 `8a150f17e38860e9b2eeabe8dc7b2a4fe75bac0270bf72c768d8744c85b27ddb`.
 
 ---
 
