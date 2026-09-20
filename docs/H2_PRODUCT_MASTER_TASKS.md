@@ -549,7 +549,7 @@ Evidence: Project Notes continue to reuse the existing `RichEditor` + `NotesTool
 
 ---
 
-## [ ] H2M-063 — Files/resources detail
+## [x] H2M-063 — Files/resources detail
 
 Initial scope:
 
@@ -561,6 +561,8 @@ Initial scope:
 Agent handles actual file operations through providers/tools.
 
 Do not mirror entire filesystem metadata into project JSON.
+
+Evidence: `H2ProjectResourceProjectionService` rebuilds project resources from the three real sources already owned elsewhere: `ProjectRecord.Links`, existing conversation `SavedFiles`, and recent Agent evidence. It deduplicates explicit project-link targets against saved files, retains Agent task/evidence identity, and does not persist filesystem metadata caches into ProjectRecord. The Resources detail is one click from the Agent-first project workspace and refreshes while open. `H2ResourceTargetPolicy` fails closed: only `http/https` and existing absolute local/UNC targets may open; missing/relative/unsafe schemes are non-actionable, reveal is Windows-only, and Agent evidence without an explicit target is never guessed into a shell path. Dedicated regressions prove ProjectLink/saved-file/evidence projection, dedupe, safe target policy, one-click UI, evidence identity visibility and absence of duplicate resource stores/filesystem metadata. Exact functional source `67a250bfdb772d8fdfb4adb3a62082591ded2487`, Actions run `35492436895` SUCCESS, H2 Notes **393/393**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `af6c33fdbd4c876cfc0942f8cfb31f55b3285c91`; portable ZIP SHA256 `6fe94870981d0d015b3026acbcaa27bf5a080f5004be61f17aae169a2713b35f`.
 
 ---
 
