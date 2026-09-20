@@ -117,16 +117,25 @@ public partial class MainWindow
         {
             if (_notesProject is null || !NotesSplitter.IsVisible) return;
             var total = TasksPane.Bounds.Height + NotesPane.Bounds.Height;
-            if (total > 0) { _notesProject.Layout.NotesFraction = Math.Clamp(NotesPane.Bounds.Height / total, .15, .85); _notesProject.Layout.HasCustomSplit = true; }
-            _app.ScheduleSave();
+            if (total > 0)
+            {
+                var localLayout = _app.LocalSettings.GetProjectLayout(_notesProject.Id);
+                localLayout.NotesFraction = Math.Clamp(NotesPane.Bounds.Height / total, .15, .85);
+                localLayout.HasCustomSplit = true;
+                _app.LocalSettings.Save();
+            }
         }), RoutingStrategies.Bubble, true);
         AiResizeGrip.PointerPressed += (_, e) => { if (_notesProject is null || _notesProject.Layout.AiDock != "floating") return; _resizeStart = e.GetPosition(WorkAndAi); _resizeSize = AiHostBorder.Bounds.Size; e.Pointer.Capture(AiResizeGrip); e.Handled = true; };
         AiResizeGrip.PointerMoved += (_, e) =>
         {
             if (_resizeStart is not { } start || _notesProject is null) return;
-            var point = e.GetPosition(WorkAndAi); _notesProject.Layout.AiWidth = Math.Max(300, _resizeSize.Width + point.X - start.X); _notesProject.Layout.AiHeight = Math.Max(350, _resizeSize.Height + point.Y - start.Y); ApplyResponsive();
+            var point = e.GetPosition(WorkAndAi);
+            var localLayout = _app.LocalSettings.GetProjectLayout(_notesProject.Id);
+            localLayout.AiWidth = Math.Max(300, _resizeSize.Width + point.X - start.X);
+            localLayout.AiHeight = Math.Max(350, _resizeSize.Height + point.Y - start.Y);
+            ApplyResponsive();
         };
-        AiResizeGrip.PointerReleased += (_, e) => { _resizeStart = null; e.Pointer.Capture(null); _app.ScheduleSave(); };
+        AiResizeGrip.PointerReleased += (_, e) => { _resizeStart = null; e.Pointer.Capture(null); _app.LocalSettings.Save(); };
         AiResizeGrip.PointerCaptureLost += (_, _) => _resizeStart = null;
         _dragGhost.Child = _ghostTitle; Grid.SetColumnSpan(_dragGhost, 3); RootBody.Children.Add(_dragGhost);
         PropertyChanged += (_, e) => { if (e.Property == BoundsProperty || e.Property == WindowStateProperty) ApplyResponsive(); };
@@ -232,6 +241,9 @@ public partial class MainWindow
         _wide = _wide ? width >= 880 : width >= 900;
 
         var layout = _notesProject?.Layout ?? new ProjectLayout();
+        var localLayout = _notesProject is null
+            ? new LocalProjectLayout()
+            : _app.LocalSettings.GetProjectLayout(_notesProject.Id);
         var projectOpen = !_showCommandCenter && _notesProject is not null;
         var primaryAgent = projectOpen
             && _projectWorkspaceMode == ProjectWorkspaceAgentMode
@@ -303,8 +315,8 @@ public partial class MainWindow
             && !layout.TasksCollapsed
             && !layout.NotesCollapsed;
 
-        var fraction = layout.HasCustomSplit && double.IsFinite(layout.NotesFraction)
-            ? Math.Clamp(layout.NotesFraction, .15, .85)
+        var fraction = localLayout.HasCustomSplit && double.IsFinite(localLayout.NotesFraction)
+            ? Math.Clamp(localLayout.NotesFraction, .15, .85)
             : _wide ? .52 : .44;
         EditorSplit.RowDefinitions[0].Height = notesTab
             ? new GridLength(0)
@@ -384,15 +396,15 @@ public partial class MainWindow
             var workWidth = width - 56 - (sidebar ? 250 : 0);
             var workHeight = height - 72;
             AiHostBorder.Width = floating
-                ? Math.Clamp(layout.AiWidth, 300, Math.Max(300, workWidth - 24))
+                ? Math.Clamp(localLayout.AiWidth, 300, Math.Max(300, workWidth - 24))
                 : double.NaN;
             AiHostBorder.Height = floating
-                ? Math.Clamp(layout.AiHeight, 350, Math.Max(350, workHeight - 24))
+                ? Math.Clamp(localLayout.AiHeight, 350, Math.Max(350, workHeight - 24))
                 : double.NaN;
             AiHostBorder.Margin = floating
                 ? new Thickness(
-                    Math.Clamp(layout.AiX < 0 ? workWidth - AiHostBorder.Width - 12 : layout.AiX, 0, Math.Max(0, workWidth - AiHostBorder.Width)),
-                    Math.Clamp(layout.AiY < 0 ? workHeight - AiHostBorder.Height - 12 : layout.AiY, 0, Math.Max(0, workHeight - AiHostBorder.Height)),
+                    Math.Clamp(localLayout.AiX < 0 ? workWidth - AiHostBorder.Width - 12 : localLayout.AiX, 0, Math.Max(0, workWidth - AiHostBorder.Width)),
+                    Math.Clamp(localLayout.AiY < 0 ? workHeight - AiHostBorder.Height - 12 : localLayout.AiY, 0, Math.Max(0, workHeight - AiHostBorder.Height)),
                     0,
                     0)
                 : new Thickness(0);
@@ -494,7 +506,16 @@ public partial class MainWindow
     {
         _dragGhost.IsVisible = DockPreview.IsVisible = false;
         if (apply && _pendingAiDock is not null && _notesProject is not null)
-        { if (_pendingAiDock == "floating") { _notesProject.Layout.AiX = _pendingAiPosition.X; _notesProject.Layout.AiY = _pendingAiPosition.Y; } SetAiDock(_pendingAiDock); }
+        {
+            if (_pendingAiDock == "floating")
+            {
+                var localLayout = _app.LocalSettings.GetProjectLayout(_notesProject.Id);
+                localLayout.AiX = _pendingAiPosition.X;
+                localLayout.AiY = _pendingAiPosition.Y;
+                _app.LocalSettings.Save();
+            }
+            SetAiDock(_pendingAiDock);
+        }
         _pendingAiDock = null;
     }
     private sealed record ProjectNavItem(ProjectRecord Project, int Number)
