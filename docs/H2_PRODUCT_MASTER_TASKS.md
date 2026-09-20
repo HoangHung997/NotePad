@@ -759,7 +759,7 @@ Evidence: `WorkAssistantBubbleWindow` is a borderless draggable local-only shell
 
 ---
 
-## [ ] H2M-082 — Add global hotkey
+## [x] H2M-082 — Add global hotkey
 
 Hotkey opens compact assistant.
 
@@ -768,6 +768,8 @@ Acceptance:
 - no mutation occurs just from hotkey;
 - conflict with another system shortcut fails gracefully;
 - configurable.
+
+Evidence: Work Assistant global hotkey is host-owned through `WorkAssistantHotkeyController` + Windows `RegisterHotKey` with MOD_NOREPEAT, a hidden native-window registration host, explicit unregister/rebind, parser normalization and fail-soft conflict/error reporting. `WorkAssistantCompactWindow` opens as a non-mutating prompt shell only; the hotkey callback does not call `IH2AgentAdapter.StartTaskAsync`, does not fabricate/send a prompt and does not mutate shared `SheetState/ProjectRecord`. Settings expose a configurable hotkey string in machine-local `WorkAssistantSettings`; invalid bindings remain unsaved/visible as UI error and registration conflicts do not crash the app. Dedicated H2M-082 tests prove parser normalization/rejection, conflict fail-soft behavior, rebinding/unregister, callback-only compact opening, zero Agent starts, no shared-state mutation and local-only hotkey round-trip. Exact functional source `34957412ed459962eee5a44f00b85ed7d40752c7`, Actions run `35514654569` SUCCESS, H2 Notes **427/427**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `2c8946b0d21771a8293567b47dbab705c226316b`; portable ZIP SHA256 `538a6b2a12361aa627b274ae63b653f939873e3e477e40e0d2a2a7570871afbc`.
 
 ---
 
