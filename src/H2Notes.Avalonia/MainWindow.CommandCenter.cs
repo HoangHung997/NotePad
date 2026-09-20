@@ -168,6 +168,8 @@ public partial class MainWindow
             SetBoard(board);
 
         _showCommandCenter = false;
+        _projectWorkspaceMode = ProjectWorkspaceAgentMode;
+        ReturnProjectAiToBoard();
         SelectCurrent(project);
         _drawerOpen = false;
         CommandCenterList.SelectedItem = null;
