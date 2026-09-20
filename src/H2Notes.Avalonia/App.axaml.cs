@@ -23,6 +23,14 @@ public partial class App : Application
     public string DeviceId => _local.DeviceId;
     public bool IsChangingStore { get; private set; }
     public bool UsesProjectFiles => _storage is ProjectWorkspaceStore;
+    public string? AgentWorkspaceRoot => _storage switch
+    {
+        ProjectWorkspaceStore project => project.Root,
+        null => null,
+        _ => string.IsNullOrWhiteSpace(_storage.FilePath)
+            ? null
+            : Path.GetDirectoryName(_storage.FilePath)
+    };
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
     public IH2AgentAdapter AgentAdapter { get; set; } = H2UnavailableAgentAdapter.Instance;
     public H2WorkspaceHealthSnapshot CurrentWorkspaceHealth
