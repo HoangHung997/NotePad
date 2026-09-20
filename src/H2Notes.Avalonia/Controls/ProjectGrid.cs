@@ -131,7 +131,12 @@ public sealed class ProjectGrid : Control
         ClearLayouts();
         var y = 0d;
         var rows = _focusedProject is { } selected
-            ? selected.ChecklistItems.Select(t => new SheetRow(selected, t, _board.Projects.IndexOf(selected) + 1)).ToList()
+            ? selected.ChecklistItems
+                .Where(task => _filter.Length == 0
+                    || task.DisplayText.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+                    || task.CommentText.Contains(_filter, StringComparison.OrdinalIgnoreCase))
+                .Select(task => new SheetRow(selected, task, _board.Projects.IndexOf(selected) + 1))
+                .ToList()
             : SheetOperations.Rows(_board, _filter);
         foreach (var row in rows)
         {
