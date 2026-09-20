@@ -198,13 +198,16 @@ internal static class H2CommandCenterUiTests
             var agent = new CommandCenterAgentFake(attention.Id, now.AddMinutes(5));
             var app = new App { AgentAdapter = agent };
             app.State.Notes.Add(board);
-            var before = System.Text.Json.JsonSerializer.Serialize(board);
 
             var window = new MainWindow(app, board);
             window.Show();
             Pump();
             try
             {
+                // MainWindow initialization legitimately updates board/session metadata.
+                // The grouping guarantee is narrower: changing the derived filter must not
+                // mutate durable ProjectRecord/TaskRecord truth.
+                var before = System.Text.Json.JsonSerializer.Serialize(board.Projects);
                 var filter = window.FindControl<ComboBox>("CommandCenterGroupFilter")!;
                 var list = window.FindControl<ListBox>("CommandCenterList")!;
                 Check(filter.ItemsSource!.Cast<object>().Count() == 6,
@@ -235,8 +238,8 @@ internal static class H2CommandCenterUiTests
                 Check(list.ItemsSource!.Cast<object>().Count() == 3,
                     "All filter did not restore all projected projects.");
 
-                var after = System.Text.Json.JsonSerializer.Serialize(board);
-                Check(before == after, "Filtering mutated persisted project/board truth.");
+                var after = System.Text.Json.JsonSerializer.Serialize(board.Projects);
+                Check(before == after, "Filtering mutated persisted ProjectRecord/TaskRecord truth.");
             }
             finally
             {
