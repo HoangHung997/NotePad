@@ -33,9 +33,9 @@ public sealed partial class AiChatPanel
             }
             cancel.Token.ThrowIfCancellationRequested();
             user.Attachments = attachments;
-            // AiProjectContext.Prepare replays old turns as text-only. Therefore only attachments
+            // AiLegacyRequestContext.Prepare replays old turns as text-only. Therefore only attachments
             // in this new user message can reach the OCR/native-media pipeline.
-            var turns = AiProjectContext.Prepare(conversation, user, context);
+            var turns = AiLegacyRequestContext.Prepare(conversation, user, context);
             turns = await AiPdfProcessor.PrepareTurnsAsync(turns, profile, settings, AiSettingsWindow.PdfBridgePath, progress, cancel.Token);
             cancel.Token.ThrowIfCancellationRequested();
             if (scope != _scope || conversation != _conversation || !IsCurrentComposerTarget(target)) return null;
