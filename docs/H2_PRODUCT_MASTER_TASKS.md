@@ -842,7 +842,7 @@ Evidence: Work Assistant now exposes four per-send permission presets: Observe o
 
 ---
 
-## [ ] H2M-087 — Work Assistant completion UX
+## [x] H2M-087 — Work Assistant completion UX
 
 Show:
 
@@ -856,6 +856,8 @@ Show:
 Undo only when underlying provider/Agent action supports a real safe undo path.
 
 Do not promise generic undo for arbitrary external applications.
+
+Evidence: Work Assistant now monitors the existing Agent task through `IH2AgentAdapter` and projects queued/running/approval/blocked/failed/cancelled/completed state into the floating bubble plus one compact completion panel. The panel shows a bounded concise result, explicit verified/attention state, expandable bounded evidence, task cancellation where still active, and retry preparation only after terminal failure/block/cancel; retry never auto-replays a mutation and resets both captured foreground context and the prior mutation permission preset before the user can send again. A quick task can be attached later to an existing H2 project through `AttachProject` without embedding Agent task/evidence state into `ProjectRecord`, then `OpenProjectWorkspace` navigates to the full linked project workspace. The completion UI contains no generic Undo action and explicitly states that undo is available only when the underlying provider/Agent exposes a real safe undo path. Dedicated `H2WorkAssistantCompletionTests` prove running → attention → verified completion, evidence details, explicit cancel/retry semantics, project linking/navigation, one-Agent-runtime ownership and the no-generic-Undo guard. Exact functional source `9cab2edfb88ae401b948040e692f0e87f2abf199`, Actions run `35541081290` SUCCESS, H2 Notes **448/448**, dedicated H2M-087 completion tests **4/4**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `e4972e10b1266cc92995d2899acde6a57af212fb`; portable ZIP SHA256 `acc5ee1ff5e16fbddbf2196d59a1266dcb7658993e96f9f6d3f683103e5268d2`.
 
 ---
 
