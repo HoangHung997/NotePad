@@ -175,6 +175,7 @@ public sealed partial class AiChatPanel : UserControl
     public void SetDetached(bool detached) { _detached = detached; _header.IsVisible = !detached && _scope?.IsStandalone != true; }
     public void Cancel()
     {
+        CancelActiveAgentTask();
         _pdfPreparation?.Cancel();
         _layoutCancellation?.Cancel();
         _flushStreaming?.Invoke();
@@ -321,6 +322,17 @@ public sealed partial class AiChatPanel : UserControl
         conversation.Draft = ""; conversation.DraftAttachments.Clear(); _loading = true; _composer.Text = ""; _loading = false; RenderAttachments();
     }
     private async Task Send()
+    {
+        if (_scope?.Project is not null)
+        {
+            await SendProjectAgent();
+            return;
+        }
+
+        await SendLegacy();
+    }
+
+    private async Task SendLegacy()
     {
         if (_scope is null) return;
         if (_profiles.SelectedItem is not AiProfile profile || string.IsNullOrWhiteSpace(profile.Model)) { _status.Text = "Mở Thiết lập AI để chọn model và lưu kết nối trước."; return; }
