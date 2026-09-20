@@ -114,6 +114,19 @@ public partial class MainWindow : Window
         AddTaskButton.IsEnabled = _notesProject is not null;
         ProjectTitle.Text = _notesProject is null ? "Chọn dự án" : _notesProject.DisplayName;
         ProjectProgress.Text = _notesProject is null ? "" : $"{_notesProject.Progress} công việc hoàn thành";
+        ProjectNextSummary.Text = _notesProject?.Next is { } summaryNext
+            ? "Tiếp theo: " + summaryNext.DisplayText
+            : _notesProject is null ? "" : "Tiếp theo: Đã hoàn thành";
+        var projectAttention = _notesProject is null || _commandCenterQuery is null
+            ? 0
+            : _commandCenterQuery.GetNeedsAttention(
+                [_notesProject],
+                H2WorkspaceHealthSnapshot.Healthy).Count;
+        ProjectAttentionSummary.Text = _notesProject is null
+            ? ""
+            : projectAttention == 0
+                ? "Không có việc cần bạn xử lý"
+                : $"⚠ {projectAttention} cần bạn xem";
         TasksTitle.Text = $"Công việc  {_notesProject?.Progress ?? "0/0"}";
         DetachedAiWindow?.UpdateProject(_notesProject);
         RefreshNavigator();
