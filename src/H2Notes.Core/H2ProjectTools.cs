@@ -66,8 +66,8 @@ public interface IH2ProjectToolHost
 }
 
 /// <summary>
-/// Optional adapter capability. A production Agent bridge can bind H2 typed project tools without
-/// H2 Notes taking a dependency on AgentRuntime/ToolRegistry.
+/// Optional adapter capability. A production Agent bridge can bind H2 typed project tools
+/// without H2 Notes depending on provider/runtime implementation details.
 /// </summary>
 public interface IH2ProjectToolHostConsumer
 {
