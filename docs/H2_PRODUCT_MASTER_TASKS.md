@@ -471,7 +471,7 @@ Evidence: `H2CommandCenterQueryService.GroupFor(...)` derives the five required 
 
 ---
 
-## [ ] H2M-053 — Sync health UI
+## [x] H2M-053 — Sync health UI
 
 Display storage health:
 
@@ -483,6 +483,8 @@ Display storage health:
 Data comes from storage/sync service.
 
 Do not allow model text to control sync health.
+
+Evidence: `App.CurrentWorkspaceHealth` derives storage health from `ProjectWorkspaceStore` diagnostics/pending/recovery state and overlays the host-owned `_saving` lifecycle as `Busy`; recovery/offline truth has priority over that transient state. Save failures are recorded through `ProjectWorkspaceStore.RecordSyncFailure(ex)`, so failed writes surface real Offline/Warning/RecoveryRequired state instead of merely showing a local-pending label. Command Center maps those enum values to explicit **Đã đồng bộ / Đang lưu / Chờ đồng bộ / Ngoại tuyến / Lỗi đồng bộ / Lỗi · cần phục hồi** labels and diagnostic tooltips. Dedicated regression proves an Agent/model completion cannot override an offline store and verifies Saving/Offline/Recovery/Error labels. Exact functional source `4f257e7d9671bf6fc2697fa0aee71fb9ebe0e8f1`, Actions run `35487603554` SUCCESS, H2 Notes **382/382**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `b54418f79b1b61daf0a5d015d36b88ff0cc07f50`; portable ZIP SHA256 `204dcb364549aff9cfed31e0b1986143fedbe0d60ac44058407e563705882063`.
 
 ---
 
