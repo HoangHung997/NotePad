@@ -406,7 +406,7 @@ Evidence: `ProjectProgressCalculator` is now the single canonical formula: compl
 
 # Stage H5 — Build Project Command Center
 
-## [ ] H2M-050 — Create Command Center view
+## [x] H2M-050 — Create Command Center view
 
 Build a new primary global project overview.
 
@@ -423,6 +423,8 @@ Each row/card must show only high-value fields:
 Acceptance:
 
 - user can understand all major projects without entering each project.
+
+Evidence: `MainWindow.CommandCenter.cs` + `MainWindow.axaml` make Command Center the default project surface, aggregate active projects across boards through `H2CommandCenterQueryService`, and show only high-value project name, deterministic task completion, next project task, latest Agent state, attention count, latest verified activity and sync health. Selecting a card reuses the existing project workspace; Projects navigation returns to the global overview. Dedicated H2CommandCenterUiTests pass, and legacy responsive/project-AI regressions were updated to navigate through Command Center before testing workspace behavior rather than weakening runtime semantics. Exact functional source `3581950046411a460d78511ac319cd5a6273ed57`, Actions run `35483265023` SUCCESS, H2 Notes **378/378**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `a8b1a5b542f88bdaabfaeccb8827ae14512e0316`; portable ZIP SHA256 `df10b9ca2c7c9f0c9b31e4da2e537ff449eb27a5105cf944e9a318eb7b6ef980`.
 
 ---
 
