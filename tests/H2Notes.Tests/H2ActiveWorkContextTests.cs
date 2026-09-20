@@ -186,11 +186,16 @@ internal static class H2ActiveWorkContextTests
             var captureIndex = appSource.IndexOf(
                 "CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();",
                 StringComparison.Ordinal);
-            var openIndex = appSource.IndexOf(
-                "EnsureWorkAssistantCompact().OpenFromHotkey();",
+            var setContextIndex = appSource.IndexOf(
+                "compact.SetActiveContext(CurrentWorkAssistantContext);",
                 StringComparison.Ordinal);
-            Check(captureIndex >= 0 && openIndex > captureIndex,
-                "Foreground context is not captured before compact assistant takes focus.");
+            var openIndex = appSource.IndexOf(
+                "compact.OpenFromHotkey();",
+                StringComparison.Ordinal);
+            Check(captureIndex >= 0
+                && setContextIndex > captureIndex
+                && openIndex > setContextIndex,
+                "Foreground context is not captured/projected before compact assistant takes focus.");
             Check(appSource.Contains(
                     "WorkAssistantContextCapture.Revalidate(context)",
                     StringComparison.Ordinal),
