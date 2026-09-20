@@ -135,18 +135,16 @@ public sealed class H2ProductProjectionService
         var attention = AttentionForProject(project.Id, recent, health).Count;
         var latestVerified = LatestVerifiedActivity(project, recent);
 
-        var total = project.ChecklistItems.Count;
-        var completed = project.ChecklistItems.Count(task => task.IsCompleted);
-        var next = project.ChecklistItems.FirstOrDefault(task =>
-            !task.IsCompleted && !string.IsNullOrWhiteSpace(TaskText(task)));
+        var progress = ProjectProgressCalculator.Calculate(project);
+        var next = ProjectProgressCalculator.NextTask(project);
 
         return new(
             project.Id,
             ProjectName(project),
-            completed,
-            total,
+            progress.Completed,
+            progress.Total,
             next?.Id,
-            next is null ? null : TaskText(next),
+            next is null ? null : ProjectProgressCalculator.TaskText(next),
             latestAgent?.Status,
             attention,
             latestVerified,
@@ -203,14 +201,14 @@ public sealed class H2ProductProjectionService
         {
             if (task.CreatedAtUtc is { } taskCreated)
                 activity.Add(new(project.Id, taskCreated, "project-task",
-                    "Task created: " + Bound(TaskText(task), 240)));
+                    "Task created: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
 
             if (task.CompletedAtUtc is { } completed)
                 activity.Add(new(project.Id, completed, "project-task",
-                    "Task completed: " + Bound(TaskText(task), 240)));
+                    "Task completed: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
             else if (task.UpdatedAtUtc is { } taskUpdated && taskUpdated != task.CreatedAtUtc)
                 activity.Add(new(project.Id, taskUpdated, "project-task",
-                    "Task updated: " + Bound(TaskText(task), 240)));
+                    "Task updated: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
         }
 
         foreach (var run in Recent(project.Id, limit))
@@ -322,9 +320,6 @@ public sealed class H2ProductProjectionService
 
     private static string ProjectName(ProjectRecord project)
         => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
-
-    private static string TaskText(TaskRecord task)
-        => task.TextRich?.Text ?? RichDocument.FromLegacy(task.Text ?? "").Text;
 
     private static string AgentActivitySummary(H2AgentTaskSummary task)
         => task.Status switch
