@@ -22,6 +22,7 @@ public partial class MainWindow
     private const string ProjectWorkspaceAgentMode = "agent";
     private const string ProjectWorkspaceTasksMode = "tasks";
     private const string ProjectWorkspaceNotesMode = "notes";
+    private const string ProjectWorkspaceResourcesMode = "resources";
     private string _projectWorkspaceMode = ProjectWorkspaceAgentMode;
     private AiChatPanel _chat = null!;
     private ProjectNavItem? _pressedProject;
@@ -106,6 +107,7 @@ public partial class MainWindow
         AgentTabButton.Click += (_, _) => ShowAgentWorkspace();
         TasksTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceTasksMode);
         NotesTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceNotesMode);
+        ResourcesTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceResourcesMode);
         CollapseTasksButton.Click += (_, _) => { if (_notesProject is not null) _notesProject.Layout.TasksCollapsed = !_notesProject.Layout.TasksCollapsed; ApplyResponsive(); _app.ScheduleSave(); };
         NotesSplitter.AddHandler(PointerReleasedEvent, (_, _) => Dispatcher.UIThread.Post(() =>
         {
@@ -166,9 +168,12 @@ public partial class MainWindow
     private void ShowProjectDetail(string mode)
     {
         if (_notesProject is null) return;
-        _projectWorkspaceMode = mode == ProjectWorkspaceNotesMode
-            ? ProjectWorkspaceNotesMode
-            : ProjectWorkspaceTasksMode;
+        _projectWorkspaceMode = mode switch
+        {
+            ProjectWorkspaceNotesMode => ProjectWorkspaceNotesMode,
+            ProjectWorkspaceResourcesMode => ProjectWorkspaceResourcesMode,
+            _ => ProjectWorkspaceTasksMode
+        };
 
         if (_projectWorkspaceMode == ProjectWorkspaceNotesMode)
         {
@@ -176,11 +181,15 @@ public partial class MainWindow
             _notesProject.Layout.NotesCollapsed = false;
             if (!_wide) _notesProject.Layout.TasksCollapsed = true;
         }
-        else
+        else if (_projectWorkspaceMode == ProjectWorkspaceTasksMode)
         {
             _notesProject.Layout.Tab = "tasks";
             _notesProject.Layout.TasksCollapsed = false;
             Sheet.SetFilter(SearchBox.Text ?? "");
+        }
+        else
+        {
+            RefreshProjectResources();
         }
 
         ApplyResponsive();
@@ -213,6 +222,8 @@ public partial class MainWindow
         var primaryAgent = projectOpen
             && _projectWorkspaceMode == ProjectWorkspaceAgentMode
             && DetachedAiWindow?.IsVisible != true;
+        var resourcesMode = projectOpen
+            && _projectWorkspaceMode == ProjectWorkspaceResourcesMode;
 
         var fullscreen = WindowState == WindowState.Maximized;
         if (!primaryAgent
@@ -260,7 +271,8 @@ public partial class MainWindow
 
         CommandCenter.IsVisible = _showCommandCenter;
         WorkContent.IsVisible = projectOpen && !inlineAi;
-        EditorSplit.IsVisible = projectOpen && !primaryAgent && !inlineAi;
+        EditorSplit.IsVisible = projectOpen && !primaryAgent && !resourcesMode && !inlineAi;
+        ProjectResourcesPane.IsVisible = projectOpen && resourcesMode && !inlineAi;
 
         // Detail mode keeps the mature task/note editor behavior. It is secondary now because
         // opening a project starts in primaryAgent; tabs expose this surface in one click.
@@ -288,11 +300,13 @@ public partial class MainWindow
         NotesToolbar.IsVisible = NotesEditorBorder.IsVisible = !layout.NotesCollapsed;
 
         AgentTabButton.IsEnabled = !primaryAgent;
-        TasksTabButton.IsEnabled = primaryAgent || layout.Tab != "tasks";
-        NotesTabButton.IsEnabled = primaryAgent || layout.Tab != "notes";
+        TasksTabButton.IsEnabled = primaryAgent || resourcesMode || layout.Tab != "tasks";
+        NotesTabButton.IsEnabled = primaryAgent || resourcesMode || layout.Tab != "notes";
+        ResourcesTabButton.IsEnabled = !resourcesMode;
         AgentTabButton.Foreground = RichEditor.Brush(primaryAgent ? "#FFFFFF" : "#796C62");
-        TasksTabButton.Foreground = RichEditor.Brush(!primaryAgent && !notesTab ? "#A4573D" : "#796C62");
-        NotesTabButton.Foreground = RichEditor.Brush(!primaryAgent && notesTab ? "#A4573D" : "#796C62");
+        TasksTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !notesTab ? "#A4573D" : "#796C62");
+        NotesTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && notesTab ? "#A4573D" : "#796C62");
+        ResourcesTabButton.Foreground = RichEditor.Brush(resourcesMode ? "#A4573D" : "#796C62");
 
         AiHostBorder.IsVisible = primaryAgent || legacyAi;
 
