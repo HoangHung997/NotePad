@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using H2Notes.Core;
 
 namespace H2Notes.Avalonia;
@@ -9,7 +10,13 @@ public partial class MainWindow
     private H2CommandCenterQueryService _commandCenterQuery = null!;
     private bool _showCommandCenter = true;
     private bool _updatingCommandCenter;
+    private bool _updatingCommandCenterAttention;
     private string _commandCenterSignature = "";
+    private string _commandCenterAttentionSignature = "";
+    private readonly DispatcherTimer _commandCenterRefreshTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
 
     private void InitializeCommandCenter()
     {
@@ -23,6 +30,27 @@ public partial class MainWindow
                 return;
             OpenProjectWorkspace(item.Board, item.Project);
         };
+
+        CommandCenterAttentionList.SelectionChanged += (_, _) =>
+        {
+            if (_updatingCommandCenterAttention
+                || CommandCenterAttentionList.SelectedItem is not CommandCenterAttentionItem item)
+                return;
+
+            CommandCenterAttentionList.SelectedItem = null;
+            if (item.Board is not null && item.Project is not null)
+                OpenProjectWorkspace(item.Board, item.Project);
+            else if (item.Kind == "workspace")
+                _app.ShowSettings(this);
+        };
+
+        _commandCenterRefreshTimer.Tick += (_, _) =>
+        {
+            if (_showCommandCenter && IsVisible)
+                RefreshCommandCenter();
+        };
+        _commandCenterRefreshTimer.Start();
+        Closed += (_, _) => _commandCenterRefreshTimer.Stop();
     }
 
     private IReadOnlyList<NoteRecord> CommandCenterBoards()
@@ -58,6 +86,29 @@ public partial class MainWindow
             })
             .ToArray();
 
+        var attentionItems = _commandCenterQuery.GetNeedsAttention(
+                pairs.Select(pair => pair.Project),
+                health)
+            .Select(projection =>
+            {
+                if (projection.ProjectId is { } projectId && byProject.TryGetValue(projectId, out var source))
+                    return new CommandCenterAttentionItem(source.Board, source.Project, projection);
+                return new CommandCenterAttentionItem(null, null, projection);
+            })
+            .ToArray();
+
+        var attentionSignature = string.Join("|", attentionItems.Select(item => item.Signature));
+        if (attentionSignature != _commandCenterAttentionSignature)
+        {
+            _commandCenterAttentionSignature = attentionSignature;
+            _updatingCommandCenterAttention = true;
+            CommandCenterAttentionList.ItemsSource = attentionItems;
+            CommandCenterAttentionList.SelectedItem = null;
+            _updatingCommandCenterAttention = false;
+        }
+        CommandCenterAttentionSection.IsVisible = attentionItems.Length != 0;
+        CommandCenterAttentionHeader.Text = $"Cần bạn xử lý · {attentionItems.Length}";
+
         var signature = string.Join("|", items.Select(item => item.Signature))
             + "|" + health.State + "|" + health.Code + "|" + health.HasPendingChanges;
         if (signature != _commandCenterSignature)
@@ -69,7 +120,7 @@ public partial class MainWindow
             _updatingCommandCenter = false;
         }
 
-        var attention = items.Sum(item => item.AttentionCount);
+        var attention = attentionItems.Length;
         var active = items.Count(item => item.AgentStatus is
             H2AgentTaskStatus.Queued or H2AgentTaskStatus.Running or H2AgentTaskStatus.WaitingForApproval);
         CommandCenterSummary.Text = $"{items.Length} dự án · {attention} cần xem"
@@ -98,6 +149,43 @@ public partial class MainWindow
         _drawerOpen = false;
         CommandCenterList.SelectedItem = null;
         ApplyResponsive();
+    }
+
+    private sealed class CommandCenterAttentionItem
+    {
+        public CommandCenterAttentionItem(
+            NoteRecord? board,
+            ProjectRecord? project,
+            NeedsAttentionProjection projection)
+        {
+            Board = board;
+            Project = project;
+            Projection = projection;
+        }
+
+        public NoteRecord? Board { get; }
+        public ProjectRecord? Project { get; }
+        public NeedsAttentionProjection Projection { get; }
+
+        public Guid? ProjectId => Projection.ProjectId;
+        public Guid? AgentTaskId => Projection.AgentTaskId;
+        public string Kind => Projection.Kind;
+        public string Code => Projection.Code;
+        public string Title => Projection.Title;
+        public string SourceText => Projection.Kind == "workspace"
+            ? "Nguồn: Lưu trữ / đồng bộ"
+            : Project is null
+                ? "Nguồn: Agent task"
+                : "Nguồn: " + ProjectName(Project)
+                    + (Projection.AgentTaskId is { } taskId ? $" · Agent {taskId.ToString("N")[..8]}" : "");
+        public string TimeText => Projection.AtUtc is { } at
+            ? ToLocal(at).ToString("dd/MM HH:mm")
+            : "";
+        public string Signature =>
+            $"{ProjectId}:{AgentTaskId}:{Kind}:{Code}:{Title}:{Projection.AtUtc:O}";
+
+        private static string ProjectName(ProjectRecord project)
+            => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
     }
 
     private sealed class CommandCenterProjectItem
