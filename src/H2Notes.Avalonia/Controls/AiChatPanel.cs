@@ -335,6 +335,8 @@ public sealed partial class AiChatPanel : UserControl
     private async Task SendLegacy()
     {
         if (_scope is null) return;
+        if (_scope.Project is not null)
+            throw new InvalidOperationException("Project AI requests must use H2AgentAdapter; legacy AiClient execution is standalone-only.");
         if (_profiles.SelectedItem is not AiProfile profile || string.IsNullOrWhiteSpace(profile.Model)) { _status.Text = "Mở Thiết lập AI để chọn model và lưu kết nối trước."; return; }
         var owner = TopLevel.GetTopLevel(this) as Window; if (owner is null) return;
         var scope = _scope; var prompt = _composer.Text?.Trim() ?? ""; string key;
@@ -367,7 +369,7 @@ public sealed partial class AiChatPanel : UserControl
         var buffer = new StringBuilder(); var reasoning = new StringBuilder(); var lastSave = DateTime.UtcNow;
         var reasoningClipped = false;
         _streamingReasoning = "";
-        _flushStreaming = () => { answer.Content = buffer.ToString(); if (scope.Project is { } p) _app.MarkProjectDirty(p.Id); };
+        _flushStreaming = () => answer.Content = buffer.ToString();
         var paint = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
         paint.Tick += (_, _) =>
         {
@@ -424,7 +426,8 @@ public sealed partial class AiChatPanel : UserControl
             cts.Dispose(); _request = null; _activeAnswer = null; _flushStreaming = null; _send.IsVisible = true; _stop.IsVisible = false;
             RefreshComposerOptions();
             answer.ErrorText = error ?? "";
-            ApplyAutomaticProjectActions(scope, conversation, answer, sentPermission);
+            // SendLegacy is standalone-only. Typed project mutations are performed by
+            // Agent-bound IH2ProjectToolHost, never by parsing legacy model output here.
             if (_conversation == conversation) { Render(); if (error is not null) _status.Text = "Gửi chưa hoàn tất · xem chi tiết trong tin nhắn phía trên."; }
             Touch(scope); _streamFinished?.TrySetResult(); _streamFinished = null;
         }
