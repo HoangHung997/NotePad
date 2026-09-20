@@ -23,6 +23,7 @@ public sealed class WorkAssistantCompactWindow : Window
     private readonly WorkAssistantSettings _settings;
     private readonly TextBox _prompt;
     private readonly TextBlock _status;
+    private readonly Button _send;
     private readonly WrapPanel _contextChips;
     private readonly TextBlock _contextHint;
     private readonly Button _contextReset;
@@ -35,9 +36,9 @@ public sealed class WorkAssistantCompactWindow : Window
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Title = "Work Assistant";
         Width = 460;
-        Height = 270;
+        Height = 300;
         MinWidth = 380;
-        MinHeight = 230;
+        MinHeight = 250;
         CanResize = true;
         ShowInTaskbar = false;
         CanMinimize = false;
@@ -127,8 +128,25 @@ public sealed class WorkAssistantCompactWindow : Window
             FontSize = 10,
             Foreground = Brush.Parse("#796C62"),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(12, 2, 12, 10)
+            VerticalAlignment = VerticalAlignment.Center
         };
+        _send = new Button
+        {
+            Name = "WorkAssistantSendButton",
+            Content = "Gửi",
+            MinWidth = 74,
+            Padding = new Thickness(12, 6),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        var footer = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            Margin = new Thickness(12, 4, 12, 10)
+        };
+        footer.Children.Add(_status);
+        Grid.SetColumn(_send, 1);
+        footer.Children.Add(_send);
 
         var root = new Grid
         {
@@ -139,12 +157,13 @@ public sealed class WorkAssistantCompactWindow : Window
         root.Children.Add(contextArea);
         Grid.SetRow(_prompt, 2);
         root.Children.Add(_prompt);
-        Grid.SetRow(_status, 3);
-        root.Children.Add(_status);
+        Grid.SetRow(footer, 3);
+        root.Children.Add(footer);
         Content = root;
 
         close.Click += (_, _) => Hide();
         _contextReset.Click += (_, _) => ResetContextScope();
+        _send.Click += async (_, _) => await SubmitPromptAsync();
         DesktopWindowChrome.Attach(this, header);
         RebuildContextChips();
     }
@@ -154,6 +173,8 @@ public sealed class WorkAssistantCompactWindow : Window
         get => _prompt.Text ?? "";
         set => _prompt.Text = value ?? "";
     }
+
+    public event Func<string, string, Task>? SubmitRequested;
 
     public H2ActiveWorkContext? CapturedContext => _capturedContext;
     public WorkAssistantContextScope AvailableContextScope => _availableContextScope;
@@ -182,6 +203,15 @@ public sealed class WorkAssistantCompactWindow : Window
         RebuildContextChips();
     }
 
+    public void SetStatus(string text, bool isError = false)
+    {
+        _status.Text = Bound(text, 600);
+        _status.Foreground = Brush.Parse(isError ? "#A33A2B" : "#796C62");
+    }
+
+    public void ClearPrompt()
+        => _prompt.Text = "";
+
     public void ApplySettings()
         => Topmost = _settings.AlwaysOnTop;
 
@@ -195,6 +225,38 @@ public sealed class WorkAssistantCompactWindow : Window
         Activate();
         _prompt.Focus();
         _prompt.CaretIndex = _prompt.Text?.Length ?? 0;
+    }
+
+    private async Task SubmitPromptAsync()
+    {
+        var prompt = PromptText.Trim();
+        if (prompt.Length == 0)
+        {
+            SetStatus("Nhập yêu cầu trước khi gửi.", isError: true);
+            return;
+        }
+
+        var handlers = SubmitRequested?
+            .GetInvocationList()
+            .Cast<Func<string, string, Task>>()
+            .ToArray();
+        if (handlers is null || handlers.Length == 0)
+        {
+            SetStatus("Work Assistant chưa sẵn sàng gửi tác vụ.", isError: true);
+            return;
+        }
+
+        _send.IsEnabled = false;
+        SetStatus("Đang gửi tác vụ…");
+        try
+        {
+            foreach (var handler in handlers)
+                await handler(prompt, SelectedContextSummary);
+        }
+        finally
+        {
+            _send.IsEnabled = true;
+        }
     }
 
     private void RebuildContextChips()
