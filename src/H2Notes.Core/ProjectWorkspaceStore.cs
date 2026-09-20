@@ -822,6 +822,20 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         if (!includeProjects) clone.Projects = [];
         ClearDrafts(clone.AiConversations);
         foreach (var project in clone.Projects) ClearDrafts(project.Conversations);
+
+        // Window/session placement is machine-local. Preserve the legacy fields in the model
+        // for single-file compatibility, but never publish another PC's placement through NAS.
+        clone.IsVisibleOnDesktop = false;
+        clone.IsPinned = false;
+        clone.Left = 120;
+        clone.Top = 100;
+        clone.Width = 1100;
+        clone.Height = 740;
+        clone.SheetLeft = null;
+        clone.SheetTop = null;
+        clone.SheetWidth = null;
+        clone.SheetHeight = null;
+
         return clone;
     }
 
