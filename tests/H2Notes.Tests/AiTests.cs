@@ -142,9 +142,9 @@ internal static class AiTests
                 conversation.Messages.Add(message);
             }
             var pending = new AiMessage { Role = "user", Content = "new request" };
-            var turns = AiProjectContext.Prepare(conversation, pending, "{\"current\":true}");
-            Check(turns.Count == AiProjectContext.RecentConversationMessages + 2);
-            Check(turns.Skip(1).Take(AiProjectContext.RecentConversationMessages).All(t => (t.Images?.Count ?? 0) == 0 && (t.Files?.Count ?? 0) == 0));
+            var turns = AiLegacyRequestContext.Prepare(conversation, pending, "{\"current\":true}");
+            Check(turns.Count == AiLegacyRequestContext.RecentConversationMessages + 2);
+            Check(turns.Skip(1).Take(AiLegacyRequestContext.RecentConversationMessages).All(t => (t.Images?.Count ?? 0) == 0 && (t.Files?.Count ?? 0) == 0));
             Check(turns.Any(t => t.Content.Contains("OCR-CACHED-TABLE", StringComparison.Ordinal)));
             Check(turns.All(t => !t.Content.Contains("turn-0", StringComparison.Ordinal)));
             Check(turns[^1].Content.Contains("new request", StringComparison.Ordinal));
