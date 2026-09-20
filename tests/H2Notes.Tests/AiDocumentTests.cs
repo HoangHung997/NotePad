@@ -158,28 +158,62 @@ internal static class AiDocumentTests
             }
             finally { window.Close(); }
         });
-        test("Project send flushes editor and sends exact snapshot without a confirmation dialog", () =>
+        test("Project Agent send flushes editor and grounds exact snapshot without a confirmation dialog", () =>
         {
-            var app = new H2Notes.Avalonia.App(); var profile = new AiProfile { Model = "test" }; app.LocalSettings.Ai.Profiles = [profile];
-            var handler = new Stub(AiProtocol.Ollama); var project = new ProjectRecord { Name = "Requested project", Notes = "stale" };
-            var panel = new AiChatPanel(app, () => new AiClient(handler)); panel.SetProject(project);
+            var app = new H2Notes.Avalonia.App();
+            var project = new ProjectRecord { Name = "Requested project", Notes = "stale" };
+            var agent = new SnapshotAgentAdapter(project.Id);
+            app.AgentAdapter = agent;
+            var clientCalls = 0;
+            var panel = new AiChatPanel(app, () => { clientCalls++; return new AiClient(); }); panel.SetProject(project);
             panel.PrepareProjectContext = () => project.NotesRich = RichDocument.Plain("Unsaved editor text");
+            panel.ReadContext = () => project.NotesText;
             var window = new Window { Content = panel, Width = 560, Height = 660 }; window.Show(); Dispatcher.UIThread.RunJobs();
             try
             {
                 panel.GetVisualDescendants().OfType<TextBox>().Single(c => c.Name == "ChatComposer").Text = "Summarize this project";
-                var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(panel, null)!; Dispatcher.UIThread.RunJobs();
+                var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(panel, null)!;
                 var end = DateTime.UtcNow.AddSeconds(3); while (!send.IsCompleted && DateTime.UtcNow < end) { Dispatcher.UIThread.RunJobs(); Thread.Sleep(5); }
-                Check(send.IsCompleted && handler.Calls == 1 && !window.OwnedWindows.Any(), "Send blocked by an unexpected dialog");
+                Check(send.IsCompleted && agent.Calls == 1 && clientCalls == 0 && !window.OwnedWindows.Any(), "Project Agent send used the wrong execution path or opened a dialog");
                 send.GetAwaiter().GetResult();
-                Check(handler.Body!.Contains("Unsaved editor text"), "Sent stale editor text");
-                Check(project.Conversations[0].Messages.Count == 2 && project.Conversations[0].Messages.Last().Status == "complete", "Missing user/final answer");
+                Check(agent.Context?.Summary?.Contains("Unsaved editor text", StringComparison.Ordinal) == true, "Agent received stale editor context");
+                Check(project.Conversations[0].Messages.Count == 2 && project.Conversations[0].Messages.Last().Status == "complete", "Missing user/final Agent presentation");
                 var other = new ProjectRecord { Name = "Other project" }; panel.SetProject(other);
-                Check(other.Conversations.Count == 0 && handler.Calls == 1, "Project switch resent the request or mixed history");
+                Check(other.Conversations.Count == 0 && agent.Calls == 1, "Project switch resent the Agent request or mixed history");
             }
             finally { foreach (var child in window.OwnedWindows.ToArray()) child.Close(); window.Close(); }
         });
     }
+    private sealed class SnapshotAgentAdapter : IH2AgentAdapter
+    {
+        private readonly Guid _projectId;
+        private H2AgentTaskSummary? _summary;
+        public SnapshotAgentAdapter(Guid projectId) { _projectId = projectId; TaskId = Guid.NewGuid(); }
+        public Guid TaskId { get; }
+        public int Calls { get; private set; }
+        public H2AgentTaskContext? Context { get; private set; }
+
+        public Task<Guid> StartTaskAsync(Guid? projectId, string goal, H2AgentTaskContext? context = null, bool readOnly = true, CancellationToken cancellationToken = default)
+        {
+            Check(projectId == _projectId, "Wrong project ID reached snapshot Agent.");
+            Calls++; Context = context; var now = DateTime.UtcNow;
+            _summary = new H2AgentTaskSummary(TaskId, projectId, goal, H2AgentTaskStatus.Completed, null,
+                Array.Empty<H2AgentEvidence>(), "OK", null, now, now);
+            return Task.FromResult(TaskId);
+        }
+        public H2AgentTaskObservation ObserveTask(Guid taskId, long afterSequence = -1)
+            => taskId == TaskId && _summary is not null
+                ? new(_summary, [new H2AgentProgress(0, DateTime.UtcNow, "final", "completed", "Completed")])
+                : throw new KeyNotFoundException();
+        public void CancelTask(Guid taskId) { }
+        public bool RespondToApproval(Guid taskId, Guid approvalId, bool approved) => false;
+        public H2AgentTaskSummary GetTaskSummary(Guid taskId) => taskId == TaskId && _summary is not null ? _summary : throw new KeyNotFoundException();
+        public IReadOnlyList<H2AgentTaskSummary> GetRecentTasks(Guid? projectId = null, int limit = 50)
+            => _summary is not null && (projectId is null || projectId == _projectId) ? [_summary] : Array.Empty<H2AgentTaskSummary>();
+        public H2AgentEvidence? GetEvidence(string evidenceId) => null;
+        public bool AttachProject(Guid taskId, Guid projectId) => false;
+    }
+
     private sealed class Stub(AiProtocol protocol) : HttpMessageHandler
     {
         public string? Body; public int Calls;
