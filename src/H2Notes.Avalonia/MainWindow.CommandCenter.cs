@@ -54,8 +54,11 @@ public partial class MainWindow
 
         _commandCenterRefreshTimer.Tick += (_, _) =>
         {
-            if (_showCommandCenter && IsVisible)
+            if (!IsVisible) return;
+            if (_showCommandCenter)
                 RefreshCommandCenter();
+            else if (_projectWorkspaceMode == ProjectWorkspaceResourcesMode)
+                RefreshProjectResources();
         };
         _commandCenterRefreshTimer.Start();
         Closed += (_, _) => _commandCenterRefreshTimer.Stop();
