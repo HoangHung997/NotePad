@@ -138,15 +138,15 @@ public sealed class H2ProductProjectionService
         var total = project.ChecklistItems.Count;
         var completed = project.ChecklistItems.Count(task => task.IsCompleted);
         var next = project.ChecklistItems.FirstOrDefault(task =>
-            !task.IsCompleted && !string.IsNullOrWhiteSpace(task.DisplayText));
+            !task.IsCompleted && !string.IsNullOrWhiteSpace(TaskText(task)));
 
         return new(
             project.Id,
-            project.DisplayName,
+            ProjectName(project),
             completed,
             total,
             next?.Id,
-            next?.DisplayText,
+            next is null ? null : TaskText(next),
             latestAgent?.Status,
             attention,
             latestVerified,
@@ -203,14 +203,14 @@ public sealed class H2ProductProjectionService
         {
             if (task.CreatedAtUtc is { } taskCreated)
                 activity.Add(new(project.Id, taskCreated, "project-task",
-                    "Task created: " + Bound(task.DisplayText, 240)));
+                    "Task created: " + Bound(TaskText(task), 240)));
 
             if (task.CompletedAtUtc is { } completed)
                 activity.Add(new(project.Id, completed, "project-task",
-                    "Task completed: " + Bound(task.DisplayText, 240)));
+                    "Task completed: " + Bound(TaskText(task), 240)));
             else if (task.UpdatedAtUtc is { } taskUpdated && taskUpdated != task.CreatedAtUtc)
                 activity.Add(new(project.Id, taskUpdated, "project-task",
-                    "Task updated: " + Bound(task.DisplayText, 240)));
+                    "Task updated: " + Bound(TaskText(task), 240)));
         }
 
         foreach (var run in Recent(project.Id, limit))
@@ -319,6 +319,12 @@ public sealed class H2ProductProjectionService
 
         return candidates.Count == 0 ? null : candidates.Max();
     }
+
+    private static string ProjectName(ProjectRecord project)
+        => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
+
+    private static string TaskText(TaskRecord task)
+        => task.TextRich?.Text ?? RichDocument.FromLegacy(task.Text ?? "").Text;
 
     private static string AgentActivitySummary(H2AgentTaskSummary task)
         => task.Status switch
