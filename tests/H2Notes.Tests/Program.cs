@@ -567,6 +567,7 @@ H2ProjectHistoryTests.Run(Test);
 H2ProjectEvidenceInspectorTests.Run(Test);
 H2AgentPresentationTests.Run(Test);
 H2LegacyConversationHistoryTests.Run(Test);
+H2LegacyRequestContextRetirementTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {
