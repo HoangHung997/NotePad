@@ -863,7 +863,7 @@ Evidence: Work Assistant now monitors the existing Agent task through `IH2AgentA
 
 # Stage H9 — Local/shared UI-state cleanup
 
-## [ ] H2M-090 — Audit ProjectLayout storage
+## [x] H2M-090 — Audit ProjectLayout storage
 
 Review:
 
@@ -883,6 +883,8 @@ Move machine-specific geometry out of shared `ProjectRecord`.
 Acceptance:
 
 - monitor/window geometry no longer syncs through NAS unless explicitly justified.
+
+Evidence: `docs/H2_PROJECT_LAYOUT_STORAGE_AUDIT.md` records the ownership decision. Portable project preferences remain only `Tab`, `AiDock`, `AiExplicitlyHidden`, `TasksCollapsed` and `NotesCollapsed`. Machine-specific `NotesFraction`, `HasCustomSplit`, `AiWidth`, `AiHeight`, `AiX` and `AiY` were removed from shared `ProjectLayout` and moved to `LocalConfiguration.ProjectLayouts[ProjectId]` as bounded `LocalProjectLayout` values. Responsive split/resize/drag code persists those values only through machine-local config; resetting layout resets both portable preference and local geometry. `H2ProjectLayoutStorageTests` prove the exact ProjectLayout surface, local per-project geometry, absence of geometry from shared ProjectRecord JSON, absence from real `projects/*.h2project.json` NAS serialization, and source-guard the responsive UI against writes back into shared project geometry. Exact functional source `2f250c8d8cfb6ca4f959ea9f93e7079f211978d8`, Actions run `35541849793` SUCCESS, H2 Notes **453/453**, dedicated H2M-090 **5/5**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `28bf5fd24cd08c7bfdfd804d6f6b847f459f149e`; portable ZIP SHA256 `dd60f3d353e9fdce9e6fca16fff596a351b70a127e9ced5397763af5946d788c`.
 
 ---
 
