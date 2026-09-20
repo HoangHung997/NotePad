@@ -37,6 +37,7 @@ public partial class MainWindow : Window
         InitializeCommandCenter();
         InitializeProjectResources();
         InitializeProjectHistory();
+        InitializeProjectEvidenceInspector();
         Sheet.SelectionChanged += OnSelection;
         Sheet.DataChanged += () =>
         {
@@ -149,6 +150,8 @@ public partial class MainWindow : Window
             RefreshProjectResources();
         if (_projectWorkspaceMode == ProjectWorkspaceHistoryMode)
             RefreshProjectHistory();
+        if (_projectWorkspaceMode == ProjectWorkspaceEvidenceMode)
+            RefreshProjectEvidence();
     }
     public void FlushNotes()
     {
