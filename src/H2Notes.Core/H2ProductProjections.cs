@@ -132,7 +132,9 @@ public sealed class H2ProductProjectionService
         var health = workspaceHealth ?? H2WorkspaceHealthSnapshot.Healthy;
         var recent = Recent(project.Id);
         var latestAgent = recent.FirstOrDefault();
-        var attention = AttentionForProject(project.Id, recent, health).Count;
+        // Workspace health is a single global source in NeedsAttentionProjection.
+        // Do not duplicate the same sync warning onto every project card.
+        var attention = AttentionForProject(project.Id, recent, health: null).Count;
         var latestVerified = LatestVerifiedActivity(project, recent);
 
         var progress = ProjectProgressCalculator.Calculate(project);
