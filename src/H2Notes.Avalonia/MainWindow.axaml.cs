@@ -60,7 +60,13 @@ public partial class MainWindow : Window
         Sheet.DeleteRequested += async row => await DeleteRow(row);
         NotesEditor.Changed += _app.ScheduleSave;
         SearchBox.TextChanged += (_, _) => { _searchTimer.Stop(); _searchTimer.Start(); };
-        _searchTimer.Tick += (_, _) => { _searchTimer.Stop(); RefreshNavigator(); };
+        _searchTimer.Tick += (_, _) =>
+        {
+            _searchTimer.Stop();
+            RefreshNavigator();
+            if (!_showCommandCenter && _projectWorkspaceMode == "tasks")
+                Sheet.SetFilter(SearchBox.Text ?? "");
+        };
         AddProjectButton.Click += async (_, _) => await AddProject();
         AddTaskButton.Click += async (_, _) => await AddTask();
         CollapseNotesButton.Click += (_, _) => ToggleNotes();
