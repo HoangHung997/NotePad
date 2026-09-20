@@ -59,7 +59,13 @@ public partial class MainWindow : Window
         Sheet.EditStarting += FlushNotes;
         Sheet.DeleteRequested += async row => await DeleteRow(row);
         NotesEditor.Changed += _app.ScheduleSave;
-        SearchBox.TextChanged += (_, _) => { _searchTimer.Stop(); _searchTimer.Start(); };
+        SearchBox.TextChanged += (_, _) =>
+        {
+            if (!_showCommandCenter && _projectWorkspaceMode == ProjectWorkspaceTasksMode)
+                Sheet.SetFilter(SearchBox.Text ?? "");
+            _searchTimer.Stop();
+            _searchTimer.Start();
+        };
         _searchTimer.Tick += (_, _) =>
         {
             _searchTimer.Stop();
