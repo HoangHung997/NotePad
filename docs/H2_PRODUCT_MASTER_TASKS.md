@@ -793,7 +793,7 @@ Evidence: `H2ActiveWorkContext` is a bounded H2-facing ephemeral record for proc
 
 ---
 
-## [ ] H2M-084 — Add context chips
+## [x] H2M-084 — Add context chips
 
 Show current interpretation:
 
@@ -802,6 +802,8 @@ Show current interpretation:
 ```
 
 User can see/remove/change scope before send where appropriate.
+
+Evidence: `WorkAssistantCompactWindow` now renders the captured ActiveWorkContext as removable RAM-only chips for application, document, provider session and selection (for example `[Excel] [DuToan.xlsx] [BAOCAOGS] [D51:F80]`). The selected chip mask only changes the bounded grounding summary prepared for the next send; it does not rewrite the original captured process/window identity used by `TryGetValidatedWorkAssistantContext(...)`. Removing Document/Selection also prevents those values from leaking through the send summary, while **Đặt lại scope** restores the captured interpretation. `App.ShowWorkAssistantCompact()` captures foreground context before focus moves, projects it into the compact window, and context refreshes update the chips. The scope mask is not persisted in `LocalConfiguration`, `SheetState`, ProjectRecord or workspace files, and the chip UI does not start Agent work or save anything by itself. Dedicated acceptance tests prove four-chip rendering, selective remove/reset, scoped summary behavior, full-context stale-target revalidation, no shared/local persistence and no implicit `StartTaskAsync`. Exact functional source `c551131e7658ccd35178c6d2a41395fb8ca981a5`, Actions run `35517481101` SUCCESS, H2 Notes **434/434**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `ab55545e1de3a1a52f6789d009ff2c4fbb3efce1`; portable ZIP SHA256 `5d7288d104f370f307e7e5b71690614efc2162f03d37f7d7fcec93b1372ebeb8`.
 
 ---
 
