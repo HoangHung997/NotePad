@@ -42,9 +42,9 @@ internal static class H2CommandCenterUiTests
                 Check(Text(item, "AgentText").Contains("chờ phê duyệt", StringComparison.OrdinalIgnoreCase), "Agent state is missing.");
                 Check(Text(item, "AttentionText") == "1 cần xem", "Attention count is missing.");
                 Check(Text(item, "ActivityText").StartsWith("Hoạt động mới nhất:", StringComparison.Ordinal), "Latest verified activity is missing.");
-                Check(Text(item, "SyncText") == "Đồng bộ: ổn", "Sync health is missing.");
+                Check(Text(item, "SyncText") == "Đã đồng bộ", "Sync health is missing.");
                 Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("3 dự án", StringComparison.Ordinal), "Global project summary is missing.");
-                Check(window.FindControl<TextBlock>("CommandCenterSync")!.Text == "Đồng bộ: ổn", "Global sync summary is missing.");
+                Check(window.FindControl<TextBlock>("CommandCenterSync")!.Text == "Đã đồng bộ", "Global sync summary is missing.");
             }
             finally
             {
@@ -247,6 +247,82 @@ internal static class H2CommandCenterUiTests
             }
         });
 
+        test("Sync health UI comes from storage lifecycle state, never Agent/model text", () =>
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "H2Notes-sync-health-ui",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+
+            var store = new ProjectWorkspaceStore(root);
+            store.LoadOrImport();
+            var state = SheetStorage.Demo();
+            store.Save(state);
+            var board = state.Notes.First(note => note.IsBoard);
+            var project = board.Projects[0];
+
+            var agent = new CommandCenterAgentFake(project.Id, DateTime.UtcNow);
+            agent.Resolve();
+            var app = new App { AgentAdapter = agent };
+            typeof(App).GetProperty("State")!.SetValue(app, state);
+            typeof(App).GetField("_storage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(app, store);
+
+            Check(app.CurrentWorkspaceHealth.State == H2WorkspaceSyncState.Healthy,
+                "Clean store did not project Healthy.");
+
+            typeof(App).GetField("_saving", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(app, true);
+            Check(app.CurrentWorkspaceHealth.State == H2WorkspaceSyncState.Busy
+                && app.CurrentWorkspaceHealth.Code == "saving",
+                "Real host saving state did not project Busy/Saving.");
+
+            typeof(App).GetField("_saving", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(app, false);
+            store.RecordSyncFailure(new IOException("network unavailable"));
+            Check(app.CurrentWorkspaceHealth.State == H2WorkspaceSyncState.Offline,
+                "Storage I/O failure did not project Offline.");
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                // The Agent task says it is resolved/completed; that must not override storage truth.
+                Check(window.FindControl<TextBlock>("CommandCenterSync")!.Text == "Ngoại tuyến",
+                    "Agent/model state overrode offline storage health.");
+
+                var projectItem = window.FindControl<ListBox>("CommandCenterList")!.ItemsSource!
+                    .Cast<object>().Single(value => (Guid?)Value(value, "ProjectId") == project.Id);
+                Check(Text(projectItem, "SyncText") == "Ngoại tuyến",
+                    "Project card did not use storage health projection.");
+
+                var nested = typeof(MainWindow).GetNestedType(
+                    "CommandCenterProjectItem",
+                    System.Reflection.BindingFlags.NonPublic)!;
+                var method = nested.GetMethod(
+                    "SyncTextFor",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+
+                string Map(H2WorkspaceSyncState value)
+                    => (string)method.Invoke(null, [value])!;
+
+                Check(Map(H2WorkspaceSyncState.Healthy) == "Đã đồng bộ", "Healthy label is wrong.");
+                Check(Map(H2WorkspaceSyncState.Busy) == "Đang lưu", "Saving label is wrong.");
+                Check(Map(H2WorkspaceSyncState.Offline) == "Ngoại tuyến", "Offline label is wrong.");
+                Check(Map(H2WorkspaceSyncState.RecoveryRequired) == "Lỗi · cần phục hồi",
+                    "Recovery-required label is wrong.");
+                Check(Map(H2WorkspaceSyncState.Warning) == "Lỗi đồng bộ",
+                    "Sync-error label is wrong.");
+            }
+            finally
+            {
+                window.Close();
+                try { Directory.Delete(root, true); } catch { }
+            }
+        });
+
         test("Command Center XAML binds only the required high-value overview fields", () =>
         {
             var repo = FindRepoRoot();
@@ -272,6 +348,8 @@ internal static class H2CommandCenterUiTests
             Check(source.Contains("CommandCenterGroupFilter", StringComparison.Ordinal)
                 && source.Contains("H2CommandCenterQueryService.GroupFor", StringComparison.Ordinal),
                 "Command Center grouping/filtering is not projection-derived.");
+            Check(source.Contains("SyncTextFor(health.State)", StringComparison.Ordinal),
+                "Command Center sync badge is not derived from workspace health.");
             Check(source.Contains("AgentTaskId", StringComparison.Ordinal)
                 && source.Contains("ProjectId", StringComparison.Ordinal),
                 "Attention deep-link source identifiers are missing.");
