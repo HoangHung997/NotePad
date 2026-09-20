@@ -248,8 +248,18 @@ internal static class H2WorkAssistantCompletionTests
 
     private static T PrivateField<T>(object owner, string name)
         where T : class
-        => (T)(owner.GetType().GetField(name, Private)?.GetValue(owner)
-            ?? throw new Exception("Missing private field " + name));
+    {
+        for (var type = owner.GetType(); type is not null; type = type.BaseType)
+        {
+            var field = type.GetField(
+                name,
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (field?.GetValue(owner) is T value)
+                return value;
+        }
+
+        throw new Exception($"Missing field {name} on {owner.GetType().FullName} or its base types.");
+    }
 
     private static string Text(object owner, string field)
         => PrivateField<TextBlock>(owner, field).Text ?? "";
@@ -262,13 +272,33 @@ internal static class H2WorkAssistantCompletionTests
 
     private static object? CallPrivate(object owner, string name, params object?[] args)
     {
-        var method = owner.GetType().GetMethod(name, Private)
-            ?? throw new Exception("Missing private method " + name);
-        return method.Invoke(owner, args);
+        for (var type = owner.GetType(); type is not null; type = type.BaseType)
+        {
+            var method = type.GetMethod(
+                name,
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (method is not null)
+                return method.Invoke(owner, args);
+        }
+
+        throw new Exception($"Missing method {name} on {owner.GetType().FullName} or its base types.");
     }
 
     private static void SetPrivate(object owner, string name, object? value)
-        => owner.GetType().GetField(name, Private)!.SetValue(owner, value);
+    {
+        for (var type = owner.GetType(); type is not null; type = type.BaseType)
+        {
+            var field = type.GetField(
+                name,
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (field is null)
+                continue;
+            field.SetValue(owner, value);
+            return;
+        }
+
+        throw new Exception($"Missing field {name} on {owner.GetType().FullName} or its base types.");
+    }
 
     private static void Pump()
     {
