@@ -8,6 +8,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
+using H2AgentLab.Integration;
 
 namespace H2Notes.Avalonia;
 
@@ -145,6 +146,7 @@ public partial class App : Application
             try
             {
                 _local = LocalConfiguration.Read();
+                ComposeProductionAgent();
                 if (_demo || dataIndex >= 0)
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(dataPath)!);
@@ -261,6 +263,8 @@ public partial class App : Application
                 _syncTimer.Stop();
                 _workAssistantTaskTimer.Stop();
                 _workAssistantHotkey?.Dispose();
+                if (_agentAdapter is IDisposable disposableAgent)
+                    disposableAgent.Dispose();
                 _workAssistantCompact?.Close();
                 _workAssistantBubble?.Close();
                 _tray?.Dispose();
@@ -294,6 +298,28 @@ public partial class App : Application
                 });
         }
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void ComposeProductionAgent()
+    {
+        AgentAdapter = new H2ProductionAgentAdapter(
+            Path.Combine(LocalConfiguration.SettingsDirectory, "agent-runtime"),
+            () =>
+            {
+                var profile = _local.Ai.Profiles
+                    .FirstOrDefault(item => item.Id == _local.Ai.SelectedId)
+                    ?? _local.Ai.Profiles.FirstOrDefault()
+                    ?? throw new InvalidOperationException(
+                        "Chưa có cấu hình model cho H2 Agent.");
+
+                if (string.IsNullOrWhiteSpace(profile.Model))
+                    throw new InvalidOperationException(
+                        "Chọn model trong Thiết lập AI trước khi chạy H2 Agent.");
+
+                return new H2ProductionAgentModel(
+                    profile,
+                    SecretVault.Read(profile.Id));
+            });
     }
 
     private void ShowStartupError(IClassicDesktopStyleApplicationLifetime desktop, string text)
