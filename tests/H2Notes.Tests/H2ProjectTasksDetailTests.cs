@@ -4,6 +4,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.Headless;
+using Avalonia.VisualTree;
 using H2Notes.Avalonia;
 using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
@@ -86,7 +88,7 @@ internal static class H2ProjectTasksDetailTests
                 search.Text = "Needle comment";
                 WaitSearch();
                 Check(LayoutRows(sheet).Count == 1, "Task/comment search did not filter Tasks detail.");
-                Check(LayoutTask(LayoutRows(sheet)[0]).Id == second.Id,
+                Check(LayoutTask(LayoutRows(sheet)[0]!).Id == second.Id,
                     "Task detail search returned the wrong TaskRecord.");
 
                 search.Text = "";
@@ -118,7 +120,7 @@ internal static class H2ProjectTasksDetailTests
                     "Task comment edit/rich formatting was lost.");
 
                 // Completion remains the ProjectGrid checkbox behavior.
-                var firstLayout = LayoutRows(sheet)
+                var firstLayout = LayoutRows(sheet).Cast<object>()
                     .Single(row => LayoutTask(row).Id == first.Id);
                 var firstPoint = LocalPoint(firstLayout, x: 20, verticalFraction: .5);
                 ClickAt(window, sheet, firstPoint);
@@ -127,9 +129,9 @@ internal static class H2ProjectTasksDetailTests
                 // Drag/drop remains task ordering; clear filter is already active.
                 sheet.Refresh();
                 Pump();
-                var thirdLayout = LayoutRows(sheet)
+                var thirdLayout = LayoutRows(sheet).Cast<object>()
                     .Single(row => LayoutTask(row).Id == third.Id);
-                firstLayout = LayoutRows(sheet)
+                firstLayout = LayoutRows(sheet).Cast<object>()
                     .Single(row => LayoutTask(row).Id == first.Id);
                 var source = Translate(sheet, window, LocalPoint(thirdLayout, x: 120, verticalFraction: .5));
                 var target = Translate(sheet, window, LocalPoint(firstLayout, x: 120, verticalFraction: .2));
