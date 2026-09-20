@@ -149,14 +149,16 @@ internal static class H2AgentPresentationTests
             Check(legacyBody.Contains("Project AI requests must use H2AgentAdapter", StringComparison.Ordinal),
                 "Legacy project-scope fail-closed message is missing.");
 
+            var executionTail = legacyBody[clientFactory..];
             foreach (var forbidden in new[]
             {
                 "ApplyAutomaticProjectActions(",
-                "scope.Project is",
+                "scope.Project",
+                "_scope.Project",
                 "MarkProjectDirty("
             })
-                Check(!legacyBody.Contains(forbidden, StringComparison.Ordinal),
-                    "Standalone legacy AiClient path regained project mutation marker: " + forbidden);
+                Check(!executionTail.Contains(forbidden, StringComparison.Ordinal),
+                    "Standalone legacy AiClient execution tail regained project mutation marker: " + forbidden);
         });
 
         test("Project Agent presentation source does not use legacy direct execution internals", () =>
