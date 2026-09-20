@@ -650,7 +650,7 @@ Evidence: legacy project conversation data remains in the existing `AiConversati
 
 ---
 
-## [ ] H2M-072 — Retire AiProjectContext after parity
+## [x] H2M-072 — Retire AiProjectContext after parity
 
 Current `AiProjectContext` serializes project/chat context for the legacy chat path.
 
@@ -664,6 +664,8 @@ Acceptance:
 
 - new Agent context is bounded by Agent engine;
 - H2 does not build giant history JSON prompt.
+
+Evidence: the `AiProjectContext` runtime type/file was fully retired. Legacy standalone/PDF compatibility now uses the explicitly named `AiLegacyRequestContext`; architecture guards fail if `AiProjectContext` returns or if `AiLegacyRequestContext` leaks into the project Agent path. New project Agent requests remain grounded through bounded `H2AgentTaskContext` built in `AiChatPanel.Agent.cs`, with an explicit 15,000-character summary bound and no legacy Build/Prepare/history JSON builder dependency. Existing standalone/PDF compatibility tests were migrated to the legacy helper name without changing behavior. Exact functional source `e0e4d160da358e56a05940292ea01ef7222abb97`, Actions run `35498072080` SUCCESS, H2 Notes **410/410**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `025dee02fc13d739603a8b626ff9c90ae0c6472e`; portable ZIP SHA256 `635ff4e2e70500e8ac1cd0c2a56c11b92c1d2061157c8360698d34fbb98a8862`.
 
 ---
 
