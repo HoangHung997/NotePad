@@ -110,27 +110,38 @@ internal static class ProjectChatTests
             }
             finally { Stop(app); }
         });
-        test("Moving project AI to desktop and hiding board does not cancel an active reply (mock transport)", () =>
+        test("Moving project Agent to desktop and hiding board does not cancel an active reply", () =>
         {
             var state = SheetStorage.Demo(); var (app, main) = Session(state, "project-chat-stream.json");
             try
             {
+                var project = state.Notes[0].Projects[0];
                 var panel = (AiChatPanel)main.FindControl<ContentControl>("AiHost")!.Content!;
-                var profile = new AiProfile { Protocol = AiProtocol.Ollama, BaseUrl = "http://localhost:11434", Model = "mock" };
-                app.LocalSettings.Ai.Profiles = [profile]; app.LocalSettings.Ai.SelectedId = profile.Id;
-                var gate = new GateHandler(); typeof(AiChatPanel).GetField("_createClient", Private)!.SetValue(panel, (Func<AiClient>)(() => new AiClient(gate)));
-                typeof(AiChatPanel).GetMethod("RefreshProfiles", Private)!.Invoke(panel, null);
+                var gate = new GateAgentAdapter(project.Id);
+                app.AgentAdapter = gate;
+
                 main.DockProjectAi("floating"); Pump(); Named<TextBox>(panel, "ChatComposer").Text = "Question A"; Pump();
                 var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", Private)!.Invoke(panel, null)!;
                 Pump();
+
+                var startDeadline = DateTime.UtcNow.AddSeconds(5);
+                while (gate.Calls == 0 && DateTime.UtcNow < startDeadline) { Pump(); Thread.Sleep(5); }
+                Check(gate.Calls == 1, "Project request did not start through AgentAdapter.");
                 Check(!main.OwnedWindows.Any(), "Unexpected send confirmation");
+
                 main.ShowProjectAiWindow(); main.Close(); Pump();
-                Check(!send.IsCompleted, "Detaching cancelled the request"); gate.Release.SetResult();
+                Check(!send.IsCompleted && gate.CancelCalls == 0, "Detaching or hiding board cancelled the Agent task");
+
+                gate.Release.SetResult();
                 var deadline = DateTime.UtcNow.AddSeconds(5); while (!send.IsCompleted && DateTime.UtcNow < deadline) { Pump(); Thread.Sleep(5); }
-                Check(send.IsCompleted, "Mock request timed out"); send.GetAwaiter().GetResult(); Pump();
-                var answer = state.Notes[0].Projects[0].Conversations.Single().Messages.Last();
-                Check(answer.Status == "complete" && answer.Content == "Project answer" && gate.Calls == 1, "Detached stream was lost or sent twice");
-                Check(main.DetachedAiWindow!.GetVisualDescendants().OfType<ChatMessageView>().Last().Body.Text == "Project answer", "Reply rendered in wrong host");
+                Check(send.IsCompleted, "Agent request timed out"); send.GetAwaiter().GetResult(); Pump();
+
+                var answer = project.Conversations.Single().Messages.Last();
+                Check(answer.Status == "complete" && answer.Content == "Project answer" && gate.Calls == 1,
+                    "Detached Agent result was lost or started twice");
+                Check(answer.AiRunId == gate.TaskId, "Detached Agent result lost task identity.");
+                Check(main.DetachedAiWindow!.GetVisualDescendants().OfType<ChatMessageView>().Last().Body.Text == "Project answer",
+                    "Reply rendered in wrong host");
             }
             finally { Stop(app); }
         });
@@ -198,14 +209,69 @@ internal static class ProjectChatTests
             finally { Stop(app); }
         });
     }
-    private sealed class GateHandler : HttpMessageHandler
+    private sealed class GateAgentAdapter : IH2AgentAdapter
     {
-        public int Calls;
-        public readonly TaskCompletionSource Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        private readonly Guid _projectId;
+        private bool _cancelled;
+        private H2AgentTaskSummary? _summary;
+
+        public GateAgentAdapter(Guid projectId)
         {
-            Calls++; await Release.Task.WaitAsync(token);
-            return new(HttpStatusCode.OK) { Content = new StringContent("{\"message\":{\"content\":\"Project answer\"},\"done\":true}\n") };
+            _projectId = projectId;
+            TaskId = Guid.NewGuid();
         }
+
+        public Guid TaskId { get; }
+        public int Calls { get; private set; }
+        public int CancelCalls { get; private set; }
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<Guid> StartTaskAsync(Guid? projectId, string goal, H2AgentTaskContext? context = null, bool readOnly = true, CancellationToken cancellationToken = default)
+        {
+            if (projectId != _projectId) throw new InvalidOperationException("Wrong project.");
+            Calls++;
+            var now = DateTime.UtcNow;
+            _summary = new H2AgentTaskSummary(TaskId, projectId, goal, H2AgentTaskStatus.Running, null,
+                Array.Empty<H2AgentEvidence>(), null, null, now, now);
+            return Task.FromResult(TaskId);
+        }
+
+        public H2AgentTaskObservation ObserveTask(Guid taskId, long afterSequence = -1)
+        {
+            if (taskId != TaskId || _summary is null) throw new KeyNotFoundException();
+            var now = DateTime.UtcNow;
+            if (_cancelled)
+            {
+                _summary = _summary with { Status = H2AgentTaskStatus.Cancelled, UpdatedUtc = now };
+                return new(_summary, [new H2AgentProgress(1, now, "final", "cancelled", "Cancelled")]);
+            }
+
+            if (Release.Task.IsCompleted)
+            {
+                _summary = _summary with
+                {
+                    Status = H2AgentTaskStatus.Completed,
+                    FinalText = "Project answer",
+                    UpdatedUtc = now
+                };
+                return new(_summary, [new H2AgentProgress(1, now, "final", "completed", "Completed")]);
+            }
+
+            return new(_summary, [new H2AgentProgress(0, now, "work", "working", "Fixture progress")]);
+        }
+
+        public void CancelTask(Guid taskId)
+        {
+            if (taskId != TaskId) throw new KeyNotFoundException();
+            CancelCalls++;
+            _cancelled = true;
+        }
+
+        public bool RespondToApproval(Guid taskId, Guid approvalId, bool approved) => false;
+        public H2AgentTaskSummary GetTaskSummary(Guid taskId) => taskId == TaskId && _summary is not null ? _summary : throw new KeyNotFoundException();
+        public IReadOnlyList<H2AgentTaskSummary> GetRecentTasks(Guid? projectId = null, int limit = 50)
+            => _summary is not null && (projectId is null || projectId == _projectId) ? [_summary] : Array.Empty<H2AgentTaskSummary>();
+        public H2AgentEvidence? GetEvidence(string evidenceId) => null;
+        public bool AttachProject(Guid taskId, Guid projectId) => false;
     }
 }
