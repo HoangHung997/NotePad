@@ -14,10 +14,142 @@ public enum H2AgentTaskStatus
     Failed = 6
 }
 
+public enum H2AgentPermissionMode
+{
+    ObserveOnly = 0,
+    AskBeforeChanges = 1,
+    AllowScopedChanges = 2,
+    UseProjectPolicy = 3
+}
+
+public enum H2AgentResourceScopeKind
+{
+    None = 0,
+    Window = 1,
+    Document = 2,
+    Session = 3,
+    Project = 4
+}
+
+/// <summary>
+/// Host-issued, task-local permission scope. This is an input to the Agent task, not a second
+/// permission engine or durable grant store. Agent/provider permission enforcement remains authoritative.
+/// </summary>
+public sealed record H2AgentPermissionScope
+{
+    public H2AgentPermissionScope(
+        H2AgentPermissionMode mode,
+        H2AgentResourceScopeKind scopeKind,
+        string? resourceKey,
+        bool mutationAllowed,
+        bool approvalRequired,
+        DateTime issuedUtc,
+        DateTime expiresUtc,
+        H2ApplicationKind applicationKind = H2ApplicationKind.Unknown,
+        string? windowIdentity = null,
+        string? documentSessionId = null,
+        string? documentPath = null)
+    {
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        if (!Enum.IsDefined(scopeKind)) throw new ArgumentOutOfRangeException(nameof(scopeKind));
+        if (issuedUtc.Kind != DateTimeKind.Utc || expiresUtc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("Permission timestamps must be UTC.");
+        if (expiresUtc <= issuedUtc)
+            throw new ArgumentException("Permission scope must expire after it is issued.", nameof(expiresUtc));
+        if (expiresUtc - issuedUtc > TimeSpan.FromHours(1))
+            throw new ArgumentException("Work Assistant permission scope lifetime is bounded to one hour.", nameof(expiresUtc));
+
+        if (mode == H2AgentPermissionMode.ObserveOnly && mutationAllowed)
+            throw new ArgumentException("Observe-only scope cannot allow mutation.", nameof(mutationAllowed));
+        if (mode == H2AgentPermissionMode.AskBeforeChanges && (!mutationAllowed || !approvalRequired))
+            throw new ArgumentException("Ask-before-changes requires mutation capability plus approval.", nameof(approvalRequired));
+        if (mode == H2AgentPermissionMode.AllowScopedChanges && (!mutationAllowed || approvalRequired))
+            throw new ArgumentException("Allow-scoped-changes must allow mutation without per-change approval.", nameof(approvalRequired));
+        if (mutationAllowed && scopeKind == H2AgentResourceScopeKind.None)
+            throw new ArgumentException("Mutating scope requires a concrete host-owned resource identity.", nameof(scopeKind));
+
+        Mode = mode;
+        ScopeKind = scopeKind;
+        ResourceKey = BoundOrNull(resourceKey, 1_024);
+        MutationAllowed = mutationAllowed;
+        ApprovalRequired = approvalRequired;
+        IssuedUtc = issuedUtc;
+        ExpiresUtc = expiresUtc;
+        ApplicationKind = applicationKind;
+        WindowIdentity = BoundOrNull(windowIdentity, 400);
+        DocumentSessionId = BoundOrNull(documentSessionId, 400);
+        DocumentPath = BoundOrNull(documentPath, 2_048);
+
+        if (mutationAllowed && string.IsNullOrWhiteSpace(ResourceKey))
+            throw new ArgumentException("Mutating scope requires ResourceKey.", nameof(resourceKey));
+    }
+
+    public H2AgentPermissionMode Mode { get; }
+    public H2AgentResourceScopeKind ScopeKind { get; }
+    public string? ResourceKey { get; }
+    public bool MutationAllowed { get; }
+    public bool ApprovalRequired { get; }
+    public DateTime IssuedUtc { get; }
+    public DateTime ExpiresUtc { get; }
+    public H2ApplicationKind ApplicationKind { get; }
+    public string? WindowIdentity { get; }
+    public string? DocumentSessionId { get; }
+    public string? DocumentPath { get; }
+
+    public bool IsActiveAt(DateTime utcNow)
+        => utcNow.Kind == DateTimeKind.Utc
+           && utcNow >= IssuedUtc
+           && utcNow < ExpiresUtc;
+
+    public bool MatchesActiveContext(H2ActiveWorkContext context, DateTime utcNow)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!IsActiveAt(utcNow)) return false;
+
+        return ScopeKind switch
+        {
+            H2AgentResourceScopeKind.None => !MutationAllowed,
+            H2AgentResourceScopeKind.Window =>
+                string.Equals(WindowIdentity, context.WindowIdentity, StringComparison.Ordinal),
+            H2AgentResourceScopeKind.Session =>
+                !string.IsNullOrWhiteSpace(DocumentSessionId)
+                && string.Equals(DocumentSessionId, context.DocumentSessionId, StringComparison.Ordinal)
+                && ProviderCompatible(context),
+            H2AgentResourceScopeKind.Document =>
+                !string.IsNullOrWhiteSpace(DocumentPath)
+                && string.Equals(
+                    NormalizePath(DocumentPath),
+                    NormalizePath(context.DocumentPath),
+                    StringComparison.OrdinalIgnoreCase),
+            H2AgentResourceScopeKind.Project => false,
+            _ => false
+        };
+    }
+
+    private bool ProviderCompatible(H2ActiveWorkContext context)
+        => ApplicationKind == H2ApplicationKind.Unknown
+           || context.ApplicationKind == ApplicationKind;
+
+    private static string? NormalizePath(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        try { return Path.GetFullPath(value.Trim()); }
+        catch { return value.Trim(); }
+    }
+
+    private static string? BoundOrNull(string? value, int max)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (value.Length == 0) return null;
+        return value.Length <= max ? value : value[..max];
+    }
+}
+
 public sealed record H2AgentTaskContext(
     string? WorkspaceRoot,
     string? Summary,
-    long Version = 0);
+    long Version = 0,
+    H2AgentPermissionScope? PermissionScope = null);
 
 public sealed record H2AgentProgress(
     long Sequence,
