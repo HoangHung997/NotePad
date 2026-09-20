@@ -700,7 +700,7 @@ Evidence: new project Agent mutations now use the host-owned typed `IH2ProjectTo
 
 ---
 
-## [ ] H2M-074 — Retire legacy direct project AiClient path
+## [x] H2M-074 — Retire legacy direct project AiClient path
 
 Only after:
 
@@ -713,6 +713,8 @@ Only after:
 - project actions parity exists.
 
 Then remove legacy direct execution from normal project flow.
+
+Evidence: normal project send is now permanently separated from the legacy direct-client path. `AiChatPanel.Send()` routes any project scope to `SendProjectAgent()`; `SendLegacy()` is standalone-only and fails closed immediately if a project scope somehow reaches it, before profile/secret/client creation. Project-specific dirty marking and legacy automatic project-action application were removed from the standalone AiClient execution body. Existing project Agent regressions already prove provider/profile presentation compatibility, attachments/context grounding, cancellation, progress, history preservation and typed project-action parity without invoking the AiClient factory. A dedicated H2M-074 architecture regression now additionally enforces the project-first router, fail-closed guard before `_createClient()`, and absence of project mutation/action markers from the legacy AiClient execution tail. Standalone/notebook legacy direct AI compatibility remains intentionally outside this project-flow retirement. Exact functional source `121af8d03d1a36f2d8defe56c4e7d791246dceaa`, Actions run `35507442067` SUCCESS, H2 Notes **417/417**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `cbf9db1d69368756133d9274b07caaae1550cb11`; portable ZIP SHA256 `280a637c13564eae485ecad8c053e4e99bb7f87b7e34c6963de826cecf1c3450`.
 
 ---
 
