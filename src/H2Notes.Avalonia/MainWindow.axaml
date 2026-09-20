@@ -25,7 +25,7 @@
           </Grid>
         </Border>
         <Grid x:Name="WorkAndAi" Grid.Column="2" ColumnDefinitions="*,5,0" RowDefinitions="*,5,0">
-          <Grid x:Name="CommandCenter" Grid.RowSpan="3" Grid.ColumnSpan="3" RowDefinitions="Auto,Auto,*" Margin="20,18,20,0">
+          <Grid x:Name="CommandCenter" Grid.RowSpan="3" Grid.ColumnSpan="3" RowDefinitions="Auto,Auto,Auto,*" Margin="20,18,20,0">
             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,14">
               <StackPanel Spacing="4">
                 <TextBlock Text="Command Center" FontFamily="Georgia" FontSize="28" FontWeight="Bold"/>
@@ -41,7 +41,25 @@
                 <TextBlock x:Name="CommandCenterSync" FontSize="11" Foreground="#796C62"/>
               </Border>
             </Grid>
-            <Grid Grid.Row="2">
+            <Border x:Name="CommandCenterAttentionSection" Grid.Row="2" IsVisible="False" Background="#FFF6F0" BorderBrush="#E5C7B7" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,12">
+              <StackPanel Spacing="7">
+                <TextBlock x:Name="CommandCenterAttentionHeader" Text="Cần bạn xử lý" FontSize="12" FontWeight="SemiBold" Foreground="#A4573D"/>
+                <ListBox x:Name="CommandCenterAttentionList" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:CompileBindings="False">
+                      <Border Background="#FFFDFC" BorderBrush="#EAD8CC" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,5">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                          <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="#5E5148" TextWrapping="Wrap"/>
+                          <TextBlock Grid.Column="1" Text="{Binding TimeText}" FontSize="10" Foreground="#8A7A6E" Margin="12,1,0,0"/>
+                          <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SourceText}" FontSize="10" Foreground="#8A7A6E" Margin="0,4,0,0"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
+            <Grid Grid.Row="3">
               <ListBox x:Name="CommandCenterList" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:CompileBindings="False">
