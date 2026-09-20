@@ -187,7 +187,23 @@ public sealed class H2ProductProjectionService
     public IReadOnlyList<ProjectActivityProjection> BuildProjectActivity(
         ProjectRecord project,
         int limit = 50)
-        => BuildProjectHistory(project, workspaceHealth: null, limit);
+    {
+        // Preserve the pre-H2M-064 public activity taxonomy for existing callers.
+        // The richer history taxonomy is exposed only by BuildProjectHistory().
+        return BuildProjectHistory(project, workspaceHealth: null, limit)
+            .Select(item => item with
+            {
+                Kind = item.Kind switch
+                {
+                    "project-created" or "project-edited" => "project",
+                    "project-task-created" or "project-task-updated" or "project-task-completed" => "project-task",
+                    "agent-lifecycle" => "agent-task",
+                    "verified-mutation" or "agent-evidence" => "agent-evidence",
+                    _ => item.Kind
+                }
+            })
+            .ToArray();
+    }
 
     public IReadOnlyList<ProjectActivityProjection> BuildProjectHistory(
         ProjectRecord project,
