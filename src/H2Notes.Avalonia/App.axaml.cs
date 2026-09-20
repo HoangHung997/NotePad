@@ -316,6 +316,7 @@ public partial class App : Application
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException or InvalidOperationException)
         {
             var projectStore = _storage as ProjectWorkspaceStore;
+            projectStore?.RecordSyncFailure(ex);
             var fallback = projectStore?.IsRecoveryFallbackActive == true;
             var locallyDurable = projectStore?.HasPendingChanges == true;
             var status = fallback
