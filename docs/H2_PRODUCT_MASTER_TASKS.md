@@ -340,7 +340,7 @@ Evidence: `src/H2Notes.Core/H2ProductProjections.cs` defines rebuildable `Projec
 
 # Stage H4 — Preserve project data model, avoid ProjectState
 
-## [ ] H2M-040 — Lock ProjectRecord / TaskRecord responsibilities
+## [x] H2M-040 — Lock ProjectRecord / TaskRecord responsibilities
 
 Document and guard:
 
@@ -362,6 +362,8 @@ They must not become Agent execution-step stores.
 Acceptance:
 
 - architecture test prevents AgentTask/VerificationReport/ToolRun collections from being added casually to ProjectRecord.
+
+Evidence: `docs/H2_PROJECT_DATA_BOUNDARY.md` freezes ProjectRecord as durable project/user truth and TaskRecord as a human/project checklist item. `H2ProjectDataBoundaryTests` requires existing durable fields, rejects AgentTask/AgentRun/VerificationReport/ToolRun/evidence/trace/progress/ProjectState persistence markers on both ProjectRecord and TaskRecord, rejects dependencies on H2/Agent execution DTOs, and proves external task correlation leaves ProjectRecord JSON unchanged. Exact functional source `5a2edd28d499a6de4bb8a68f4fa8db19554ef36d`, Actions run `35479914331` SUCCESS, H2 Notes full suite + project boundary guards + NAS/Agent/provider/publish pipeline PASS. Publish commit `492e424629ed4224fc3316e6250f85905735daa5`; ZIP SHA256 `f0ee9739ea8f68e2542dc09985bbc7cbe8bfceec5e584a7ca296e5a60474faad`.
 
 ---
 
