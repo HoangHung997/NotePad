@@ -22,6 +22,7 @@ public sealed class WorkAssistantCompactWindow : Window
 {
     private readonly WorkAssistantSettings _settings;
     private readonly TextBox _prompt;
+    private readonly ComboBox _permission;
     private readonly TextBlock _status;
     private readonly Button _send;
     private readonly WrapPanel _contextChips;
@@ -36,9 +37,9 @@ public sealed class WorkAssistantCompactWindow : Window
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         Title = "Work Assistant";
         Width = 460;
-        Height = 300;
+        Height = 352;
         MinWidth = 380;
-        MinHeight = 250;
+        MinHeight = 300;
         CanResize = true;
         ShowInTaskbar = false;
         CanMinimize = false;
@@ -112,6 +113,37 @@ public sealed class WorkAssistantCompactWindow : Window
             Children = { contextHeader, _contextChips }
         };
 
+        _permission = new ComboBox
+        {
+            Name = "WorkAssistantPermissionPreset",
+            Margin = new Thickness(12, 4),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ItemsSource = PermissionOptions,
+            SelectedIndex = 0
+        };
+        _permission.ItemTemplate = new FuncDataTemplate<WorkAssistantPermissionOption>(
+            (item, _) => new TextBlock
+            {
+                Text = item?.Label ?? "",
+                FontSize = 11
+            });
+
+        var permissionArea = new StackPanel
+        {
+            Spacing = 2,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Quyền cho lượt gửi này",
+                    FontSize = 10,
+                    Foreground = Brush.Parse("#796C62"),
+                    Margin = new Thickness(12, 0, 12, 0)
+                },
+                _permission
+            }
+        };
+
         _prompt = new TextBox
         {
             Name = "WorkAssistantPrompt",
@@ -150,14 +182,16 @@ public sealed class WorkAssistantCompactWindow : Window
 
         var root = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto")
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto")
         };
         root.Children.Add(header);
         Grid.SetRow(contextArea, 1);
         root.Children.Add(contextArea);
-        Grid.SetRow(_prompt, 2);
+        Grid.SetRow(permissionArea, 2);
+        root.Children.Add(permissionArea);
+        Grid.SetRow(_prompt, 3);
         root.Children.Add(_prompt);
-        Grid.SetRow(footer, 3);
+        Grid.SetRow(footer, 4);
         root.Children.Add(footer);
         Content = root;
 
@@ -180,6 +214,18 @@ public sealed class WorkAssistantCompactWindow : Window
     public WorkAssistantContextScope AvailableContextScope => _availableContextScope;
     public WorkAssistantContextScope SelectedContextScope => _selectedContextScope;
 
+    public H2AgentPermissionMode SelectedPermissionMode
+    {
+        get => _permission.SelectedItem is WorkAssistantPermissionOption option
+            ? option.Mode
+            : H2AgentPermissionMode.ObserveOnly;
+        set
+        {
+            var index = Array.FindIndex(PermissionOptions, option => option.Mode == value);
+            _permission.SelectedIndex = index >= 0 ? index : 0;
+        }
+    }
+
     public string SelectedContextSummary
         => BuildSelectedContextSummary(_capturedContext, _selectedContextScope);
 
@@ -188,6 +234,9 @@ public sealed class WorkAssistantCompactWindow : Window
         _capturedContext = context;
         _availableContextScope = AvailableScope(context);
         _selectedContextScope = _availableContextScope;
+        // Permission grants are per-send/session. Capturing a different foreground target must
+        // never silently carry a prior mutation preset into the new context.
+        SelectedPermissionMode = H2AgentPermissionMode.ObserveOnly;
         RebuildContextChips();
     }
 
@@ -385,6 +434,18 @@ public sealed class WorkAssistantCompactWindow : Window
         value = Bound(value, 160);
         return value.Length <= 54 ? value : value[..51] + "…";
     }
+
+    private static readonly WorkAssistantPermissionOption[] PermissionOptions =
+    [
+        new(H2AgentPermissionMode.ObserveOnly, "Chỉ quan sát"),
+        new(H2AgentPermissionMode.AskBeforeChanges, "Hỏi trước khi thay đổi"),
+        new(H2AgentPermissionMode.AllowScopedChanges, "Cho phép thay đổi tài liệu/session hiện tại"),
+        new(H2AgentPermissionMode.UseProjectPolicy, "Dùng chính sách dự án")
+    ];
+
+    private sealed record WorkAssistantPermissionOption(
+        H2AgentPermissionMode Mode,
+        string Label);
 
     private static string Bound(string? value, int max)
     {
