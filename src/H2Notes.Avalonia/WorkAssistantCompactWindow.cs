@@ -281,11 +281,12 @@ public sealed class WorkAssistantCompactWindow : Window
         var parts = new List<string>();
         if ((scope & WorkAssistantContextScope.Application) != 0)
         {
+            // Do not include WindowTitle here: many apps embed document/session names in it.
+            // Those belong to explicit Document/Session chips so removing those chips truly
+            // removes that scope from the next-send grounding summary.
             parts.Add("App=" + context.ApplicationKind);
             parts.Add("Process=" + Bound(
                 context.ProcessName + "#" + context.ProcessId, 180));
-            if (!string.IsNullOrWhiteSpace(context.WindowTitle))
-                parts.Add("Window=" + Bound(context.WindowTitle, 500));
         }
         if ((scope & WorkAssistantContextScope.Document) != 0
             && !string.IsNullOrWhiteSpace(context.DocumentPath))
