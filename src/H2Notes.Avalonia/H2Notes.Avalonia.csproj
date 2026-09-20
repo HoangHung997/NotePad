@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>../../assets/branding/h2-notes-app-icon-v1.ico</ApplicationIcon>
@@ -13,6 +13,7 @@
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <PackageReference Include="Markdig" Version="0.37.0" />
     <ProjectReference Include="../H2Notes.Core/H2Notes.Core.csproj" />
+    <ProjectReference Include="../../experiments/H2AgentLab/H2AgentLab.csproj" />
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <None Update="PORTABLE-README.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
