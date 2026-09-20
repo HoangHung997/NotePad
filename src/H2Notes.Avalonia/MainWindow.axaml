@@ -123,6 +123,7 @@
               </Button>
               <Button x:Name="TasksTabButton" Content="Công việc" Classes="quiet"/>
               <Button x:Name="NotesTabButton" Content="Ghi chú" Classes="quiet"/>
+              <Button x:Name="ResourcesTabButton" Content="Tài nguyên" Classes="quiet"/>
             </StackPanel>
             <Grid x:Name="EditorSplit" Grid.Row="2" RowDefinitions="*,8,*">
               <Border x:Name="TasksPane" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
@@ -148,6 +149,35 @@
                 </Grid>
               </Border>
             </Grid>
+            <Border x:Name="ProjectResourcesPane" Grid.Row="2" IsVisible="False" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
+              <Grid RowDefinitions="44,*">
+                <Grid ColumnDefinitions="*,Auto,Auto" Background="#FAF7F2" Margin="0">
+                  <StackPanel Orientation="Horizontal" Spacing="9" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock Text="Tài nguyên dự án" FontFamily="Georgia" FontSize="17" FontWeight="Bold"/>
+                    <TextBlock x:Name="ProjectResourcesSummary" FontSize="11" Foreground="#8A7A6E" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <Button x:Name="ProjectResourceOpenButton" Grid.Column="1" Classes="outline" Content="Mở" IsEnabled="False" Margin="0,6,6,6"/>
+                  <Button x:Name="ProjectResourceRevealButton" Grid.Column="2" Classes="quiet" Content="Hiện vị trí" IsEnabled="False" Margin="0,6,8,6"/>
+                </Grid>
+                <Grid Grid.Row="1">
+                  <ListBox x:Name="ProjectResourcesList" Background="Transparent" BorderThickness="0" Padding="8" SelectionMode="Single">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:CompileBindings="False">
+                        <Border BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4" Padding="11,9" Margin="0,0,0,6">
+                          <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SourceText}" FontSize="10" Foreground="#A4573D" Margin="12,1,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TargetText}" FontSize="10" Foreground="#796C62" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding MetaText}" FontSize="9" Foreground="#9A8D82" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                  <TextBlock x:Name="ProjectResourcesEmpty" Text="Chưa có liên kết, tệp hoặc evidence cho dự án này." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="13"/>
+                </Grid>
+              </Grid>
+            </Border>
           </Grid>
           <local:ResizeSplitter x:Name="AiVerticalSplitter" Grid.Column="1" ResizeDirection="Columns" IsVisible="False" ToolTip.Tip="Kéo trái / phải để đổi chiều rộng AI"/>
           <local:ResizeSplitter x:Name="AiHorizontalSplitter" Grid.Row="1" Grid.ColumnSpan="3" ResizeDirection="Rows" IsVisible="False" ToolTip.Tip="Kéo lên / xuống để đổi chiều cao AI"/>
