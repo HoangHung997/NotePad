@@ -566,7 +566,7 @@ Evidence: `H2ProjectResourceProjectionService` rebuilds project resources from t
 
 ---
 
-## [ ] H2M-064 — Project History projection
+## [x] H2M-064 — Project History projection
 
 Build timeline from:
 
@@ -582,6 +582,8 @@ Acceptance:
 
 - user sees meaningful work history;
 - detailed trace remains available through Agent inspection when needed.
+
+Evidence: `BuildProjectHistory(...)` creates a disposable timeline from existing project/task timestamps, one lifecycle row per Agent run, meaningful Agent evidence, verified-mutation evidence and current storage/sync diagnostics. Raw `H2AgentProgress`/tool trace is intentionally excluded; timeline rows retain `AgentTaskId`/EvidenceId so detailed progress remains available through `IH2AgentAdapter.ObserveTask(...)` instead of being copied into H2. The existing `BuildProjectActivity(...)` taxonomy remains backward-compatible. Project workspace now exposes a one-click **Lịch sử** detail surface; it is rebuilt from projection sources and has no HistoryStore/TraceDatabase/persistence path. Dedicated regressions prove project/task/Agent/evidence/sync event coverage, verified-mutation classification, raw-trace exclusion, Agent inspection availability, correlation IDs, one-click History UI and absence of duplicate history stores. Exact functional source `d75ffe62107efbd80f0325fcec306b72b453d21c`, Actions run `35493677292` SUCCESS, H2 Notes **396/396**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `902f45cc5f77156c822319cd9131a8d3a7300cf2`; portable ZIP SHA256 `8165229b35e6dfefd132c465e6a86718ffd4ec90f47851c769504440d268f540`.
 
 ---
 
