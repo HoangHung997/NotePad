@@ -83,8 +83,8 @@ public sealed class ProjectRecord
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
     [JsonIgnore] public string DisplayName => (NameRich ??= RichDocument.FromLegacy(Name)).Text;
     [JsonIgnore] public string NotesText => (NotesRich ??= RichDocument.FromLegacy(Notes)).Text;
-    [JsonIgnore] public TaskRecord? Next => ChecklistItems.FirstOrDefault(t => !t.IsCompleted && !string.IsNullOrWhiteSpace(t.DisplayText));
-    [JsonIgnore] public string Progress => $"{ChecklistItems.Count(t => t.IsCompleted)}/{ChecklistItems.Count}";
+    [JsonIgnore] public TaskRecord? Next => ProjectProgressCalculator.NextTask(this);
+    [JsonIgnore] public string Progress => ProjectProgressCalculator.Calculate(this).Label;
     public RichDocument ReadName() => (NameRich ??= RichDocument.FromLegacy(Name)).Clone();
     public RichDocument ReadNotes() => (NotesRich ??= RichDocument.FromLegacy(Notes)).Clone();
 }
