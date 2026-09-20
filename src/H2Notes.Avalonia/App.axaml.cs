@@ -175,8 +175,8 @@ public partial class App : Application
                     _dirtyProjects.UnionWith(restoredPending.DirtyProjectIds);
                     _restoredPending = restoredPending;
                 }
-                if (UsesProjectFiles && _local.DesktopSession is not null)
-                    State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
+                if (UsesProjectFiles)
+                    ApplyLocalDesktopSession();
                 if (_storage is ProjectWorkspaceStore loadedStore)
                 {
                     var loadedProfile = loadedStore.CreateLocationProfile();
@@ -719,6 +719,7 @@ public partial class App : Application
                 return;
             }
             LastSaveError = null;
+            ApplyLocalDesktopSession();
             _main?.RefreshAfterExternalSync();
             foreach (var window in _aiWindows.Values) window.RefreshFromModel();
             var text = projectStore.LastSyncDiagnostic?.Code == "transient_generation_converged"
@@ -815,7 +816,7 @@ public partial class App : Application
             foreach (var window in OpenWindows.ToArray()) window.Close();
             _notes.Clear(); _aiWindows.Clear(); _windowOrder.Clear();
             _instanceLock?.Dispose(); _instanceLock = destinationLock; _storage = destination; State = next;
-            if (_local.DesktopSession is not null) State.DesktopSession = ProjectWorkspaceStore.Clone(_local.DesktopSession);
+            ApplyLocalDesktopSession();
             var plan = DesktopRestorePlan.Create(State, false);
             _main = new MainWindow(this, plan.Board); TrackWindow(_main);
             ShowMain();
@@ -876,14 +877,70 @@ public partial class App : Application
 
     private void CaptureDesktopSession()
     {
-        if (State.DesktopSession?.ProjectAiWindow is { } placement) placement.IsVisible = _main?.DetachedAiWindow?.IsVisible == true;
+        if (State.DesktopSession?.ProjectAiWindow is { } placement)
+            placement.IsVisible = _main?.DetachedAiWindow?.IsVisible == true;
+
+        var noteWindows = State.Notes
+            .Where(note => note.Id != Guid.Empty)
+            .GroupBy(note => note.Id)
+            .ToDictionary(group => group.Key, group => NoteWindowPlacementState.From(group.First()));
+
         State.DesktopSession = new DesktopSessionState
         {
             SelectedBoardId = _main?.BoardId,
             ProjectAiWindow = State.DesktopSession?.ProjectAiWindow,
+            NoteWindows = noteWindows,
             OpenWindowIds = _windowOrder.Where(w => w.IsVisible)
                 .Select(w => w switch { MainWindow main => main.BoardId, ProjectAiWindow projectAi => projectAi.WindowId, AiChatWindow ai => ai.NotebookId, NoteWindow note => note.NoteId, _ => throw new InvalidOperationException("Unknown session window.") }).ToList()
         };
+    }
+
+    private void ApplyLocalDesktopSession()
+    {
+        if (!UsesProjectFiles)
+            return;
+
+        var session = _local.DesktopSession is null
+            ? new DesktopSessionState()
+            : ProjectWorkspaceStore.Clone(_local.DesktopSession);
+
+        session.OpenWindowIds ??= [];
+        session.NoteWindows ??= [];
+        foreach (var key in session.NoteWindows
+                     .Where(pair => pair.Key == Guid.Empty || pair.Value is null)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+            session.NoteWindows.Remove(key);
+
+        foreach (var note in State.Notes)
+        {
+            if (session.NoteWindows.TryGetValue(note.Id, out var localPlacement))
+                localPlacement.ApplyTo(note);
+            else
+                ResetMachineWindowState(note);
+        }
+
+        State.DesktopSession = session;
+    }
+
+    private static void ResetMachineWindowState(NoteRecord note)
+    {
+        note.IsVisibleOnDesktop = false;
+        note.IsPinned = false;
+        if (note.IsBoard)
+        {
+            note.SheetLeft = null;
+            note.SheetTop = null;
+            note.SheetWidth = null;
+            note.SheetHeight = null;
+        }
+        else
+        {
+            note.Left = 120;
+            note.Top = 100;
+            note.Width = 1100;
+            note.Height = 740;
+        }
     }
 
     public void RaiseOpenWindows()
