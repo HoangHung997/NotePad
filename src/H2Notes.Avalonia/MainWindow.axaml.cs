@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         NotesToolbar.Content = NotesEditor.CreateToolbar();
         InitializeShell();
         InitializeCommandCenter();
+        InitializeProjectResources();
         Sheet.SelectionChanged += OnSelection;
         Sheet.DataChanged += () =>
         {
@@ -143,6 +144,8 @@ public partial class MainWindow : Window
         DetachedAiWindow?.UpdateProject(_notesProject);
         RefreshNavigator();
         RefreshCommandCenter();
+        if (_projectWorkspaceMode == ProjectWorkspaceResourcesMode)
+            RefreshProjectResources();
     }
     public void FlushNotes()
     {
