@@ -96,6 +96,83 @@ Test("Local configuration preserves friendly path and resolved workspace endpoin
     Equal(config.WorkspaceLocation.CanonicalPath, restored.WorkspaceLocation.CanonicalPath);
 });
 
+Test("Work Assistant settings round-trip only through local configuration", () =>
+{
+    var config = new H2Notes.Avalonia.LocalConfiguration
+    {
+        DeviceId = "test-device",
+        WorkAssistant = new H2Notes.Avalonia.WorkAssistantSettings
+        {
+            Enabled = true,
+            StartWithH2 = false,
+            StartCollapsed = false,
+            AlwaysOnTop = false,
+            Hotkey = "Ctrl+Alt+Space",
+            BubblePosition = new H2Notes.Avalonia.WorkAssistantBubblePosition(125.5, 340.25),
+            PreferredMonitor = @"\\.\DISPLAY2",
+            NotificationPreference = "attention-only"
+        }
+    };
+
+    var json = JsonSerializer.Serialize(config);
+    var restored = JsonSerializer.Deserialize<H2Notes.Avalonia.LocalConfiguration>(json)!;
+    var wa = restored.WorkAssistant;
+
+    True(wa.Enabled);
+    True(!wa.StartWithH2);
+    True(!wa.StartCollapsed);
+    True(!wa.AlwaysOnTop);
+    Equal("Ctrl+Alt+Space", wa.Hotkey);
+    Equal(125.5, wa.BubblePosition!.XDip);
+    Equal(340.25, wa.BubblePosition.YDip);
+    Equal(@"\\.\DISPLAY2", wa.PreferredMonitor);
+    Equal("attention-only", wa.NotificationPreference);
+
+    var legacy = JsonSerializer.Deserialize<H2Notes.Avalonia.LocalConfiguration>(
+        "{\"DeviceId\":\"legacy-device\"}")!;
+    True(!legacy.WorkAssistant.Enabled);
+    True(legacy.WorkAssistant.StartWithH2);
+    True(legacy.WorkAssistant.StartCollapsed);
+    True(legacy.WorkAssistant.AlwaysOnTop);
+    Equal("Ctrl+Shift+Space", legacy.WorkAssistant.Hotkey);
+    Equal("attention-and-completed", legacy.WorkAssistant.NotificationPreference);
+});
+
+Test("Work Assistant settings never enter shared workspace models", () =>
+{
+    var shared = new SheetState
+    {
+        Notes =
+        [
+            new NoteRecord
+            {
+                Projects =
+                [
+                    new ProjectRecord
+                    {
+                        Name = "Shared project",
+                        Layout = new ProjectLayout()
+                    }
+                ]
+            }
+        ]
+    };
+    var json = JsonSerializer.Serialize(shared);
+
+    foreach (var forbidden in new[]
+    {
+        "WorkAssistant", "StartWithH2", "StartCollapsed", "AlwaysOnTop",
+        "Hotkey", "BubblePosition", "PreferredMonitor", "NotificationPreference"
+    })
+        True(!json.Contains(forbidden, StringComparison.Ordinal));
+
+    foreach (var type in new[] { typeof(SheetState), typeof(ProjectRecord), typeof(ProjectLayout) })
+        True(type.GetProperties().All(property =>
+            !property.Name.Contains("WorkAssistant", StringComparison.OrdinalIgnoreCase)
+            && property.PropertyType != typeof(H2Notes.Avalonia.WorkAssistantSettings)
+            && property.PropertyType != typeof(H2Notes.Avalonia.WorkAssistantBubblePosition)));
+});
+
 Test("Project move preserves identity and child order", () =>
 {
     var board = SheetStorage.Demo().Notes[0]; var project = board.Projects[2]; var ids = project.ChecklistItems.Select(t => t.Id).ToArray();
