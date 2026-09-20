@@ -131,15 +131,11 @@ public sealed record ProjectLink(Guid Id, string Label, string Target);
 
 public sealed class ProjectLayout
 {
+    // Portable per-project presentation preferences. Machine-specific geometry lives in
+    // Avalonia LocalConfiguration and must never be serialized into shared project files.
     public string Tab { get; set; } = "tasks";
     public string AiDock { get; set; } = "hidden";
     public bool AiExplicitlyHidden { get; set; }
-    public double NotesFraction { get; set; } = .5;
-    public bool HasCustomSplit { get; set; }
     public bool TasksCollapsed { get; set; }
     public bool NotesCollapsed { get; set; }
-    public double AiWidth { get; set; } = 360;
-    public double AiHeight { get; set; } = 510;
-    public double AiX { get; set; } = -1;
-    public double AiY { get; set; } = -1;
 }
