@@ -165,6 +165,21 @@ public partial class MainWindow
         ApplyResponsive();
     }
 
+    public bool OpenProjectWorkspace(Guid projectId)
+    {
+        if (projectId == Guid.Empty) return false;
+        var matches = _app.State.Notes
+            .Where(note => note.IsBoard && !note.IsArchived)
+            .SelectMany(board => board.Projects.Select(project => (Board: board, Project: project)))
+            .Where(item => item.Project.Id == projectId)
+            .Take(2)
+            .ToArray();
+        if (matches.Length != 1) return false;
+
+        OpenProjectWorkspace(matches[0].Board, matches[0].Project);
+        return true;
+    }
+
     private void OpenProjectWorkspace(NoteRecord board, ProjectRecord project)
     {
         if (_board.Id != board.Id)
