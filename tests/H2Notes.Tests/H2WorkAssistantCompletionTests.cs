@@ -261,8 +261,11 @@ internal static class H2WorkAssistantCompletionTests
     }
 
     private static object? CallPrivate(object owner, string name, params object?[] args)
-        => owner.GetType().GetMethod(name, Private)?.Invoke(owner, args)
-           ?? throw new Exception("Missing private method " + name);
+    {
+        var method = owner.GetType().GetMethod(name, Private)
+            ?? throw new Exception("Missing private method " + name);
+        return method.Invoke(owner, args);
+    }
 
     private static void SetPrivate(object owner, string name, object? value)
         => owner.GetType().GetField(name, Private)!.SetValue(owner, value);
