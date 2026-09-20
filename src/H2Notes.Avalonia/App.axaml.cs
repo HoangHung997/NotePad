@@ -453,7 +453,10 @@ public partial class App : Application
     }
 
     public void RefreshWorkAssistantContext()
-        => CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
+    {
+        CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
+        _workAssistantCompact?.SetActiveContext(CurrentWorkAssistantContext);
+    }
 
     public bool IsWorkAssistantCompactVisible
         => _workAssistantCompact?.IsVisible == true;
@@ -492,7 +495,9 @@ public partial class App : Application
 
         // Capture foreground context before the compact assistant becomes foreground.
         CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
-        EnsureWorkAssistantCompact().OpenFromHotkey();
+        var compact = EnsureWorkAssistantCompact();
+        compact.SetActiveContext(CurrentWorkAssistantContext);
+        compact.OpenFromHotkey();
     }
 
     public void HideWorkAssistantCompact()
