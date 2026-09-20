@@ -11,14 +11,14 @@ public interface IWorkAssistantActiveContextCapture
     bool Revalidate(H2ActiveWorkContext context);
 }
 
-internal sealed record WorkAssistantWindowSnapshot(
+public sealed record WorkAssistantWindowSnapshot(
     long NativeWindowHandle,
     int ProcessId,
     long ProcessStartUtcTicks,
     string ProcessName,
     string WindowTitle);
 
-internal interface IWorkAssistantWindowContextBackend
+public interface IWorkAssistantWindowContextBackend
 {
     WorkAssistantWindowSnapshot? CaptureForeground();
     WorkAssistantWindowSnapshot? InspectWindow(long nativeWindowHandle);
@@ -29,7 +29,7 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
     private readonly IWorkAssistantWindowContextBackend _backend;
     private readonly Func<IH2ActiveWorkContextProvider?> _provider;
 
-    internal WorkAssistantActiveContextCapture(
+    public WorkAssistantActiveContextCapture(
         IWorkAssistantWindowContextBackend backend,
         Func<IH2ActiveWorkContextProvider?> provider)
     {
