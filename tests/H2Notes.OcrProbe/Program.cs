@@ -44,7 +44,7 @@ try
     if (result.IsPdf || !(result.HasImageOcr || result.MimeType == "text/markdown") || string.IsNullOrWhiteSpace(result.Text) || result.SourceName != input.Name)
         throw new InvalidDataException("Incomplete Markdown/provenance.");
     var user = new AiMessage { Attachments = [result], Content = "Summarize the fixture." };
-    var turns = AiProjectContext.Prepare(new(), user, "");
+    var turns = AiLegacyRequestContext.Prepare(new(), user, "");
     if (turns.Any(t => t.Files is { Count: > 0 } || t.Images is { Count: > 0 }) || !turns.Last().Content.Contains(result.Text))
         throw new InvalidDataException("Prepared request lost the converted Markdown.");
     if (input.IsImage && (!result.Data.SequenceEqual(input.Data) || result.Sha256 != input.Sha256))
