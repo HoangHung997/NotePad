@@ -720,7 +720,7 @@ Evidence: normal project send is now permanently separated from the legacy direc
 
 # Stage H8 — Work Assistant
 
-## [ ] H2M-080 — Add machine-local Work Assistant settings
+## [x] H2M-080 — Add machine-local Work Assistant settings
 
 Extend `LocalConfiguration` with local-only settings:
 
@@ -734,6 +734,8 @@ Extend `LocalConfiguration` with local-only settings:
 - notification preference.
 
 Do not persist these in shared project files.
+
+Evidence: `LocalConfiguration` now owns a dedicated local-only `WorkAssistantSettings` section with enabled/start-with-H2/start-collapsed/always-on-top, configurable hotkey, optional DIP bubble position, preferred monitor identity and bounded notification preference. Defaults are backward-compatible for older local-config JSON and invalid/non-finite position or unrecognized preferences normalize safely. The section is persisted only through `%LocalAppData%\\H2Notes\\local-config-v2.json`; `SheetState`, `ProjectRecord`, `ProjectLayout` and shared workspace files have no Work Assistant settings or types. Dedicated regressions prove round-trip/default behavior and explicitly fail if Work Assistant fields leak into shared model serialization. Exact functional source `f432ed9a7904be4eb1e124345745f01a66a08d94`, Actions run `35507925945` SUCCESS, H2 Notes **419/419**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `c5175b04b35f95a37765b37927e02f0c39ff3538`; portable ZIP SHA256 `c5b6b50d76ffc97a31444d6a4f7a25013b22fd527758297a5417c89770fdd3cc`.
 
 ---
 
