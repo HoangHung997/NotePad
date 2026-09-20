@@ -428,7 +428,7 @@ Evidence: `MainWindow.CommandCenter.cs` + `MainWindow.axaml` make Command Center
 
 ---
 
-## [ ] H2M-051 — Attention projection
+## [x] H2M-051 — Attention projection
 
 Create a “Needs attention” section from real sources.
 
@@ -446,6 +446,8 @@ Acceptance:
 
 - every attention item deep-links to a real source;
 - resolving the source removes/updates the projection automatically.
+
+Evidence: Command Center now renders a dedicated `CommandCenterAttentionSection` from `H2CommandCenterQueryService.GetNeedsAttention(...)` only; no AI Inbox/attention database was added. Agent attention rows retain real `ProjectId` + `AgentTaskId` and deep-link to the owning project; workspace/sync attention links to storage settings. A one-second visible-Command-Center refresh plus normal save/sync refreshes rebuild the list from source state, so resolving a WaitingForApproval/Blocked/Failed source removes or updates the row automatically. Workspace health is one global attention row instead of being multiplied into every project card. Dedicated UI regression proves source IDs, deep-linking and stale-row removal after Agent resolution. Exact functional source `abcd5ac633a39f3a427fe45503d89e3cae645c19`, Actions run `35483760781` SUCCESS, H2 Notes **379/379**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `3c0b361c4d3bd5a25b1468183a87abfcc4cfa685`; portable ZIP SHA256 `32963b5b56bb513353862c9b84fa6e8d269d2b9b7e744ca0e061b9db7693e58e`.
 
 ---
 
