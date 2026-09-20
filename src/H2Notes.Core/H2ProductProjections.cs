@@ -61,6 +61,69 @@ public sealed class H2ProductProjectionService
     public H2ProductProjectionService(IH2AgentAdapter agent)
         => _agent = agent ?? throw new ArgumentNullException(nameof(agent));
 
+    public static H2WorkspaceHealthSnapshot CaptureWorkspaceHealth(ProjectWorkspaceStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        var diagnostic = store.LastSyncDiagnostic;
+        var hasPending = store.HasPendingChanges;
+
+        if (store.IsRecoveryFallbackActive)
+            return new(
+                H2WorkspaceSyncState.RecoveryRequired,
+                diagnostic?.Code ?? "recovery-fallback",
+                diagnostic?.Message ?? "Workspace is using a write-blocked last-known-good generation.",
+                DateTime.UtcNow,
+                hasPending,
+                IsRecoveryFallback: true);
+
+        if (diagnostic is not null)
+        {
+            if (diagnostic.Recovered || diagnostic.Code == "transient_generation_converged")
+                return new(
+                    hasPending ? H2WorkspaceSyncState.PendingLocal : H2WorkspaceSyncState.Healthy,
+                    diagnostic.Code,
+                    diagnostic.Message,
+                    DateTime.UtcNow,
+                    hasPending,
+                    IsRecoveryFallback: false);
+
+            if (diagnostic.IsPersistent)
+                return new(
+                    H2WorkspaceSyncState.RecoveryRequired,
+                    diagnostic.Code,
+                    diagnostic.Message,
+                    DateTime.UtcNow,
+                    hasPending,
+                    IsRecoveryFallback: false);
+
+            if (diagnostic.Code is "io_error" or "access_denied")
+                return new(
+                    H2WorkspaceSyncState.Offline,
+                    diagnostic.Code,
+                    diagnostic.Message,
+                    DateTime.UtcNow,
+                    hasPending,
+                    IsRecoveryFallback: false);
+
+            return new(
+                H2WorkspaceSyncState.Warning,
+                diagnostic.Code,
+                diagnostic.Message,
+                DateTime.UtcNow,
+                hasPending,
+                IsRecoveryFallback: false);
+        }
+
+        return hasPending
+            ? new H2WorkspaceHealthSnapshot(
+                H2WorkspaceSyncState.PendingLocal,
+                "pending-local",
+                "Local changes are durably pending shared sync.",
+                DateTime.UtcNow,
+                HasPendingChanges: true)
+            : H2WorkspaceHealthSnapshot.Healthy;
+    }
+
     public ProjectOverviewProjection BuildProjectOverview(
         ProjectRecord project,
         H2WorkspaceHealthSnapshot? workspaceHealth = null)
