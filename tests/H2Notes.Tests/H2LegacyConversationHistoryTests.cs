@@ -59,7 +59,7 @@ internal static class H2LegacyConversationHistoryTests
             Check(attachment.Id == known.Attachments.Single().Id
                 && attachment.Name == "legacy.docx"
                 && attachment.MimeType.Contains("wordprocessingml", StringComparison.Ordinal)
-                && attachment.Data.SequenceEqual([1, 2, 3, 4])
+                && attachment.Data.AsSpan().SequenceEqual(new byte[] { 1, 2, 3, 4 })
                 && attachment.Text == "Legacy extracted text"
                 && attachment.Notice == "Legacy extraction notice"
                 && attachment.Sha256 == "ATTACH-SHA"
