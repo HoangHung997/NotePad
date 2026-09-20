@@ -76,8 +76,8 @@ internal static class ThinkingUiTests
                 Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownTable") == 2, "Markdown or fenced table not rendered as a real table");
                 Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownQuote"), "Markdown quote not rendered");
                 Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownCode") == 1, "A fenced table stayed as code or ordinary code was lost");
-                Check(AiProjectContext.Instructions.Contains("bảng Markdown", StringComparison.Ordinal)
-                    && AiProjectContext.Instructions.Contains("không bọc bảng trong code fence", StringComparison.Ordinal),
+                Check(AiLegacyRequestContext.Instructions.Contains("bảng Markdown", StringComparison.Ordinal)
+                    && AiLegacyRequestContext.Instructions.Contains("không bọc bảng trong code fence", StringComparison.Ordinal),
                     "Vision transcription guidance no longer preserves table structure");
 
                 var user = new ChatMessageView(new AiMessage { Role = "user", Status = "complete", Content = "**literal user text**" });
