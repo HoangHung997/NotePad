@@ -202,7 +202,7 @@ public partial class MainWindow
         notes.Format(0, notes.Text.Length, s => s with { Font = "Cambria", Color = "#302E2B" });
         var highlighted = notes.Text.IndexOf("Cập nhật", StringComparison.Ordinal);
         notes.Format(highlighted, "Cập nhật khối lượng khi có xác nhận mới.".Length, s => s with { Highlight = "#FFDDC7" });
-        p.NotesRich = notes; p.Layout.NotesFraction = .44; SelectCurrent(p);
+        p.NotesRich = notes; _app.LocalSettings.GetProjectLayout(p.Id).NotesFraction = .44; SelectCurrent(p);
         async Task Capture(string id, double width, double height, string dock = "hidden", bool drawer = false, bool collapseTasks = false, string tab = "tasks")
         {
             WindowState = WindowState.Normal; Width = width; Height = height;
