@@ -29,11 +29,15 @@ internal static class H2ProductArchitectureGuardTests
         test("H2M-102 research remains evidence view with no independent ResearchStore", () =>
         {
             GuardNoRuntimeType("ResearchStore");
-            var evidence = ReadSource("src/H2Notes.Avalonia/MainWindow.AgentEvidenceInspector.cs");
-            Check(evidence.Contains("GetEvidence(", StringComparison.Ordinal)
-                  || evidence.Contains("H2AgentEvidence", StringComparison.Ordinal),
-                "Project evidence inspector no longer projects Agent evidence.");
-            GuardNoPersistenceMarkers(evidence, "Project evidence inspector");
+            var projection = ReadSource("src/H2Notes.Core/H2EvidenceInspection.cs");
+            var ui = ReadSource("src/H2Notes.Avalonia/MainWindow.AgentEvidenceInspector.cs");
+            Check(projection.Contains("_agent.GetEvidence(", StringComparison.Ordinal)
+                  && projection.Contains("H2EvidenceInspectionProjection", StringComparison.Ordinal),
+                "Project evidence projection no longer resolves authoritative Agent evidence.");
+            Check(ui.Contains("H2EvidenceInspectionProjectionService", StringComparison.Ordinal),
+                "Project evidence inspector UI bypasses the evidence projection service.");
+            GuardNoPersistenceMarkers(projection, "Project evidence projection");
+            GuardNoPersistenceMarkers(ui, "Project evidence inspector");
         });
 
         test("H2M-103 formal ProjectDecision subsystem remains deferred", () =>
