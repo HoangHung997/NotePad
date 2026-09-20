@@ -29,7 +29,7 @@ internal static class H2ProductArchitectureGuardTests
         test("H2M-102 research remains evidence view with no independent ResearchStore", () =>
         {
             GuardNoRuntimeType("ResearchStore");
-            var evidence = ReadSource("src/H2Notes.Avalonia/MainWindow.ProjectEvidence.cs");
+            var evidence = ReadSource("src/H2Notes.Avalonia/MainWindow.AgentEvidenceInspector.cs");
             Check(evidence.Contains("GetEvidence(", StringComparison.Ordinal)
                   || evidence.Contains("H2AgentEvidence", StringComparison.Ordinal),
                 "Project evidence inspector no longer projects Agent evidence.");
