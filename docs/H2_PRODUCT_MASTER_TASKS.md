@@ -511,7 +511,7 @@ Evidence: project open now enters a runtime-only Agent-first workspace mode. `Ai
 
 ---
 
-## [ ] H2M-061 — Project Tasks detail
+## [x] H2M-061 — Project Tasks detail
 
 Reuse `ProjectGrid`.
 
@@ -527,6 +527,8 @@ Keep:
 - rich text where already supported.
 
 Do not show Agent execution steps as TaskRecord rows.
+
+Evidence: the existing `ProjectGrid` remains the sole Project Tasks detail/editor and stays focused on real `TaskRecord` rows. Focused-project mode now honors task-title/comment filtering, and the existing sidebar search applies immediately while the Tasks detail is active. H2M-061 acceptance regression opens a project through the new Agent-first workspace, enters `Công việc`, and verifies task search, rich task text formatting, rich comment editing, completion toggling, drag/drop reordering, and that an injected Agent run does **not** appear as a TaskRecord/ProjectGrid row. A source architecture guard keeps ProjectGrid independent from IH2AgentAdapter/H2AgentTask/verification/runtime types. Exact functional source `48e1ed4a787015fe1d4a56f17e2f4035e493689f`, Actions run `35491525771` SUCCESS, H2 Notes **387/387**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `a7ca70c73944a94567b62e4bd739c05ea6f16ab7`; portable ZIP SHA256 `0d9adad2222ba8af25534b032a19682fea6353ef6aa524028d6c1ff1da12d5ae`.
 
 ---
 
