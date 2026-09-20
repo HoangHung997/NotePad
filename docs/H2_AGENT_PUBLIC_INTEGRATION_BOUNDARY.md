@@ -1,7 +1,7 @@
 # H2 Agent — Public Integration Boundary
 
-Status: **MB-121 frozen boundary; not yet integrated into H2 Notes**  
-Date: **2026-09-19**
+Status: **MB-121 frozen boundary; MB-122 approved; production composition now implemented by H2M-093**  
+Date: **2026-09-21**
 
 ## Purpose
 
@@ -12,8 +12,8 @@ H2 Notes must interact with Agent through one small, stable contract:
 The H2 UI must not call model transports, provider factories, ToolRegistry, AgentRuntime,
 AgentOrchestrator, AgentTools, or provider/model configuration APIs directly.
 
-Construction/composition of the concrete Agent implementation is not part of the H2 UI contract.
-Phase 13 may inject an implementation after MB-122 user acceptance.
+Construction/composition of the concrete Agent implementation is not part of ordinary H2 UI code.
+MB-122 was explicitly accepted by the user on 2026-09-19. H2M-093 may therefore compose a concrete bridge at the application composition root while normal product surfaces continue to depend on `IH2AgentAdapter` and bounded DTOs.
 
 ## Allowed H2 Notes calls
 
@@ -87,10 +87,15 @@ The following are internal implementation details and must not become H2 UI depe
 
 ## Integration gate
 
-MB-121 freezes the contract only.
+MB-121 froze the public boundary before product integration.
 
-There is **no H2 Notes production integration yet**. H2 Notes source/projects must not reference
-`H2AgentLab.Integration` or the Agent Lab project before MB-122 is explicitly accepted by the
-user.
+MB-122 was explicitly accepted by the user on **2026-09-19**, and MB-123 authorized Phase 13 preparation. H2M-093 therefore performs the approved production composition through `H2ProductionAgentAdapter`.
 
-MB-122 remains the user acceptance gate. MB-123 may prepare Phase 13 integration only after that.
+The post-approval rule is now:
+
+- ordinary H2 product/UI surfaces depend on `IH2AgentAdapter`, not AgentRuntime/transport/ToolRegistry/provider internals;
+- the Avalonia composition root may reference `H2AgentLab.Integration` to construct the concrete bridge;
+- runtime/provider internals remain inside the Agent assembly;
+- no second Agent runtime/task/evidence database may be created in H2 project state.
+
+This supersedes the former pre-MB-122 “no integration yet” source guard while preserving the frozen public-boundary intent.
