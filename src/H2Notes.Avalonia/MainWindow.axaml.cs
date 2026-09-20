@@ -231,7 +231,7 @@ public partial class MainWindow : Window
         Add("AI: Ghim bên phải", () => SetAiDock("right"));
         Add("AI: Ghim phía dưới", () => SetAiDock("bottom"));
         Add("AI: Cửa sổ nổi", () => SetAiDock("floating"));
-        Add("Khôi phục bố cục mặc định", () => { if (_notesProject is not null) _notesProject.Layout = new(); _manualSidebarCollapsed = false; _notesCollapsed = false; ApplyResponsive(); });
+        Add("Khôi phục bố cục mặc định", () => { if (_notesProject is not null) { _notesProject.Layout = new(); _app.LocalSettings.ResetProjectLayout(_notesProject.Id); _app.LocalSettings.Save(); _app.ScheduleSave(); } _manualSidebarCollapsed = false; _notesCollapsed = false; ApplyResponsive(); });
         foreach (var board in _app.State.Notes.Where(n => n.IsBoard && !n.IsArchived))
             Add("▦ " + board.Title, () => { Sheet.CommitEdit(); SetBoard(board); ShowCommandCenter(); });
         var otherNotes = _app.State.Notes.Where(n => !n.IsBoard && !n.IsChat && !n.IsArchived).ToList();
