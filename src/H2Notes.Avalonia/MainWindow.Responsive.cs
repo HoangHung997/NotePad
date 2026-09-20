@@ -49,9 +49,19 @@ public partial class MainWindow
         _chat.ReadContext = () => { FlushNotes(); return NotesEditor.Editor.SelectionLength > 0 ? NotesEditor.Editor.SelectedText : _notesProject?.NotesText ?? ""; };
         _chat.PrepareProjectContext = () => { FlushNotes(); Sheet.FlushDraft(); };
         _chat.DragStarted += BeginAiDrag; _chat.DragMoved += MoveAiDrag; _chat.DragFinished += EndAiDrag;
-        ProjectsNavButton.Click += (_, _) => { if (_wide) { _manualSidebarCollapsed = !_manualSidebarCollapsed; _drawerOpen = false; } else _drawerOpen = !_drawerOpen; ApplyResponsive(); };
+        ProjectsNavButton.Click += (_, _) =>
+        {
+            if (!_showCommandCenter) { ShowCommandCenter(); return; }
+            if (_wide) { _manualSidebarCollapsed = !_manualSidebarCollapsed; _drawerOpen = false; }
+            else _drawerOpen = !_drawerOpen;
+            ApplyResponsive();
+        };
         NotesNavButton.Click += (_, _) => ShowNotesMenu();
-        AiNavButton.Click += (_, _) => SetAiDock("floating");
+        AiNavButton.Click += (_, _) =>
+        {
+            if (_showCommandCenter && _notesProject is not null) _showCommandCenter = false;
+            SetAiDock("floating");
+        };
         var aiMenu = new ContextMenu();
         var projectAi = new MenuItem { Header = "AI của dự án", Icon = new AppIcon(IconKind.Folder) };
         projectAi.Click += (_, _) => SetAiDock("floating"); aiMenu.Items.Add(projectAi);
@@ -75,7 +85,7 @@ public partial class MainWindow
             if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None) { FlushNotes(); EndRename(); _app.ScheduleSave(); e.Handled = true; }
             else if (e.Key == Key.Escape) { ProjectTitleEditor.Load(_nameBeforeEdit ?? RichDocument.Plain("")); if (_notesProject is not null && _nameBeforeEdit is not null) _notesProject.NameRich = _nameBeforeEdit; EndRename(); _app.ScheduleSave(); e.Handled = true; }
         }, RoutingStrategies.Tunnel);
-        ProjectList.SelectionChanged += (_, _) => { if (!_updatingNavigator && ProjectList.SelectedItem is ProjectNavItem item) { SelectCurrent(item.Project); _drawerOpen = false; ApplyResponsive(); } };
+        ProjectList.SelectionChanged += (_, _) => { if (!_updatingNavigator && ProjectList.SelectedItem is ProjectNavItem item) OpenProjectWorkspace(_board, item.Project); };
         ProjectList.AddHandler(PointerPressedEvent, ProjectPressed, RoutingStrategies.Tunnel);
         ProjectList.AddHandler(PointerMovedEvent, ProjectMoved, RoutingStrategies.Tunnel);
         ProjectList.AddHandler(PointerReleasedEvent, ProjectReleased, RoutingStrategies.Tunnel);
@@ -154,7 +164,7 @@ public partial class MainWindow
         if (fullscreen && !_wasFullscreen && DetachedAiWindow?.IsVisible != true && _notesProject is { Layout.AiExplicitlyHidden: false }) _notesProject.Layout.AiDock = "right";
         _wasFullscreen = fullscreen;
         var layout = _notesProject?.Layout ?? new ProjectLayout();
-        var ai = DetachedAiWindow?.IsVisible != true && _notesProject is not null && layout.AiDock != "hidden";
+        var ai = !_showCommandCenter && DetachedAiWindow?.IsVisible != true && _notesProject is not null && layout.AiDock != "hidden";
         var inlineAi = ai && width < 900;
         var dockRight = ai && !inlineAi && layout.AiDock == "right";
         var dockBottom = ai && !inlineAi && layout.AiDock == "bottom";
@@ -168,13 +178,14 @@ public partial class MainWindow
         DrawerShade.IsVisible = _drawerOpen && !sidebar; CloseDrawerButton.IsVisible = _drawerOpen && !sidebar;
         var shortWindow = height < 730;
         var notesTab = shortWindow && layout.Tab == "notes";
-        CompactTabs.IsVisible = !_wide || shortWindow;
-        CompactProjectPicker.IsVisible = !_wide;
+        CompactTabs.IsVisible = !_showCommandCenter && (!_wide || shortWindow);
+        CompactProjectPicker.IsVisible = !_showCommandCenter && !_wide;
         CompactPickerLabel.Text = "Dự án / " + (_notesProject is null ? "" : (_board.Projects.IndexOf(_notesProject) + 1).ToString());
         PriorityButton.IsEnabled = _notesProject is not null;
         ProjectTitle.FontSize = !_wide ? 26 : 22;
         Sheet.SetCompact(width - 56 - (sidebar ? 250 : 0) - (dockRight ? 345 : 0) - 32 < 600);
-        WorkContent.IsVisible = !inlineAi;
+        CommandCenter.IsVisible = _showCommandCenter;
+        WorkContent.IsVisible = !_showCommandCenter && !inlineAi;
         TasksPane.IsVisible = !notesTab;
         NotesPane.IsVisible = !shortWindow || notesTab;
         NotesSplitter.IsVisible = !shortWindow && !layout.TasksCollapsed && !layout.NotesCollapsed;
