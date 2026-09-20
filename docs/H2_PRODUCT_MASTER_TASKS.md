@@ -807,7 +807,7 @@ Evidence: `WorkAssistantCompactWindow` now renders the captured ActiveWorkContex
 
 ---
 
-## [ ] H2M-085 — Quick task through the same Agent Adapter
+## [x] H2M-085 — Quick task through the same Agent Adapter
 
 A quick Work Assistant request starts a normal Agent task with:
 
@@ -822,6 +822,8 @@ Acceptance:
 - task runs while panel collapses;
 - user can later link task to a project;
 - no second Agent runtime.
+
+Evidence: the compact Work Assistant now submits through the existing `IH2AgentAdapter` only. `App.StartWorkAssistantQuickTaskAsync(...)` calls `_agentAdapter.StartTaskAsync(projectId: null, ...)` with bounded selected ActiveWorkContext grounding, keeps only the returned TaskId in RAM, clears/hides the compact panel after a successful start, and projects **Working** state to the existing floating bubble while the Agent task continues independently. Until H2M-086 permission mapping, quick tasks fail-safe as read-only. Stale selected ActiveWorkContext is revalidated before task start and fails closed without starting work. Later association calls `IH2AgentAdapter.AttachProject(taskId, projectId)` after validating the H2 project exists; it does not copy Agent task state into ProjectRecord or introduce `QuickWorkSession`. Dedicated acceptance tests prove `ProjectId=null`, scoped context forwarding, removed-selection exclusion, panel collapse while Agent status remains Running, bubble state, later project association, stale-context fail-closed behavior, unchanged shared project JSON and absence of a second Agent/runtime/session subsystem. Exact functional source `d33b07c599af3c7210c9351822bccc505525c781`, Actions run `35518099898` SUCCESS, H2 Notes **437/437**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `39ed999978a4e69fd3548e5f6a8b3649dc37cb58`; portable ZIP SHA256 `841f2ebf3e468a1bac8474cb6a8505052779808d6c7d10b2866135a686f5e9cd`.
 
 ---
 
