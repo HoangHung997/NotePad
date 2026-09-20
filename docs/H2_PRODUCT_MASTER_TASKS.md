@@ -888,13 +888,15 @@ Evidence: `docs/H2_PROJECT_LAYOUT_STORAGE_AUDIT.md` records the ownership decisi
 
 ---
 
-## [ ] H2M-091 — Audit DesktopSessionState
+## [x] H2M-091 — Audit DesktopSessionState
 
 Keep local desktop session restore logic, but confirm where it is persisted.
 
 Machine-specific window state should live locally.
 
 Do not let another PC inherit invalid monitor coordinates/session windows from NAS.
+
+Evidence: `docs/H2_DESKTOP_SESSION_STORAGE_AUDIT.md` freezes ownership: project-workspace desktop restore state is authoritative only in machine-local `LocalConfiguration.DesktopSession`. `DesktopSessionState.NoteWindows` now stores bounded note/board placement keyed by stable NoteId; load/store-switch/external-NAS-refresh paths call `ApplyLocalDesktopSession`, so the current PC's session wins before restore/presentation. A PC with no local session starts with an empty open-window list and safe default placement instead of inheriting NAS state. `ProjectWorkspaceStore` still writes `DesktopSession = null` to the shared index and now neutralizes legacy NoteRecord window fields/pin/visibility before NAS serialization, while keeping those model fields for single-file backward compatibility. `H2DesktopSessionStorageTests` prove local serialization, actual NAS index/note sanitization, PC-B local placement overriding foreign geometry, new-PC safe defaults and source ownership guards. The pre-existing chat storage assertion was corrected so message timestamps remain shared history while window pin state is explicitly machine-local. Exact functional source `4deefa18ce3969d365e961fc74f4bd8ce2ff79d0`, Actions run `35543627032` SUCCESS, H2 Notes **458/458**, dedicated H2M-091 **5/5**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `3bc98cd3061933065a41e6b0b200127d63ee516c`; portable ZIP SHA256 `ec2357dead9eb3538ddfbb20b7768469bc8ba30da1bce2e710e2b5cb5e6ffa26`.
 
 ---
 
