@@ -900,7 +900,7 @@ Evidence: `docs/H2_DESKTOP_SESSION_STORAGE_AUDIT.md` freezes ownership: project-
 
 ---
 
-## [ ] H2M-092 — Preserve responsive behavior
+## [x] H2M-092 — Preserve responsive behavior
 
 Reuse useful current responsive rules:
 
@@ -911,6 +911,8 @@ Reuse useful current responsive rules:
 - DPI/multi-monitor support.
 
 Adapt them to the new Command Center/Project Workspace instead of reproducing the old information hierarchy.
+
+Evidence: `docs/H2_RESPONSIVE_BEHAVIOR_ACCEPTANCE.md` freezes the retained responsive contract around the current Command Center/Agent-first Project Workspace rather than the old hierarchy. `H2ResponsiveProductTests` exercise the real Avalonia UI at 560×820 (compact picker + overlay drawer), 1040×760 (usable simultaneous task/note detail), 560×600 (tab-switched short-window detail), and 1440×860 (large Agent-first surface plus bounded explicit right dock). The suite also invokes the production `WindowPlacement.ReachablePosition` multi-monitor recovery rule and guards the existing Work Assistant DIP/scaling acceptance coverage. No duplicate responsive subsystem or layout model was introduced. Exact functional source `3053244f083d2f068a9c6d939be229d33b7f6f78`, Actions run `35544023398` SUCCESS, H2 Notes **463/463**, dedicated H2M-092 **5/5**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `d558933a6a234a5d6f6bbf5ab5dd3ad7afb47a49`; portable ZIP SHA256 `092fc7a804d47cc654dbd5fa09059b5b91fea9d166617b1670291c54c17f0b69`.
 
 ---
 
