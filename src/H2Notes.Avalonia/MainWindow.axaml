@@ -25,7 +25,52 @@
           </Grid>
         </Border>
         <Grid x:Name="WorkAndAi" Grid.Column="2" ColumnDefinitions="*,5,0" RowDefinitions="*,5,0">
-          <Grid x:Name="WorkContent" RowDefinitions="Auto,Auto,*" Margin="16,12,16,0">
+          <Grid x:Name="CommandCenter" Grid.RowSpan="3" Grid.ColumnSpan="3" RowDefinitions="Auto,Auto,*" Margin="20,18,20,0">
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Command Center" FontFamily="Georgia" FontSize="28" FontWeight="Bold"/>
+                <TextBlock Text="Tổng quan các dự án · mở dự án chỉ khi cần đi vào chi tiết." FontSize="12" Foreground="#796C62"/>
+              </StackPanel>
+              <Button x:Name="CommandCenterAddProjectButton" Grid.Column="1" Classes="accent" VerticalAlignment="Center" AutomationProperties.Name="Thêm dự án từ Command Center">
+                <StackPanel Orientation="Horizontal" Spacing="7"><local:AppIcon Kind="Plus"/><TextBlock Text="Dự án mới" VerticalAlignment="Center"/></StackPanel>
+              </Button>
+            </Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+              <TextBlock x:Name="CommandCenterSummary" FontSize="13" FontWeight="SemiBold" Foreground="#5E5148" VerticalAlignment="Center"/>
+              <Border Grid.Column="1" Background="#F4F0EA" BorderBrush="#DED7CF" BorderThickness="1" CornerRadius="12" Padding="10,5">
+                <TextBlock x:Name="CommandCenterSync" FontSize="11" Foreground="#796C62"/>
+              </Border>
+            </Grid>
+            <Grid Grid.Row="2">
+              <ListBox x:Name="CommandCenterList" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:CompileBindings="False">
+                    <Border Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="6" Padding="16,13" Margin="0,0,0,10">
+                      <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="3">
+                          <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding BoardText}" FontSize="10" Foreground="#8A7A6E" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding AgentText}" FontSize="11" Foreground="#6E645C" VerticalAlignment="Top" Margin="16,3,0,0"/>
+                        <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto" Margin="0,10,0,0">
+                          <TextBlock Text="{Binding ProgressText}" FontSize="12" Foreground="#5E5148" Margin="0,0,12,0"/>
+                          <ProgressBar Grid.Column="1" Value="{Binding ProgressPercent}" Maximum="100" Height="5" Foreground="#A4573D" Background="#E6E1DA" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="2" Text="{Binding AttentionText}" FontSize="11" Foreground="#A4573D" Margin="12,0,0,0"/>
+                        </Grid>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding NextText}" FontSize="12" Foreground="#5E5148" TextWrapping="Wrap" Margin="0,9,0,0"/>
+                        <Grid Grid.Row="3" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                          <TextBlock Text="{Binding ActivityText}" FontSize="10" Foreground="#8A7A6E" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Grid.Column="1" Text="{Binding SyncText}" FontSize="10" Foreground="#8A7A6E" Margin="12,0,0,0"/>
+                        </Grid>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock x:Name="CommandCenterEmpty" Text="Chưa có dự án. Tạo dự án đầu tiên để bắt đầu." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="14"/>
+            </Grid>
+          </Grid>
+          <Grid x:Name="WorkContent" RowDefinitions="Auto,Auto,*" Margin="16,12,16,0" IsVisible="False">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
               <Button x:Name="CompactProjectPicker" Grid.ColumnSpan="2" Classes="outline" HorizontalAlignment="Left" Margin="0,0,0,10" IsVisible="False"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock x:Name="CompactPickerLabel" Text="Dự án"/><local:AppIcon Kind="ChevronDown" Width="14" Height="14"/></StackPanel></Button>
               <StackPanel Grid.Row="1">
