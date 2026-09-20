@@ -80,6 +80,7 @@ public partial class App : Application
     private WorkAssistantBubbleWindow? _workAssistantBubble;
     private WorkAssistantCompactWindow? _workAssistantCompact;
     private WorkAssistantHotkeyController? _workAssistantHotkey;
+    private IWorkAssistantActiveContextCapture? _workAssistantContextCapture;
     private bool _saving;
     private bool _demo;
     private FileStream? _instanceLock;
@@ -400,6 +401,7 @@ public partial class App : Application
 
         if (!_local.WorkAssistant.Enabled)
         {
+            CurrentWorkAssistantContext = null;
             HideWorkAssistantCompact();
             HideWorkAssistantBubble();
             return;
@@ -423,6 +425,35 @@ public partial class App : Application
 
     public string? WorkAssistantHotkeyError
         => _workAssistantHotkey?.Error;
+
+    public IWorkAssistantActiveContextCapture WorkAssistantContextCapture
+    {
+        get => _workAssistantContextCapture ??= new WorkAssistantActiveContextCapture(
+            () => _agentAdapter as IH2ActiveWorkContextProvider);
+        set => _workAssistantContextCapture = value
+            ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public H2ActiveWorkContext? CurrentWorkAssistantContext { get; private set; }
+
+    public bool TryGetValidatedWorkAssistantContext(out H2ActiveWorkContext? context)
+    {
+        context = CurrentWorkAssistantContext;
+        if (context is null)
+            return false;
+
+        if (!WorkAssistantContextCapture.Revalidate(context))
+        {
+            CurrentWorkAssistantContext = null;
+            context = null;
+            return false;
+        }
+
+        return true;
+    }
+
+    public void RefreshWorkAssistantContext()
+        => CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
 
     public bool IsWorkAssistantCompactVisible
         => _workAssistantCompact?.IsVisible == true;
@@ -459,6 +490,8 @@ public partial class App : Application
         if (!_local.WorkAssistant.Enabled || IsExiting)
             return;
 
+        // Capture foreground context before the compact assistant becomes foreground.
+        CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
         EnsureWorkAssistantCompact().OpenFromHotkey();
     }
 
