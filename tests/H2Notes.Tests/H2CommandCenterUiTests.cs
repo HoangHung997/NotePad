@@ -96,6 +96,56 @@ internal static class H2CommandCenterUiTests
             }
         });
 
+        test("Needs attention deep-links to source and disappears when source resolves", () =>
+        {
+            var now = DateTime.UtcNow;
+            var project = Project("Attention project", now, 0, 1);
+            var board = new NoteRecord { Title = "Attention board", NoteKind = "project-hub", Projects = [project] };
+            var agent = new CommandCenterAgentFake(project.Id, now.AddMinutes(5));
+            var app = new App { AgentAdapter = agent };
+            app.State.Notes.Add(board);
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                var section = window.FindControl<Border>("CommandCenterAttentionSection")!;
+                var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
+                Check(section.IsVisible, "Needs-attention section is hidden despite a waiting approval.");
+                var item = list.ItemsSource!.Cast<object>().Single();
+
+                Check((Guid?)Value(item, "ProjectId") == project.Id, "Attention item lost ProjectId source.");
+                Check((Guid?)Value(item, "AgentTaskId") == agent.TaskId, "Attention item lost AgentTaskId source.");
+                Check(Text(item, "Code") == "agent-waiting-approval", "Wrong attention source code.");
+                Check(Text(item, "Title") == "Approve file change", "Approval title is not projected.");
+                Check(Text(item, "SourceText").Contains("Attention project", StringComparison.Ordinal),
+                    "Attention item does not describe its real project source.");
+
+                list.SelectedItem = item;
+                Pump();
+                Check(window.SelectedProjectId == project.Id && !window.FindControl<Grid>("CommandCenter")!.IsVisible,
+                    "Attention item did not deep-link to its source project.");
+
+                window.FindControl<Button>("ProjectsNavButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                agent.Resolve();
+                window.RefreshAfterSave();
+                Pump();
+
+                Check(!window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Resolved source left a stale attention section.");
+                Check(window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().Count() == 0,
+                    "Resolved source left a stale attention row.");
+                Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("0 cần xem", StringComparison.Ordinal),
+                    "Global attention summary did not rebuild after resolution.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
         test("Command Center XAML binds only the required high-value overview fields", () =>
         {
             var repo = FindRepoRoot();
@@ -115,7 +165,13 @@ internal static class H2CommandCenterUiTests
             var source = File.ReadAllText(Path.Combine(repo, "src", "H2Notes.Avalonia", "MainWindow.CommandCenter.cs"));
             Check(source.Contains("H2CommandCenterQueryService", StringComparison.Ordinal),
                 "Command Center UI bypasses the projection/query service.");
-            foreach (var forbidden in new[] { "ToolRegistry", "AgentRuntime", "IAgentTransport", "File.Write", "AtomicWrite(" })
+            Check(source.Contains("GetNeedsAttention", StringComparison.Ordinal)
+                && source.Contains("_commandCenterRefreshTimer", StringComparison.Ordinal),
+                "Command Center attention is not rebuilt from live projection sources.");
+            Check(source.Contains("AgentTaskId", StringComparison.Ordinal)
+                && source.Contains("ProjectId", StringComparison.Ordinal),
+                "Attention deep-link source identifiers are missing.");
+            foreach (var forbidden in new[] { "ToolRegistry", "AgentRuntime", "IAgentTransport", "File.Write", "AtomicWrite(", "AttentionDatabase", "AiInboxStore" })
                 Check(!source.Contains(forbidden, StringComparison.Ordinal),
                     "Command Center UI contains forbidden runtime/persistence marker: " + forbidden);
         });
@@ -144,8 +200,11 @@ internal static class H2CommandCenterUiTests
         return project;
     }
 
+    private static object? Value(object value, string property)
+        => value.GetType().GetProperty(property)!.GetValue(value);
+
     private static string Text(object value, string property)
-        => value.GetType().GetProperty(property)!.GetValue(value)?.ToString() ?? "";
+        => Value(value, property)?.ToString() ?? "";
 
     private static void Check(bool value, string message)
     {
@@ -173,7 +232,9 @@ internal static class H2CommandCenterUiTests
 
     private sealed class CommandCenterAgentFake : IH2AgentAdapter
     {
-        private readonly H2AgentTaskSummary _task;
+        private H2AgentTaskSummary _task;
+
+        public Guid TaskId => _task.TaskId;
 
         public CommandCenterAgentFake(Guid projectId, DateTime updated)
         {
@@ -207,5 +268,16 @@ internal static class H2CommandCenterUiTests
             => _task.Evidence.FirstOrDefault(evidence => evidence.EvidenceId == evidenceId);
 
         public bool AttachProject(Guid taskId, Guid projectId) => false;
+
+        public void Resolve()
+        {
+            _task = _task with
+            {
+                Status = H2AgentTaskStatus.Completed,
+                PendingApproval = null,
+                UpdatedUtc = DateTime.UtcNow,
+                FinalText = "Resolved"
+            };
+        }
     }
 }
