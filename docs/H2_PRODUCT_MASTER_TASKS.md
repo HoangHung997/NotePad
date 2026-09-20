@@ -490,7 +490,7 @@ Evidence: `App.CurrentWorkspaceHealth` derives storage health from `ProjectWorks
 
 # Stage H6 — Build AI-first Project Workspace
 
-## [ ] H2M-060 — Reframe MainWindow/project view
+## [x] H2M-060 — Reframe MainWindow/project view
 
 Future default project screen:
 
@@ -506,6 +506,8 @@ Acceptance:
 
 - opening project makes it immediately obvious where to ask Agent to work;
 - tasks/notes remain one click away.
+
+Evidence: project open now enters a runtime-only Agent-first workspace mode. `AiHostBorder`/the existing `AiChatPanel` becomes the primary project work surface while the former dominant Task+Notes split is hidden by default; compact project status shows deterministic progress, next task and attention summary. `Agent / Công việc / Ghi chú` navigation keeps Tasks and Notes one click away and reuses the existing responsive infrastructure rather than replacing it. The new primary/detail mode is not persisted into ProjectRecord/ProjectLayout and H2M-060 intentionally does not replace the legacy project-AI execution path before H2M-070. `H2ProjectWorkspaceUiTests` proves Agent-first default, one-click Task/Notes details, compact status, transient workspace mode and the H2M-070 boundary. Legacy responsive/project-AI regressions were aligned to explicitly enter the relevant detail surface. Exact functional source `734d79cd74a5ef96145fbb9ab59d3f4f2405cb75`, Actions run `35488277938` SUCCESS, H2 Notes **385/385**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `e9a28e10d4a90741d327d0f2cf7d88f3cf71f176`; portable ZIP SHA256 `8ea52ce750d0bb868257a4f4c586c22856c3d1631d22b2e6bb65887b0904350b`.
 
 ---
 
