@@ -647,6 +647,7 @@ H2LegacyConversationHistoryTests.Run(Test);
 H2LegacyRequestContextRetirementTests.Run(Test);
 H2TypedProjectToolTests.Run(Test);
 H2WorkAssistantBubbleTests.Run(Test);
+H2WorkAssistantHotkeyTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {
