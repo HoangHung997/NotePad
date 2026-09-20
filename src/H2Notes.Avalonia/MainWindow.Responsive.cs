@@ -293,6 +293,6 @@ public partial class MainWindow
     {
         public string Title => Project.DisplayName;
         public string Summary => Project.Progress + " · " + (Project.Next?.DisplayText ?? "Đã hoàn thành");
-        public double Percent => Project.ChecklistItems.Count == 0 ? 0 : 100d * Project.ChecklistItems.Count(t => t.IsCompleted) / Project.ChecklistItems.Count;
+        public double Percent => ProjectProgressCalculator.Calculate(Project).Percent;
     }
 }
