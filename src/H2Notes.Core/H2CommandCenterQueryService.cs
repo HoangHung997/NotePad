@@ -65,4 +65,10 @@ public sealed class H2CommandCenterQueryService
         ProjectRecord project,
         int limit = 50)
         => _projections.BuildProjectActivity(project, limit);
+
+    public IReadOnlyList<ProjectActivityProjection> GetProjectHistory(
+        ProjectRecord project,
+        H2WorkspaceHealthSnapshot? workspaceHealth = null,
+        int limit = 100)
+        => _projections.BuildProjectHistory(project, workspaceHealth, limit);
 }
