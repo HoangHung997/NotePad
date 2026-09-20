@@ -187,6 +187,12 @@ public sealed class H2ProductProjectionService
     public IReadOnlyList<ProjectActivityProjection> BuildProjectActivity(
         ProjectRecord project,
         int limit = 50)
+        => BuildProjectHistory(project, workspaceHealth: null, limit);
+
+    public IReadOnlyList<ProjectActivityProjection> BuildProjectHistory(
+        ProjectRecord project,
+        H2WorkspaceHealthSnapshot? workspaceHealth = null,
+        int limit = 100)
     {
         ArgumentNullException.ThrowIfNull(project);
         if (limit is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(limit));
@@ -194,46 +200,59 @@ public sealed class H2ProductProjectionService
         var activity = new List<ProjectActivityProjection>();
 
         if (project.CreatedAtUtc is { } created)
-            activity.Add(new(project.Id, created, "project", "Project created."));
+            activity.Add(new(project.Id, created, "project-created", "Project created."));
 
         if (project.UpdatedAtUtc is { } updated)
-            activity.Add(new(project.Id, updated, "project", "Project updated."));
+            activity.Add(new(project.Id, updated, "project-edited", "Project updated."));
 
         foreach (var task in project.ChecklistItems)
         {
+            var text = Bound(ProjectProgressCalculator.TaskText(task), 240);
             if (task.CreatedAtUtc is { } taskCreated)
-                activity.Add(new(project.Id, taskCreated, "project-task",
-                    "Task created: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
+                activity.Add(new(project.Id, taskCreated, "project-task-created",
+                    "Task created: " + text));
 
             if (task.CompletedAtUtc is { } completed)
-                activity.Add(new(project.Id, completed, "project-task",
-                    "Task completed: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
+                activity.Add(new(project.Id, completed, "project-task-completed",
+                    "Task completed: " + text));
             else if (task.UpdatedAtUtc is { } taskUpdated && taskUpdated != task.CreatedAtUtc)
-                activity.Add(new(project.Id, taskUpdated, "project-task",
-                    "Task updated: " + Bound(ProjectProgressCalculator.TaskText(task), 240)));
+                activity.Add(new(project.Id, taskUpdated, "project-task-updated",
+                    "Task updated: " + text));
         }
 
-        foreach (var run in Recent(project.Id, limit))
+        foreach (var run in Recent(project.Id, Math.Min(limit, 100)))
         {
+            // One lifecycle row per Agent run. Low-level progress/trace remains Agent-owned
+            // and can still be inspected through IH2AgentAdapter.ObserveTask().
             activity.Add(new(
                 project.Id,
                 run.UpdatedUtc,
-                "agent-task",
+                "agent-lifecycle",
                 AgentActivitySummary(run),
                 run.TaskId));
 
             foreach (var evidence in run.Evidence)
             {
+                var verifiedMutation = IsVerifiedMutationEvidence(evidence.Kind);
                 activity.Add(new(
                     project.Id,
                     run.UpdatedUtc,
-                    "agent-evidence",
-                    string.IsNullOrWhiteSpace(evidence.Summary)
-                        ? "Verified evidence: " + evidence.Kind
-                        : "Verified evidence: " + Bound(evidence.Summary!, 240),
+                    verifiedMutation ? "verified-mutation" : "agent-evidence",
+                    EvidenceActivitySummary(evidence, verifiedMutation),
                     run.TaskId,
                     evidence.EvidenceId));
             }
+        }
+
+        if (workspaceHealth is { ObservedUtc: { } observed }
+            && (workspaceHealth.State != H2WorkspaceSyncState.Healthy
+                || !string.IsNullOrWhiteSpace(workspaceHealth.Code)))
+        {
+            activity.Add(new(
+                project.Id,
+                observed,
+                "sync",
+                SyncActivitySummary(workspaceHealth)));
         }
 
         return activity
@@ -322,6 +341,41 @@ public sealed class H2ProductProjectionService
 
     private static string ProjectName(ProjectRecord project)
         => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
+
+    private static bool IsVerifiedMutationEvidence(string kind)
+    {
+        kind = (kind ?? "").Trim().ToLowerInvariant();
+        return kind.Contains("mutation", StringComparison.Ordinal)
+            || kind.Contains("verification", StringComparison.Ordinal)
+            || kind.Contains("verified", StringComparison.Ordinal)
+            || kind.Contains("patch", StringComparison.Ordinal)
+            || kind.Contains("write", StringComparison.Ordinal);
+    }
+
+    private static string EvidenceActivitySummary(H2AgentEvidence evidence, bool verifiedMutation)
+    {
+        var prefix = verifiedMutation ? "Verified mutation" : "Evidence";
+        var detail = string.IsNullOrWhiteSpace(evidence.Summary)
+            ? evidence.Kind
+            : Bound(evidence.Summary!, 240);
+        return prefix + ": " + detail;
+    }
+
+    private static string SyncActivitySummary(H2WorkspaceHealthSnapshot health)
+        => health.State switch
+        {
+            H2WorkspaceSyncState.Busy => "Storage: saving.",
+            H2WorkspaceSyncState.PendingLocal => "Storage: local changes waiting to sync.",
+            H2WorkspaceSyncState.Offline => "Storage: offline.",
+            H2WorkspaceSyncState.RecoveryRequired => "Storage: recovery required.",
+            H2WorkspaceSyncState.Warning => string.IsNullOrWhiteSpace(health.Message)
+                ? "Storage: sync warning."
+                : "Storage: " + Bound(health.Message!, 240),
+            H2WorkspaceSyncState.Healthy => string.IsNullOrWhiteSpace(health.Message)
+                ? "Storage: synchronized."
+                : "Storage: " + Bound(health.Message!, 240),
+            _ => "Storage state changed."
+        };
 
     private static string AgentActivitySummary(H2AgentTaskSummary task)
         => task.Status switch
