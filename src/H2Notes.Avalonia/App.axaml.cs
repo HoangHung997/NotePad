@@ -77,6 +77,7 @@ public partial class App : Application
     private readonly List<Window> _windowOrder = [];
     private MainWindow? _main;
     private TrayIcon? _tray;
+    private WorkAssistantBubbleWindow? _workAssistantBubble;
     private bool _saving;
     private bool _demo;
     private FileStream? _instanceLock;
@@ -203,6 +204,7 @@ public partial class App : Application
             _saveTimer.Tick += (_, _) => SaveNow();
             _syncTimer.Tick += (_, _) => RefreshSharedWorkspace();
             BuildTray();
+            InitializeWorkAssistantBubble();
             RestoreWindows(plan);
             _restoring = false;
             if (_restoredPending is { } restored)
@@ -247,7 +249,15 @@ public partial class App : Application
                     try { ShowMain(); await _main.CaptureAiErrorEvidence(Path.GetFullPath(args[aiErrorEvidenceIndex + 1])); }
                     catch (Exception ex) { await Dialogs.Message(_main, "AI error evidence failed", ex.Message); }
                 });
-            desktop.Exit += (_, _) => { IsExiting = true; _saveTimer.Stop(); _syncTimer.Stop(); _tray?.Dispose(); _instanceLock?.Dispose(); };
+            desktop.Exit += (_, _) =>
+            {
+                IsExiting = true;
+                _saveTimer.Stop();
+                _syncTimer.Stop();
+                _workAssistantBubble?.Close();
+                _tray?.Dispose();
+                _instanceLock?.Dispose();
+            };
             var documentsEvidenceIndex = Array.IndexOf(args, "--documents-evidence");
             if (_demo && dataIndex >= 0 && documentsEvidenceIndex >= 0 && documentsEvidenceIndex + 1 < args.Length)
                 Dispatcher.UIThread.Post(async () =>
@@ -289,6 +299,7 @@ public partial class App : Application
         var menu = new NativeMenu();
         void Add(string text, Action action) { var item = new NativeMenuItem(text); item.Click += (_, _) => action(); menu.Items.Add(item); }
         Add("H2 Notes · Mở bảng dự án", ShowMain);
+        Add("Work Assistant · hiện / ẩn", ToggleWorkAssistantBubble);
         Add("＋ Ghi chú mới", NewNote);
         Add("AI dự án · cửa sổ riêng", ShowProjectAiWindow);
         var legacyChats = State.Notes.Where(n => n.IsChat && !n.IsArchived).ToList();
@@ -312,6 +323,94 @@ public partial class App : Application
             else { _lastTrayClick = now; RaiseOpenWindows(); }
         };
         TrayIcon.SetIcons(this, new TrayIcons { _tray });
+    }
+
+    private void InitializeWorkAssistantBubble()
+    {
+        if (!_local.WorkAssistant.Enabled)
+        {
+            HideWorkAssistantBubble();
+            return;
+        }
+
+        EnsureWorkAssistantBubble();
+        if (_local.WorkAssistant.StartWithH2)
+            ShowWorkAssistantBubble();
+    }
+
+    private WorkAssistantBubbleWindow EnsureWorkAssistantBubble()
+    {
+        if (_workAssistantBubble is not null)
+            return _workAssistantBubble;
+
+        _workAssistantBubble = new WorkAssistantBubbleWindow(
+            _local.WorkAssistant,
+            () =>
+            {
+                _local.WorkAssistant.Normalize();
+                _local.Save();
+            });
+        return _workAssistantBubble;
+    }
+
+    public bool IsWorkAssistantBubbleVisible
+        => _workAssistantBubble?.IsVisible == true;
+
+    public void ShowWorkAssistantBubble()
+    {
+        if (!_local.WorkAssistant.Enabled || IsExiting)
+            return;
+
+        var bubble = EnsureWorkAssistantBubble();
+        bubble.ApplySettings();
+        if (!bubble.IsVisible)
+            bubble.Show();
+    }
+
+    public void HideWorkAssistantBubble()
+    {
+        if (_workAssistantBubble?.IsVisible == true)
+            _workAssistantBubble.Hide();
+    }
+
+    public void ToggleWorkAssistantBubble()
+    {
+        if (!_local.WorkAssistant.Enabled)
+        {
+            HideWorkAssistantBubble();
+            return;
+        }
+
+        if (IsWorkAssistantBubbleVisible)
+            HideWorkAssistantBubble();
+        else
+            ShowWorkAssistantBubble();
+    }
+
+    public void ApplyWorkAssistantSettings()
+    {
+        _local.WorkAssistant.Normalize();
+        _local.Save();
+
+        if (!_local.WorkAssistant.Enabled)
+        {
+            HideWorkAssistantBubble();
+            return;
+        }
+
+        var bubble = EnsureWorkAssistantBubble();
+        bubble.ApplySettings();
+    }
+
+    public void SetWorkAssistantBubbleState(
+        WorkAssistantBubbleState state,
+        string? detail = null)
+    {
+        if (!_local.WorkAssistant.Enabled)
+            return;
+
+        var bubble = EnsureWorkAssistantBubble();
+        bubble.SetState(state, detail);
     }
 
     public void ScheduleSave()
