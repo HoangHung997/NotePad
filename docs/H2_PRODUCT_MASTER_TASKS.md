@@ -669,7 +669,7 @@ Evidence: the `AiProjectContext` runtime type/file was fully retired. Legacy sta
 
 ---
 
-## [ ] H2M-073 — Retire AiProjectActions pseudo-protocol
+## [x] H2M-073 — Retire AiProjectActions pseudo-protocol
 
 Current model-generated:
 
@@ -695,6 +695,8 @@ Acceptance:
 
 - no parsing model prose/fenced pseudo-action JSON for new Agent operations;
 - host validates all typed project mutations.
+
+Evidence: new project Agent mutations now use the host-owned typed `IH2ProjectToolHost` allowlist only: read project summary/details, add project task, append project note, and replace a uniquely matched project-note segment. The host validates project scope, permission mode, explicit approval for ConfirmChanges, expected project version/stale writes, bounded text, unique note matches and mutation receipts; it never exposes unrestricted `ProjectRecord` mutation to the Agent adapter. Capable adapters receive the host through the optional `IH2ProjectToolHostConsumer` boundary. Normal H2 Agent output is fail-closed against the legacy fenced `h2-actions` parser: H2 Agent prose/fenced pseudo-actions remain presentation text and cannot create legacy action UI or mutate the project. The legacy parser remains only for old compatibility paths and is guarded before parse/apply for `Provider == "H2 Agent"`. Dedicated acceptance tests cover read-only/confirmation/project-access permissions, stale-version rejection, bounded typed tools, ambiguous note rejection, adapter host binding, no unrestricted ProjectRecord/runtime leakage and pseudo-action non-execution. Exact functional source `b89da2ce786dcf15eb8222da56810324e3c9381a`, Actions run `35498986590` SUCCESS, H2 Notes **416/416**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `769dc4f9089924ae284de38f32b4a612df7ee080`; portable ZIP SHA256 `fb017f975aec3ed342f93220cacd7295bb30e652f51e90663601ba9354c0a411`.
 
 ---
 
