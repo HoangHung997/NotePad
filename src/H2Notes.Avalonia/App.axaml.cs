@@ -26,9 +26,28 @@ public partial class App : Application
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
     public IH2AgentAdapter AgentAdapter { get; set; } = H2UnavailableAgentAdapter.Instance;
     public H2WorkspaceHealthSnapshot CurrentWorkspaceHealth
-        => _storage is ProjectWorkspaceStore project
-            ? H2ProductProjectionService.CaptureWorkspaceHealth(project)
-            : H2WorkspaceHealthSnapshot.Healthy;
+    {
+        get
+        {
+            var health = _storage is ProjectWorkspaceStore project
+                ? H2ProductProjectionService.CaptureWorkspaceHealth(project)
+                : H2WorkspaceHealthSnapshot.Healthy;
+
+            // Saving is host/storage lifecycle state. Never source this status from model text.
+            // Recovery/offline states retain priority over the transient saving badge.
+            if (_saving
+                && health.State is not H2WorkspaceSyncState.RecoveryRequired
+                && health.State is not H2WorkspaceSyncState.Offline)
+                return health with
+                {
+                    State = H2WorkspaceSyncState.Busy,
+                    Code = "saving",
+                    Message = "Đang lưu dữ liệu."
+                };
+
+            return health;
+        }
+    }
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly Dictionary<Guid, NoteWindow> _notes = [];
