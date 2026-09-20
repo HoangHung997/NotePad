@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.Threading;
 
 namespace H2Notes.Avalonia;
