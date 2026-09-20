@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         InitializeShell();
         InitializeCommandCenter();
         InitializeProjectResources();
+        InitializeProjectHistory();
         Sheet.SelectionChanged += OnSelection;
         Sheet.DataChanged += () =>
         {
@@ -146,6 +147,8 @@ public partial class MainWindow : Window
         RefreshCommandCenter();
         if (_projectWorkspaceMode == ProjectWorkspaceResourcesMode)
             RefreshProjectResources();
+        if (_projectWorkspaceMode == ProjectWorkspaceHistoryMode)
+            RefreshProjectHistory();
     }
     public void FlushNotes()
     {
