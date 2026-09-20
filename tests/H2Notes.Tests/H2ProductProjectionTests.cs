@@ -107,6 +107,34 @@ internal static class H2ProductProjectionTests
                 throw new Exception("Projection activity summary is not bounded.");
         });
 
+        test("Workspace health projection is rebuilt from real store pending and sync state", () =>
+        {
+            var root = Folder();
+            var pendingRoot = Folder();
+            var store = new ProjectWorkspaceStore(root, pendingRoot: pendingRoot);
+            store.LoadOrImport();
+            var state = SheetStorage.Demo();
+            store.Save(state);
+
+            var healthy = H2ProductProjectionService.CaptureWorkspaceHealth(store);
+            if (healthy.State != H2WorkspaceSyncState.Healthy || healthy.HasPendingChanges)
+                throw new Exception("Clean workspace did not project Healthy.");
+
+            store.PersistPendingChanges(
+                state,
+                new HashSet<Guid> { state.Notes[0].Projects[0].Id });
+            var pending = H2ProductProjectionService.CaptureWorkspaceHealth(store);
+            if (pending.State != H2WorkspaceSyncState.PendingLocal || !pending.HasPendingChanges)
+                throw new Exception("Durable pending work did not project PendingLocal.");
+
+            store.RecordSyncFailure(new IOException("network unavailable"));
+            var offline = H2ProductProjectionService.CaptureWorkspaceHealth(store);
+            if (offline.State != H2WorkspaceSyncState.Offline
+                || offline.Code != "io_error"
+                || !offline.HasPendingChanges)
+                throw new Exception("I/O sync failure did not project Offline with durable pending state.");
+        });
+
         test("Product projections are disposable views and rebuild without mutating project truth", () =>
         {
             var now = DateTime.UtcNow;
@@ -158,6 +186,16 @@ internal static class H2ProductProjectionTests
                 if (source.Contains(marker, StringComparison.Ordinal))
                     throw new Exception("Projection layer contains persistence marker: " + marker);
         });
+    }
+
+    private static string Folder()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            "H2Notes-projection-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
     }
 
     private static ProjectRecord Project(DateTime now)
