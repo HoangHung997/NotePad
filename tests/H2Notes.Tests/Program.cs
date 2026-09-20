@@ -587,8 +587,11 @@ Test("Project drawer switches selected project and AI draft remains with its own
     Equal(board.Projects[2].Id, window.SelectedProjectId); True(!window.FindControl<Border>("Sidebar")!.IsVisible);
     Equal("Nháp riêng dự án 1", board.Projects[0].Conversations[0].Draft); Equal(0, board.Projects[2].Conversations.Count);
     window.FindControl<Button>("AskAiButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
-    True(window.FindControl<Border>("AiHostBorder")!.IsVisible); True(!window.FindControl<Grid>("WorkContent")!.IsVisible);
-    Equal("floating", board.Projects[2].Layout.AiDock); window.Hide();
+    True(window.FindControl<Border>("AiHostBorder")!.IsVisible);
+    True(window.FindControl<Grid>("WorkContent")!.IsVisible);
+    True(!window.FindControl<Grid>("EditorSplit")!.IsVisible);
+    True(!window.FindControl<Button>("AgentTabButton")!.IsEnabled);
+    window.Hide();
 });
 Test("Compact task drag only commits Next on release and edits comment separately", () =>
 {
