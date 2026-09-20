@@ -564,6 +564,7 @@ Test("Responsive shell keeps rich draft, selection and undo across narrow and wi
 {
     var app = new H2Notes.Avalonia.App(); var board = SheetStorage.Demo().Notes[0]; var p = board.Projects[2]; board.SelectedProjectId = p.Id;
     var window = new H2Notes.Avalonia.MainWindow(app, board); window.Show(); Pump();
+    H2UiTestNavigation.OpenProjectWorkspace(window, p.Id); Pump();
     var editor = window.FindControl<RichEditor>("NotesEditor")!;
     editor.Editor.Document.Insert(editor.Editor.Text.Length, "\nBản nháp tiếng Việt"); editor.Editor.Select(0, 4); var draft = editor.Editor.Text;
     window.Width = 560; window.Height = 600; Pump();
