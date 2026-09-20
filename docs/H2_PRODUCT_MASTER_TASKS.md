@@ -916,6 +916,63 @@ Evidence: `docs/H2_RESPONSIVE_BEHAVIOR_ACCEPTANCE.md` freezes the retained respo
 
 ---
 
+## [ ] H2M-093 — Wire real production H2 ↔ Agent bridge and durable task queries
+
+**BLOCKING CORRECTION discovered by architecture review.**
+
+Goal:
+
+The H2 product UI is already built against `IH2AgentAdapter`, but production startup still defaults to `H2UnavailableAgentAdapter` and current Agent integration/coordinator state is not yet sufficient for all Product Master flows. Close this gap before any final Agent-driven acceptance scenario.
+
+Required work:
+
+1. Compose one **real production implementation** behind `IH2AgentAdapter` at the H2 application composition boundary.
+   - Normal project Agent chat must reach the accepted Agent runtime through this bridge.
+   - Work Assistant quick tasks must reach the same Agent runtime.
+   - H2 product code must still depend only on `IH2AgentAdapter`, not ToolRegistry/transport/MCP/runtime internals.
+   - Do not create a second Agent runtime.
+
+2. Support **unscoped quick work** in the real bridge:
+   - `StartTaskAsync(projectId: null, ...)` must work without a fake adapter.
+   - If the frozen Agent integration boundary cannot represent an unscoped task, minimally evolve only the public integration/coordinator seam needed for nullable/unscoped project context. Do **not** reopen or redesign AgentRuntime, ToolRegistry or the extension architecture.
+
+3. Support **later project attachment** in the real bridge:
+   - a task started with `ProjectId = null` can later be associated with one H2 project;
+   - attachment changes correlation only;
+   - do not copy Agent task/evidence/trace state into `ProjectRecord`.
+
+4. Support **recent task/evidence queries from durable state**:
+   - `GetRecentTasks(projectId?)`, `GetTaskSummary(taskId)` and `GetEvidence(id)` must not depend only on an in-memory `Dictionary` that disappears when H2 restarts;
+   - terminal/recent Agent task summaries and evidence required by Command Center/History must be recoverable after application restart;
+   - reuse Agent-owned durable task/evidence/artifact stores where possible;
+   - a small machine-local correlation index may persist only `TaskId ↔ ProjectId?` metadata when necessary;
+   - do not create an H2-owned second Agent task database and do not embed full Agent state in shared NAS project JSON.
+
+5. Keep current safety boundaries:
+   - project grounding is versioned/bounded;
+   - Work Assistant ActiveWorkContext remains ephemeral/local;
+   - permissions remain Agent-enforced;
+   - evidence remains Agent-owned;
+   - legacy standalone AI compatibility may remain only where already intentionally retained.
+
+Acceptance:
+
+- launching the real H2 app with Agent available composes a concrete adapter instead of leaving `H2UnavailableAgentAdapter` as the only runtime path;
+- one real project task executes:
+  `H2 project UI -> IH2AgentAdapter -> production bridge -> accepted Agent runtime -> final result/evidence`;
+- one real quick task executes with `ProjectId = null` through the same runtime;
+- the quick task can later be attached to an existing project without rewriting `ProjectRecord`;
+- after restarting H2, at least completed/recent task summaries and evidence needed by project projections are still queryable from durable Agent-side state;
+- project chat and Work Assistant use the same Agent runtime/bridge;
+- no direct H2 dependency on `IAgentTransport`, `AgentRuntime`, `ToolRegistry`, MCP internals or provider wire formats outside the composition/bridge implementation;
+- no `QuickWorkSession`, giant `ProjectState`, H2 Agent task database or copied evidence store is introduced;
+- deterministic tests may use fakes, but this task's end-to-end acceptance must include the **concrete production adapter/bridge**, not only `Fake IH2AgentAdapter`;
+- CI is green.
+
+Do not mark H2M-093 complete merely because the UI contract/fake tests pass. It is complete only when the real production bridge is wired.
+
+---
+
 # Stage H10 — Remove over-designed product models
 
 ## [ ] H2M-100 — Explicitly reject giant ProjectState implementation
@@ -959,6 +1016,16 @@ Guard UI/data model against arbitrary model-written progress percentage.
 ---
 
 # Stage H11 — Acceptance scenarios
+
+> **REAL-BRIDGE ACCEPTANCE RULE**
+>
+> H2M-093 must be complete before Agent-driven final acceptance in this stage.
+>
+> - Fakes/fixtures may supplement deterministic tests, but H2M-111, H2M-112, H2M-113, H2M-114 and the "new Agent tasks work" portion of H2M-115 must execute through the concrete production `IH2AgentAdapter` bridge and the accepted Agent runtime.
+> - `H2UnavailableAgentAdapter` or a test `Fake IH2AgentAdapter` is not sufficient evidence for end-to-end Agent behavior.
+> - H2M-116 may continue using deterministic/local tests while the user-approved physical two-PC/NAS run remains deferred, but it must retain the explicit `DEFERRED_REAL_NAS` limitation and reopen the physical test at H2M-133/final production acceptance.
+
+
 
 ## [ ] H2M-110 — Command Center 5–10 second test
 
