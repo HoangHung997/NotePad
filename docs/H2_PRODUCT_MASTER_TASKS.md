@@ -625,7 +625,7 @@ Evidence: `AiChatPanel.Send()` now routes project scope exclusively to `SendProj
 
 ---
 
-## [ ] H2M-071 — Preserve legacy conversation history
+## [x] H2M-071 — Preserve legacy conversation history
 
 Existing `AiConversation` / `AiMessage` are user data.
 
@@ -645,6 +645,8 @@ Choose migration presentation:
 Acceptance:
 
 - no chat data loss.
+
+Evidence: legacy project conversation data remains in the existing `AiConversation` / `AiMessage` models and presentation thread; no destructive conversion store was introduced. `H2LegacyConversationHistoryTests` proves workspace save/read preserves conversation IDs/revision/title/profile/reasoning/permission metadata; known provider/model/run/device/parent/time metadata; attachment bytes/text/notice/hash/source metadata; and saved-file name/path/hash/time. Messages with unknown legacy timestamps remain `CreatedAt == default`, render as **Không rõ giờ**, and are not rewritten to the current time. New Agent presentation appends new H2 Agent user/assistant messages while serialized legacy messages remain byte-for-byte equivalent at the model JSON level and old bubbles stay readable. Exact functional source `c2a9b5ae529271660e7182cef56375cce0a67848`, Actions run `35496694714` SUCCESS, H2 Notes **406/406**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `1c264d78934f8304b1e431d84f19dc291cffb921`; portable ZIP SHA256 `90a7dbf50133dcbf08aa19418b215594872427bacbc4715b4f7c280092ce1303`.
 
 ---
 
