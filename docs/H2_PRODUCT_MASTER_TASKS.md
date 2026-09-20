@@ -587,7 +587,7 @@ Evidence: `BuildProjectHistory(...)` creates a disposable timeline from existing
 
 ---
 
-## [ ] H2M-065 — Evidence/research inspector
+## [x] H2M-065 — Evidence/research inspector
 
 Provide a view into Agent evidence for current project/run.
 
@@ -597,6 +597,8 @@ Acceptance:
 
 - official web evidence and file evidence can be inspected;
 - evidence identity/provenance remains Agent-owned.
+
+Evidence: `H2EvidenceInspectionProjectionService` rebuilds inspector rows from recent project Agent tasks and re-fetches each authoritative evidence object through `IH2AgentAdapter.GetEvidence(EvidenceId)`; H2 never promotes the task-summary copy into a new truth store. The H2-facing evidence DTO now exposes optional `SourceUri`, `LocalPath` and `Provenance` fields while retaining EvidenceId/kind/hash/summary compatibility. The one-click **Evidence** project detail displays EvidenceId, AgentTaskId, provenance, source target and SHA256. Web/file actions are gated through the existing `H2ResourceTargetPolicy`; missing/unsafe targets fail closed. No ResearchStore/EvidenceStore/database was introduced and ProjectRecord remains unchanged. Dedicated acceptance tests prove authoritative re-fetch, web + file provenance inspection, safe source actions, one-click UI, Agent-owned identity/provenance and absence of a parallel H2 research store. Exact functional source `0acc3101862ec8eeb28ea19cef3398b4d5dc11e2`, Actions run `35494477960` SUCCESS, H2 Notes **399/399**, NAS harness + full Agent/reference-extension/provider pipeline + both Windows publishes PASS. Publish commit `630fecf7da979d3b4e517cb7da42b1200d2de57c`; portable ZIP SHA256 `8497d4373b05961c404331eeec76309b41e88a0e26f3190501104ac9cd08e674`.
 
 ---
 
