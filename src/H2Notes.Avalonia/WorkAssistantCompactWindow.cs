@@ -19,7 +19,7 @@ public enum WorkAssistantContextScope
     All = Application | Document | Session | Selection
 }
 
-public sealed class WorkAssistantCompactWindow : Window
+public sealed partial class WorkAssistantCompactWindow : Window
 {
     private readonly WorkAssistantSettings _settings;
     private readonly TextBox _prompt;
@@ -183,7 +183,7 @@ public sealed class WorkAssistantCompactWindow : Window
 
         var root = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto")
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto")
         };
         root.Children.Add(header);
         Grid.SetRow(contextArea, 1);
@@ -194,6 +194,7 @@ public sealed class WorkAssistantCompactWindow : Window
         root.Children.Add(_prompt);
         Grid.SetRow(footer, 4);
         root.Children.Add(footer);
+        InitializeCompletionUi(root);
         Content = root;
 
         close.Click += (_, _) => Hide();
