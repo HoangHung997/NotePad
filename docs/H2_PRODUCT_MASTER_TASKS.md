@@ -313,7 +313,7 @@ Evidence: `H2AgentTaskCorrelationIndex` stores only `TaskId ↔ ProjectId?` corr
 
 ---
 
-## [ ] H2M-032 — Define H2 product projections
+## [x] H2M-032 — Define H2 product projections
 
 Add query/view-model layer, not new authoritative databases.
 
@@ -333,6 +333,8 @@ Acceptance:
 
 - projections can be rebuilt from source state;
 - deleting a projection cache does not lose project truth.
+
+Evidence: `src/H2Notes.Core/H2ProductProjections.cs` defines rebuildable `ProjectOverviewProjection`, `NeedsAttentionProjection`, `ProjectActivityProjection` and `H2WorkspaceHealthSnapshot` over authoritative ProjectRecord/TaskRecord, `IH2AgentAdapter` and live ProjectWorkspaceStore health. The projection service has no durable/cache store and was corrected to avoid lazy-mutating `DisplayText/DisplayName` getters; legacy text is parsed into temporary objects only. Regression tests prove deterministic task progress/next task, actionable Agent/workspace attention, chronological project/Agent/evidence activity, direct workspace-health derivation, fresh-service rebuild equivalence, no ProjectRecord mutation and no persistence APIs in the projection source. Exact source `8944c06128b101fccc8ef35c08a21799399914cf`, Actions run `35479559324` SUCCESS, H2 Notes **362/362**, all six projection tests PASS, NAS harness + full Agent/reference-extension/provider pipeline PASS. Publish commit `15b0f9acee43fa9d059f41e033cc32b944fbb042`; portable ZIP SHA256 `4a40a8c148301975a75971ded350527e57c3ddc2f4be913fd5a24cec5a744216`.
 
 ---
 
