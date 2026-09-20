@@ -32,7 +32,21 @@ public partial class App : Application
             : Path.GetDirectoryName(_storage.FilePath)
     };
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
-    public IH2AgentAdapter AgentAdapter { get; set; } = H2UnavailableAgentAdapter.Instance;
+    private IH2AgentAdapter _agentAdapter = H2UnavailableAgentAdapter.Instance;
+    private IH2ProjectToolHost? _projectToolHost;
+    public IH2ProjectToolHost ProjectToolHost => _projectToolHost ??= new H2ProjectToolHost(
+        ResolveProjectForAgentTools,
+        ProjectChangedByAgentTool);
+    public IH2AgentAdapter AgentAdapter
+    {
+        get => _agentAdapter;
+        set
+        {
+            _agentAdapter = value ?? H2UnavailableAgentAdapter.Instance;
+            if (_agentAdapter is IH2ProjectToolHostConsumer consumer)
+                consumer.BindProjectToolHost(ProjectToolHost);
+        }
+    }
     public H2WorkspaceHealthSnapshot CurrentWorkspaceHealth
     {
         get
@@ -71,6 +85,33 @@ public partial class App : Application
     private readonly HashSet<Guid> _dirtyProjects = [];
     private WorkspacePendingRestoreResult? _restoredPending;
     public void MarkProjectDirty(Guid id) => _dirtyProjects.Add(id);
+
+    private ProjectRecord? ResolveProjectForAgentTools(Guid projectId)
+    {
+        var matches = State.Notes
+            .Where(note => note.IsBoard)
+            .SelectMany(note => note.Projects)
+            .Where(project => project.Id == projectId)
+            .Take(2)
+            .ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private void ProjectChangedByAgentTool(Guid projectId)
+    {
+        void Apply()
+        {
+            MarkProjectDirty(projectId);
+            _main?.RefreshAfterSave();
+            ScheduleSave();
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+            Apply();
+        else
+            Dispatcher.UIThread.Post(Apply);
+    }
+
     public Task StopAiAsync() => Task.WhenAll(_aiWindows.Values.Select(w => w.StopAiAsync()).Append(_main?.StopAiAsync() ?? Task.CompletedTask));
     private void CancelAi() { _main?.CancelAi(); foreach (var window in _aiWindows.Values) window.CancelAi(); }
     public void RefreshAiConnections() { _main?.RefreshAiConnections(); foreach (var window in _aiWindows.Values) window.RefreshAiConnections(); }
