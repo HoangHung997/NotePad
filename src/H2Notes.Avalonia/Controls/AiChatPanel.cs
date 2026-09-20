@@ -347,7 +347,7 @@ public sealed partial class AiChatPanel : UserControl
         var runId = Guid.NewGuid();
         var user = new AiMessage { Role = "user", Content = prompt, Provider = profile.Name, Model = profile.Model, CreatedAt = DateTime.UtcNow,
             AiRunId = runId, DeviceId = _app.DeviceId, Attachments = conversation.DraftAttachments.ToList() };
-        try { context = BuildProjectContext(); turns = AiProjectContext.Prepare(conversation, user, context); }
+        try { context = BuildProjectContext(); turns = AiLegacyRequestContext.Prepare(conversation, user, context); }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException) { _status.Text = ex.Message; return; }
         if (AiPdfProcessor.NeedsPreparation(turns, _app.LocalSettings.Ai.Pdf))
         {
