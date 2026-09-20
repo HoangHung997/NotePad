@@ -114,9 +114,9 @@ internal static class ThinkingUiTests
         {
             var app = new H2Notes.Avalonia.App(); var profile = new AiProfile { Model = "fixture" };
             app.LocalSettings.Ai.Profiles = [profile]; app.LocalSettings.Ai.SelectedId = profile.Id;
-            var project = new ProjectRecord { Name = "Fixture project", Notes = "Selected project context" };
+            var notebook = new NoteRecord { NoteKind = "ai-chat", Title = "Thinking fixture" };
             var stream = new GatedStream(); var handler = new Handler(stream);
-            var panel = new AiChatPanel(app, () => new AiClient(handler)); panel.SetProject(project);
+            var panel = new AiChatPanel(app, () => new AiClient(handler)); panel.SetStandalone(notebook);
             var window = new Window { Content = panel, Width = 420, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
             Task? send = null;
             try
@@ -130,14 +130,14 @@ internal static class ThinkingUiTests
                 PumpUntil(() => thinkingText.Text == "Provider progress fixture", () => $"Status={bubble.Message.Status}; error={bubble.Message.ErrorText}; display={thinkingText.Text}; chunks={stream.ChunksRead}; task={send.Status}");
                 Check(thinking.IsVisible && thinking.IsExpanded, "Thinking not expandable");
                 Check(bubble.Message.Content == "", "Thinking leaked to answer");
-                Check(handler.Body!.Contains("Selected project context"), "Selected context omitted without confirmation");
-                Check(!JsonSerializer.Serialize(project).Contains("Provider progress fixture"), "Transient reasoning was persisted");
+                Check(handler.Body!.Contains("Summarize the selected project"), "Standalone prompt omitted from provider request");
+                Check(!JsonSerializer.Serialize(notebook).Contains("Provider progress fixture"), "Transient reasoning was persisted");
                 stream.Answer.TrySetResult();
                 PumpUntil(() => bubble.Message.Content == "Visible answer" && !thinking.IsVisible);
                 Check(!send.IsCompleted && thinkingText.Text == "", "Thinking not cleared before response completion");
                 stream.Finish.TrySetResult(); PumpUntil(() => send.IsCompleted); send.GetAwaiter().GetResult();
-                Check(project.Conversations.Single().Messages.Last().Content == "Visible answer", "Final answer lost");
-                Check(!JsonSerializer.Serialize(project).Contains("Provider progress fixture"), "Saved final history contains reasoning");
+                Check(notebook.AiConversations.Single().Messages.Last().Content == "Visible answer", "Final answer lost");
+                Check(!JsonSerializer.Serialize(notebook).Contains("Provider progress fixture"), "Saved final history contains reasoning");
                 Check(handler.Calls == 1, "Unexpected retry");
             }
             finally { stream.Answer.TrySetResult(); stream.Finish.TrySetResult(); panel.Cancel(); if (send is not null) PumpUntil(() => send.IsCompleted); window.Close(); }
