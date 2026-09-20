@@ -34,6 +34,7 @@ public partial class MainWindow : Window
         BrandImage.Source = new Bitmap(AssetLoader.Open(new Uri("avares://H2Notes.Avalonia/Assets/app.png")));
         NotesToolbar.Content = NotesEditor.CreateToolbar();
         InitializeShell();
+        InitializeCommandCenter();
         Sheet.SelectionChanged += OnSelection;
         Sheet.DataChanged += () =>
         {
@@ -76,6 +77,7 @@ public partial class MainWindow : Window
             Flush(); e.Cancel = true; _board.IsVisibleOnDesktop = false; Hide(); _app.SaveNow();
         };
         SetBoard(board);
+        ShowCommandCenter();
         WindowPlacement.Attach(this, () => _board, app, true);
         Opened += (_, _) => { _board.IsVisibleOnDesktop = true; _app.ScheduleSave(); };
     }
@@ -89,7 +91,7 @@ public partial class MainWindow : Window
         if (IsVisible) { board.IsVisibleOnDesktop = true; _app.ScheduleSave(); }
         SearchBox.Text = ""; BoardTitle.Text = board.Title; Topmost = board.IsPinned;
         Sheet.Preferences = _app.State.SheetPreferences;
-        Sheet.SetBoard(board); _switching = false; SelectCurrent(board.Projects.FirstOrDefault(p => p.Id == board.SelectedProjectId) ?? board.Projects.FirstOrDefault()); UpdatePin(); UpdateSummary();
+        Sheet.SetBoard(board); _switching = false; SelectCurrent(board.Projects.FirstOrDefault(p => p.Id == board.SelectedProjectId) ?? board.Projects.FirstOrDefault()); UpdatePin(); UpdateSummary(); RefreshCommandCenter();
     }
     private void UpdatePin() { PinIcon.Kind = Topmost ? IconKind.PinFilled : IconKind.Pin; }
     private void OnSelection(SheetRow? row)
@@ -115,6 +117,7 @@ public partial class MainWindow : Window
         TasksTitle.Text = $"Công việc  {_notesProject?.Progress ?? "0/0"}";
         DetachedAiWindow?.UpdateProject(_notesProject);
         RefreshNavigator();
+        RefreshCommandCenter();
     }
     public void FlushNotes()
     {
@@ -153,7 +156,7 @@ public partial class MainWindow : Window
         var now = DateTime.UtcNow;
         var project = new ProjectRecord { Name = name.Trim(), CreatedAtUtc = now, UpdatedAtUtc = now };
         _board.UpdatedAtUtc = now;
-        _board.Projects.Add(project); SearchBox.Text = ""; SelectCurrent(project); _app.ScheduleSave();
+        _board.Projects.Add(project); SearchBox.Text = ""; OpenProjectWorkspace(_board, project); _app.ScheduleSave();
     }
     private async Task AddTask()
     {
@@ -196,7 +199,7 @@ public partial class MainWindow : Window
         Add("AI: Cửa sổ nổi", () => SetAiDock("floating"));
         Add("Khôi phục bố cục mặc định", () => { if (_notesProject is not null) _notesProject.Layout = new(); _manualSidebarCollapsed = false; _notesCollapsed = false; ApplyResponsive(); });
         foreach (var board in _app.State.Notes.Where(n => n.IsBoard && !n.IsArchived))
-            Add("▦ " + board.Title, () => { Sheet.CommitEdit(); SetBoard(board); });
+            Add("▦ " + board.Title, () => { Sheet.CommitEdit(); SetBoard(board); ShowCommandCenter(); });
         var otherNotes = _app.State.Notes.Where(n => !n.IsBoard && !n.IsChat && !n.IsArchived).ToList();
         if (otherNotes.Count > 0)
         {
