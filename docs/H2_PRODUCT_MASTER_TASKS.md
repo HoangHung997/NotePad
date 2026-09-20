@@ -367,7 +367,7 @@ Evidence: `docs/H2_PROJECT_DATA_BOUNDARY.md` freezes ProjectRecord as durable pr
 
 ---
 
-## [ ] H2M-041 — Remove future giant ProjectState requirement
+## [x] H2M-041 — Remove future giant ProjectState requirement
 
 No implementation should create a second durable object containing copies of:
 
@@ -384,6 +384,8 @@ when those values are available from authoritative sources.
 Acceptance:
 
 - Command Center uses projection/query services.
+
+Evidence: `H2CommandCenterQueryService` is the sole Command Center-facing query facade introduced by this stage and composes only `H2ProductProjectionService`; it owns no durable truth/cache. `docs/H2_PROJECT_STATE_BOUNDARY.md` freezes the projection-only architecture. `H2ProjectStateArchitectureTests` scan all runtime `src/**/*.cs` for a forbidden `class/record/struct ProjectState`, guard the query facade against hidden state/persistence, prove a fresh query/projection service rebuilds equivalent cards from authoritative inputs, and prove queries do not mutate ProjectRecord. Exact functional source `ce980fc63ca282f2da3cc8ffedb7c9b91579a9f4`, Actions run `35480922743` SUCCESS, H2 Notes **370/370**, ProjectState architecture guards PASS, NAS harness + full Agent/reference-extension/provider/publish pipeline PASS.
 
 ---
 
