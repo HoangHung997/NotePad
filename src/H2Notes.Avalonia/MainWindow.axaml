@@ -124,6 +124,7 @@
               <Button x:Name="TasksTabButton" Content="Công việc" Classes="quiet"/>
               <Button x:Name="NotesTabButton" Content="Ghi chú" Classes="quiet"/>
               <Button x:Name="ResourcesTabButton" Content="Tài nguyên" Classes="quiet"/>
+              <Button x:Name="HistoryTabButton" Content="Lịch sử" Classes="quiet"/>
             </StackPanel>
             <Grid x:Name="EditorSplit" Grid.Row="2" RowDefinitions="*,8,*">
               <Border x:Name="TasksPane" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
@@ -175,6 +176,36 @@
                     </ListBox.ItemTemplate>
                   </ListBox>
                   <TextBlock x:Name="ProjectResourcesEmpty" Text="Chưa có liên kết, tệp hoặc evidence cho dự án này." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="13"/>
+                </Grid>
+              </Grid>
+            </Border>
+            <Border x:Name="ProjectHistoryPane" Grid.Row="2" IsVisible="False" Background="#FFFDFC" BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4">
+              <Grid RowDefinitions="44,*">
+                <Grid ColumnDefinitions="*,Auto" Background="#FAF7F2">
+                  <StackPanel Orientation="Horizontal" Spacing="9" Margin="12,0" VerticalAlignment="Center">
+                    <TextBlock Text="Lịch sử dự án" FontFamily="Georgia" FontSize="17" FontWeight="Bold"/>
+                    <TextBlock x:Name="ProjectHistorySummary" FontSize="11" Foreground="#8A7A6E" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="Trace chi tiết vẫn thuộc Agent" FontSize="10" Foreground="#8A7A6E" VerticalAlignment="Center" Margin="12,0"/>
+                </Grid>
+                <Grid Grid.Row="1">
+                  <ListBox x:Name="ProjectHistoryList" Background="Transparent" BorderThickness="0" Padding="8" SelectionMode="Single">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:CompileBindings="False">
+                        <Border BorderBrush="#E1DDD7" BorderThickness="1" CornerRadius="4" Padding="11,9" Margin="0,0,0,6">
+                          <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*">
+                            <Border Background="#F8EAE2" CornerRadius="10" Padding="7,3" VerticalAlignment="Top">
+                              <TextBlock Text="{Binding KindText}" FontSize="9" Foreground="#A4573D"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="12" TextWrapping="Wrap" Margin="10,1,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MetaText}" FontSize="9" Foreground="#8A7A6E" TextWrapping="Wrap" Margin="10,5,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TimeText}" FontSize="9" Foreground="#9A8D82" Margin="10,4,0,0"/>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                  <TextBlock x:Name="ProjectHistoryEmpty" Text="Chưa có hoạt động có ý nghĩa để hiển thị." IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#796C62" FontSize="13"/>
                 </Grid>
               </Grid>
             </Border>
