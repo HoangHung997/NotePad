@@ -177,29 +177,31 @@ internal static class ChatTests
             panel.SetStandalone(notebook);
             Check(message.Status == "interrupted" && message.Content == "Partial response" && message.CreatedAt == stamp, "Lost partial response or changed its timestamp");
         });
-        test("Chat shows safe HTTP error in the saved bubble after reopening without retrying", () =>
+        test("Standalone chat shows safe HTTP error in the saved bubble after reopening without retrying", () =>
         {
             var app = new H2Notes.Avalonia.App(); var profile = new AiProfile { Model = "minimax-m3:cloud" };
             app.LocalSettings.Ai.Profiles = [profile]; app.LocalSettings.Ai.SelectedId = profile.Id;
-            var handler = new ErrorStub(); var project = new ProjectRecord();
-            var panel = new AiChatPanel(app, () => new AiClient(handler)); panel.SetProject(project);
+            var handler = new ErrorStub();
+            var notebook = new NoteRecord { NoteKind = "ai-chat", Title = "HTTP error fixture" };
+            var panel = new AiChatPanel(app, () => new AiClient(handler)); panel.SetStandalone(notebook);
             var window = new Window { Width = 420, Height = 660, Content = panel }; window.Show(); Pump();
             try
             {
                 Named<TextBox>(panel, "ChatComposer").Text = "Test only"; Pump();
-                panel.GetVisualDescendants().OfType<Expander>().Single().IsExpanded = true; Pump();
-                Named<CheckBox>(panel, "ChatIncludeProject").IsChecked = false;
                 var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(panel, null)!;
                 var deadline = DateTime.UtcNow.AddSeconds(5); while (!send.IsCompleted && DateTime.UtcNow < deadline) { Pump(); Thread.Sleep(5); }
                 Check(send.IsCompleted, "Mock failure did not finish"); send.GetAwaiter().GetResult(); Pump();
-                var answer = project.Conversations.Single().Messages.Last();
+                var answer = notebook.AiConversations.Single().Messages.Last();
                 Check(answer.Status == "error" && answer.Content == "" && answer.ErrorText.Contains("HTTP 402") && !answer.ErrorText.Contains("private-key"), "Wrong persisted failure");
                 Check(panel.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Name == "MessageError" && t.IsVisible && t.Text!.Contains("HTTP 402")), "Missing visible failure");
-                var store = new ProjectWorkspaceStore(Path.Combine(folder, "chat-error-project")); _ = store.LoadOrImport();
-                store.Save(new() { Notes = [new() { Projects = [project] }] }); var restored = store.Read().Notes[0].Projects[0];
-                panel.SetProject(null); panel.SetProject(restored); Pump();
-                Check(restored.Conversations[0].Messages.Last().ErrorText == answer.ErrorText && handler.Calls == 1, "Reopen lost error or resent request");
-                Check(AiHistory.RequestTurns(restored.Conversations[0]).Count == 1, "Error leaked into future AI context");
+
+                var store = new ProjectWorkspaceStore(Path.Combine(folder, "chat-error-standalone")); _ = store.LoadOrImport();
+                store.Save(new() { Notes = [notebook] });
+                var restored = store.Read().Notes.Single(n => n.Id == notebook.Id);
+
+                panel.SetProject(null); panel.SetStandalone(restored); Pump();
+                Check(restored.AiConversations[0].Messages.Last().ErrorText == answer.ErrorText && handler.Calls == 1, "Reopen lost error or resent request");
+                Check(AiHistory.RequestTurns(restored.AiConversations[0]).Count == 1, "Error leaked into future AI context");
             }
             finally { window.Close(); }
         });
