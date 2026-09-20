@@ -523,14 +523,38 @@ public partial class App : Application
             return;
         }
 
-        // If context will be used, validate the original full target identity first.
-        // The UI scope mask narrows grounding only; it never weakens stale-target checks.
-        if (!string.IsNullOrWhiteSpace(selectedContextSummary)
-            && !TryGetValidatedWorkAssistantContext(out _))
+        var permissionMode = compact.SelectedPermissionMode;
+        H2ActiveWorkContext? validatedContext = null;
+
+        // Grounding and any mutating scope both use the original captured target identity.
+        // Removing chips narrows what is sent; it never bypasses stale-target validation.
+        var needsTargetValidation =
+            !string.IsNullOrWhiteSpace(selectedContextSummary)
+            || permissionMode is H2AgentPermissionMode.AskBeforeChanges
+                or H2AgentPermissionMode.AllowScopedChanges;
+
+        if (needsTargetValidation
+            && !TryGetValidatedWorkAssistantContext(out validatedContext))
         {
             compact.SetActiveContext(null);
             compact.SetStatus(
-                "Context đã thay đổi hoặc không còn hợp lệ. Mở lại trợ lý để capture lại, hoặc gửi không kèm context.",
+                "Context đã thay đổi hoặc không còn hợp lệ. Mở lại trợ lý để capture lại, hoặc gửi ở chế độ Chỉ quan sát không kèm context.",
+                isError: true);
+            return;
+        }
+
+        if (!WorkAssistantPermissionScopeMapper.TryMap(
+                permissionMode,
+                validatedContext ?? CurrentWorkAssistantContext,
+                compact.SelectedContextScope,
+                projectId: null,
+                DateTime.UtcNow,
+                out var permission,
+                out var permissionError)
+            || permission is null)
+        {
+            compact.SetStatus(
+                permissionError ?? "Không ánh xạ được quyền cho tác vụ.",
                 isError: true);
             return;
         }
@@ -540,18 +564,16 @@ public partial class App : Application
             string.IsNullOrWhiteSpace(selectedContextSummary)
                 ? null
                 : selectedContextSummary,
-            Version: 0);
+            Version: 0,
+            PermissionScope: permission.PermissionScope);
 
         try
         {
-            // H2M-085 deliberately starts through the one existing Agent adapter.
-            // Permission mapping for mutating quick work is introduced in H2M-086;
-            // until then quick work is read-only/fail-safe.
             var taskId = await _agentAdapter.StartTaskAsync(
                 projectId: null,
                 goal: prompt,
                 context: taskContext,
-                readOnly: true,
+                readOnly: permission.ReadOnly,
                 cancellationToken: CancellationToken.None);
 
             _workAssistantQuickTaskId = taskId;
