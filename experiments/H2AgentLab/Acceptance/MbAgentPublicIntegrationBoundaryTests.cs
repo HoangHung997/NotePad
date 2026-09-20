@@ -264,7 +264,7 @@ public static class MbAgentPublicIntegrationBoundaryTests
 
         await Test(
             "MB121-INTEGRATION-GATE",
-            "boundary is documented while H2 Notes remains unintegrated before MB-122",
+            "approved H2 composition preserves the frozen boundary without leaking runtime internals",
             () =>
             {
                 var repo = FindRepoRoot();
@@ -285,25 +285,49 @@ public static class MbAgentPublicIntegrationBoundaryTests
                     Check(document.Contains(method, StringComparison.Ordinal),
                         "Boundary document is missing operation: " + method);
 
-                Check(document.Contains(
-                        "no H2 Notes production integration yet",
-                        StringComparison.OrdinalIgnoreCase)
-                      && document.Contains("MB-122", StringComparison.Ordinal),
-                    "Boundary document lost the user-acceptance integration gate.");
+                Check(document.Contains("MB-122 was explicitly accepted", StringComparison.Ordinal)
+                      && document.Contains("H2M-093", StringComparison.Ordinal)
+                      && document.Contains("composition root", StringComparison.OrdinalIgnoreCase),
+                    "Boundary document does not record the approved post-MB-122 composition gate.");
+
+                var appSource = File.ReadAllText(Path.Combine(
+                    repo,
+                    "src",
+                    "H2Notes.Avalonia",
+                    "App.axaml.cs"));
+                Check(appSource.Contains("H2ProductionAgentAdapter", StringComparison.Ordinal)
+                      && appSource.Contains("H2AgentLab.Integration", StringComparison.Ordinal),
+                    "Approved H2 composition root does not construct the concrete integration bridge.");
+
+                foreach (var marker in new[]
+                {
+                    "H2AgentLab.Runtime",
+                    "H2AgentLab.Transport",
+                    "AgentRuntimeFactory",
+                    "AgentOrchestrator",
+                    "ToolRegistry"
+                })
+                    Check(!appSource.Contains(marker, StringComparison.Ordinal),
+                        "H2 composition root leaks Agent runtime internal: " + marker);
 
                 var src = Path.Combine(repo, "src");
                 foreach (var path in Directory.EnumerateFiles(
                              src,
-                             "*",
+                             "*.cs",
                              SearchOption.AllDirectories)
-                         .Where(x => x.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
-                             || x.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+                         .Where(path => !path.EndsWith("App.axaml.cs", StringComparison.OrdinalIgnoreCase)))
                 {
                     var source = File.ReadAllText(path);
-                    Check(!source.Contains("H2AgentLab.Integration", StringComparison.Ordinal)
-                          && !source.Contains("experiments/H2AgentLab/H2AgentLab.csproj", StringComparison.Ordinal)
-                          && !source.Contains("experiments\\H2AgentLab\\H2AgentLab.csproj", StringComparison.Ordinal),
-                        "H2 Notes production source integrated Agent Lab before MB-122: " + path);
+                    foreach (var marker in new[]
+                    {
+                        "H2AgentLab.Runtime",
+                        "H2AgentLab.Transport",
+                        "AgentRuntimeFactory",
+                        "AgentOrchestrator",
+                        "ToolRegistry"
+                    })
+                        Check(!source.Contains(marker, StringComparison.Ordinal),
+                            "Ordinary H2 product source leaks Agent runtime internal '" + marker + "': " + path);
                 }
 
                 return Task.CompletedTask;
