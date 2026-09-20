@@ -119,9 +119,9 @@ internal static class H2WorkAssistantPermissionTests
             Check(compact.SelectedPermissionMode == H2AgentPermissionMode.ObserveOnly,
                 "New context silently inherited a previous mutation grant preset.");
 
-            var combo = compact.FindControl<ComboBox>("WorkAssistantPermissionPreset")
-                ?? throw new Exception("Permission preset ComboBox missing.");
-            Check(combo.ItemsSource!.Cast<object>().Count() == 4,
+            var combo = PrivateField<ComboBox>(compact, "_permission");
+            Check(combo.Name == "WorkAssistantPermissionPreset"
+                && combo.ItemsSource!.Cast<object>().Count() == 4,
                 "Work Assistant does not expose the four product permission presets.");
             compact.Close();
         });
@@ -188,7 +188,7 @@ internal static class H2WorkAssistantPermissionTests
                 "Project-policy preset started an unscoped quick Agent task.");
             Check(app.IsWorkAssistantCompactVisible,
                 "Fail-closed project-policy mapping hid the compact panel.");
-            var status = compact.FindControl<TextBlock>("WorkAssistantCompactStatus")?.Text ?? "";
+            var status = PrivateField<TextBlock>(compact, "_status").Text ?? "";
             Check(status.Contains("chưa gắn dự án", StringComparison.OrdinalIgnoreCase),
                 "User did not receive a clear project-policy scope error.");
         });
@@ -231,6 +231,11 @@ internal static class H2WorkAssistantPermissionTests
             Selection: "D51:F80",
             Provider: "OfficeHost",
             CapturedUtc: DateTime.UtcNow);
+
+    private static T PrivateField<T>(object owner, string name)
+        where T : class
+        => (T)(owner.GetType().GetField(name, Private)?.GetValue(owner)
+            ?? throw new Exception($"Missing private field {name}."));
 
     private static WorkAssistantCompactWindow Compact(App app)
     {
