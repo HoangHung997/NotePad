@@ -292,7 +292,7 @@ Evidence: `src/H2Notes.Core/H2AgentAdapter.cs` defines the provider-neutral `IH2
 
 ---
 
-## [ ] H2M-031 — ProjectId correlation without embedding Agent state
+## [x] H2M-031 — ProjectId correlation without embedding Agent state
 
 Goal:
 
@@ -308,6 +308,8 @@ Acceptance:
 
 - Agent run can be queried by ProjectId;
 - Agent run with ProjectId = null is valid.
+
+Evidence: `H2AgentTaskCorrelationIndex` stores only `TaskId ↔ ProjectId?` correlation and timestamps; it does not own Agent execution/evidence state and never mutates `ProjectRecord`. It supports project queries, unscoped quick-work queries, later project attachment, bounded recent correlation queries and fail-closed conflicting registration. Architecture tests serialize ProjectRecord before/after correlation operations and reflect its properties to prove no Agent task/verification/tool state was embedded. Exact functional source `dae9adf56a000aa09f0e0c6ff7807083fbaf2ceb`, Actions run `35477369245` SUCCESS, H2 Notes **356/356**, dedicated correlation tests PASS, full Agent/reference-extension/provider/publish pipeline PASS. Publish commit `548fd0827272855e870c7863d2de36403dd9bdb2`; portable ZIP SHA256 `d78048cab78ae8cad75cb165b3a9680989caadee1ccec0ee3d1d44b66da174b6`.
 
 ---
 
