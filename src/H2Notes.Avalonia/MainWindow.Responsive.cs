@@ -180,6 +180,7 @@ public partial class MainWindow
         {
             _notesProject.Layout.Tab = "tasks";
             _notesProject.Layout.TasksCollapsed = false;
+            Sheet.SetFilter(SearchBox.Text ?? "");
         }
 
         ApplyResponsive();
