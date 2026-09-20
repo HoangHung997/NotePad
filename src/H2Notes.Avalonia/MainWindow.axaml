@@ -102,11 +102,14 @@
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
               <Button x:Name="CompactProjectPicker" Grid.ColumnSpan="2" Classes="outline" HorizontalAlignment="Left" Margin="0,0,0,10" IsVisible="False"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock x:Name="CompactPickerLabel" Text="Dự án"/><local:AppIcon Kind="ChevronDown" Width="14" Height="14"/></StackPanel></Button>
               <StackPanel Grid.Row="1">
+                <TextBlock Text="PROJECT" FontSize="9" FontWeight="SemiBold" Foreground="#8A7A6E" Margin="0,0,0,2"/>
                 <Button x:Name="ProjectPickerButton" Classes="quiet" HorizontalAlignment="Left" Padding="0,3" ToolTip.Tip="Đổi dự án · Ctrl+K">
                   <Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="ProjectTitle" Text="Chọn dự án" FontFamily="Georgia" FontSize="22" FontWeight="Bold" TextWrapping="Wrap"/><local:AppIcon Grid.Column="1" Kind="ChevronDown" Width="15" Height="15" Margin="8,0,0,0"/></Grid>
                 </Button>
                 <local:RichEditor x:Name="ProjectTitleEditor" IsVisible="False" MinHeight="48"/>
                 <TextBlock x:Name="ProjectProgress" FontSize="12" Foreground="#88614C" Margin="0,5,0,0"/>
+                <TextBlock x:Name="ProjectNextSummary" FontSize="11" Foreground="#5E5148" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock x:Name="ProjectAttentionSummary" FontSize="10" Foreground="#A4573D" TextWrapping="Wrap" Margin="0,3,0,0"/>
               </StackPanel>
               <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
                 <Button x:Name="PriorityButton" Classes="quiet" Padding="5,4" Foreground="#A4573D" ToolTip.Tip="Ưu tiên thực hiện trước" AutomationProperties.Name="Ưu tiên thực hiện trước"><local:AppIcon Kind="Star"/></Button>
@@ -115,6 +118,9 @@
               </StackPanel>
             </Grid>
             <StackPanel x:Name="CompactTabs" Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="False">
+              <Button x:Name="AgentTabButton" Classes="accent" AutomationProperties.Name="Làm việc với Agent">
+                <StackPanel Orientation="Horizontal" Spacing="6"><local:AppIcon Kind="SparkleFilled" Width="15" Height="15"/><TextBlock Text="Agent"/></StackPanel>
+              </Button>
               <Button x:Name="TasksTabButton" Content="Công việc" Classes="quiet"/>
               <Button x:Name="NotesTabButton" Content="Ghi chú" Classes="quiet"/>
             </StackPanel>
