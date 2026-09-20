@@ -32,8 +32,8 @@ internal static class H2ProductProjectionTests
                 throw new Exception("Deterministic next task is wrong.");
             if (overview.AgentStatus != H2AgentTaskStatus.WaitingForApproval)
                 throw new Exception("Latest Agent status not projected.");
-            if (overview.AttentionCount != 2)
-                throw new Exception("Expected Agent approval + workspace pending attention.");
+            if (overview.AttentionCount != 1)
+                throw new Exception("Project card attention must count only project/Agent sources; workspace health is global.");
             if (overview.LatestVerifiedActivityUtc != now.AddMinutes(4))
                 throw new Exception("Latest verified activity must ignore unverified waiting task.");
             if (overview.SyncState != H2WorkspaceSyncState.PendingLocal)
