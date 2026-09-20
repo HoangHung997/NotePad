@@ -24,12 +24,17 @@ internal static class ProjectActionUiTests
         foreach (var permission in Enum.GetValues<AiPermissionMode>())
             test("Composer project edits enforce " + permission + " with one-step permission UX", () =>
             {
-                var app = new H2Notes.Avalonia.App(); var profile = new AiProfile { Model = "fixture" };
-                app.LocalSettings.Ai = new() { Profiles = [profile], SelectedId = profile.Id };
-                var conversation = new AiConversation { PermissionMode = permission };
+                var app = new H2Notes.Avalonia.App();
+                var answer = new AiMessage
+                {
+                    Role = "assistant",
+                    Status = "complete",
+                    Content = "Đề xuất thao tác\n" + "```h2-actions\n[{\"kind\":\"add_task\",\"text\":\"Kiểm tra hồ sơ\"}]\n```"
+                };
+                var conversation = new AiConversation { PermissionMode = permission, Messages = [answer] };
                 if (permission == AiPermissionMode.ProjectAccess) app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
                 var project = new ProjectRecord { Conversations = [conversation] };
-                var panel = new AiChatPanel(app, () => new AiClient(new Handler())); panel.SetProject(project);
+                var panel = new AiChatPanel(app); panel.SetProject(project);
                 var window = new Window { Content = panel, Width = 420, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
                 var refreshCount = 0;
                 panel.ProjectActionsRequested += (target, actions) =>
@@ -40,10 +45,10 @@ internal static class ProjectActionUiTests
                 };
                 try
                 {
-                    panel.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "ChatComposer").Text = "Thêm công việc kiểm tra hồ sơ";
-                    var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(panel, null)!;
-                    PumpUntil(() => send.IsCompleted, "Send timed out"); send.GetAwaiter().GetResult(); Dispatcher.UIThread.RunJobs();
-                    var answer = conversation.Messages.Last(); Check(answer.Status == "complete", answer.ErrorText);
+                    var scope = (AiChatScope)typeof(AiChatPanel).GetField("_scope", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;
+                    typeof(AiChatPanel).GetMethod("ApplyAutomaticProjectActions", BindingFlags.Instance | BindingFlags.NonPublic)!
+                        .Invoke(panel, [scope, conversation, answer, permission]);
+                    Dispatcher.UIThread.RunJobs();
 
                     if (permission == AiPermissionMode.ConfirmChanges)
                     {
