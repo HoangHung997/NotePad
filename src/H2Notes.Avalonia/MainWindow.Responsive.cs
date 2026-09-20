@@ -24,6 +24,7 @@ public partial class MainWindow
     private const string ProjectWorkspaceNotesMode = "notes";
     private const string ProjectWorkspaceResourcesMode = "resources";
     private const string ProjectWorkspaceHistoryMode = "history";
+    private const string ProjectWorkspaceEvidenceMode = "evidence";
     private string _projectWorkspaceMode = ProjectWorkspaceAgentMode;
     private AiChatPanel _chat = null!;
     private ProjectNavItem? _pressedProject;
@@ -110,6 +111,7 @@ public partial class MainWindow
         NotesTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceNotesMode);
         ResourcesTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceResourcesMode);
         HistoryTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceHistoryMode);
+        EvidenceTabButton.Click += (_, _) => ShowProjectDetail(ProjectWorkspaceEvidenceMode);
         CollapseTasksButton.Click += (_, _) => { if (_notesProject is not null) _notesProject.Layout.TasksCollapsed = !_notesProject.Layout.TasksCollapsed; ApplyResponsive(); _app.ScheduleSave(); };
         NotesSplitter.AddHandler(PointerReleasedEvent, (_, _) => Dispatcher.UIThread.Post(() =>
         {
@@ -175,6 +177,7 @@ public partial class MainWindow
             ProjectWorkspaceNotesMode => ProjectWorkspaceNotesMode,
             ProjectWorkspaceResourcesMode => ProjectWorkspaceResourcesMode,
             ProjectWorkspaceHistoryMode => ProjectWorkspaceHistoryMode,
+            ProjectWorkspaceEvidenceMode => ProjectWorkspaceEvidenceMode,
             _ => ProjectWorkspaceTasksMode
         };
 
@@ -194,9 +197,13 @@ public partial class MainWindow
         {
             RefreshProjectResources();
         }
-        else
+        else if (_projectWorkspaceMode == ProjectWorkspaceHistoryMode)
         {
             RefreshProjectHistory();
+        }
+        else
+        {
+            RefreshProjectEvidence();
         }
 
         ApplyResponsive();
@@ -233,6 +240,8 @@ public partial class MainWindow
             && _projectWorkspaceMode == ProjectWorkspaceResourcesMode;
         var historyMode = projectOpen
             && _projectWorkspaceMode == ProjectWorkspaceHistoryMode;
+        var evidenceMode = projectOpen
+            && _projectWorkspaceMode == ProjectWorkspaceEvidenceMode;
 
         var fullscreen = WindowState == WindowState.Maximized;
         if (!primaryAgent
@@ -280,9 +289,10 @@ public partial class MainWindow
 
         CommandCenter.IsVisible = _showCommandCenter;
         WorkContent.IsVisible = projectOpen && !inlineAi;
-        EditorSplit.IsVisible = projectOpen && !primaryAgent && !resourcesMode && !historyMode && !inlineAi;
+        EditorSplit.IsVisible = projectOpen && !primaryAgent && !resourcesMode && !historyMode && !evidenceMode && !inlineAi;
         ProjectResourcesPane.IsVisible = projectOpen && resourcesMode && !inlineAi;
         ProjectHistoryPane.IsVisible = projectOpen && historyMode && !inlineAi;
+        ProjectEvidencePane.IsVisible = projectOpen && evidenceMode && !inlineAi;
 
         // Detail mode keeps the mature task/note editor behavior. It is secondary now because
         // opening a project starts in primaryAgent; tabs expose this surface in one click.
@@ -310,15 +320,17 @@ public partial class MainWindow
         NotesToolbar.IsVisible = NotesEditorBorder.IsVisible = !layout.NotesCollapsed;
 
         AgentTabButton.IsEnabled = !primaryAgent;
-        TasksTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || layout.Tab != "tasks";
-        NotesTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || layout.Tab != "notes";
+        TasksTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || evidenceMode || layout.Tab != "tasks";
+        NotesTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || evidenceMode || layout.Tab != "notes";
         ResourcesTabButton.IsEnabled = !resourcesMode;
         HistoryTabButton.IsEnabled = !historyMode;
+        EvidenceTabButton.IsEnabled = !evidenceMode;
         AgentTabButton.Foreground = RichEditor.Brush(primaryAgent ? "#FFFFFF" : "#796C62");
-        TasksTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && !notesTab ? "#A4573D" : "#796C62");
-        NotesTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && notesTab ? "#A4573D" : "#796C62");
+        TasksTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && !evidenceMode && !notesTab ? "#A4573D" : "#796C62");
+        NotesTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && !evidenceMode && notesTab ? "#A4573D" : "#796C62");
         ResourcesTabButton.Foreground = RichEditor.Brush(resourcesMode ? "#A4573D" : "#796C62");
         HistoryTabButton.Foreground = RichEditor.Brush(historyMode ? "#A4573D" : "#796C62");
+        EvidenceTabButton.Foreground = RichEditor.Brush(evidenceMode ? "#A4573D" : "#796C62");
 
         AiHostBorder.IsVisible = primaryAgent || legacyAi;
 
