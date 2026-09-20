@@ -78,6 +78,8 @@ public partial class App : Application
     private MainWindow? _main;
     private TrayIcon? _tray;
     private WorkAssistantBubbleWindow? _workAssistantBubble;
+    private WorkAssistantCompactWindow? _workAssistantCompact;
+    private WorkAssistantHotkeyController? _workAssistantHotkey;
     private bool _saving;
     private bool _demo;
     private FileStream? _instanceLock;
@@ -205,6 +207,7 @@ public partial class App : Application
             _syncTimer.Tick += (_, _) => RefreshSharedWorkspace();
             BuildTray();
             InitializeWorkAssistantBubble();
+            InitializeWorkAssistantHotkey();
             RestoreWindows(plan);
             _restoring = false;
             if (_restoredPending is { } restored)
@@ -254,6 +257,8 @@ public partial class App : Application
                 IsExiting = true;
                 _saveTimer.Stop();
                 _syncTimer.Stop();
+                _workAssistantHotkey?.Dispose();
+                _workAssistantCompact?.Close();
                 _workAssistantBubble?.Close();
                 _tray?.Dispose();
                 _instanceLock?.Dispose();
@@ -391,15 +396,18 @@ public partial class App : Application
     {
         _local.WorkAssistant.Normalize();
         _local.Save();
+        InitializeWorkAssistantHotkey();
 
         if (!_local.WorkAssistant.Enabled)
         {
+            HideWorkAssistantCompact();
             HideWorkAssistantBubble();
             return;
         }
 
         var bubble = EnsureWorkAssistantBubble();
         bubble.ApplySettings();
+        _workAssistantCompact?.ApplySettings();
     }
 
     public void SetWorkAssistantBubbleState(
@@ -411,6 +419,53 @@ public partial class App : Application
 
         var bubble = EnsureWorkAssistantBubble();
         bubble.SetState(state, detail);
+    }
+
+    public string? WorkAssistantHotkeyError
+        => _workAssistantHotkey?.Error;
+
+    public bool IsWorkAssistantCompactVisible
+        => _workAssistantCompact?.IsVisible == true;
+
+    private void InitializeWorkAssistantHotkey()
+    {
+        if (_workAssistantHotkey is null)
+        {
+            _workAssistantHotkey = new WorkAssistantHotkeyController(
+                new WindowsWorkAssistantHotkeyRegistration(),
+                ShowWorkAssistantCompact);
+        }
+
+        if (!_local.WorkAssistant.Enabled)
+        {
+            _workAssistantHotkey.Disable();
+            return;
+        }
+
+        _workAssistantHotkey.Apply(_local.WorkAssistant.Hotkey);
+    }
+
+    private WorkAssistantCompactWindow EnsureWorkAssistantCompact()
+    {
+        if (_workAssistantCompact is not null)
+            return _workAssistantCompact;
+
+        _workAssistantCompact = new WorkAssistantCompactWindow(_local.WorkAssistant);
+        return _workAssistantCompact;
+    }
+
+    public void ShowWorkAssistantCompact()
+    {
+        if (!_local.WorkAssistant.Enabled || IsExiting)
+            return;
+
+        EnsureWorkAssistantCompact().OpenFromHotkey();
+    }
+
+    public void HideWorkAssistantCompact()
+    {
+        if (_workAssistantCompact?.IsVisible == true)
+            _workAssistantCompact.Hide();
     }
 
     public void ScheduleSave()
