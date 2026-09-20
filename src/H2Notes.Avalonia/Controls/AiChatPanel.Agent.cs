@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using System.Text;
 using Avalonia.Threading;
 using H2Notes.Core;
@@ -227,7 +228,8 @@ public sealed partial class AiChatPanel
         var summary = new StringBuilder();
         summary.AppendLine("H2 project context");
         summary.AppendLine("ProjectId: " + project.Id);
-        summary.AppendLine("Project: " + BoundAgentContext(project.DisplayName, 500));
+        var projectName = project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
+        summary.AppendLine("Project: " + BoundAgentContext(projectName, 500));
         summary.AppendLine($"Progress: {progress.Completed}/{progress.Total}");
         if (next is not null)
             summary.AppendLine("Next task: " + BoundAgentContext(
