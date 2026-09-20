@@ -231,11 +231,13 @@ public sealed class SettingsWindow : Window
                     }
                     else key.DeleteValue("H2Notes.Avalonia", false);
                 }
+                WorkAssistantHotkey parsedHotkey = default;
+                var hotkeyParseError = "";
                 if (workAssistantEnabled.IsChecked == true
                     && !WorkAssistantHotkeyParser.TryParse(
                         workAssistantHotkey.Text,
-                        out var parsedHotkey,
-                        out var hotkeyParseError))
+                        out parsedHotkey,
+                        out hotkeyParseError))
                 {
                     workAssistantHotkeyStatus.Text = "Hotkey: " + hotkeyParseError;
                     return;
