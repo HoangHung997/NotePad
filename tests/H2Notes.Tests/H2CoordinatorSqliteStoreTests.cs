@@ -59,6 +59,38 @@ internal static class H2CoordinatorSqliteStoreTests
             Equal(3L, afterRestart.Acknowledgements.Single().ServerSequence);
         });
 
+        test("Coordinator serializes concurrent client submissions into unique server order", () =>
+        {
+            var db = Path.Combine(Folder(), "coordinator.db");
+            var workspace = Guid.NewGuid();
+            var project = Guid.NewGuid();
+            var pc1 = H2CoordinatorDeviceIdentity.CreateNew("PC1");
+            var pc2 = H2CoordinatorDeviceIdentity.CreateNew("PC2");
+            var store = new H2CoordinatorSqliteStore(db);
+            store.RegisterDevice(workspace, pc1);
+            store.RegisterDevice(workspace, pc2);
+
+            var a = Draft(workspace, project, pc1.DeviceId, 1, Guid.NewGuid(), "Name", "A", DateTimeOffset.UtcNow.AddMinutes(5));
+            var b = Draft(workspace, project, pc2.DeviceId, 1, Guid.NewGuid(), "Deadline", "B", DateTimeOffset.UtcNow.AddMinutes(-5));
+            H2ProjectEventSubmissionResult? resultA = null;
+            H2ProjectEventSubmissionResult? resultB = null;
+
+            Parallel.Invoke(
+                () => resultA = store.SubmitProjectEvents(workspace, pc1.DeviceId, new[] { a }),
+                () => resultB = store.SubmitProjectEvents(workspace, pc2.DeviceId, new[] { b }));
+
+            var sequences = new[]
+            {
+                resultA!.Acknowledgements.Single().ServerSequence,
+                resultB!.Acknowledgements.Single().ServerSequence
+            }.OrderBy(value => value).ToArray();
+
+            Equal(1L, sequences[0]);
+            Equal(2L, sequences[1]);
+            Equal(2L, store.GetProjectHead(workspace, project).ServerSequence);
+            Equal(2, store.GetProjectEvents(workspace, project, 0).Count);
+        });
+
         test("Coordinator rejects ClientOperationId collision instead of duplicating or overwriting", () =>
         {
             var db = Path.Combine(Folder(), "coordinator.db");
