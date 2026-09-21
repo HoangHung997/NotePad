@@ -38,6 +38,22 @@ No .NET installation is required for the published artifact.
 
 CI also runs `--self-test`, but that self-test uses a local filesystem and is **not** H2M-013 acceptance evidence.
 
+## H2M-133 final-gate artifact — 2026-09-21
+
+Use the NAS acceptance probe published by the exact H13 functional source:
+
+- H2 source: `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`
+- GitHub Actions run: `35551667214` — SUCCESS
+- artifact: `H2Notes-NasAcceptance-win-x64`
+- H2 Notes regression in the same run: **489 passed, 0 failed**
+- full Agent/provider/transport/Windows publish pipeline: PASS
+
+The portable H2 app from the same source has SHA256:
+
+`776f087e71aed1c41e0305e9c14469f1e618e0e80c2de08771c0c9df203d187a`
+
+Do not substitute a local temp-folder self-test for the physical two-PC run.
+
 ## Run on two physical PCs
 
 Choose one session ID, for example:
