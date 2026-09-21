@@ -244,11 +244,9 @@ internal static class H2TypedProjectToolTests
             Check(addStart >= 0 && guard > addStart && parse > guard,
                 "Legacy action renderer does not fail closed before parsing H2 Agent output.");
 
-            var autoStart = legacyUi.IndexOf("private async Task ApplyAutomaticProjectActionsAsync", StringComparison.Ordinal);
-            var autoGuard = legacyUi.IndexOf("answer.Provider, \"H2 Agent\"", autoStart, StringComparison.Ordinal);
-            var autoParse = legacyUi.IndexOf("AiProjectActions.Parse(answer.Content)", autoStart, StringComparison.Ordinal);
-            Check(autoStart >= 0 && autoGuard > autoStart && autoParse > autoGuard,
-                "Automatic legacy action path can parse H2 Agent output.");
+            Check(!legacyUi.Contains("ApplyAutomaticProjectActionsAsync", StringComparison.Ordinal)
+                  && !legacyUi.Contains("AiProjectActions.Parse(answer.Content)", StringComparison.Ordinal),
+                "Retired automatic legacy action execution path returned.");
         });
     }
 
