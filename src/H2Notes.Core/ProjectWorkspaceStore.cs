@@ -21,6 +21,106 @@ public sealed record WorkspacePendingRestoreResult(
     string? BaseGenerationId,
     string? ObservedRemoteGenerationId);
 
+// Cross-device commit serialization must not depend on SMB share-mode enforcement.
+// Some NAS / redirected-drive implementations allow a second FileShare.None open.
+// This lease instead relies on atomic FileMode.CreateNew: while the lease name exists,
+// no second writer may create it. DeleteOnClose gives crash cleanup on Windows/SMB;
+// Dispose also removes only a file that still contains this lease's unique token.
+public sealed class WorkspaceCommitLease : IDisposable
+{
+    public const string FileName = ".h2-commit.lease";
+    private readonly FileStream _stream;
+    private int _disposed;
+
+    public string Path { get; }
+    public string Token { get; }
+
+    private WorkspaceCommitLease(string path, string token, FileStream stream)
+    {
+        Path = path;
+        Token = token;
+        _stream = stream;
+    }
+
+    public static WorkspaceCommitLease Acquire(string root, string owner, TimeSpan? timeout = null)
+    {
+        Directory.CreateDirectory(root);
+        var path = System.IO.Path.Combine(root, FileName);
+        var wait = timeout ?? TimeSpan.FromSeconds(8);
+        var deadline = DateTime.UtcNow + wait;
+        IOException? last = null;
+
+        do
+        {
+            try
+            {
+                var token = Guid.NewGuid().ToString("N");
+                var stream = new FileStream(
+                    path,
+                    FileMode.CreateNew,
+                    FileAccess.ReadWrite,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    4096,
+                    FileOptions.WriteThrough | FileOptions.DeleteOnClose);
+                try
+                {
+                    var payload = Encoding.UTF8.GetBytes(
+                        token + Environment.NewLine +
+                        owner + Environment.NewLine +
+                        Environment.MachineName + Environment.NewLine +
+                        Environment.ProcessId + Environment.NewLine +
+                        DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine);
+                    stream.Write(payload);
+                    stream.Flush(true);
+                    return new WorkspaceCommitLease(path, token, stream);
+                }
+                catch
+                {
+                    stream.Dispose();
+                    TryDeleteOwned(path, token);
+                    throw;
+                }
+            }
+            catch (IOException ex)
+            {
+                last = ex;
+                if (DateTime.UtcNow >= deadline) break;
+                Thread.Sleep(60);
+            }
+        } while (true);
+
+        throw new IOException(
+            "Kho dữ liệu đang được thiết bị khác ghi. H2 Notes sẽ thử lại ở lần tự lưu sau.",
+            last);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _stream.Dispose();
+        TryDeleteOwned(Path, Token);
+    }
+
+    private static void TryDeleteOwned(string path, string token)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            using var reader = new StreamReader(new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
+                Encoding.UTF8, true, 1024, leaveOpen: false);
+            var current = reader.ReadLine();
+            if (string.Equals(current, token, StringComparison.Ordinal))
+                File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best effort only. DeleteOnClose is the primary crash-safe cleanup path.
+            // A leftover lease fails closed rather than allowing concurrent writers.
+        }
+    }
+}
+
 // Schema 6 keeps the schema-5 multi-device protocol and adds a stable WorkspaceId
 // to the shared index so mapped-drive/UNC aliases identify the same logical workspace.
 public sealed class ProjectWorkspaceStore : INoteStorage
@@ -65,7 +165,7 @@ public sealed class ProjectWorkspaceStore : INoteStorage
     private string JournalPath => Path.Combine(Root, ".h2-transaction.json");
     private string RecoveryPointerPath => Path.Combine(_recoveryRoot, "last-good.txt");
     private string SyncDiagnosticPath => Path.Combine(_recoveryRoot, "last-sync-diagnostic.json");
-    private string CommitLockPath => Path.Combine(Root, ".h2-commit.lock");
+    private string CommitLockPath => Path.Combine(Root, WorkspaceCommitLease.FileName);
     private string PendingRoot
     {
         get
@@ -222,19 +322,8 @@ public sealed class ProjectWorkspaceStore : INoteStorage
         catch { }
     }
 
-    private FileStream AcquireCommitLock()
-    {
-        Directory.CreateDirectory(Root);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
-        IOException? last = null;
-        do
-        {
-            try { return new FileStream(CommitLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-            catch (IOException ex) { last = ex; Thread.Sleep(60); }
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new IOException("Kho dữ liệu đang được thiết bị khác ghi. H2 Notes sẽ thử lại ở lần tự lưu sau.", last);
-    }
+    private WorkspaceCommitLease AcquireCommitLock()
+        => WorkspaceCommitLease.Acquire(Root, WriterId, TimeSpan.FromSeconds(8));
 
     public SheetState LoadOrImport(string? legacyPath = null)
     {
