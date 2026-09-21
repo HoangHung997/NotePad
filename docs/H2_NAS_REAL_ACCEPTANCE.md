@@ -36,6 +36,21 @@ H2Notes-NasAcceptance-win-x64
 
 No .NET installation is required for the published artifact.
 
+The current artifact also contains:
+
+```text
+READ_ME_FIRST_NAS_TEST.txt
+PC1_RUN_NAS_TEST.cmd
+PC2_RUN_NAS_TEST.cmd
+```
+
+Before starting the physical run, execute `H2Notes.NasAcceptance.exe --info` on both PCs. Both must report:
+
+- `CommitLeaseProtocol = byte-range-file-lock-v1`;
+- the same `SourceStamp`.
+
+The current probe also performs this check automatically during rendezvous and fails closed if the other PC uses an older/incompatible protocol or a different build.
+
 CI also runs `--self-test`, but that self-test uses a local filesystem and is **not** H2M-013 acceptance evidence.
 
 ## H2M-133 final-gate state — 2026-09-21
@@ -165,6 +180,8 @@ Required closure evidence:
 - two distinct physical Windows node fingerprints in the reports; computer names may be identical;
 - same session ID;
 - same intended NAS filesystem/share;
+- both reports identify `CommitLeaseProtocol = byte-range-file-lock-v1`;
+- both PCs use the exact same `SourceStamp` / artifact build;
 - all six cases PASS on both sides;
 - exact H2 Notes/source build recorded;
 - no persistent mixed-generation/hash mismatch after the run;
