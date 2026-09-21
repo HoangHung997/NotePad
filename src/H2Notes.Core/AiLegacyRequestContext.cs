@@ -181,9 +181,11 @@ public static class AiLegacyRequestContext
             AiDocuments.NativeFiles(pending.Attachments)));
         var now = DateTimeOffset.Now;
         var clock = $"\nH2 runtime clock: currentLocalTime={now:yyyy-MM-ddTHH:mm:sszzz}; currentUtc={now.UtcDateTime:O}; timeZoneId={TimeZoneInfo.Local.Id}; morning=05:00-11:59; afternoon=12:00-17:59; evening=18:00-22:59; night=23:00-04:59.\n";
+        // Standalone/direct legacy chat has no project mutation authority. Project mutations moved
+        // to IH2AgentAdapter + typed IH2ProjectToolHost; never prompt a standalone model to emit
+        // the retired h2-actions pseudo-protocol.
         turns.Insert(0, new AiTurn("system", Instructions + clock
-            + (conversation.PermissionMode == AiPermissionMode.ReadOnly ? "" : AiArtifacts.Instructions)
-            + "\n" + AiProjectActions.Instructions(conversation.PermissionMode)));
+            + (conversation.PermissionMode == AiPermissionMode.ReadOnly ? "" : AiArtifacts.Instructions)));
         ValidateBudget(turns);
         return turns;
     }
