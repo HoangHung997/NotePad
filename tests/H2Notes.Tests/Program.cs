@@ -633,6 +633,7 @@ H2AgentAdapterContractTests.Run(Test);
 H2SyncCoordinatorContractTests.Run(Test);
 H2CoordinatorSqliteStoreTests.Run(Test);
 H2CoordinatorClientSyncTests.Run(Test);
+H2CoordinatorConflictSnapshotTests.Run(Test);
 H2AgentTaskCorrelationTests.Run(Test);
 H2ProductProjectionTests.Run(Test);
 H2ProjectDataBoundaryTests.Run(Test);
