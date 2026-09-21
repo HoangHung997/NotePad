@@ -98,13 +98,18 @@ internal static class Program
         await WaitFile(Path.Combine(session, "peer.ready.json"));
         var peerReady = ReadJson<NodeReady>(Path.Combine(session, "peer.ready.json"));
         evidence.PeerMachine = peerReady.Machine;
-        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal) &&
-            string.Equals(peerReady.Machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Real NAS acceptance requires two different physical machine names. Use --self-test for same-machine harness verification.");
+        evidence.PeerNodeFingerprint = peerReady.NodeFingerprint;
+        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(peerReady.NodeFingerprint))
+                throw new InvalidOperationException("Peer is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
+            if (string.Equals(peerReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
+        }
         evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
             sessionId.StartsWith("selftest-", StringComparison.Ordinal)
                 ? "Local harness self-test rendezvous completed."
-                : $"Two distinct machines observed the same acceptance session: {Environment.MachineName} <-> {peerReady.Machine}."));
+                : $"Two distinct Windows node fingerprints observed the same acceptance session; computer names may match ({Environment.MachineName} <-> {peerReady.Machine})."));
 
         await CoordinatorLockCase(session, evidence);
         await CoordinatorFlushCase(session, evidence);
@@ -132,14 +137,19 @@ internal static class Program
         await WaitFile(Path.Combine(session, "coordinator.ready.json"));
         var coordinatorReady = ReadJson<NodeReady>(Path.Combine(session, "coordinator.ready.json"));
         evidence.PeerMachine = coordinatorReady.Machine;
-        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal) &&
-            string.Equals(coordinatorReady.Machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Real NAS acceptance requires two different physical machine names. Use --self-test for same-machine harness verification.");
+        evidence.PeerNodeFingerprint = coordinatorReady.NodeFingerprint;
+        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(coordinatorReady.NodeFingerprint))
+                throw new InvalidOperationException("Coordinator is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
+            if (string.Equals(coordinatorReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
+        }
         WriteJson(Path.Combine(session, "peer.ready.json"), NodeInfo("peer"));
         evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
             sessionId.StartsWith("selftest-", StringComparison.Ordinal)
                 ? "Local harness self-test rendezvous completed."
-                : $"Peer observed coordinator on distinct machine {coordinatorReady.Machine}."));
+                : $"Peer observed coordinator with a distinct Windows node fingerprint; computer names may match ({coordinatorReady.Machine})."));
 
         await PeerLockCase(session, evidence);
         await PeerReadCase(session, "flush", "FLUSH-VISIBILITY", evidence);
@@ -398,10 +408,11 @@ internal static class Program
 
     private static ProbeReport NewReport(string role, string root, string session) => new()
     {
-        Schema = 1,
+        Schema = 2,
         Role = role,
         SessionId = session,
         Machine = Environment.MachineName,
+        NodeFingerprint = NodeFingerprint(),
         User = Environment.UserName,
         Os = Environment.OSVersion.VersionString,
         Runtime = Environment.Version.ToString(),
@@ -412,9 +423,36 @@ internal static class Program
 
     private static ProbeCase Pass(string id, string details) => new(id, "PASS", details, DateTimeOffset.UtcNow);
 
+    private static string NodeFingerprint()
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Real NAS acceptance node fingerprints are supported on Windows only.");
+
+        object? raw = null;
+        try
+        {
+            raw = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+                "MachineGuid",
+                null);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            throw new InvalidOperationException("Cannot read the Windows machine identity required for real two-PC acceptance.", ex);
+        }
+
+        var machineGuid = raw?.ToString()?.Trim();
+        if (string.IsNullOrWhiteSpace(machineGuid))
+            throw new InvalidOperationException("Windows MachineGuid is unavailable; the NAS probe cannot safely distinguish two physical Windows installations.");
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes("h2-nas-node-v1|" + machineGuid.ToUpperInvariant()));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
     private static NodeReady NodeInfo(string role) => new(
         role,
         Environment.MachineName,
+        NodeFingerprint(),
         Environment.UserName,
         Environment.OSVersion.VersionString,
         Environment.Version.ToString(),
@@ -504,19 +542,21 @@ internal static class Program
         public string Role { get; set; } = "";
         public string SessionId { get; set; } = "";
         public string Machine { get; set; } = "";
+        public string NodeFingerprint { get; set; } = "";
         public string User { get; set; } = "";
         public string Os { get; set; } = "";
         public string Runtime { get; set; } = "";
         public string SharedRoot { get; set; } = "";
         public string SourceStamp { get; set; } = "";
         public string? PeerMachine { get; set; }
+        public string? PeerNodeFingerprint { get; set; }
         public DateTimeOffset StartedUtc { get; set; }
         public DateTimeOffset? CompletedUtc { get; set; }
         public string Overall { get; set; } = "RUNNING";
         public List<ProbeCase> Cases { get; set; } = [];
     }
 
-    private sealed record NodeReady(string Role, string Machine, string User, string Os, string Runtime, string SourceStamp, DateTimeOffset Utc);
+    private sealed record NodeReady(string Role, string Machine, string NodeFingerprint, string User, string Os, string Runtime, string SourceStamp, DateTimeOffset Utc);
     private sealed record ProbeCase(string CaseId, string Status, string Details, DateTimeOffset Utc);
     private sealed record PeerResult(bool Success, DateTimeOffset Utc, string Machine);
     private sealed record PayloadMarker(string Hash, long Length, DateTimeOffset PublishedUtc);
