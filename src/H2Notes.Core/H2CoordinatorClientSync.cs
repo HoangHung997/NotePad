@@ -270,6 +270,7 @@ public static class H2ProjectEventApplier
             H2ProjectEventKind.CreateEntity => ApplyCreate(project, draft),
             H2ProjectEventKind.SetField => ApplySetField(project, draft),
             H2ProjectEventKind.DeleteEntity => ApplyDelete(project, draft),
+            H2ProjectEventKind.ResolveConflict => ApplyResolution(project, draft),
             _ => throw new NotSupportedException(
                 $"Project event kind {draft.Kind} is not part of the initial Coordinator client projection.")
         };
@@ -393,6 +394,72 @@ public static class H2ProjectEventApplier
             default:
                 throw new NotSupportedException(
                     $"SetField for {draft.Target.EntityKind} is not implemented in initial project replica.");
+        }
+    }
+
+    private static ProjectRecord? ApplyResolution(ProjectRecord? project, H2ProjectEventDraft draft)
+    {
+        var resolution = H2ProjectEventPayload.Deserialize<H2ConflictResolutionPayload>(draft.PayloadJson);
+
+        switch (resolution.Action)
+        {
+            case H2ConflictResolutionAction.SetField:
+            {
+                if (resolution.ValueJson is null)
+                    throw new InvalidDataException("SetField resolution is missing ValueJson.");
+                var synthetic = new H2ProjectEventDraft(
+                    draft.EventId,
+                    draft.WorkspaceId,
+                    draft.ProjectId,
+                    draft.DeviceId,
+                    draft.DeviceSequence,
+                    draft.ClientOperationId,
+                    H2ProjectEventKind.SetField,
+                    draft.Target,
+                    resolution.ValueJson,
+                    H2ProjectEventDraft.ComputePayloadSha256(resolution.ValueJson),
+                    draft.ClientCreatedUtc);
+                return ApplySetField(project, synthetic);
+            }
+
+            case H2ConflictResolutionAction.DeleteEntity:
+            {
+                var synthetic = new H2ProjectEventDraft(
+                    draft.EventId,
+                    draft.WorkspaceId,
+                    draft.ProjectId,
+                    draft.DeviceId,
+                    draft.DeviceSequence,
+                    draft.ClientOperationId,
+                    H2ProjectEventKind.DeleteEntity,
+                    draft.Target,
+                    "{}",
+                    H2ProjectEventDraft.ComputePayloadSha256("{}"),
+                    draft.ClientCreatedUtc);
+                return ApplyDelete(project, synthetic);
+            }
+
+            case H2ConflictResolutionAction.RestoreEntity:
+            {
+                if (resolution.ValueJson is null)
+                    throw new InvalidDataException("RestoreEntity resolution is missing ValueJson.");
+                var synthetic = new H2ProjectEventDraft(
+                    draft.EventId,
+                    draft.WorkspaceId,
+                    draft.ProjectId,
+                    draft.DeviceId,
+                    draft.DeviceSequence,
+                    draft.ClientOperationId,
+                    H2ProjectEventKind.CreateEntity,
+                    draft.Target,
+                    resolution.ValueJson,
+                    H2ProjectEventDraft.ComputePayloadSha256(resolution.ValueJson),
+                    draft.ClientCreatedUtc);
+                return ApplyCreate(project, synthetic);
+            }
+
+            default:
+                throw new NotSupportedException("Unsupported conflict resolution action.");
         }
     }
 
@@ -779,7 +846,13 @@ public sealed class H2ProjectSyncClient
         H2AcceptedProjectEvent accepted)
     {
         var draft = accepted.Draft;
-        if (draft.Kind == H2ProjectEventKind.SetField && accepted.ResultingRevision.HasValue)
+        var resolutionAction = draft.Kind == H2ProjectEventKind.ResolveConflict
+            ? H2ProjectEventPayload.Deserialize<H2ConflictResolutionPayload>(draft.PayloadJson).Action
+            : (H2ConflictResolutionAction?)null;
+
+        if ((draft.Kind == H2ProjectEventKind.SetField
+             || resolutionAction == H2ConflictResolutionAction.SetField)
+            && accepted.ResultingRevision.HasValue)
             UpsertReplicaRevision(
                 revisions,
                 new H2ProjectRevisionEntry(
@@ -797,7 +870,8 @@ public sealed class H2ProjectSyncClient
                     draft.Target.EntityId,
                     null,
                     accepted.ResultingEntityRevision.Value,
-                    draft.Kind == H2ProjectEventKind.DeleteEntity));
+                    draft.Kind == H2ProjectEventKind.DeleteEntity
+                    || resolutionAction == H2ConflictResolutionAction.DeleteEntity));
     }
 
     private static void UpsertReplicaRevision(
