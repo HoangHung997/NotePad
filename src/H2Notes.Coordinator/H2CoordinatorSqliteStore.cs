@@ -159,6 +159,11 @@ public sealed class H2CoordinatorSqliteStore
                 if (byEvent is not null)
                     throw new InvalidOperationException("EventId already exists with another client operation.");
 
+                var byDeviceSequence = FindEventByDeviceSequence(
+                    connection, tx, workspaceId, draft.DeviceId, draft.DeviceSequence);
+                if (byDeviceSequence is not null)
+                    throw new InvalidOperationException("DeviceSequence was reused by another accepted project event.");
+
                 if (!heads.TryGetValue(draft.ProjectId, out var sequence))
                 {
                     EnsureProjectHead(connection, tx, workspaceId, draft.ProjectId);
@@ -282,6 +287,9 @@ public sealed class H2CoordinatorSqliteStore
                 throw new InvalidOperationException("Resolution ClientOperationId already belongs to another accepted operation.");
             if (FindEventByEventId(connection, tx, resolutionEvent.EventId) is not null)
                 throw new InvalidOperationException("Resolution EventId already exists.");
+            if (FindEventByDeviceSequence(
+                    connection, tx, workspaceId, resolutionEvent.DeviceId, resolutionEvent.DeviceSequence) is not null)
+                throw new InvalidOperationException("Resolution DeviceSequence was already used by another event.");
 
             var payload = Deserialize<H2ConflictResolutionPayload>(resolutionEvent.PayloadJson);
             var arbitration = ArbitrateResolution(connection, tx, conflict, resolutionEvent, payload);
@@ -405,7 +413,17 @@ public sealed class H2CoordinatorSqliteStore
                 SELECT
                     server_sequence, draft_json, accepted_utc,
                     disposition, resulting_revision, resulting_entity_revision, conflict_id
-                FROM project_events
+                FROM (
+                    SELECT
+                        workspace_id, project_id, server_sequence, draft_json, accepted_utc,
+                        disposition, resulting_revision, resulting_entity_revision, conflict_id
+                    FROM project_event_archive
+                    UNION ALL
+                    SELECT
+                        workspace_id, project_id, server_sequence, draft_json, accepted_utc,
+                        disposition, resulting_revision, resulting_entity_revision, conflict_id
+                    FROM project_events
+                ) e
                 WHERE workspace_id = $workspace
                   AND project_id = $project
                   AND server_sequence > $after
@@ -974,7 +992,13 @@ public sealed class H2CoordinatorSqliteStore
             command.CommandText =
                 """
                 SELECT draft_json, disposition
-                FROM project_events
+                FROM (
+                    SELECT workspace_id, project_id, server_sequence, draft_json, disposition
+                    FROM project_event_archive
+                    UNION ALL
+                    SELECT workspace_id, project_id, server_sequence, draft_json, disposition
+                    FROM project_events
+                ) e
                 WHERE workspace_id = $workspace
                   AND project_id = $project
                   AND server_sequence <= $sequence
@@ -1694,8 +1718,17 @@ public sealed class H2CoordinatorSqliteStore
         command.CommandText =
             """
             SELECT event_id, project_id, device_id, client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
-            FROM project_events
-            WHERE workspace_id = $workspace AND client_operation_id = $operation;
+            FROM (
+                SELECT workspace_id, event_id, project_id, device_id, client_operation_id,
+                       payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_event_archive
+                UNION ALL
+                SELECT workspace_id, event_id, project_id, device_id, client_operation_id,
+                       payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_events
+            ) e
+            WHERE workspace_id = $workspace AND client_operation_id = $operation
+            LIMIT 1;
             """;
         command.Parameters.AddWithValue("$workspace", Id(workspaceId));
         command.Parameters.AddWithValue("$operation", Id(clientOperationId));
@@ -1722,10 +1755,62 @@ public sealed class H2CoordinatorSqliteStore
         command.CommandText =
             """
             SELECT event_id, project_id, device_id, client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
-            FROM project_events
-            WHERE event_id = $event;
+            FROM (
+                SELECT event_id, project_id, device_id, client_operation_id,
+                       payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_event_archive
+                UNION ALL
+                SELECT event_id, project_id, device_id, client_operation_id,
+                       payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_events
+            ) e
+            WHERE event_id = $event
+            LIMIT 1;
             """;
         command.Parameters.AddWithValue("$event", Id(eventId));
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) return null;
+        return new ExistingEvent(
+            Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)),
+            Guid.Parse(reader.GetString(2)),
+            Guid.Parse(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetInt64(5),
+            ParseStamp(reader.GetString(6)),
+            reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7)));
+    }
+
+    private static ExistingEvent? FindEventByDeviceSequence(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid workspaceId,
+        Guid deviceId,
+        long deviceSequence)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT event_id, project_id, device_id, client_operation_id,
+                   payload_sha256, server_sequence, accepted_utc, conflict_id
+            FROM (
+                SELECT workspace_id, event_id, project_id, device_id, device_sequence,
+                       client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_event_archive
+                UNION ALL
+                SELECT workspace_id, event_id, project_id, device_id, device_sequence,
+                       client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
+                FROM project_events
+            ) e
+            WHERE workspace_id = $workspace
+              AND device_id = $device
+              AND device_sequence = $deviceSequence
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+        command.Parameters.AddWithValue("$device", Id(deviceId));
+        command.Parameters.AddWithValue("$deviceSequence", deviceSequence);
         using var reader = command.ExecuteReader();
         if (!reader.Read()) return null;
         return new ExistingEvent(
