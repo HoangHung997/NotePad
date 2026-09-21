@@ -666,6 +666,22 @@ public sealed class H2ProjectSyncClient
                     AppliedServerSequence = accepted.ServerSequence,
                     UpdatedUtc = DateTimeOffset.UtcNow
                 };
+
+                // An earlier submit may have succeeded even if the client crashed/lost the response.
+                // Observing our exact immutable event in authoritative server order is sufficient
+                // acknowledgement to remove the matching local outbox copy without applying it twice.
+                if (accepted.Draft.DeviceId == Device.DeviceId)
+                {
+                    _local.Acknowledge(
+                    [
+                        new H2ProjectEventAcknowledgement(
+                            accepted.Draft.EventId,
+                            accepted.Draft.ClientOperationId,
+                            accepted.ServerSequence,
+                            accepted.AcceptedUtc)
+                    ]);
+                }
+
                 pulled++;
             }
 
