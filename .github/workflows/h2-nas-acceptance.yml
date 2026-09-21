@@ -6,6 +6,7 @@ on:
       - feature/nas-multi-device-sync
     paths:
       - 'src/H2Notes.Core/**'
+      - 'src/H2Notes.Coordinator/**'
       - 'src/H2Notes.Avalonia/**'
       - 'tests/H2Notes.Tests/**'
       - 'tools/H2Notes.NasAcceptance/**'
