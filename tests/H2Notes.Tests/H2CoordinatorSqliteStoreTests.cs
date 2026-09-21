@@ -134,14 +134,20 @@ internal static class H2CoordinatorSqliteStoreTests
             var b = Draft(workspace, project, device.DeviceId, 3, Guid.NewGuid(), "NotesRich", "B", DateTimeOffset.UtcNow);
             store.SubmitProjectEvents(workspace, device.DeviceId, new[] { baseline, a, b });
 
-            var state = "{\"project\":\"snapshot\"}";
+            ProjectRecord? projected = null;
+            foreach (var accepted in store.GetProjectEvents(workspace, project, 0)
+                         .Where(item => item.Disposition == H2ProjectEventDisposition.Applied))
+                projected = H2ProjectEventApplier.Apply(projected, accepted.Draft);
+
+            var state = System.Text.Json.JsonSerializer.Serialize(projected);
             var snapshot = new H2ProjectSnapshot(
                 workspace,
                 project,
                 3,
                 state,
                 H2ProjectEventDraft.ComputePayloadSha256(state),
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                store.GetProjectRevisions(workspace, project));
             store.SaveSnapshot(snapshot);
 
             var conflict = new H2ProjectConflict(
