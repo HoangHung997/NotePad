@@ -71,11 +71,11 @@ public partial class MainWindow
             ShowAgentWorkspace();
         };
         var aiMenu = new ContextMenu();
-        var projectAi = new MenuItem { Header = "AI của dự án", Icon = new AppIcon(IconKind.Folder) };
+        var projectAi = new MenuItem { Header = "Agent của dự án", Icon = new AppIcon(IconKind.Folder) };
         projectAi.Click += (_, _) => SetAiDock("floating"); aiMenu.Items.Add(projectAi);
-        var standaloneAi = new MenuItem { Header = "Tách AI của dự án ra màn hình", Icon = new AppIcon(IconKind.Sparkle) };
+        var standaloneAi = new MenuItem { Header = "Tách Agent dự án ra màn hình", Icon = new AppIcon(IconKind.Sparkle) };
         standaloneAi.Click += (_, _) => ShowProjectAiWindow(); aiMenu.Items.Add(standaloneAi); AiNavButton.ContextMenu = aiMenu;
-        ToolTip.SetTip(AiNavButton, "AI dự án · chuột phải để mở cửa sổ riêng");
+        ToolTip.SetTip(AiNavButton, "Agent dự án · chuột phải để mở cửa sổ riêng");
         AskAiButton.Click += (_, _) => ShowAgentWorkspace();
         SettingsNavButton.Click += (_, _) => _app.ShowSettings(this);
         ProjectPickerButton.Click += (_, _) => { _pickerTimer.Stop(); _pickerTimer.Start(); };
