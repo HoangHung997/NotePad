@@ -1210,7 +1210,7 @@ Evidence for H2M-120..124: `docs/H2_H12_LEGACY_CLEANUP.md`, `H2LegacyCleanupTest
 
 # Stage H13 — Final product acceptance
 
-## [ ] H2M-130 — Product correctness report
+## [x] H2M-130 — Product correctness report
 
 Report by surface:
 
@@ -1223,7 +1223,7 @@ Report by surface:
 
 ---
 
-## [ ] H2M-131 — UX responsiveness report
+## [x] H2M-131 — UX responsiveness report
 
 Test:
 
@@ -1238,7 +1238,7 @@ Test:
 
 ---
 
-## [ ] H2M-132 — Resource/performance report
+## [x] H2M-132 — Resource/performance report
 
 Measure:
 
@@ -1251,6 +1251,8 @@ Measure:
 - large project behavior.
 
 Do not optimize based only on assumptions.
+
+Evidence for H2M-130..132: `docs/H2_H13_FINAL_PRODUCT_ACCEPTANCE.md` consolidates correctness, responsiveness and measured performance without claiming native checks that were not run. Exact source `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`, Actions `35551667214` SUCCESS, H2 Notes **489/489**, full NAS self-test + Agent/provider/transport/publish pipeline PASS. H2M-132 Windows CI measurements: startup proxy 58.34 ms; Command Center refresh ×20 5.59 ms; project switch ×25 133.01 ms; Agent progress ×100 1.25 ms; bubble idle ×250 pumps 0.11 ms and +230,168 managed bytes; workspace save 250 projects/1,250 tasks 4,167.04 ms; large layout 1,000 projects/10,000 tasks 567.04 ms with 27 visual elements. Native multi-DPI/IME remain explicitly unverified limitations in the H2M-131 report, not hidden PASS claims.
 
 ---
 
