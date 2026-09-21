@@ -1307,7 +1307,7 @@ public sealed partial class H2CoordinatorSqliteStore
         }
     }
 
-    public void CompleteProjectAi(H2ProjectAiCompletion completion)
+    public void CompleteProjectAiUncheckedLegacy(H2ProjectAiCompletion completion)
     {
         ArgumentNullException.ThrowIfNull(completion);
 
