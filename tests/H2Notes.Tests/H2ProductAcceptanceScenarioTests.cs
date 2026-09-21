@@ -93,6 +93,12 @@ internal static class H2ProductAcceptanceScenarioTests
             try
             {
                 var project = Project("Dự án AI-first", 0, 2, "Chốt hồ sơ", DateTime.UtcNow);
+                project.Conversations.Add(new AiConversation
+                {
+                    Title = "Acceptance review",
+                    PermissionMode = AiPermissionMode.ReadOnly
+                });
+                project.SelectedAiConversationId = project.Conversations[0].Id;
                 var board = new NoteRecord
                 {
                     Title = "Dự án",
