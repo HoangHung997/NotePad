@@ -358,27 +358,39 @@ Do not expose secrets or unrelated file contents.
 **First recorded:** 2026-09-18  
 **Area:** NAS protocol compatibility
 
-## Current assumptions
+## Current production assumptions
 
-The multi-PC protocol depends on:
-- `.h2-commit.lock` opened with exclusive `FileShare.None`;
-- temporary-file write + flush;
+The multi-PC protocol now depends on:
+- a persistent `.h2-commit.lock` coordination file whose byte 0 is owned through `FileStream.Lock(0, 1)`; correctness depends on the live OS/SMB byte-range lock, not on `FileShare.None` and not on atomic `FileMode.CreateNew`;
+- temporary-file write + durable flush;
 - replace/move behavior for atomic file publication;
 - all participating H2 Notes instances respecting the same transaction protocol.
 
 These semantics may hold on normal SMB shares but are not guaranteed for every mapped `X:` provider such as WebDAV, cloud-sync drives, virtual filesystems, or third-party sync clients.
 
+## Physical lock findings — 2026-09-21
+
+Two real-PC attempts have already rejected weaker lock assumptions on the user's intended mapped NAS/share:
+
+1. **Attempt #1 — `FileShare.None`: FAIL.** The two distinct Windows node fingerprints rendezvoused correctly, but PC2 could open the lock file while PC1 still held the supposedly exclusive share-mode handle.
+2. **Attempt #2 — atomic `FileMode.CreateNew`: FAIL.** Session `nas-final-05` again rendezvoused, but PC1 reported `Peer acquired the atomic-create commit lease while coordinator still held it.`
+
+These are storage-semantics findings, not launcher failures. The probe was not weakened to accept them. Production and probe code were moved to the current byte-range-lock mechanism instead.
+
+Current deterministic regression coverage proves local exclusion/release semantics for `WorkspaceCommitLease`; current published application source metadata `082b7dea7a386b8103096c50021930a899675d29` contains the byte-range implementation. This does **not** close H2-NONAI-004: one fresh physical two-PC run with the current probe bundle is still required.
+
 ## Required direction
 
-Before declaring a folder multi-PC-safe, add a bounded capability/protocol probe or explicitly limit supported shared-storage types.
+Before declaring a folder multi-PC-safe, add/use a bounded capability/protocol probe or explicitly limit supported shared-storage types.
 
 Real NAS acceptance must prove:
-- exclusive lock visibility across PCs;
+- byte-range lock visibility/exclusion across PCs;
+- successful acquisition by PC2 after PC1 releases its handle;
 - replacement visibility/order;
 - no client-side delayed publish that exposes mixed generations;
 - crash/reconnect behavior.
 
-If the share fails the capability probe, fail closed with a clear warning instead of silently enabling shared editing.
+If the share fails the current byte-range capability probe, fail closed with a clear warning instead of silently enabling shared editing.
 
 ---
 
