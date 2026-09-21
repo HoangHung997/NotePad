@@ -333,6 +333,20 @@ public sealed class H2ProductionAgentAdapter :
 
             var evidence = result.Evidence
                 .Select(ToH2Evidence)
+                .Concat(result.VerificationHistory.Select((report, index) =>
+                    new H2AgentEvidence(
+                        "verification:" + live.TaskId.ToString("N") + ":" + index,
+                        "verification",
+                        Sha256: null,
+                        Summary: Bound(
+                            report.VerifierId
+                            + " "
+                            + (report.Passed ? "PASS" : "FAIL")
+                            + " · "
+                            + string.Join(", ", report.Criteria.Select(criterion =>
+                                criterion.CriterionId + "=" + criterion.Status)),
+                            1_000),
+                        Provenance: "H2AgentLab.AgentRuntime.Verification")))
                 .ToArray();
 
             lock (live.Gate)
