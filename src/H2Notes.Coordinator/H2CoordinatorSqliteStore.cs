@@ -178,6 +178,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 sequence++;
                 heads[draft.ProjectId] = sequence;
                 var acceptedUtc = DateTimeOffset.UtcNow;
+                ValidateAiEventCorrelation(connection, tx, draft, _utcNow());
                 var arbitration = ArbitrateMutation(connection, tx, draft);
                 var draftJson = JsonSerializer.Serialize(draft, Json);
 
@@ -1209,6 +1210,51 @@ public sealed partial class H2CoordinatorSqliteStore
             resolutionEvent.EventId);
     }
 
+    private static void ValidateAiEventCorrelation(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectEventDraft draft,
+        DateTimeOffset serverNow)
+    {
+        if (!draft.AiRequestId.HasValue && !draft.AiLeaseId.HasValue) return;
+        if (!draft.AiRequestId.HasValue || !draft.AiLeaseId.HasValue)
+            throw new InvalidOperationException("AI event correlation is incomplete.");
+
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT request_json, state, lease_json
+            FROM ai_queue
+            WHERE workspace_id = $workspace
+              AND project_id = $project
+              AND request_id = $request;
+            """;
+        command.Parameters.AddWithValue("$workspace", Id(draft.WorkspaceId));
+        command.Parameters.AddWithValue("$project", Id(draft.ProjectId));
+        command.Parameters.AddWithValue("$request", Id(draft.AiRequestId.Value));
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            throw new InvalidOperationException("AI-correlated project event has no matching queued request.");
+
+        var request = Deserialize<H2ProjectAiRequest>(reader.GetString(0));
+        var state = (H2ProjectAiQueueState)reader.GetInt32(1);
+        if (state != H2ProjectAiQueueState.Running || reader.IsDBNull(2))
+            throw new InvalidOperationException("AI-correlated project event requires a RUNNING project AI lease.");
+        var lease = Deserialize<H2ProjectAiLease>(reader.GetString(2));
+
+        if (request.RequestId != draft.AiRequestId.Value
+            || request.ProjectId != draft.ProjectId
+            || request.OwnerDeviceId != draft.DeviceId
+            || lease.LeaseId != draft.AiLeaseId.Value
+            || lease.RequestId != draft.AiRequestId.Value
+            || lease.ProjectId != draft.ProjectId
+            || lease.OwnerDeviceId != draft.DeviceId)
+            throw new InvalidOperationException("AI-correlated project event does not match the active request/lease/device.");
+        if (lease.ExpiresUtc <= serverNow)
+            throw new InvalidOperationException("AI-correlated project event lease has expired.");
+    }
+
     private static MutationArbitration ArbitrateMutation(
         SqliteConnection connection,
         SqliteTransaction tx,
@@ -1267,6 +1313,29 @@ public sealed partial class H2CoordinatorSqliteStore
                     entity.Revision + 1);
             }
 
+            case H2ProjectEventKind.AppendMessage:
+            {
+                if (draft.Target.EntityKind != H2ProjectEntityKind.Message)
+                    throw new InvalidOperationException("AppendMessage must target Message.");
+                var projectEntity = ReadRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    H2ProjectEntityKind.Project, draft.ProjectId, null);
+                if (projectEntity is null || projectEntity.IsDeleted)
+                    throw new InvalidOperationException("Message cannot be appended before an active project baseline.");
+
+                var append = Deserialize<H2ProjectMessageAppend>(draft.PayloadJson);
+                if (append.Message.Id != draft.Target.EntityId)
+                    throw new InvalidDataException("AppendMessage payload identity does not match target.");
+                var expected = draft.Target.ExpectedRevision ?? 0;
+                if (entity is null)
+                {
+                    if (expected != 0)
+                        throw new InvalidOperationException("AppendMessage expected revision must be zero for a new message.");
+                    return MutationArbitration.Applied(1, 1);
+                }
+                return MutationArbitration.FromConflict(CreateConflict(draft, entity.LastEventId));
+            }
+
             case H2ProjectEventKind.DeleteEntity:
             {
                 if (entity is null)
@@ -1301,6 +1370,7 @@ public sealed partial class H2CoordinatorSqliteStore
         switch (draft.Kind)
         {
             case H2ProjectEventKind.CreateEntity:
+            case H2ProjectEventKind.AppendMessage:
                 UpsertRevision(
                     connection, tx, draft.WorkspaceId, draft.ProjectId,
                     draft.Target.EntityKind, draft.Target.EntityId, null,
