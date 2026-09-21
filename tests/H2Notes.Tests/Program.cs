@@ -631,6 +631,7 @@ Test("Viewport visual count stays bounded for 10,000 tasks", () =>
 WorkspaceTests.Run(Test);
 H2AgentAdapterContractTests.Run(Test);
 H2SyncCoordinatorContractTests.Run(Test);
+H2CoordinatorSqliteStoreTests.Run(Test);
 H2AgentTaskCorrelationTests.Run(Test);
 H2ProductProjectionTests.Run(Test);
 H2ProjectDataBoundaryTests.Run(Test);
