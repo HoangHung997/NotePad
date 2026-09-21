@@ -519,6 +519,31 @@ public sealed class H2CoordinatorSqliteStore
         }
     }
 
+    public (int Hot, int Archived) GetProjectEventStorageCounts(Guid workspaceId, Guid projectId)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
+        if (projectId == Guid.Empty) throw new ArgumentException("ProjectId is required.", nameof(projectId));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM project_events
+                     WHERE workspace_id = $workspace AND project_id = $project),
+                    (SELECT COUNT(*) FROM project_event_archive
+                     WHERE workspace_id = $workspace AND project_id = $project);
+                """;
+            command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+            command.Parameters.AddWithValue("$project", Id(projectId));
+            using var reader = command.ExecuteReader();
+            if (!reader.Read()) throw new InvalidOperationException("Could not read project event storage counts.");
+            return (reader.GetInt32(0), reader.GetInt32(1));
+        }
+    }
+
     public int CompactProjectEventsThrough(
         Guid workspaceId,
         Guid projectId,
