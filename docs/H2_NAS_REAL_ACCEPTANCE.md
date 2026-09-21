@@ -57,13 +57,19 @@ CI also runs `--self-test`, but that self-test uses a local filesystem and is **
 
 Use the NAS acceptance probe built from the **current feature-branch source**, not the earlier atomic-create bundle.
 
-Current verified branch state:
+Current verified physical-probe build:
 
-- current published application source metadata: `082b7dea7a386b8103096c50021930a899675d29`;
-- current production commit serialization: persistent `.h2-commit.lock` coordination file + OS/SMB byte-range lock via `FileStream.Lock`;
-- artifact name: `H2Notes-NasAcceptance-win-x64`;
-- deterministic H2 Notes regression for the byte-range lease: PASS in the current branch;
-- NAS acceptance harness local self-test: required before publication, but local self-test is not physical-NAS evidence.
+- exact source: `42b66bc2fc62a423d5ba50907f76a6ae5a4f2230`;
+- focused Actions workflow: `H2 NAS Acceptance Package`, run `35560190273` — **SUCCESS**;
+- artifact: `H2Notes-NasAcceptance-win-x64`, artifact id `10621219868`;
+- artifact digest: `sha256:7c3483af68f857467ebec15a9b75f8e9fc8a476e9bd7ac02ba17570a0e01defb`;
+- current production commit serialization: persistent `.h2-commit.lock` coordination file + OS/SMB byte-range lock via `FileStream.Lock(0, 1)`;
+- H2 Notes regression suite: PASS;
+- NAS acceptance harness self-test: PASS;
+- publish step: PASS and explicitly verified that the bundle contains the executable, `SOURCE.txt`, both PC launchers, and `READ_ME_FIRST_NAS_TEST.txt`;
+- probe schema 3 records `CommitLeaseProtocol = byte-range-file-lock-v1`, requires the peer to use the same protocol/source build, and persists failure JSON even when a physical case throws.
+
+The local self-test proves the probe state machine only; it is **not** physical-NAS acceptance evidence.
 
 ### Physical attempt #1 — `FileShare.None` rejected
 
