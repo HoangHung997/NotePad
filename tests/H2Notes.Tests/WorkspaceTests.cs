@@ -422,7 +422,7 @@ internal static class WorkspaceTests
             state.Notes[0].Projects[1].Id = state.Notes[0].Projects[0].Id; Fails(() => store.Save(state));
             Check(!File.Exists(store.FilePath));
         });
-        test("Workspace commit lease serializes writers with visible atomic-create file and releases cleanly", () =>
+        test("Workspace commit lease serializes writers with byte-range lock and releases with the handle", () =>
         {
             var root = Folder();
             var leasePath = Path.Combine(root, WorkspaceCommitLease.FileName);
@@ -432,7 +432,10 @@ internal static class WorkspaceTests
                 Fails(() => { using var second = WorkspaceCommitLease.Acquire(root, "writer-B", TimeSpan.FromMilliseconds(120)); });
                 Check(File.Exists(leasePath));
             }
-            Check(!File.Exists(leasePath));
+
+            // The coordination file is intentionally persistent; only the byte-range
+            // lock is transient and tied to the live OS/SMB handle.
+            Check(File.Exists(leasePath));
             using var afterRelease = WorkspaceCommitLease.Acquire(root, "writer-B", TimeSpan.FromSeconds(1));
             Check(afterRelease.Token.Length == 32 && File.Exists(leasePath));
         });
