@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using H2Notes.Avalonia;
+using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
 
 internal static class H2FinalPerformanceTests
