@@ -462,8 +462,9 @@ public sealed partial class H2CoordinatorSqliteStore
                 throw new InvalidDataException("Archive contains duplicate EventId.");
             if (!operations.Add(accepted.Draft.ClientOperationId))
                 throw new InvalidDataException("Archive contains duplicate ClientOperationId.");
-            if (!deviceSequences.Add($"{accepted.Draft.DeviceId:N}:{accepted.Draft.DeviceSequence}"))
-                throw new InvalidDataException("Archive contains duplicate per-device sequence.");
+            if (!deviceSequences.Add(
+                    $"{accepted.Draft.ProjectId:N}:{accepted.Draft.DeviceId:N}:{accepted.Draft.DeviceSequence}"))
+                throw new InvalidDataException("Archive contains duplicate per-project device sequence.");
         }
 
         foreach (var projectGroup in archive.Events.GroupBy(item => item.Draft.ProjectId))
