@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using H2Notes.Core;
 using Microsoft.Data.Sqlite;
 
@@ -444,8 +445,10 @@ public sealed class H2CoordinatorSqliteStore
             using var tx = connection.BeginTransaction();
             EnsureProjectHead(connection, tx, snapshot.WorkspaceId, snapshot.ProjectId);
             var head = ReadProjectSequence(connection, tx, snapshot.WorkspaceId, snapshot.ProjectId);
-            if (snapshot.ThroughServerSequence > head)
-                throw new InvalidOperationException("Snapshot cannot advance beyond accepted project head.");
+            if (snapshot.ThroughServerSequence != head)
+                throw new InvalidOperationException("Verified snapshot must be created exactly at the current accepted project head.");
+
+            VerifySnapshotAgainstEventLog(connection, tx, snapshot);
 
             using (var check = connection.CreateCommand())
             {
@@ -836,29 +839,99 @@ public sealed class H2CoordinatorSqliteStore
         lock (_gate)
         {
             using var connection = Open();
-            using var command = connection.CreateCommand();
+            return ReadProjectRevisions(connection, null, workspaceId, projectId);
+        }
+    }
+
+    private static IReadOnlyList<H2ProjectRevisionEntry> ReadProjectRevisions(
+        SqliteConnection connection,
+        SqliteTransaction? tx,
+        Guid workspaceId,
+        Guid projectId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT entity_kind, entity_id, field_key, revision, is_deleted
+            FROM project_revisions
+            WHERE workspace_id = $workspace AND project_id = $project
+            ORDER BY entity_kind, entity_id, field_key;
+            """;
+        command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+        command.Parameters.AddWithValue("$project", Id(projectId));
+
+        var result = new List<H2ProjectRevisionEntry>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(new H2ProjectRevisionEntry(
+                (H2ProjectEntityKind)reader.GetInt32(0),
+                Guid.Parse(reader.GetString(1)),
+                FromDbFieldKey(reader.GetString(2)),
+                reader.GetInt64(3),
+                reader.GetInt32(4) != 0));
+        }
+        return result;
+    }
+
+    private static void VerifySnapshotAgainstEventLog(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectSnapshot snapshot)
+    {
+        ProjectRecord? rebuilt = null;
+
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = tx;
             command.CommandText =
                 """
-                SELECT entity_kind, entity_id, field_key, revision, is_deleted
-                FROM project_revisions
-                WHERE workspace_id = $workspace AND project_id = $project
-                ORDER BY entity_kind, entity_id, field_key;
+                SELECT draft_json, disposition
+                FROM project_events
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND server_sequence <= $sequence
+                ORDER BY server_sequence;
                 """;
-            command.Parameters.AddWithValue("$workspace", Id(workspaceId));
-            command.Parameters.AddWithValue("$project", Id(projectId));
+            command.Parameters.AddWithValue("$workspace", Id(snapshot.WorkspaceId));
+            command.Parameters.AddWithValue("$project", Id(snapshot.ProjectId));
+            command.Parameters.AddWithValue("$sequence", snapshot.ThroughServerSequence);
 
-            var result = new List<H2ProjectRevisionEntry>();
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                result.Add(new H2ProjectRevisionEntry(
-                    (H2ProjectEntityKind)reader.GetInt32(0),
-                    Guid.Parse(reader.GetString(1)),
-                    FromDbFieldKey(reader.GetString(2)),
-                    reader.GetInt64(3),
-                    reader.GetInt32(4) != 0));
+                var disposition = (H2ProjectEventDisposition)reader.GetInt32(1);
+                if (disposition != H2ProjectEventDisposition.Applied) continue;
+                var draft = Deserialize<H2ProjectEventDraft>(reader.GetString(0));
+                rebuilt = H2ProjectEventApplier.Apply(rebuilt, draft);
             }
-            return result;
+        }
+
+        var expectedNode = JsonNode.Parse(JsonSerializer.Serialize(rebuilt, Json));
+        var actualNode = JsonNode.Parse(snapshot.StateJson);
+        if (!JsonNode.DeepEquals(expectedNode, actualNode))
+            throw new InvalidDataException("Snapshot state does not equal replay of accepted applied project events.");
+
+        var currentRevisions = ReadProjectRevisions(
+            connection, tx, snapshot.WorkspaceId, snapshot.ProjectId)
+            .OrderBy(item => item.StableKey, StringComparer.Ordinal)
+            .ToArray();
+        var snapshotRevisions = snapshot.Revisions
+            .OrderBy(item => item.StableKey, StringComparer.Ordinal)
+            .ToArray();
+
+        if (currentRevisions.Length != snapshotRevisions.Length)
+            throw new InvalidDataException("Snapshot revision metadata does not match current Coordinator revisions.");
+
+        for (var i = 0; i < currentRevisions.Length; i++)
+        {
+            var expected = currentRevisions[i];
+            var actual = snapshotRevisions[i];
+            if (!string.Equals(expected.StableKey, actual.StableKey, StringComparison.Ordinal)
+                || expected.Revision != actual.Revision
+                || expected.IsDeleted != actual.IsDeleted)
+                throw new InvalidDataException("Snapshot revision metadata does not match current Coordinator revisions.");
         }
     }
 
