@@ -1277,7 +1277,7 @@ public sealed class H2CoordinatorSqliteStore
         command.Transaction = tx;
         command.CommandText =
             """
-            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc
+            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc, conflict_id
             FROM project_events
             WHERE workspace_id = $workspace AND client_operation_id = $operation;
             """;
@@ -1291,7 +1291,8 @@ public sealed class H2CoordinatorSqliteStore
             Guid.Parse(reader.GetString(2)),
             reader.GetString(3),
             reader.GetInt64(4),
-            ParseStamp(reader.GetString(5)));
+            ParseStamp(reader.GetString(5)),
+            reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6)));
     }
 
     private static ExistingEvent? FindEventByEventId(
@@ -1303,7 +1304,7 @@ public sealed class H2CoordinatorSqliteStore
         command.Transaction = tx;
         command.CommandText =
             """
-            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc
+            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc, conflict_id
             FROM project_events
             WHERE event_id = $event;
             """;
