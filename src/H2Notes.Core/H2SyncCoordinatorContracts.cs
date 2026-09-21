@@ -283,7 +283,7 @@ public sealed record H2ProjectConflict
         Guid workspaceId,
         Guid projectId,
         H2ProjectMutationTarget target,
-        IEnumerable<Guid> eventIds,
+        IReadOnlyList<Guid> eventIds,
         DateTimeOffset createdUtc,
         H2ProjectConflictState state = H2ProjectConflictState.Open,
         Guid? resolvedByEventId = null)
