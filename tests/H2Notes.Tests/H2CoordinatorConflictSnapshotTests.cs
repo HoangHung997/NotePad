@@ -172,6 +172,118 @@ internal static class H2CoordinatorConflictSnapshotTests
             Equal(2L, entityRevision.Revision);
         });
 
+        test("Coordinator entity restore resets old field revisions and stale pre-delete edit conflicts", () =>
+        {
+            var fixture = Fixture();
+            var baseline = CreateProject(fixture, fixture.Pc1, 1);
+            fixture.Store.SubmitProjectEvents(fixture.Workspace, fixture.Pc1.DeviceId, new[] { baseline });
+
+            var task = new TaskRecord
+            {
+                Id = Guid.NewGuid(),
+                Text = "Task",
+                TextRich = RichDocument.Plain("Task"),
+                Comment = "",
+                CommentRich = RichDocument.Plain("")
+            };
+            var createTask = Draft(
+                fixture,
+                fixture.Pc1,
+                2,
+                H2ProjectEventKind.CreateEntity,
+                new H2ProjectMutationTarget(H2ProjectEntityKind.Task, task.Id, expectedRevision: 0),
+                H2ProjectEventPayload.Serialize(task));
+            fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { createTask });
+
+            var comment = Draft(
+                fixture,
+                fixture.Pc1,
+                3,
+                H2ProjectEventKind.SetField,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Task, task.Id, "CommentRich", expectedRevision: 0),
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("Before delete")));
+            fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { comment });
+
+            var delete = Draft(
+                fixture,
+                fixture.Pc2,
+                1,
+                H2ProjectEventKind.DeleteEntity,
+                new H2ProjectMutationTarget(H2ProjectEntityKind.Task, task.Id, expectedRevision: 2),
+                "{}");
+            fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc2.DeviceId, new[] { delete });
+
+            var stale = Draft(
+                fixture,
+                fixture.Pc1,
+                4,
+                H2ProjectEventKind.SetField,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Task, task.Id, "CommentRich", expectedRevision: 1),
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("Stale while deleted")));
+            var conflict = fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { stale }).Conflicts.Single();
+
+            var restoredTask = new TaskRecord
+            {
+                Id = task.Id,
+                Text = "Task restored",
+                TextRich = RichDocument.Plain("Task restored"),
+                Comment = "Restored",
+                CommentRich = RichDocument.Plain("Restored")
+            };
+            var restorePayload = H2ProjectEventPayload.Serialize(
+                new H2ConflictResolutionPayload(
+                    H2ConflictResolutionAction.RestoreEntity,
+                    H2ProjectEventPayload.Serialize(restoredTask)));
+            var restore = new H2ProjectEventDraft(
+                Guid.NewGuid(),
+                fixture.Workspace,
+                fixture.Project,
+                fixture.Pc2.DeviceId,
+                2,
+                Guid.NewGuid(),
+                H2ProjectEventKind.ResolveConflict,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Task, task.Id, expectedRevision: 3),
+                restorePayload,
+                H2ProjectEventDraft.ComputePayloadSha256(restorePayload),
+                DateTimeOffset.UtcNow);
+            fixture.Store.ResolveConflict(fixture.Workspace, conflict.ConflictId, restore);
+
+            var revisions = fixture.Store.GetProjectRevisions(fixture.Workspace, fixture.Project);
+            var entity = Revision(revisions, H2ProjectEntityKind.Task, task.Id, null);
+            Equal(4L, entity.Revision);
+            True(!entity.IsDeleted);
+            True(!revisions.Any(item =>
+                item.EntityKind == H2ProjectEntityKind.Task
+                && item.EntityId == task.Id
+                && item.FieldKey == "CommentRich"));
+
+            var replay = Replay(fixture.Store.GetProjectEvents(
+                fixture.Workspace, fixture.Project, 0))!;
+            Equal("Task restored", replay.ChecklistItems.Single().DisplayText);
+            Equal("Restored", replay.ChecklistItems.Single().CommentText);
+
+            var staleAfterRestore = Draft(
+                fixture,
+                fixture.Pc1,
+                5,
+                H2ProjectEventKind.SetField,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Task, task.Id, "CommentRich", expectedRevision: 1),
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("Old revision again")));
+            var staleResult = fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { staleAfterRestore });
+            Equal(1, staleResult.Conflicts.Count);
+            Equal(H2ProjectEventDisposition.Conflict,
+                fixture.Store.GetProjectEvents(fixture.Workspace, fixture.Project, 0)[^1].Disposition);
+        });
+
         test("Coordinator compacts hot events only behind a verified snapshot and keeps archived events queryable", () =>
         {
             var fixture = Fixture();
