@@ -224,6 +224,118 @@ internal static class H2CoordinatorConflictSnapshotTests
                 fixture.Store.CompactProjectEventsThrough(fixture.Workspace, fixture.Project, 3));
         });
 
+        test("Coordinator logical archive restores compacted project truth and continues sequencing", () =>
+        {
+            var fixture = Fixture();
+            var baseline = CreateProject(fixture, fixture.Pc1, 1);
+            fixture.Store.SubmitProjectEvents(fixture.Workspace, fixture.Pc1.DeviceId, new[] { baseline });
+
+            var first = SetProjectField(
+                fixture, fixture.Pc1, 2, "NameRich", 0,
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("PC1")));
+            var stale = SetProjectField(
+                fixture, fixture.Pc2, 1, "NameRich", 0,
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("PC2")));
+            fixture.Store.SubmitProjectEvents(fixture.Workspace, fixture.Pc1.DeviceId, new[] { first });
+            var conflict = fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc2.DeviceId, new[] { stale }).Conflicts.Single();
+
+            var valueJson = H2ProjectEventPayload.Serialize(RichDocument.Plain("Resolved archive"));
+            var payload = H2ProjectEventPayload.Serialize(
+                new H2ConflictResolutionPayload(H2ConflictResolutionAction.SetField, valueJson));
+            var resolution = new H2ProjectEventDraft(
+                Guid.NewGuid(),
+                fixture.Workspace,
+                fixture.Project,
+                fixture.Pc2.DeviceId,
+                2,
+                Guid.NewGuid(),
+                H2ProjectEventKind.ResolveConflict,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Project,
+                    fixture.Project,
+                    "NameRich",
+                    expectedRevision: 1),
+                payload,
+                H2ProjectEventDraft.ComputePayloadSha256(payload),
+                DateTimeOffset.UtcNow);
+            fixture.Store.ResolveConflict(fixture.Workspace, conflict.ConflictId, resolution);
+
+            var events = fixture.Store.GetProjectEvents(fixture.Workspace, fixture.Project, 0);
+            var state = Replay(events);
+            var stateJson = System.Text.Json.JsonSerializer.Serialize(state);
+            fixture.Store.SaveSnapshot(new H2ProjectSnapshot(
+                fixture.Workspace,
+                fixture.Project,
+                4,
+                stateJson,
+                H2ProjectEventDraft.ComputePayloadSha256(stateJson),
+                DateTimeOffset.UtcNow,
+                fixture.Store.GetProjectRevisions(fixture.Workspace, fixture.Project)));
+            Equal(4, fixture.Store.CompactProjectEventsThrough(
+                fixture.Workspace, fixture.Project, 4));
+            Equal((0, 4), fixture.Store.GetProjectEventStorageCounts(
+                fixture.Workspace, fixture.Project));
+
+            var folder = Path.GetDirectoryName(fixture.DatabasePath)!;
+            var archivePath = Path.Combine(folder, "workspace.h2coord.json");
+            fixture.Store.ExportWorkspaceToFile(fixture.Workspace, archivePath);
+            var archive = H2CoordinatorSqliteStore.ReadWorkspaceArchiveFile(archivePath);
+            Equal(fixture.Workspace, archive.WorkspaceId);
+            Equal(4, archive.Events.Count);
+
+            var restoredPath = Path.Combine(folder, "restored.db");
+            var restored = H2CoordinatorSqliteStore.RestoreWorkspaceArchive(
+                restoredPath, archivePath);
+            var restoredEvents = restored.GetProjectEvents(
+                fixture.Workspace, fixture.Project, 0);
+            Equal(4, restoredEvents.Count);
+            Equal("Resolved archive", Replay(restoredEvents)!.DisplayName);
+            Equal(4L, restored.GetProjectHead(fixture.Workspace, fixture.Project).ServerSequence);
+            Equal(0, restored.GetProjectHead(fixture.Workspace, fixture.Project).OpenConflictCount);
+            Equal(H2ProjectConflictState.Resolved,
+                restored.GetConflicts(fixture.Workspace, fixture.Project).Single().State);
+            Equal(
+                fixture.Store.GetLatestSnapshot(fixture.Workspace, fixture.Project)!.StateSha256,
+                restored.GetLatestSnapshot(fixture.Workspace, fixture.Project)!.StateSha256);
+
+            var sourceRevisions = fixture.Store.GetProjectRevisions(
+                fixture.Workspace, fixture.Project)
+                .OrderBy(item => item.StableKey, StringComparer.Ordinal)
+                .ToArray();
+            var restoredRevisions = restored.GetProjectRevisions(
+                fixture.Workspace, fixture.Project)
+                .OrderBy(item => item.StableKey, StringComparer.Ordinal)
+                .ToArray();
+            Equal(sourceRevisions.Length, restoredRevisions.Length);
+            for (var i = 0; i < sourceRevisions.Length; i++)
+            {
+                Equal(sourceRevisions[i].StableKey, restoredRevisions[i].StableKey);
+                Equal(sourceRevisions[i].Revision, restoredRevisions[i].Revision);
+                Equal(sourceRevisions[i].IsDeleted, restoredRevisions[i].IsDeleted);
+            }
+
+            // Imported device audit identity permits the restored Coordinator to continue
+            // accepting that device's next immutable operation without sequence reset.
+            var notes = SetProjectField(
+                fixture, fixture.Pc1, 3, "NotesRich", 0,
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("After restore")));
+            var continued = restored.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { notes });
+            Equal(5L, continued.Acknowledgements.Single().ServerSequence);
+            Equal("After restore",
+                Replay(restored.GetProjectEvents(fixture.Workspace, fixture.Project, 0))!.NotesText);
+
+            // Top-level archive hash detects tampering before restore.
+            var tamperedPath = Path.Combine(folder, "tampered.h2coord.json");
+            var archiveText = File.ReadAllText(archivePath);
+            var tampered = archiveText.Replace("PC1", "PX1", StringComparison.Ordinal);
+            if (tampered == archiveText) throw new Exception("Archive tamper fixture did not change payload.");
+            File.WriteAllText(tamperedPath, tampered);
+            Throws<InvalidDataException>(() =>
+                H2CoordinatorSqliteStore.ReadWorkspaceArchiveFile(tamperedPath));
+        });
+
         test("Coordinator accepts only snapshots that equal applied replay and current revision metadata", () =>
         {
             var fixture = Fixture();
