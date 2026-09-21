@@ -233,10 +233,21 @@ public sealed partial class H2CoordinatorSqliteStore
         if (string.IsNullOrWhiteSpace(archivePath))
             throw new ArgumentException("Archive path is required.", nameof(archivePath));
 
-        var envelope = JsonSerializer.Deserialize<H2CoordinatorWorkspaceArchiveEnvelope>(
-            File.ReadAllBytes(Path.GetFullPath(archivePath)),
-            ArchiveJson)
-            ?? throw new InvalidDataException("Coordinator workspace archive could not be decoded.");
+        H2CoordinatorWorkspaceArchiveEnvelope envelope;
+        try
+        {
+            envelope = JsonSerializer.Deserialize<H2CoordinatorWorkspaceArchiveEnvelope>(
+                File.ReadAllBytes(Path.GetFullPath(archivePath)),
+                ArchiveJson)
+                ?? throw new InvalidDataException("Coordinator workspace archive could not be decoded.");
+        }
+        catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
+        {
+            throw new InvalidDataException(
+                "Coordinator workspace archive contains invalid or tampered structured data.",
+                ex);
+        }
+
         if (envelope.SchemaVersion != WorkspaceArchiveSchemaVersion)
             throw new InvalidDataException("Unsupported Coordinator workspace archive schema.");
 
