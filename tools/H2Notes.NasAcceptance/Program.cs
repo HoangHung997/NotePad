@@ -6,6 +6,7 @@ using H2Notes.Core;
 
 internal static class Program
 {
+    private const string CommitLeaseProtocol = "byte-range-file-lock-v1";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(3);
     private static TimeSpan _waitTimeout = DefaultTimeout;
@@ -99,6 +100,8 @@ internal static class Program
         var peerReady = ReadJson<NodeReady>(Path.Combine(session, "peer.ready.json"));
         evidence.PeerMachine = peerReady.Machine;
         evidence.PeerNodeFingerprint = peerReady.NodeFingerprint;
+        evidence.PeerSourceStamp = peerReady.SourceStamp;
+        ValidatePeerBundle("Peer", peerReady);
         if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
         {
             if (string.IsNullOrWhiteSpace(peerReady.NodeFingerprint))
@@ -138,6 +141,8 @@ internal static class Program
         var coordinatorReady = ReadJson<NodeReady>(Path.Combine(session, "coordinator.ready.json"));
         evidence.PeerMachine = coordinatorReady.Machine;
         evidence.PeerNodeFingerprint = coordinatorReady.NodeFingerprint;
+        evidence.PeerSourceStamp = coordinatorReady.SourceStamp;
+        ValidatePeerBundle("Coordinator", coordinatorReady);
         if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
         {
             if (string.IsNullOrWhiteSpace(coordinatorReady.NodeFingerprint))
@@ -398,7 +403,7 @@ internal static class Program
 
     private static ProbeReport NewReport(string role, string root, string session) => new()
     {
-        Schema = 2,
+        Schema = 3,
         Role = role,
         SessionId = session,
         Machine = Environment.MachineName,
@@ -407,11 +412,31 @@ internal static class Program
         Os = Environment.OSVersion.VersionString,
         Runtime = Environment.Version.ToString(),
         SharedRoot = root,
+        CommitLeaseProtocol = CommitLeaseProtocol,
         SourceStamp = ReadSourceStamp(),
         StartedUtc = DateTimeOffset.UtcNow
     };
 
     private static ProbeCase Pass(string id, string details) => new(id, "PASS", details, DateTimeOffset.UtcNow);
+
+    private static void ValidatePeerBundle(string peerRole, NodeReady peer)
+    {
+        if (!string.Equals(peer.CommitLeaseProtocol, CommitLeaseProtocol, StringComparison.Ordinal))
+        {
+            var remote = string.IsNullOrWhiteSpace(peer.CommitLeaseProtocol) ? "<missing/legacy>" : peer.CommitLeaseProtocol;
+            throw new InvalidOperationException(
+                $"{peerRole} is using an incompatible NAS acceptance lock protocol. " +
+                $"Local={CommitLeaseProtocol}, remote={remote}. Download the same current probe bundle on both PCs and use a new Session ID.");
+        }
+
+        var localSource = ReadSourceStamp();
+        if (!string.Equals(peer.SourceStamp, localSource, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{peerRole} is not using the same NAS acceptance build as this PC. " +
+                "Download/copy one current H2Notes-NasAcceptance-win-x64 artifact to both PCs and use a new Session ID.");
+        }
+    }
 
     private static string NodeFingerprint()
     {
@@ -446,6 +471,7 @@ internal static class Program
         Environment.UserName,
         Environment.OSVersion.VersionString,
         Environment.Version.ToString(),
+        CommitLeaseProtocol,
         ReadSourceStamp(),
         DateTimeOffset.UtcNow);
 
@@ -537,16 +563,27 @@ internal static class Program
         public string Os { get; set; } = "";
         public string Runtime { get; set; } = "";
         public string SharedRoot { get; set; } = "";
+        public string CommitLeaseProtocol { get; set; } = "";
         public string SourceStamp { get; set; } = "";
         public string? PeerMachine { get; set; }
         public string? PeerNodeFingerprint { get; set; }
+        public string? PeerSourceStamp { get; set; }
         public DateTimeOffset StartedUtc { get; set; }
         public DateTimeOffset? CompletedUtc { get; set; }
         public string Overall { get; set; } = "RUNNING";
         public List<ProbeCase> Cases { get; set; } = [];
     }
 
-    private sealed record NodeReady(string Role, string Machine, string NodeFingerprint, string User, string Os, string Runtime, string SourceStamp, DateTimeOffset Utc);
+    private sealed record NodeReady(
+        string Role,
+        string Machine,
+        string NodeFingerprint,
+        string User,
+        string Os,
+        string Runtime,
+        string? CommitLeaseProtocol,
+        string SourceStamp,
+        DateTimeOffset Utc);
     private sealed record ProbeCase(string CaseId, string Status, string Details, DateTimeOffset Utc);
     private sealed record PeerResult(bool Success, DateTimeOffset Utc, string Machine);
     private sealed record PayloadMarker(string Hash, long Length, DateTimeOffset PublishedUtc);
