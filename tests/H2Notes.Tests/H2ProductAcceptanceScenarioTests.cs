@@ -41,10 +41,10 @@ internal static class H2ProductAcceptanceScenarioTests
             };
 
             var agent = new ProjectionAgent();
-            agent.Add(Task(needs.Id, H2AgentTaskStatus.WaitingForApproval, now.AddMinutes(4),
+            agent.Add(AgentTaskSummary(needs.Id, H2AgentTaskStatus.WaitingForApproval, now.AddMinutes(4),
                 approval: new H2AgentApproval(Guid.NewGuid(), "Duyệt cập nhật pháp lý", "Fixture", now.AddMinutes(4))));
-            agent.Add(Task(working.Id, H2AgentTaskStatus.Running, now.AddMinutes(5)));
-            agent.Add(Task(waiting.Id, H2AgentTaskStatus.Queued, now.AddMinutes(3)));
+            agent.Add(AgentTaskSummary(working.Id, H2AgentTaskStatus.Running, now.AddMinutes(5)));
+            agent.Add(AgentTaskSummary(waiting.Id, H2AgentTaskStatus.Queued, now.AddMinutes(3)));
 
             var app = new App { AgentAdapter = agent };
             app.State.Notes.Add(board);
@@ -458,7 +458,7 @@ internal static class H2ProductAcceptanceScenarioTests
                     && migratedProject.Layout.AiDock == "right"
                     && migratedProject.Layout.TasksCollapsed,
                     "Portable old layout preference was lost.");
-                Check(migrated.Notes.Any(x => x.Title == "Legacy note" && x.ContentText == "Standalone legacy note"),
+                Check(migrated.Notes.Any(x => x.Title == "Legacy note" && x.ReadContent().Text == "Standalone legacy note"),
                     "Standalone legacy note was lost.");
 
                 File.WriteAllText(Path.Combine(workspace, "migration-check.txt"), "migrated");
@@ -579,7 +579,7 @@ internal static class H2ProductAcceptanceScenarioTests
         return project;
     }
 
-    private static H2AgentTaskSummary Task(
+    private static H2AgentTaskSummary AgentTaskSummary(
         Guid? projectId,
         H2AgentTaskStatus status,
         DateTime updated,
