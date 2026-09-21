@@ -1317,7 +1317,8 @@ public sealed class H2CoordinatorSqliteStore
             Guid.Parse(reader.GetString(2)),
             reader.GetString(3),
             reader.GetInt64(4),
-            ParseStamp(reader.GetString(5)));
+            ParseStamp(reader.GetString(5)),
+            reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6)));
     }
 
     private static int Execute(
