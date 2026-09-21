@@ -1261,32 +1261,277 @@ Evidence for H2M-130..132: `docs/H2_H13_FINAL_PRODUCT_ACCEPTANCE.md` consolidate
 Require:
 
 - no unresolved silent HIGH/CRITICAL data-integrity bug;
-- real NAS evidence where required;
+- shared-project correctness independent of mixed WebDAV/SMB file-lock semantics;
 - migration rollback path;
-- old data preserved.
+- old data preserved;
+- real two-PC evidence on the user's actual topology after the new sync path is wired.
 
-Status: **BLOCKED — USER/PHYSICAL EVIDENCE REQUIRED.**
+Status: **IN PROGRESS — CROSS-TRANSPORT COORDINATOR REMEDIATION.**
 
-Automated/code readiness has now gone through **two real-NAS lock findings**. Physical attempt #1 on 2026-09-21 proved rendezvous across two distinct Windows node fingerprints but showed that the target NAS/share did not reliably enforce the legacy `FileShare.None` lock assumption. Production H2 Notes was changed rather than weakening the probe.
+### Physical evidence that invalidated the old shared-file protocol
 
-Physical attempt #2 on 2026-09-21 (session `nas-final-05`) exercised the atomic `FileMode.CreateNew` lease remediation and failed the same exclusion requirement: PC1 reported `Peer acquired the atomic-create commit lease while coordinator still held it.` This is valid physical evidence that exclusive-create semantics on this mapped/redirected share are also insufficient for H2's cross-device writer serialization.
+The real two-PC runs on 2026-09-21 are retained as canonical architecture evidence:
 
-The current branch therefore no longer depends on either `FileShare.None` or `FileMode.CreateNew` for commit ownership. `WorkspaceCommitLease` uses a persistent `.h2-commit.lock` coordination file plus `FileStream.Lock(0, 1)` byte-range locking tied to the live handle, and the NAS probe exercises that exact production mechanism. The probe now also requires both PCs to use `CommitLeaseProtocol = byte-range-file-lock-v1` and the exact same `SourceStamp`, exposes `--info`, ships guided PC1/PC2 launchers, and writes failure JSON even when a case throws.
+1. **Attempt #1 — `FileShare.None`: FAIL.** Two distinct Windows node fingerprints rendezvoused on the same session, but PC2 was not excluded by PC1's supposed exclusive share-mode handle.
+2. **Attempt #2 — atomic `FileMode.CreateNew`: FAIL.** Session `nas-final-05` reported `Peer acquired the atomic-create commit lease while coordinator still held it.`
+3. **Attempt #3 — byte-range `FileStream.Lock(0, 1)`: FAIL.** Session `nas-final-06` reported on PC1 `Peer acquired the byte-range commit lock while coordinator still held it.` and on PC2 `Byte-range commit lock was not enforced across nodes.`
 
-Final code-side physical-probe readiness is pinned to source `42b66bc2fc62a423d5ba50907f76a6ae5a4f2230`: focused Actions run `35560190273` **SUCCESS** for build, H2 Notes regression, NAS harness self-test, publish, required-bundle-file verification and artifact upload. Artifact `H2Notes-NasAcceptance-win-x64` id `10621219868`, digest `sha256:7c3483af68f857467ebec15a9b75f8e9fc8a476e9bd7ac02ba17570a0e01defb`. A **fresh physical two-PC run with this exact probe bundle on both PCs and a new Session ID remains mandatory**. Migration source preservation/rollback and old-data preservation are covered by the accepted migration/storage suites.
+The user then confirmed the real topology is mixed transport:
 
-H2M-133 cannot be closed automatically because the independent bug ledger still has three physical-NAS blockers:
+- PC1 uses WebDAV and may access the NAS from outside the LAN;
+- PC2 uses a LAN mapped path expected to be SMB;
+- sometimes both PCs may be on the same LAN;
+- both PCs must be able to view/edit one project and may enqueue AI work concurrently.
 
-- H2-NONAI-001 — second-PC convergence after generation/hash race;
-- H2-NONAI-004 — actual share lock/rename/flush/read-after-commit semantics;
-- H2-NONAI-006 — real two-PC/NAS coverage.
+Therefore no fourth NAS-file-lock trick is the current direction.
 
-Run the artifact/runbook in `docs/H2_NAS_REAL_ACCEPTANCE.md` on two physical PCs and preserve both JSON reports. All six NAS cases must PASS on both sides.
+Canonical replacement architecture:
 
-A second explicit product-policy decision is also required for H2-NONAI-008:
+`docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`
 
-- **Option A:** accept current production boundary = verified LAN/mapped/UNC alias + durable offline pending; no automatic secure Remote/VPN failover.
-- **Option B:** require secure Remote/VPN alias failover implementation and real acceptance before H2M-133 can close.
+Core decision:
+
+> H2 shared-project correctness moves to a single-writer H2 Sync Coordinator with immutable accepted project events, snapshots, structured conflicts, durable client outbox, per-project AI queue/lease and sync barriers. Client WebDAV/SMB paths are no longer the H2 project transaction protocol.
+
+### [x] H2M-133A — Canonical cross-transport architecture reset
+
+Required:
+
+- record all three physical lock failures without weakening the probe;
+- make mixed WebDAV/SMB topology explicit;
+- define Coordinator ownership boundary;
+- define event sync, offline outbox, conflicts, AI queue/lease/barrier, migration and portability invariants;
+- update Product Master Spec so old shared-NAS synchronization language is no longer authoritative.
+
+Evidence:
+
+- `docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`;
+- updated `docs/H2_PRODUCT_MASTER_SPEC.md`;
+- physical sessions `nas-final-05` and `nas-final-06` retained as failure evidence.
+
+### [~] H2M-133B — Define Coordinator protocol contracts
+
+Implement only stable protocol/domain contracts first:
+
+- persistent random `DeviceId`;
+- `ProjectEvent` envelope;
+- `ProjectSnapshot` envelope;
+- field/entity revision identity;
+- `ProjectConflict`;
+- local outbox item/ack identity;
+- `ProjectAiRequest`;
+- `ProjectAiLease`;
+- queue/server sequence types;
+- sync barrier/watermark types;
+- explicit Coordinator API/service boundary.
+
+Acceptance:
+
+- client clock cannot decide ordering;
+- event/client-operation identity is idempotent;
+- one contract set is reused by server/client tests;
+- no HTTP/database implementation details leak into H2 product models;
+- no Agent Core internals copied into Coordinator contracts.
+
+### [ ] H2M-133C — Durable single-writer Coordinator store
+
+Implement one active Coordinator instance with a local durable store.
+
+Required:
+
+- local Coordinator database; initial target SQLite on Coordinator-local storage;
+- never open the authoritative SQLite DB independently over WebDAV/SMB from clients;
+- transactional monotonic per-workspace/project event sequencing;
+- idempotent operation acceptance;
+- durable device/workspace registration;
+- durable AI queue/lease state;
+- restart recovery;
+- bounded audit metadata.
+
+Acceptance:
+
+- duplicate retry does not duplicate an event;
+- concurrent client submissions receive deterministic server order;
+- restart preserves head sequence/queue/conflict state;
+- no correctness dependency on NAS file locking.
+
+### [ ] H2M-133D — Client project sync + durable offline outbox
+
+Required:
+
+- clients submit shared H2 project mutations through Coordinator;
+- durable machine-local outbox before remote acknowledgement;
+- optimistic local projection allowed;
+- pull authoritative snapshot/events by server sequence;
+- reconnect retries idempotently;
+- pending changes survive app restart/network loss;
+- existing `ProjectRecord`, `TaskRecord`, notes and links remain the product model.
+
+Acceptance:
+
+- human editing works while Coordinator is temporarily unavailable;
+- reconnect does not lose either local or remote edits;
+- two clients no longer overwrite the same shared project JSON file.
+
+### [ ] H2M-133E — Revision merge, conflicts, snapshots and compaction
+
+Required:
+
+- field/entity expected revisions;
+- automatic merge for independent entities/fields;
+- structured same-field conflict instead of silent last-writer-wins;
+- delete-vs-update handling;
+- explicit conflict-resolution event;
+- verified project snapshots;
+- snapshot + later-event reconstruction;
+- safe bounded compaction/retention;
+- portable Coordinator export/archive.
+
+Acceptance:
+
+- PC1 Task A.Name + PC2 Task B.Deadline merge;
+- concurrent same-field edits preserve both values in conflict evidence;
+- snapshot rebuild equals event replay;
+- export is sufficient to restore shared H2 project truth elsewhere.
+
+### [ ] H2M-133F — Per-project AI queue, lease, heartbeat and sync barriers
+
+Required:
+
+- one mutating AI execution RUNNING per `ProjectId`;
+- FIFO Coordinator queue sequence;
+- user message may be accepted/displayed while AI request waits;
+- different projects may run concurrently;
+- heartbeat + expiry/abandoned recovery;
+- lease contains `RequiredProjectSequence`;
+- client must synchronize through that barrier before Agent start;
+- AI response is not terminal until verified project mutations/messages are committed;
+- next queue item starts only after previous run reaches an explicit resolved terminal state.
+
+Acceptance scenario:
+
+```text
+PC1 Project A AI -> RUNNING
+PC2 Project A AI -> WAITING
+PC1 response + project events -> COMMITTED
+PC2 syncs through completion barrier
+PC2 -> RUNNING
+```
+
+No NAS lock file participates.
+
+### [ ] H2M-133G — Coordinator authentication and deployment boundary
+
+Required:
+
+- authenticated Coordinator transport;
+- per-device registration/pairing credential;
+- credentials remain machine-local/SecretVault;
+- revoke one device;
+- Coordinator endpoint in LocalConfiguration;
+- preferred deployment documented: NAS container/service or always-on host;
+- remote PC uses secure HTTPS/private VPN/Tailscale/WireGuard-class path;
+- no raw public-Internet SMB requirement.
+
+Acceptance:
+
+- one unauthorized device cannot mutate workspace;
+- credentials are not stored in shared project JSON/export plaintext;
+- LAN and remote client can use the same Coordinator protocol.
+
+### [ ] H2M-133H — Production H2 cutover + legacy migration / split-brain guard
+
+Required:
+
+- validated Schema-6 legacy source import;
+- immutable pre-migration backup;
+- Coordinator baseline snapshot;
+- migration/source hash record;
+- production H2 reads/writes shared project truth through Coordinator mode;
+- legacy shared multi-writer mode becomes read-only historical/migration path for that WorkspaceId;
+- refuse one WorkspaceId being actively written by legacy and Coordinator modes simultaneously;
+- preserve historical conversations/tasks/notes/links.
+
+Acceptance:
+
+- no old user data lost;
+- migration rollback source remains untouched;
+- no split-brain legacy/new writer combination.
+
+### [ ] H2M-133I — Coordinator-aware H2 UX
+
+Required:
+
+Command Center/Project Workspace distinguish:
+
+- Synced + server sequence;
+- Syncing + local pending count;
+- Offline but local changes safe;
+- Conflict requiring review;
+- Coordinator unavailable;
+- AI waiting for project turn;
+- Agent running/blocked independently from project sync;
+- external file/resource availability separately.
+
+Do not collapse everything into `NAS unavailable`.
+
+### [ ] H2M-133J — Deterministic/fault integration gate + focused CI
+
+Required tests:
+
+- duplicate event retry;
+- concurrent submissions/order;
+- offline/reconnect;
+- same-field conflict;
+- Coordinator restart;
+- lease heartbeat expiry;
+- crash between AI result and project commit;
+- queue barrier ordering;
+- migration/split-brain rejection;
+- export/restore;
+- two logical clients with different simulated transport labels produce identical H2 state.
+
+Add a focused CI/package path for Coordinator acceptance without weakening the existing full H2/Agent pipeline.
+
+### [ ] H2M-133K — Real two-PC mixed-topology acceptance
+
+Only after H2M-133B..J are green.
+
+Use the user's real topology:
+
+- PC1 remote-capable path;
+- PC2 LAN;
+- same Coordinator/workspace;
+- same project open on both PCs.
+
+Physical scenarios:
+
+1. PC1 edit -> PC2 receives same project state.
+2. PC2 edit -> PC1 receives it.
+3. independent concurrent edits merge.
+4. same-field concurrent edit becomes visible conflict, no lost value.
+5. PC1 Project A AI starts; PC2 Project A AI queues.
+6. PC1 completes; PC2 waits for sync barrier then starts.
+7. disconnect one client, edit locally, reconnect and reconcile.
+8. Coordinator restart does not duplicate events or AI completion.
+9. external NAS WebDAV/SMB mount differences do not change H2 project correctness.
+
+Required evidence:
+
+- Coordinator log/audit;
+- PC1 client evidence;
+- PC2 client evidence;
+- event/server-sequence records;
+- queue/lease/barrier records;
+- no lost project data;
+- no silent conflict;
+- old physical NAS-lock failures remain documented as superseded protocol evidence, not hidden.
+
+### Final H2M-133 closure
+
+H2M-133 closes only after H2M-133A..K satisfy their gates and the independent non-AI bug ledger is reconciled against the Coordinator architecture.
+
+The previous requirement “make all six NAS file-lock/rename cases PASS” is **no longer the production acceptance target**, because the production architecture is being changed specifically so H2 shared-project correctness does not depend on mixed WebDAV/SMB filesystem semantics.
 
 H2M-134 remains blocked until H2M-133 is resolved.
 
