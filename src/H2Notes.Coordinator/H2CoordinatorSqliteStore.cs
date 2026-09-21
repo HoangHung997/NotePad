@@ -1550,10 +1550,11 @@ public sealed class H2CoordinatorSqliteStore
             Guid.Parse(reader.GetString(0)),
             Guid.Parse(reader.GetString(1)),
             Guid.Parse(reader.GetString(2)),
-            reader.GetString(3),
-            reader.GetInt64(4),
-            ParseStamp(reader.GetString(5)),
-            reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6)));
+            Guid.Parse(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetInt64(5),
+            ParseStamp(reader.GetString(6)),
+            reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7)));
     }
 
     private static int Execute(
