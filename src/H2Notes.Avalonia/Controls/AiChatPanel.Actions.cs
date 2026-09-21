@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media;
 using H2Notes.Core;
 
 namespace H2Notes.Avalonia.Controls;
