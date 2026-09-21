@@ -1253,10 +1253,8 @@ public sealed partial class H2CoordinatorSqliteStore
 
                 if (expected != currentFieldRevision)
                 {
-                    if (field is null)
-                        throw new InvalidOperationException(
-                            "SetField expected a non-zero revision for a field with no accepted revision history.");
-                    return MutationArbitration.FromConflict(CreateConflict(draft, field.LastEventId));
+                    var priorEventId = field?.LastEventId ?? entity.LastEventId;
+                    return MutationArbitration.FromConflict(CreateConflict(draft, priorEventId));
                 }
 
                 return MutationArbitration.Applied(
