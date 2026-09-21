@@ -224,7 +224,8 @@ public sealed record H2ProjectConflict
         CreatedUtc = createdUtc;
         if (!Enum.IsDefined(state)) throw new ArgumentOutOfRangeException(nameof(state));
         State = state;
-        if (state == H2ProjectConflictState.Resolved && resolvedByEventId is null or { } value && value == Guid.Empty)
+        if (state == H2ProjectConflictState.Resolved
+            && (!resolvedByEventId.HasValue || resolvedByEventId.Value == Guid.Empty))
             throw new ArgumentException("Resolved conflict requires a non-empty resolution event.", nameof(resolvedByEventId));
         if (state == H2ProjectConflictState.Open && resolvedByEventId is not null)
             throw new ArgumentException("Open conflict cannot already reference a resolution event.", nameof(resolvedByEventId));
@@ -277,22 +278,31 @@ public sealed record H2ProjectEventAcknowledgement
     public DateTimeOffset AcceptedUtc { get; }
 }
 
-public sealed record H2ProjectHead(
-    Guid WorkspaceId,
-    Guid ProjectId,
-    long ServerSequence,
-    long SnapshotThroughSequence,
-    int OpenConflictCount)
+public sealed record H2ProjectHead
 {
-    public H2ProjectHead : this()
+    public H2ProjectHead(
+        Guid workspaceId,
+        Guid projectId,
+        long serverSequence,
+        long snapshotThroughSequence,
+        int openConflictCount)
     {
-        if (WorkspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(WorkspaceId));
-        if (ProjectId == Guid.Empty) throw new ArgumentException("ProjectId is required.", nameof(ProjectId));
-        if (ServerSequence < 0) throw new ArgumentOutOfRangeException(nameof(ServerSequence));
-        if (SnapshotThroughSequence < 0 || SnapshotThroughSequence > ServerSequence)
-            throw new ArgumentOutOfRangeException(nameof(SnapshotThroughSequence));
-        if (OpenConflictCount < 0) throw new ArgumentOutOfRangeException(nameof(OpenConflictCount));
+        WorkspaceId = H2CoordinatorContractGuard.NonEmpty(workspaceId, nameof(workspaceId));
+        ProjectId = H2CoordinatorContractGuard.NonEmpty(projectId, nameof(projectId));
+        if (serverSequence < 0) throw new ArgumentOutOfRangeException(nameof(serverSequence));
+        if (snapshotThroughSequence < 0 || snapshotThroughSequence > serverSequence)
+            throw new ArgumentOutOfRangeException(nameof(snapshotThroughSequence));
+        if (openConflictCount < 0) throw new ArgumentOutOfRangeException(nameof(openConflictCount));
+        ServerSequence = serverSequence;
+        SnapshotThroughSequence = snapshotThroughSequence;
+        OpenConflictCount = openConflictCount;
     }
+
+    public Guid WorkspaceId { get; }
+    public Guid ProjectId { get; }
+    public long ServerSequence { get; }
+    public long SnapshotThroughSequence { get; }
+    public int OpenConflictCount { get; }
 }
 
 public sealed record H2ProjectEventSubmissionResult
