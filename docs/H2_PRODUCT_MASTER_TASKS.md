@@ -21,8 +21,8 @@ Architecture source of truth: `docs/H2_PRODUCT_MASTER_SPEC.md`
 
 1. Read `docs/H2_PRODUCT_MASTER_SPEC.md` completely before implementation.
 2. Read `docs/H2_AGENT_CHAT_SURFACE_SPEC.md` before implementing or accepting any Agent chat, Project Agent or Work Assistant full-thread UI.
-4. Read `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` completely before changing shared storage/data models.
-3. Preserve existing user projects/tasks/notes/chat history.
+3. Read `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` completely before changing shared storage/data models.
+4. Preserve existing user projects/tasks/notes/chat history.
 5. Do not create duplicate H2 stores for Agent tasks/evidence/verification.
 6. Do not put machine-local UI state into shared NAS project data.
 7. Do not delete a legacy AI path until Agent replacement parity is proven.
