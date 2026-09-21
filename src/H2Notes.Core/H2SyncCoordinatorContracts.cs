@@ -31,6 +31,51 @@ public enum H2ProjectConflictState
     Resolved = 2
 }
 
+public enum H2ProjectEventDisposition
+{
+    Applied = 1,
+    Conflict = 2
+}
+
+public enum H2ConflictResolutionAction
+{
+    SetField = 1,
+    DeleteEntity = 2,
+    RestoreEntity = 3
+}
+
+public sealed record H2ConflictResolutionPayload(
+    H2ConflictResolutionAction Action,
+    string? ValueJson);
+
+public sealed record H2ProjectRevisionEntry
+{
+    public H2ProjectRevisionEntry(
+        H2ProjectEntityKind entityKind,
+        Guid entityId,
+        string? fieldKey,
+        long revision,
+        bool isDeleted = false)
+    {
+        if (!Enum.IsDefined(entityKind)) throw new ArgumentOutOfRangeException(nameof(entityKind));
+        EntityKind = entityKind;
+        EntityId = H2CoordinatorContractGuard.NonEmpty(entityId, nameof(entityId));
+        FieldKey = H2CoordinatorContractGuard.BoundOrNull(fieldKey, nameof(fieldKey), 200);
+        if (revision < 0) throw new ArgumentOutOfRangeException(nameof(revision));
+        Revision = revision;
+        IsDeleted = isDeleted;
+    }
+
+    public H2ProjectEntityKind EntityKind { get; }
+    public Guid EntityId { get; }
+    public string? FieldKey { get; }
+    public long Revision { get; }
+    public bool IsDeleted { get; }
+
+    public string StableKey
+        => $"{(int)EntityKind}:{EntityId:N}:{FieldKey ?? "$entity"}";
+}
+
 public enum H2ProjectAiQueueState
 {
     Waiting = 1,
@@ -153,17 +198,41 @@ public sealed record H2ProjectEventDraft
 
 public sealed record H2AcceptedProjectEvent
 {
-    public H2AcceptedProjectEvent(H2ProjectEventDraft draft, long serverSequence, DateTimeOffset acceptedUtc)
+    public H2AcceptedProjectEvent(
+        H2ProjectEventDraft draft,
+        long serverSequence,
+        DateTimeOffset acceptedUtc,
+        H2ProjectEventDisposition disposition = H2ProjectEventDisposition.Applied,
+        long? resultingRevision = null,
+        long? resultingEntityRevision = null,
+        Guid? conflictId = null)
     {
         Draft = draft ?? throw new ArgumentNullException(nameof(draft));
         if (serverSequence <= 0) throw new ArgumentOutOfRangeException(nameof(serverSequence));
+        if (!Enum.IsDefined(disposition)) throw new ArgumentOutOfRangeException(nameof(disposition));
+        if (resultingRevision is < 0) throw new ArgumentOutOfRangeException(nameof(resultingRevision));
+        if (resultingEntityRevision is < 0) throw new ArgumentOutOfRangeException(nameof(resultingEntityRevision));
+        if (disposition == H2ProjectEventDisposition.Conflict
+            && (!conflictId.HasValue || conflictId.Value == Guid.Empty))
+            throw new ArgumentException("Conflict event requires a non-empty ConflictId.", nameof(conflictId));
+        if (disposition == H2ProjectEventDisposition.Applied && conflictId is not null)
+            throw new ArgumentException("Applied event cannot carry ConflictId.", nameof(conflictId));
+
         ServerSequence = serverSequence;
         AcceptedUtc = acceptedUtc;
+        Disposition = disposition;
+        ResultingRevision = resultingRevision;
+        ResultingEntityRevision = resultingEntityRevision;
+        ConflictId = conflictId;
     }
 
     public H2ProjectEventDraft Draft { get; }
     public long ServerSequence { get; }
     public DateTimeOffset AcceptedUtc { get; }
+    public H2ProjectEventDisposition Disposition { get; }
+    public long? ResultingRevision { get; }
+    public long? ResultingEntityRevision { get; }
+    public Guid? ConflictId { get; }
 }
 
 public sealed record H2ProjectSnapshot
@@ -176,7 +245,8 @@ public sealed record H2ProjectSnapshot
         long throughServerSequence,
         string stateJson,
         string stateSha256,
-        DateTimeOffset createdUtc)
+        DateTimeOffset createdUtc,
+        IEnumerable<H2ProjectRevisionEntry>? revisions = null)
     {
         WorkspaceId = H2CoordinatorContractGuard.NonEmpty(workspaceId, nameof(workspaceId));
         ProjectId = H2CoordinatorContractGuard.NonEmpty(projectId, nameof(projectId));
@@ -190,6 +260,11 @@ public sealed record H2ProjectSnapshot
         if (!string.Equals(computed, StateSha256, StringComparison.Ordinal))
             throw new ArgumentException("Project snapshot SHA-256 does not match state bytes.", nameof(stateSha256));
         CreatedUtc = createdUtc;
+
+        var revisionArray = (revisions ?? Array.Empty<H2ProjectRevisionEntry>()).ToArray();
+        if (revisionArray.GroupBy(item => item.StableKey, StringComparer.Ordinal).Any(group => group.Count() > 1))
+            throw new ArgumentException("Snapshot contains duplicate revision identity.", nameof(revisions));
+        Revisions = revisionArray;
     }
 
     public Guid WorkspaceId { get; }
@@ -198,6 +273,7 @@ public sealed record H2ProjectSnapshot
     public string StateJson { get; }
     public string StateSha256 { get; }
     public DateTimeOffset CreatedUtc { get; }
+    public IReadOnlyList<H2ProjectRevisionEntry> Revisions { get; }
 }
 
 public sealed record H2ProjectConflict
