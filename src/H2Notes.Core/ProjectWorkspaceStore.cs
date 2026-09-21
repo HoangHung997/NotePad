@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -72,6 +73,7 @@ public sealed class WorkspaceCommitLease : IDisposable
                         token + Environment.NewLine +
                         owner + Environment.NewLine +
                         Environment.MachineName + Environment.NewLine +
+                        LocalNodeIdentity() + Environment.NewLine +
                         Environment.ProcessId + Environment.NewLine +
                         DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine);
                     stream.Write(payload);
@@ -130,18 +132,82 @@ public sealed class WorkspaceCommitLease : IDisposable
         try
         {
             if (!File.Exists(path)) return;
+
+            var lines = File.ReadAllLines(path);
+            var sameNodeDeadOwner = false;
+            if (lines.Length >= 6 &&
+                string.Equals(lines[3], LocalNodeIdentity(), StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(lines[4], out var pid) &&
+                DateTimeOffset.TryParse(lines[5], out var createdUtc))
+            {
+                sameNodeDeadOwner = IsProcessGoneOrReused(pid, createdUtc);
+            }
+
             var age = DateTime.UtcNow - File.GetLastWriteTimeUtc(path);
-            if (age < StaleLeaseAge) return;
+            if (!sameNodeDeadOwner && age < StaleLeaseAge) return;
 
             // A live lease keeps this file open without FileShare.Delete, so deletion
-            // fails while the owner is still in the critical section. Only a crash
-            // remnant (no live handle) is eligible for stale cleanup.
+            // fails while the owner is still in the critical section. Same-node crash
+            // remnants can be reclaimed immediately; foreign-node remnants require
+            // the conservative stale-age boundary.
             File.Delete(path);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
         {
             // Active lease or transient NAS condition: fail closed and retry later.
         }
+    }
+
+    private static bool IsProcessGoneOrReused(int pid, DateTimeOffset leaseCreatedUtc)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            if (process.HasExited) return true;
+            try
+            {
+                // If Windows reused the PID after the recorded lease was created,
+                // the original lease owner is gone.
+                return process.StartTime.ToUniversalTime() > leaseCreatedUtc.UtcDateTime.AddSeconds(1);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        catch (ArgumentException) { return true; }
+        catch (InvalidOperationException) { return true; }
+    }
+
+    private static string LocalNodeIdentity()
+    {
+        string seed;
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                seed = Microsoft.Win32.Registry.GetValue(
+                           @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
+                           "MachineGuid",
+                           null)?.ToString()?.Trim()
+                       ?? "";
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                seed = "";
+            }
+        }
+        else
+        {
+            seed = "";
+        }
+
+        if (string.IsNullOrWhiteSpace(seed))
+            seed = Environment.MachineName + "|" + Environment.OSVersion.VersionString;
+
+        return Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes("h2-workspace-node-v1|" + seed.ToUpperInvariant())))
+            .ToLowerInvariant();
     }
 }
 
