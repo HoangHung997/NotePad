@@ -53,14 +53,6 @@ public partial class MainWindow
         _chat.DockRequested += SetAiDock;
         _chat.AppendNoteRequested += text => { NotesEditor.AppendText(text); _app.ScheduleSave(); };
         _chat.AddTaskRequested += text => { if (_notesProject is null) return; _notesProject.ChecklistItems.Add(new() { Text = text }); Sheet.Refresh(); UpdateSummary(); _app.ScheduleSave(); };
-        _chat.ProjectActionsRequested += (project, actions) =>
-        {
-            if (_notesProject != project) throw new InvalidOperationException("Đã đổi dự án; hãy xem và áp dụng lại trong đúng dự án.");
-            if (actions.Count != 0) throw new InvalidOperationException("Thay đổi AI phải được áp dụng trong Core trước khi làm mới giao diện.");
-            FlushNotes();
-            NotesEditor.Load(project.ReadNotes()); _loadedNotesSource = project.NotesRich; NotesEditor.MarkSaved();
-            Sheet.Refresh(); UpdateSummary(); _app.MarkProjectDirty(project.Id); _app.ScheduleSave();
-        };
         _chat.ReadContext = () => { FlushNotes(); return NotesEditor.Editor.SelectionLength > 0 ? NotesEditor.Editor.SelectedText : _notesProject?.NotesText ?? ""; };
         _chat.PrepareProjectContext = () => { FlushNotes(); Sheet.FlushDraft(); };
         _chat.DragStarted += BeginAiDrag; _chat.DragMoved += MoveAiDrag; _chat.DragFinished += EndAiDrag;
