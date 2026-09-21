@@ -459,6 +459,20 @@ public sealed class H2ProjectSyncClient
             throw new InvalidOperationException("Local replica identity does not match sync client.");
 
         _replica = _local.LoadReplica();
+        var pending = _local.Pending();
+        if (pending.Count > 0)
+        {
+            var minimumNext = pending.Max(item => item.DeviceSequence) + 1;
+            if (_replica.NextDeviceSequence < minimumNext)
+            {
+                _replica = _replica with
+                {
+                    NextDeviceSequence = minimumNext,
+                    UpdatedUtc = DateTimeOffset.UtcNow
+                };
+                PersistReplica();
+            }
+        }
         RebuildCurrent();
     }
 
@@ -570,13 +584,21 @@ public sealed class H2ProjectSyncClient
                 Device.DeviceId,
                 pending,
                 cancellationToken).ConfigureAwait(false);
+
+            // Keep durable outbox items until the accepted server sequence has been ingested into
+            // the local authoritative projection. If the process/network fails after Submit, retrying
+            // the same ClientOperationId is idempotent and the optimistic edit remains durable/visible.
+            pulled += await PullRemoteAsync(cancellationToken).ConfigureAwait(false);
+            if (result.Acknowledgements.Count > 0)
+            {
+                var requiredWatermark = result.Acknowledgements.Max(item => item.ServerSequence);
+                if (_replica.AppliedServerSequence < requiredWatermark)
+                    throw new InvalidDataException(
+                        $"Coordinator acknowledgement watermark {requiredWatermark} was not observable after submit; local outbox is retained.");
+            }
+
             _local.Acknowledge(result.Acknowledgements);
             acknowledged = result.Acknowledgements.Count;
-
-            // Pull accepted server order (including our just-acknowledged events) before changing
-            // authoritative state. If this pull fails, outbox retry is still safe because server
-            // accepts ClientOperationId idempotently and the acknowledged event remains in server log.
-            pulled += await PullRemoteAsync(cancellationToken).ConfigureAwait(false);
         }
 
         PersistReplica();
