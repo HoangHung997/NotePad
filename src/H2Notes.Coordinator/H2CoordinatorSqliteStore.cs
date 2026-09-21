@@ -711,6 +711,325 @@ public sealed class H2CoordinatorSqliteStore
         }
     }
 
+    public IReadOnlyList<H2ProjectRevisionEntry> GetProjectRevisions(Guid workspaceId, Guid projectId)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
+        if (projectId == Guid.Empty) throw new ArgumentException("ProjectId is required.", nameof(projectId));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT entity_kind, entity_id, field_key, revision, is_deleted
+                FROM project_revisions
+                WHERE workspace_id = $workspace AND project_id = $project
+                ORDER BY entity_kind, entity_id, field_key;
+                """;
+            command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+            command.Parameters.AddWithValue("$project", Id(projectId));
+
+            var result = new List<H2ProjectRevisionEntry>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new H2ProjectRevisionEntry(
+                    (H2ProjectEntityKind)reader.GetInt32(0),
+                    Guid.Parse(reader.GetString(1)),
+                    FromDbFieldKey(reader.GetString(2)),
+                    reader.GetInt64(3),
+                    reader.GetInt32(4) != 0));
+            }
+            return result;
+        }
+    }
+
+    private static MutationArbitration ArbitrateMutation(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectEventDraft draft)
+    {
+        var entity = ReadRevision(
+            connection, tx, draft.WorkspaceId, draft.ProjectId,
+            draft.Target.EntityKind, draft.Target.EntityId, null);
+
+        switch (draft.Kind)
+        {
+            case H2ProjectEventKind.CreateEntity:
+            {
+                if (draft.Target.EntityKind != H2ProjectEntityKind.Project)
+                {
+                    var projectEntity = ReadRevision(
+                        connection, tx, draft.WorkspaceId, draft.ProjectId,
+                        H2ProjectEntityKind.Project, draft.ProjectId, null);
+                    if (projectEntity is null || projectEntity.IsDeleted)
+                        throw new InvalidOperationException("Child entity cannot be created before an active project baseline.");
+                }
+
+                var expected = draft.Target.ExpectedRevision ?? 0;
+                if (entity is null)
+                {
+                    if (expected != 0)
+                        throw new InvalidOperationException("CreateEntity expected revision must be zero for a new entity.");
+                    return MutationArbitration.Applied(resultingRevision: 1, resultingEntityRevision: 1);
+                }
+
+                return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+            }
+
+            case H2ProjectEventKind.SetField:
+            {
+                if (entity is null)
+                    throw new InvalidOperationException("SetField target entity does not exist.");
+                if (entity.IsDeleted)
+                    return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+
+                var expected = draft.Target.ExpectedRevision
+                    ?? throw new InvalidOperationException("SetField requires ExpectedRevision.");
+                var field = ReadRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    draft.Target.EntityKind, draft.Target.EntityId, draft.Target.FieldKey);
+                var currentFieldRevision = field?.Revision ?? 0;
+
+                if (expected != currentFieldRevision)
+                {
+                    if (field is null)
+                        throw new InvalidOperationException(
+                            "SetField expected a non-zero revision for a field with no accepted revision history.");
+                    return MutationArbitration.Conflict(CreateConflict(draft, field.LastEventId));
+                }
+
+                return MutationArbitration.Applied(
+                    currentFieldRevision + 1,
+                    entity.Revision + 1);
+            }
+
+            case H2ProjectEventKind.DeleteEntity:
+            {
+                if (entity is null)
+                    throw new InvalidOperationException("DeleteEntity target does not exist.");
+
+                var expected = draft.Target.ExpectedRevision
+                    ?? throw new InvalidOperationException("DeleteEntity requires ExpectedRevision.");
+                if (entity.IsDeleted || expected != entity.Revision)
+                    return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+
+                return MutationArbitration.Applied(
+                    entity.Revision + 1,
+                    entity.Revision + 1,
+                    deleteEntity: true);
+            }
+
+            default:
+                throw new NotSupportedException(
+                    $"Coordinator revision arbitration does not support event kind {draft.Kind} in H2M-133E.");
+        }
+    }
+
+    private static void ApplyRevisionMutation(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectEventDraft draft,
+        MutationArbitration arbitration)
+    {
+        if (arbitration.Disposition != H2ProjectEventDisposition.Applied)
+            throw new InvalidOperationException("Only applied mutations can advance revision state.");
+
+        switch (draft.Kind)
+        {
+            case H2ProjectEventKind.CreateEntity:
+                UpsertRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    draft.Target.EntityKind, draft.Target.EntityId, null,
+                    arbitration.ResultingEntityRevision!.Value,
+                    isDeleted: false,
+                    draft.EventId);
+                break;
+
+            case H2ProjectEventKind.SetField:
+                UpsertRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    draft.Target.EntityKind, draft.Target.EntityId, draft.Target.FieldKey,
+                    arbitration.ResultingRevision!.Value,
+                    isDeleted: false,
+                    draft.EventId);
+                UpsertRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    draft.Target.EntityKind, draft.Target.EntityId, null,
+                    arbitration.ResultingEntityRevision!.Value,
+                    isDeleted: false,
+                    draft.EventId);
+                break;
+
+            case H2ProjectEventKind.DeleteEntity:
+                UpsertRevision(
+                    connection, tx, draft.WorkspaceId, draft.ProjectId,
+                    draft.Target.EntityKind, draft.Target.EntityId, null,
+                    arbitration.ResultingEntityRevision!.Value,
+                    isDeleted: true,
+                    draft.EventId);
+                break;
+
+            default:
+                throw new NotSupportedException("Unsupported applied revision mutation.");
+        }
+    }
+
+    private static RevisionRow? ReadRevision(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid workspaceId,
+        Guid projectId,
+        H2ProjectEntityKind entityKind,
+        Guid entityId,
+        string? fieldKey)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT revision, is_deleted, last_event_id
+            FROM project_revisions
+            WHERE workspace_id = $workspace
+              AND project_id = $project
+              AND entity_kind = $kind
+              AND entity_id = $entity
+              AND field_key = $field;
+            """;
+        command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+        command.Parameters.AddWithValue("$project", Id(projectId));
+        command.Parameters.AddWithValue("$kind", (int)entityKind);
+        command.Parameters.AddWithValue("$entity", Id(entityId));
+        command.Parameters.AddWithValue("$field", ToDbFieldKey(fieldKey));
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) return null;
+        return new RevisionRow(
+            reader.GetInt64(0),
+            reader.GetInt32(1) != 0,
+            Guid.Parse(reader.GetString(2)));
+    }
+
+    private static void UpsertRevision(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid workspaceId,
+        Guid projectId,
+        H2ProjectEntityKind entityKind,
+        Guid entityId,
+        string? fieldKey,
+        long revision,
+        bool isDeleted,
+        Guid lastEventId)
+    {
+        Execute(connection, tx,
+            """
+            INSERT INTO project_revisions(
+                workspace_id, project_id, entity_kind, entity_id, field_key,
+                revision, is_deleted, last_event_id)
+            VALUES(
+                $workspace, $project, $kind, $entity, $field,
+                $revision, $deleted, $event)
+            ON CONFLICT(workspace_id, project_id, entity_kind, entity_id, field_key)
+            DO UPDATE SET
+                revision = excluded.revision,
+                is_deleted = excluded.is_deleted,
+                last_event_id = excluded.last_event_id;
+            """,
+            ("$workspace", Id(workspaceId)),
+            ("$project", Id(projectId)),
+            ("$kind", (int)entityKind),
+            ("$entity", Id(entityId)),
+            ("$field", ToDbFieldKey(fieldKey)),
+            ("$revision", revision),
+            ("$deleted", isDeleted ? 1 : 0),
+            ("$event", Id(lastEventId)));
+    }
+
+    private static H2ProjectConflict CreateConflict(H2ProjectEventDraft draft, Guid priorEventId)
+    {
+        if (priorEventId == Guid.Empty)
+            throw new InvalidOperationException("Conflict cannot be anchored without prior accepted event identity.");
+        return new H2ProjectConflict(
+            Guid.NewGuid(),
+            draft.WorkspaceId,
+            draft.ProjectId,
+            draft.Target,
+            new[] { priorEventId, draft.EventId },
+            DateTimeOffset.UtcNow);
+    }
+
+    private static void InsertConflict(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectConflict conflict)
+    {
+        Execute(connection, tx,
+            """
+            INSERT INTO project_conflicts(
+                conflict_id, workspace_id, project_id,
+                entity_kind, entity_id, field_key, expected_revision,
+                event_ids_json, created_utc, state, resolved_event_id)
+            VALUES(
+                $conflict, $workspace, $project,
+                $entityKind, $entity, $field, $revision,
+                $events, $created, $state, $resolved);
+            """,
+            ("$conflict", Id(conflict.ConflictId)),
+            ("$workspace", Id(conflict.WorkspaceId)),
+            ("$project", Id(conflict.ProjectId)),
+            ("$entityKind", (int)conflict.Target.EntityKind),
+            ("$entity", Id(conflict.Target.EntityId)),
+            ("$field", conflict.Target.FieldKey),
+            ("$revision", conflict.Target.ExpectedRevision),
+            ("$events", JsonSerializer.Serialize(conflict.EventIds, Json)),
+            ("$created", Stamp(conflict.CreatedUtc)),
+            ("$state", (int)conflict.State),
+            ("$resolved", conflict.ResolvedByEventId is null ? null : Id(conflict.ResolvedByEventId.Value)));
+    }
+
+    private static H2ProjectConflict ReadConflict(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid conflictId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT
+                workspace_id, project_id,
+                entity_kind, entity_id, field_key, expected_revision,
+                event_ids_json, created_utc, state, resolved_event_id
+            FROM project_conflicts
+            WHERE conflict_id = $conflict;
+            """;
+        command.Parameters.AddWithValue("$conflict", Id(conflictId));
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) throw new InvalidDataException("Conflict record is missing.");
+
+        var target = new H2ProjectMutationTarget(
+            (H2ProjectEntityKind)reader.GetInt32(2),
+            Guid.Parse(reader.GetString(3)),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetInt64(5));
+        var eventIds = JsonSerializer.Deserialize<Guid[]>(reader.GetString(6), Json)
+            ?? throw new InvalidDataException("Conflict event identity list is missing.");
+        return new H2ProjectConflict(
+            conflictId,
+            Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)),
+            target,
+            eventIds,
+            ParseStamp(reader.GetString(7)),
+            (H2ProjectConflictState)reader.GetInt32(8),
+            reader.IsDBNull(9) ? null : Guid.Parse(reader.GetString(9)));
+    }
+
+    private static string ToDbFieldKey(string? fieldKey) => fieldKey ?? "$entity";
+    private static string? FromDbFieldKey(string fieldKey)
+        => string.Equals(fieldKey, "$entity", StringComparison.Ordinal) ? null : fieldKey;
+
     private void Initialize()
     {
         using var connection = Open();
@@ -1037,11 +1356,36 @@ public sealed class H2CoordinatorSqliteStore
     private static DateTimeOffset ParseStamp(string value)
         => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
+    private sealed record RevisionRow(long Revision, bool IsDeleted, Guid LastEventId);
+
+    private sealed record MutationArbitration(
+        H2ProjectEventDisposition Disposition,
+        long? ResultingRevision,
+        long? ResultingEntityRevision,
+        bool DeleteEntity,
+        H2ProjectConflict? Conflict)
+    {
+        public static MutationArbitration Applied(
+            long resultingRevision,
+            long resultingEntityRevision,
+            bool deleteEntity = false)
+            => new(
+                H2ProjectEventDisposition.Applied,
+                resultingRevision,
+                resultingEntityRevision,
+                deleteEntity,
+                null);
+
+        public static MutationArbitration Conflict(H2ProjectConflict conflict)
+            => new(H2ProjectEventDisposition.Conflict, null, null, false, conflict);
+    }
+
     private sealed record ExistingEvent(
         Guid EventId,
         Guid ProjectId,
         Guid DeviceId,
         string PayloadSha256,
         long ServerSequence,
-        DateTimeOffset AcceptedUtc);
+        DateTimeOffset AcceptedUtc,
+        Guid? ConflictId);
 }
