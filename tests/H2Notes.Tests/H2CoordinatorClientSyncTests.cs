@@ -173,6 +173,82 @@ internal static class H2CoordinatorClientSyncTests
             Equal("Local", restarted.CurrentProject!.DisplayName);
         });
 
+        test("Coordinator clients keep conflicted local value optimistic only and converge after explicit resolution", () =>
+        {
+            var root = Folder();
+            var store = new H2CoordinatorSqliteStore(Path.Combine(root, "coordinator.db"));
+            var service = new StoreCoordinator(store);
+            var workspace = Guid.NewGuid();
+            var project = Guid.NewGuid();
+            var pc1 = H2CoordinatorDeviceIdentity.CreateNew("PC1");
+            var pc2 = H2CoordinatorDeviceIdentity.CreateNew("PC2");
+
+            var client1 = new H2ProjectSyncClient(
+                workspace, project, pc1, service,
+                new H2CoordinatorClientStateStore(
+                    Path.Combine(root, "pc1"), workspace, project, pc1.DeviceId));
+            var client2 = new H2ProjectSyncClient(
+                workspace, project, pc2, service,
+                new H2CoordinatorClientStateStore(
+                    Path.Combine(root, "pc2"), workspace, project, pc2.DeviceId));
+
+            client1.QueueCreateProject(new ProjectRecord
+            {
+                Id = project,
+                Name = "Baseline",
+                NameRich = RichDocument.Plain("Baseline"),
+                Notes = "",
+                NotesRich = RichDocument.Plain("")
+            });
+            client1.SynchronizeAsync().GetAwaiter().GetResult();
+            client2.SynchronizeAsync().GetAwaiter().GetResult();
+
+            client1.QueueSetProjectName(RichDocument.Plain("PC1 value"));
+            client2.QueueSetProjectName(RichDocument.Plain("PC2 optimistic"));
+            Equal("PC2 optimistic", client2.CurrentProject!.DisplayName);
+
+            client1.SynchronizeAsync().GetAwaiter().GetResult();
+            var result2 = client2.SynchronizeAsync().GetAwaiter().GetResult();
+
+            Equal(H2ProjectSyncStatus.Synced, result2.Status);
+            Equal(0, client2.PendingCount);
+            Equal("PC1 value", client2.AuthoritativeProject!.DisplayName);
+            Equal("PC1 value", client2.CurrentProject!.DisplayName);
+
+            var conflict = store.GetConflicts(workspace, project).Single();
+            Equal(H2ProjectConflictState.Open, conflict.State);
+
+            var valueJson = H2ProjectEventPayload.Serialize(RichDocument.Plain("Resolved client value"));
+            var resolutionPayload = H2ProjectEventPayload.Serialize(
+                new H2ConflictResolutionPayload(
+                    H2ConflictResolutionAction.SetField,
+                    valueJson));
+            var resolution = new H2ProjectEventDraft(
+                Guid.NewGuid(),
+                workspace,
+                project,
+                pc2.DeviceId,
+                2,
+                Guid.NewGuid(),
+                H2ProjectEventKind.ResolveConflict,
+                new H2ProjectMutationTarget(
+                    H2ProjectEntityKind.Project,
+                    project,
+                    "NameRich",
+                    expectedRevision: 1),
+                resolutionPayload,
+                H2ProjectEventDraft.ComputePayloadSha256(resolutionPayload),
+                DateTimeOffset.UtcNow);
+            service.ResolveConflictAsync(workspace, conflict.ConflictId, resolution)
+                .GetAwaiter().GetResult();
+
+            client1.SynchronizeAsync().GetAwaiter().GetResult();
+            client2.SynchronizeAsync().GetAwaiter().GetResult();
+            Equal("Resolved client value", client1.CurrentProject!.DisplayName);
+            Equal("Resolved client value", client2.CurrentProject!.DisplayName);
+            Equal(0, store.GetProjectHead(workspace, project).OpenConflictCount);
+        });
+
         test("Project event applier mutates existing H2 task and link models without shared workspace files", () =>
         {
             var workspace = Guid.NewGuid();
