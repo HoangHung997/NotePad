@@ -1379,7 +1379,7 @@ Acceptance:
 
 Evidence: `src/H2Notes.Core/H2CoordinatorClientSync.cs` adds a machine-local durable immutable outbox, authoritative replica watermark/cache, optimistic `ProjectRecord` projection and Coordinator-only synchronization path. Accepted events are applied through the existing `ProjectRecord`/`TaskRecord`/`ProjectLink` models; no `ProjectWorkspaceStore`, `WorkspaceCommitLease` or shared project-index write is used. The outbox is written before optimistic projection, survives restart/offline periods, is retained across submit/ACK interruption, and is removed only after the exact immutable event is observed in authoritative server order. `H2CoordinatorClientSyncTests` prove PC2 offline edit + restart + PC1 remote advance + reconnect convergence, crash after server acceptance without duplicate replay, task/link projection, and legacy shared-workspace primitive exclusion. Exact source `d88d564df7c27e5b17ecee4fd9e4b3031ae72185`; focused Actions run `35565652209` SUCCESS, H2 Notes **509/509**, NAS harness self-test PASS, publish/artifact steps PASS.
 
-### [~] H2M-133E — Revision merge, conflicts, snapshots and compaction
+### [x] H2M-133E — Revision merge, conflicts, snapshots and compaction
 
 Required:
 
@@ -1400,7 +1400,11 @@ Acceptance:
 - snapshot rebuild equals event replay;
 - export is sufficient to restore shared H2 project truth elsewhere.
 
-### [ ] H2M-133F — Per-project AI queue, lease, heartbeat and sync barriers
+Evidence: Coordinator schema v2 stores field/entity revision metadata and event disposition transactionally; independent fields/entities merge while stale same-field and delete-vs-update mutations become structured conflicts whose losing event remains immutable in server order but is not applied to authoritative projection. Conflict resolution is itself an immutable event. Verified snapshots are accepted only at current project head and must equal replay of all applied events plus exact revision metadata. Compaction moves verified old events to an archive table rather than deleting audit history; hot + archived events remain queryable and idempotent. Logical workspace export/restore preserves immutable events, snapshots, conflicts, revision metadata and bounded device audit identity without copying the raw SQLite database/credential state, and validates payload hash/replay/revision consistency before restore. RestoreEntity clears stale field revision history so pre-delete edits cannot silently apply after restore.
+
+Acceptance coverage: `H2CoordinatorConflictSnapshotTests` + `H2CoordinatorClientSyncTests` prove independent-field merge, same-field conflict without state overwrite, explicit resolution convergence, delete-vs-update, verified snapshot replay, snapshot-gated compaction, compacted-event idempotency, portable archive restore/continued sequencing/tamper rejection, client optimistic-conflict rollback, and restored-entity stale-revision rejection. Exact source `176520661597657003aa3d89bd591a309642a262`; focused Actions run `35570298116` SUCCESS: H2 Notes **517/517**, NAS harness self-test PASS, publish/artifact steps PASS.
+
+### [~] H2M-133F — Per-project AI queue, lease, heartbeat and sync barriers
 
 Required:
 
