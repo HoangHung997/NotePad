@@ -868,6 +868,264 @@ public sealed partial class H2CoordinatorSqliteStore
         }
     }
 
+    public H2ProjectAiLease? TryAcquireProjectAiLease(
+        Guid workspaceId,
+        Guid projectId,
+        Guid deviceId)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
+        if (projectId == Guid.Empty) throw new ArgumentException("ProjectId is required.", nameof(projectId));
+        if (deviceId == Guid.Empty) throw new ArgumentException("DeviceId is required.", nameof(deviceId));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+            RequireRegisteredDevice(connection, tx, workspaceId, deviceId);
+            EnsureProjectHead(connection, tx, workspaceId, projectId);
+            var now = ServerNow();
+            RecoverExpiredProjectAiUnderLock(connection, tx, workspaceId, projectId, now);
+
+            using (var blocking = connection.CreateCommand())
+            {
+                blocking.Transaction = tx;
+                blocking.CommandText =
+                    """
+                    SELECT 1
+                    FROM ai_queue
+                    WHERE workspace_id = $workspace
+                      AND project_id = $project
+                      AND state IN ($waitingSync, $running, $repair, $review)
+                    LIMIT 1;
+                    """;
+                blocking.Parameters.AddWithValue("$workspace", Id(workspaceId));
+                blocking.Parameters.AddWithValue("$project", Id(projectId));
+                blocking.Parameters.AddWithValue("$waitingSync", (int)H2ProjectAiQueueState.WaitingForSync);
+                blocking.Parameters.AddWithValue("$running", (int)H2ProjectAiQueueState.Running);
+                blocking.Parameters.AddWithValue("$repair", (int)H2ProjectAiQueueState.WaitingForRepair);
+                blocking.Parameters.AddWithValue("$review", (int)H2ProjectAiQueueState.NeedsUserReview);
+                if (blocking.ExecuteScalar() is not null)
+                {
+                    tx.Commit();
+                    return null;
+                }
+            }
+
+            H2ProjectAiRequest? request = null;
+            long queueSequence = 0;
+            using (var first = connection.CreateCommand())
+            {
+                first.Transaction = tx;
+                first.CommandText =
+                    """
+                    SELECT queue_sequence, request_json
+                    FROM ai_queue
+                    WHERE workspace_id = $workspace
+                      AND project_id = $project
+                      AND state = $waiting
+                    ORDER BY queue_sequence
+                    LIMIT 1;
+                    """;
+                first.Parameters.AddWithValue("$workspace", Id(workspaceId));
+                first.Parameters.AddWithValue("$project", Id(projectId));
+                first.Parameters.AddWithValue("$waiting", (int)H2ProjectAiQueueState.Waiting);
+                using var reader = first.ExecuteReader();
+                if (reader.Read())
+                {
+                    queueSequence = reader.GetInt64(0);
+                    request = Deserialize<H2ProjectAiRequest>(reader.GetString(1));
+                }
+            }
+
+            if (request is null || request.OwnerDeviceId != deviceId)
+            {
+                tx.Commit();
+                return null;
+            }
+
+            var barrier = new H2ProjectSyncBarrier(
+                projectId,
+                ReadProjectSequence(connection, tx, workspaceId, projectId));
+            var lease = new H2ProjectAiLease(
+                Guid.NewGuid(),
+                request.RequestId,
+                projectId,
+                deviceId,
+                queueSequence,
+                barrier,
+                now,
+                now,
+                now + ProjectAiLeaseDuration);
+
+            var changed = Execute(connection, tx,
+                """
+                UPDATE ai_queue
+                SET state = $state, lease_json = $lease
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND queue_sequence = $queue
+                  AND state = $waiting;
+                """,
+                ("$state", (int)H2ProjectAiQueueState.WaitingForSync),
+                ("$lease", JsonSerializer.Serialize(lease, Json)),
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(projectId)),
+                ("$queue", queueSequence),
+                ("$waiting", (int)H2ProjectAiQueueState.Waiting));
+            if (changed != 1)
+                throw new InvalidOperationException("AI queue head changed while acquiring lease.");
+
+            tx.Commit();
+            return lease;
+        }
+    }
+
+    public bool ConfirmProjectAiBarrier(
+        Guid leaseId,
+        Guid deviceId,
+        long observedProjectSequence)
+    {
+        if (leaseId == Guid.Empty) throw new ArgumentException("LeaseId is required.", nameof(leaseId));
+        if (deviceId == Guid.Empty) throw new ArgumentException("DeviceId is required.", nameof(deviceId));
+        if (observedProjectSequence < 0) throw new ArgumentOutOfRangeException(nameof(observedProjectSequence));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+            var row = FindAiQueueByLease(connection, tx, leaseId);
+            if (row is null || row.Lease.OwnerDeviceId != deviceId)
+            {
+                tx.Commit();
+                return false;
+            }
+
+            var now = ServerNow();
+            RecoverExpiredProjectAiUnderLock(
+                connection, tx, row.WorkspaceId, row.ProjectId, now);
+            row = FindAiQueueByLease(connection, tx, leaseId);
+            if (row is null
+                || row.State != H2ProjectAiQueueState.WaitingForSync
+                || row.Lease.OwnerDeviceId != deviceId
+                || observedProjectSequence < row.Lease.Barrier.RequiredProjectSequence)
+            {
+                tx.Commit();
+                return false;
+            }
+
+            var refreshed = RefreshLease(row.Lease, now);
+            var changed = Execute(connection, tx,
+                """
+                UPDATE ai_queue
+                SET state = $running, lease_json = $lease
+                WHERE request_id = $request AND state = $waitingSync;
+                """,
+                ("$running", (int)H2ProjectAiQueueState.Running),
+                ("$lease", JsonSerializer.Serialize(refreshed, Json)),
+                ("$request", Id(row.Request.RequestId)),
+                ("$waitingSync", (int)H2ProjectAiQueueState.WaitingForSync));
+            tx.Commit();
+            return changed == 1;
+        }
+    }
+
+    public bool HeartbeatProjectAiLease(
+        Guid leaseId,
+        Guid deviceId,
+        DateTimeOffset clientHeartbeatUtc)
+    {
+        if (leaseId == Guid.Empty) throw new ArgumentException("LeaseId is required.", nameof(leaseId));
+        if (deviceId == Guid.Empty) throw new ArgumentException("DeviceId is required.", nameof(deviceId));
+        _ = clientHeartbeatUtc; // diagnostic-only client time; server clock is authoritative.
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+            var row = FindAiQueueByLease(connection, tx, leaseId);
+            if (row is null || row.Lease.OwnerDeviceId != deviceId)
+            {
+                tx.Commit();
+                return false;
+            }
+
+            var now = ServerNow();
+            RecoverExpiredProjectAiUnderLock(
+                connection, tx, row.WorkspaceId, row.ProjectId, now);
+            row = FindAiQueueByLease(connection, tx, leaseId);
+            if (row is null
+                || row.Lease.OwnerDeviceId != deviceId
+                || row.State is not (H2ProjectAiQueueState.WaitingForSync or H2ProjectAiQueueState.Running))
+            {
+                tx.Commit();
+                return false;
+            }
+
+            var refreshed = RefreshLease(row.Lease, now);
+            var changed = Execute(connection, tx,
+                """
+                UPDATE ai_queue
+                SET lease_json = $lease
+                WHERE request_id = $request;
+                """,
+                ("$lease", JsonSerializer.Serialize(refreshed, Json)),
+                ("$request", Id(row.Request.RequestId)));
+            tx.Commit();
+            return changed == 1;
+        }
+    }
+
+    public bool ResolveInterruptedProjectAi(
+        Guid leaseId,
+        Guid deviceId,
+        H2ProjectAiQueueState terminalState)
+    {
+        if (terminalState is not (
+            H2ProjectAiQueueState.Abandoned
+            or H2ProjectAiQueueState.Failed
+            or H2ProjectAiQueueState.Cancelled))
+            throw new ArgumentException(
+                "Interrupted AI resolution must be Abandoned, Failed or Cancelled.",
+                nameof(terminalState));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+            var row = FindAiQueueByLease(connection, tx, leaseId);
+            if (row is null
+                || row.Lease.OwnerDeviceId != deviceId
+                || row.State is not (H2ProjectAiQueueState.WaitingForRepair or H2ProjectAiQueueState.NeedsUserReview))
+            {
+                tx.Commit();
+                return false;
+            }
+
+            var now = ServerNow();
+            var head = ReadProjectSequence(connection, tx, row.WorkspaceId, row.ProjectId);
+            var completion = new H2ProjectAiCompletion(
+                row.Lease.LeaseId,
+                row.Request.RequestId,
+                row.ProjectId,
+                terminalState,
+                head,
+                null,
+                now);
+
+            var changed = Execute(connection, tx,
+                """
+                UPDATE ai_queue
+                SET state = $state, lease_json = NULL, completion_json = $completion
+                WHERE request_id = $request;
+                """,
+                ("$state", (int)terminalState),
+                ("$completion", JsonSerializer.Serialize(completion, Json)),
+                ("$request", Id(row.Request.RequestId)));
+            tx.Commit();
+            return changed == 1;
+        }
+    }
+
     public void SaveProjectAiLease(H2ProjectAiLease lease)
     {
         ArgumentNullException.ThrowIfNull(lease);
