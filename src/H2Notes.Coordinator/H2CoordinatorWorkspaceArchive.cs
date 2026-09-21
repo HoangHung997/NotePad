@@ -509,7 +509,7 @@ public sealed partial class H2CoordinatorSqliteStore
             ProjectRecord? project = null;
             foreach (var accepted in events)
                 if (accepted.Disposition == H2ProjectEventDisposition.Applied)
-                    project = H2ProjectEventApplier.Apply(project, accepted.Draft);
+                    project = H2ProjectEventApplier.Apply(project, accepted);
 
             var expectedNode = JsonNode.Parse(JsonSerializer.Serialize(project, Json));
             var actualNode = JsonNode.Parse(snapshot.StateJson);
