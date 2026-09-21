@@ -23,12 +23,16 @@ public sealed record WorkspacePendingRestoreResult(
 
 // Cross-device commit serialization must not depend on SMB share-mode enforcement.
 // Some NAS / redirected-drive implementations allow a second FileShare.None open.
-// This lease instead relies on atomic FileMode.CreateNew: while the lease name exists,
-// no second writer may create it. DeleteOnClose gives crash cleanup on Windows/SMB;
-// Dispose also removes only a file that still contains this lease's unique token.
+// This lease relies on atomic FileMode.CreateNew while keeping the directory entry
+// present for the entire critical section. Do NOT use DeleteOnClose here: on some
+// Windows/SMB stacks delete-pending semantics can remove the name early and allow a
+// second create while the original handle is still open. Dispose removes only a file
+// that still contains this lease's unique token; stale crash remnants are recovered
+// conservatively after a bounded age.
 public sealed class WorkspaceCommitLease : IDisposable
 {
     public const string FileName = ".h2-commit.lease";
+    private static readonly TimeSpan StaleLeaseAge = TimeSpan.FromMinutes(2);
     private readonly FileStream _stream;
     private int _disposed;
 
@@ -59,9 +63,9 @@ public sealed class WorkspaceCommitLease : IDisposable
                     path,
                     FileMode.CreateNew,
                     FileAccess.ReadWrite,
-                    FileShare.ReadWrite | FileShare.Delete,
+                    FileShare.Read,
                     4096,
-                    FileOptions.WriteThrough | FileOptions.DeleteOnClose);
+                    FileOptions.WriteThrough);
                 try
                 {
                     var payload = Encoding.UTF8.GetBytes(
@@ -84,6 +88,7 @@ public sealed class WorkspaceCommitLease : IDisposable
             catch (IOException ex)
             {
                 last = ex;
+                TryRemoveStale(path);
                 if (DateTime.UtcNow >= deadline) break;
                 Thread.Sleep(60);
             }
@@ -106,17 +111,36 @@ public sealed class WorkspaceCommitLease : IDisposable
         try
         {
             if (!File.Exists(path)) return;
-            using var reader = new StreamReader(new FileStream(
-                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
-                Encoding.UTF8, true, 1024, leaveOpen: false);
-            var current = reader.ReadLine();
+            string? current;
+            using (var reader = new StreamReader(new FileStream(
+                       path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite),
+                       Encoding.UTF8, true, 1024, leaveOpen: false))
+                current = reader.ReadLine();
             if (string.Equals(current, token, StringComparison.Ordinal))
                 File.Delete(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Best effort only. DeleteOnClose is the primary crash-safe cleanup path.
-            // A leftover lease fails closed rather than allowing concurrent writers.
+            // Best effort only. A remnant fails closed until bounded stale recovery.
+        }
+    }
+
+    private static void TryRemoveStale(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            var age = DateTime.UtcNow - File.GetLastWriteTimeUtc(path);
+            if (age < StaleLeaseAge) return;
+
+            // A live lease keeps this file open without FileShare.Delete, so deletion
+            // fails while the owner is still in the critical section. Only a crash
+            // remnant (no live handle) is eligible for stale cleanup.
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Active lease or transient NAS condition: fail closed and retry later.
         }
     }
 }
