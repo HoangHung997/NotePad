@@ -76,6 +76,23 @@ public sealed record H2ProjectRevisionEntry
         => $"{(int)EntityKind}:{EntityId:N}:{FieldKey ?? "$entity"}";
 }
 
+public sealed record H2ProjectMessageAppend
+{
+    public H2ProjectMessageAppend(Guid conversationId, string? conversationTitle, AiMessage message)
+    {
+        ConversationId = H2CoordinatorContractGuard.NonEmpty(conversationId, nameof(conversationId));
+        ConversationTitle = H2CoordinatorContractGuard.BoundOrNull(conversationTitle, nameof(conversationTitle), 300);
+        Message = message ?? throw new ArgumentNullException(nameof(message));
+        if (message.Id == Guid.Empty) throw new ArgumentException("Message.Id is required.", nameof(message));
+        if (message.Role is not ("user" or "assistant"))
+            throw new ArgumentException("Shared project message role must be user or assistant.", nameof(message));
+    }
+
+    public Guid ConversationId { get; }
+    public string? ConversationTitle { get; }
+    public AiMessage Message { get; }
+}
+
 public enum H2ProjectAiQueueState
 {
     Waiting = 1,
@@ -149,7 +166,9 @@ public sealed record H2ProjectEventDraft
         H2ProjectMutationTarget target,
         string payloadJson,
         string payloadSha256,
-        DateTimeOffset clientCreatedUtc)
+        DateTimeOffset clientCreatedUtc,
+        Guid? aiRequestId = null,
+        Guid? aiLeaseId = null)
     {
         EventId = H2CoordinatorContractGuard.NonEmpty(eventId, nameof(eventId));
         WorkspaceId = H2CoordinatorContractGuard.NonEmpty(workspaceId, nameof(workspaceId));
@@ -174,6 +193,12 @@ public sealed record H2ProjectEventDraft
         if (kind == H2ProjectEventKind.SetField && string.IsNullOrWhiteSpace(target.FieldKey))
             throw new ArgumentException("SetField events require a stable FieldKey.", nameof(target));
 
+        if (aiRequestId == Guid.Empty) throw new ArgumentException("AiRequestId cannot be empty.", nameof(aiRequestId));
+        if (aiLeaseId == Guid.Empty) throw new ArgumentException("AiLeaseId cannot be empty.", nameof(aiLeaseId));
+        if (aiRequestId.HasValue != aiLeaseId.HasValue)
+            throw new ArgumentException("AI-correlated project events require both AiRequestId and AiLeaseId.");
+        AiRequestId = aiRequestId;
+        AiLeaseId = aiLeaseId;
         ClientCreatedUtc = clientCreatedUtc;
     }
 
@@ -188,6 +213,8 @@ public sealed record H2ProjectEventDraft
     public string PayloadJson { get; }
     public string PayloadSha256 { get; }
     public DateTimeOffset ClientCreatedUtc { get; }
+    public Guid? AiRequestId { get; }
+    public Guid? AiLeaseId { get; }
 
     public static string ComputePayloadSha256(string payloadJson)
     {
@@ -605,6 +632,18 @@ public interface IH2SyncCoordinator
         Guid leaseId,
         Guid deviceId,
         DateTimeOffset heartbeatUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ConfirmProjectAiBarrierAsync(
+        Guid leaseId,
+        Guid deviceId,
+        long observedProjectSequence,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ResolveInterruptedProjectAiAsync(
+        Guid leaseId,
+        Guid deviceId,
+        H2ProjectAiQueueState terminalState,
         CancellationToken cancellationToken = default);
 
     Task CompleteProjectAiAsync(
