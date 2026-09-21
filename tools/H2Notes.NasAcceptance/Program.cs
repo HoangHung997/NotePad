@@ -111,40 +111,55 @@ internal static class Program
         var session = SessionRoot(sharedRoot, sessionId);
         Directory.CreateDirectory(session);
         var evidence = NewReport("coordinator", sharedRoot, sessionId);
-        WriteJson(Path.Combine(session, "coordinator.ready.json"), NodeInfo("coordinator"));
-
-        await WaitFile(Path.Combine(session, "peer.ready.json"));
-        var peerReady = ReadJson<NodeReady>(Path.Combine(session, "peer.ready.json"));
-        evidence.PeerMachine = peerReady.Machine;
-        evidence.PeerNodeFingerprint = peerReady.NodeFingerprint;
-        evidence.PeerSourceStamp = peerReady.SourceStamp;
-        ValidatePeerBundle("Peer", peerReady);
-        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
-        {
-            if (string.IsNullOrWhiteSpace(peerReady.NodeFingerprint))
-                throw new InvalidOperationException("Peer is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
-            if (string.Equals(peerReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
-        }
-        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
-            sessionId.StartsWith("selftest-", StringComparison.Ordinal)
-                ? "Local harness self-test rendezvous completed."
-                : $"Two distinct Windows node fingerprints observed the same acceptance session; computer names may match ({Environment.MachineName} <-> {peerReady.Machine})."));
-
-        await CoordinatorLockCase(session, evidence);
-        await CoordinatorFlushCase(session, evidence);
-        await CoordinatorRenameCase(session, evidence);
-        await CoordinatorWorkspaceConcurrencyCase(session, evidence);
-        await CoordinatorCrashRecoveryCase(session, evidence);
-
-        evidence.CompletedUtc = DateTimeOffset.UtcNow;
-        evidence.Overall = evidence.Cases.All(c => c.Status == "PASS") ? "PASS" : "FAIL";
         var local = Path.Combine(outputDir, "nas-acceptance-coordinator.json");
-        WriteJson(local, evidence);
-        WriteJson(Path.Combine(session, "coordinator.summary.json"), evidence);
-        File.WriteAllText(Path.Combine(session, "session.complete"), evidence.Overall);
-        Console.WriteLine(JsonSerializer.Serialize(new { evidence.Overall, Evidence = local, SharedSession = session }, Json));
-        return evidence.Overall == "PASS" ? 0 : 1;
+
+        try
+        {
+            WriteJson(Path.Combine(session, "coordinator.ready.json"), NodeInfo("coordinator"));
+
+            await WaitFile(Path.Combine(session, "peer.ready.json"));
+            var peerReady = ReadJson<NodeReady>(Path.Combine(session, "peer.ready.json"));
+            evidence.PeerMachine = peerReady.Machine;
+            evidence.PeerNodeFingerprint = peerReady.NodeFingerprint;
+            evidence.PeerSourceStamp = peerReady.SourceStamp;
+            ValidatePeerBundle("Peer", peerReady);
+            if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(peerReady.NodeFingerprint))
+                    throw new InvalidOperationException("Peer is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
+                if (string.Equals(peerReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
+            }
+            evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
+                sessionId.StartsWith("selftest-", StringComparison.Ordinal)
+                    ? "Local harness self-test rendezvous completed."
+                    : $"Two distinct Windows node fingerprints observed the same acceptance session; computer names may match ({Environment.MachineName} <-> {peerReady.Machine})."));
+
+            await CoordinatorLockCase(session, evidence);
+            await CoordinatorFlushCase(session, evidence);
+            await CoordinatorRenameCase(session, evidence);
+            await CoordinatorWorkspaceConcurrencyCase(session, evidence);
+            await CoordinatorCrashRecoveryCase(session, evidence);
+
+            evidence.CompletedUtc = DateTimeOffset.UtcNow;
+            evidence.Overall = evidence.Cases.All(c => c.Status == "PASS") ? "PASS" : "FAIL";
+            WriteJson(local, evidence);
+            WriteJson(Path.Combine(session, "coordinator.summary.json"), evidence);
+            File.WriteAllText(Path.Combine(session, "session.complete"), evidence.Overall);
+            Console.WriteLine(JsonSerializer.Serialize(new { evidence.Overall, Evidence = local, SharedSession = session }, Json));
+            return evidence.Overall == "PASS" ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            RecordFailureEvidence(
+                evidence,
+                session,
+                local,
+                Path.Combine(session, "coordinator.summary.json"),
+                ex,
+                markSessionComplete: true);
+            throw;
+        }
     }
 
     private static async Task<int> RunPeer(string sharedRoot, string sessionId, string outputDir)
@@ -154,39 +169,54 @@ internal static class Program
         var session = SessionRoot(sharedRoot, sessionId);
         Directory.CreateDirectory(session);
         var evidence = NewReport("peer", sharedRoot, sessionId);
-        await WaitFile(Path.Combine(session, "coordinator.ready.json"));
-        var coordinatorReady = ReadJson<NodeReady>(Path.Combine(session, "coordinator.ready.json"));
-        evidence.PeerMachine = coordinatorReady.Machine;
-        evidence.PeerNodeFingerprint = coordinatorReady.NodeFingerprint;
-        evidence.PeerSourceStamp = coordinatorReady.SourceStamp;
-        ValidatePeerBundle("Coordinator", coordinatorReady);
-        if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
-        {
-            if (string.IsNullOrWhiteSpace(coordinatorReady.NodeFingerprint))
-                throw new InvalidOperationException("Coordinator is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
-            if (string.Equals(coordinatorReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
-        }
-        WriteJson(Path.Combine(session, "peer.ready.json"), NodeInfo("peer"));
-        evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
-            sessionId.StartsWith("selftest-", StringComparison.Ordinal)
-                ? "Local harness self-test rendezvous completed."
-                : $"Peer observed coordinator with a distinct Windows node fingerprint; computer names may match ({coordinatorReady.Machine})."));
-
-        await PeerLockCase(session, evidence);
-        await PeerReadCase(session, "flush", "FLUSH-VISIBILITY", evidence);
-        await PeerReadCase(session, "rename", "RENAME-REPLACE-VISIBILITY", evidence);
-        await PeerWorkspaceConcurrencyCase(session, evidence);
-        await PeerCrashRecoveryCase(session, evidence);
-
-        await WaitFile(Path.Combine(session, "session.complete"));
-        evidence.CompletedUtc = DateTimeOffset.UtcNow;
-        evidence.Overall = evidence.Cases.All(c => c.Status == "PASS") ? "PASS" : "FAIL";
         var local = Path.Combine(outputDir, "nas-acceptance-peer.json");
-        WriteJson(local, evidence);
-        WriteJson(Path.Combine(session, "peer.summary.json"), evidence);
-        Console.WriteLine(JsonSerializer.Serialize(new { evidence.Overall, Evidence = local, SharedSession = session }, Json));
-        return evidence.Overall == "PASS" ? 0 : 1;
+
+        try
+        {
+            await WaitFile(Path.Combine(session, "coordinator.ready.json"));
+            var coordinatorReady = ReadJson<NodeReady>(Path.Combine(session, "coordinator.ready.json"));
+            evidence.PeerMachine = coordinatorReady.Machine;
+            evidence.PeerNodeFingerprint = coordinatorReady.NodeFingerprint;
+            evidence.PeerSourceStamp = coordinatorReady.SourceStamp;
+            ValidatePeerBundle("Coordinator", coordinatorReady);
+            if (!sessionId.StartsWith("selftest-", StringComparison.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(coordinatorReady.NodeFingerprint))
+                    throw new InvalidOperationException("Coordinator is using an older NAS acceptance probe without a node fingerprint. Use the same updated bundle on both PCs and a new Session ID.");
+                if (string.Equals(coordinatorReady.NodeFingerprint, NodeFingerprint(), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Real NAS acceptance requires two distinct Windows node fingerprints. Two PCs may have the same computer name, but the probe must not be run twice on the same Windows installation.");
+            }
+            WriteJson(Path.Combine(session, "peer.ready.json"), NodeInfo("peer"));
+            evidence.Cases.Add(Pass("TWO-PC-RENDEZVOUS",
+                sessionId.StartsWith("selftest-", StringComparison.Ordinal)
+                    ? "Local harness self-test rendezvous completed."
+                    : $"Peer observed coordinator with a distinct Windows node fingerprint; computer names may match ({coordinatorReady.Machine})."));
+
+            await PeerLockCase(session, evidence);
+            await PeerReadCase(session, "flush", "FLUSH-VISIBILITY", evidence);
+            await PeerReadCase(session, "rename", "RENAME-REPLACE-VISIBILITY", evidence);
+            await PeerWorkspaceConcurrencyCase(session, evidence);
+            await PeerCrashRecoveryCase(session, evidence);
+
+            await WaitFile(Path.Combine(session, "session.complete"));
+            evidence.CompletedUtc = DateTimeOffset.UtcNow;
+            evidence.Overall = evidence.Cases.All(c => c.Status == "PASS") ? "PASS" : "FAIL";
+            WriteJson(local, evidence);
+            WriteJson(Path.Combine(session, "peer.summary.json"), evidence);
+            Console.WriteLine(JsonSerializer.Serialize(new { evidence.Overall, Evidence = local, SharedSession = session }, Json));
+            return evidence.Overall == "PASS" ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            RecordFailureEvidence(
+                evidence,
+                session,
+                local,
+                Path.Combine(session, "peer.summary.json"),
+                ex,
+                markSessionComplete: false);
+            throw;
+        }
     }
 
     private static async Task CoordinatorLockCase(string session, ProbeReport evidence)
@@ -436,6 +466,27 @@ internal static class Program
 
     private static ProbeCase Pass(string id, string details) => new(id, "PASS", details, DateTimeOffset.UtcNow);
 
+    private static void RecordFailureEvidence(
+        ProbeReport evidence,
+        string session,
+        string localPath,
+        string sharedSummaryPath,
+        Exception error,
+        bool markSessionComplete)
+    {
+        evidence.CompletedUtc = DateTimeOffset.UtcNow;
+        evidence.Overall = "FAIL";
+        evidence.Error = error.ToString();
+        evidence.Cases.Add(new ProbeCase("PROBE-FAILURE", "FAIL", error.Message, DateTimeOffset.UtcNow));
+
+        try { WriteJson(localPath, evidence); } catch { }
+        try { WriteJson(sharedSummaryPath, evidence); } catch { }
+        if (markSessionComplete)
+        {
+            try { File.WriteAllText(Path.Combine(session, "session.complete"), "FAIL"); } catch { }
+        }
+    }
+
     private static void ValidatePeerBundle(string peerRole, NodeReady peer)
     {
         if (!string.Equals(peer.CommitLeaseProtocol, CommitLeaseProtocol, StringComparison.Ordinal))
@@ -588,6 +639,7 @@ internal static class Program
         public DateTimeOffset StartedUtc { get; set; }
         public DateTimeOffset? CompletedUtc { get; set; }
         public string Overall { get; set; } = "RUNNING";
+        public string? Error { get; set; }
         public List<ProbeCase> Cases { get; set; } = [];
     }
 
