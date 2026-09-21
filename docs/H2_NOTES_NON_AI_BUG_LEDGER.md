@@ -144,12 +144,12 @@ Disposition:
 
 | ID | Severity | Area | Status | Short description |
 |---|---|---|---|---|
-| H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN-REAL-NAS / H2M-133 BLOCKER | Code-side recovery is implemented; physical two-PC/NAS convergence proof is now required at the final data-integrity gate |
+| H2-NONAI-001 | HIGH | multi-PC project sync | OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER | Legacy mixed-generation recovery exists, but shared project correctness is moving to Coordinator event sync after real WebDAV/SMB lock failures |
 | H2-NONAI-002 | HIGH | Persistence / recovery | FIXED | Journal now survives through final snapshot validation; fault-injection proves rollback after a bad committed generation |
 | H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | FIXED | Structured bounded sync diagnostics are persisted locally and surfaced as transient/persistent/recovery status |
-| H2-NONAI-004 | HIGH | NAS protocol compatibility | OPEN-REAL-NAS / H2M-133 BLOCKER | Harness exists and self-tests; real share locking/rename/flush semantics must now be certified on the intended share |
+| H2-NONAI-004 | HIGH | cross-transport coordination | OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER | Real FileShare.None/CreateNew/byte-range lock tests all failed across the user's mixed WebDAV/SMB topology; legacy multi-writer shared-file protocol is being retired |
 | H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
-| H2-NONAI-006 | HIGH | Test coverage | OPEN-REAL-NAS / H2M-133 BLOCKER | Real two-PC harness is ready; final physical run is now required before production acceptance |
+| H2-NONAI-006 | HIGH | Test coverage | OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER | Final physical acceptance must exercise two real PCs through the new Coordinator/event protocol, including queue/barrier/offline/conflict scenarios |
 | H2-NONAI-007 | MEDIUM | Offline durability | FIXED | Durable machine-local pending snapshots survive restart, merge after reconnect, audit conflicts and clear only after shared commit |
 | H2-NONAI-008 | HIGH | Storage location / network failover | PARTIAL-FIX / USER-POLICY-DECISION-REQUIRED | Local/mapped/UNC classification, canonical mapped→UNC resolution, WorkspaceId and identity-checked alias fallback are implemented; optional secure Remote/VPN failover still needs final product-policy decision |
 | H2-NONAI-009 | HIGH | Workspace identity / locking | FIXED | Schema 6 WorkspaceId drives logical alias identity, same-machine locking and self-transfer rejection; mapped/UNC alias regressions are green |
@@ -159,9 +159,9 @@ Disposition:
 # H2-NONAI-001 — NAS project/index hash mismatch blocks second-PC refresh
 
 **Severity:** HIGH  
-**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
+**Status:** OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER  
 **First confirmed:** 2026-09-18  
-**Area:** multi-PC NAS synchronization / data integrity
+**Area:** multi-PC project synchronization / data integrity
 
 ## Observed behavior
 
@@ -354,9 +354,9 @@ Do not expose secrets or unrelated file contents.
 # H2-NONAI-004 — Shared-filesystem capability assumptions are not verified
 
 **Severity:** HIGH  
-**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
+**Status:** OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER  
 **First recorded:** 2026-09-18  
-**Area:** NAS protocol compatibility
+**Area:** cross-transport project coordination
 
 ## Current production assumptions
 
@@ -374,10 +374,13 @@ Two real-PC attempts have already rejected weaker lock assumptions on the user's
 
 1. **Attempt #1 — `FileShare.None`: FAIL.** The two distinct Windows node fingerprints rendezvoused correctly, but PC2 could open the lock file while PC1 still held the supposedly exclusive share-mode handle.
 2. **Attempt #2 — atomic `FileMode.CreateNew`: FAIL.** Session `nas-final-05` again rendezvoused, but PC1 reported `Peer acquired the atomic-create commit lease while coordinator still held it.`
+3. **Attempt #3 — byte-range `FileStream.Lock(0, 1)`: FAIL.** Session `nas-final-06` reported on PC1 `Peer acquired the byte-range commit lock while coordinator still held it.` and on PC2 `Byte-range commit lock was not enforced across nodes.`
 
-These are storage-semantics findings, not launcher failures. The probe was not weakened to accept them. Production and probe code were moved to the current byte-range-lock mechanism instead.
+These are storage-semantics findings, not launcher failures. The user then confirmed PC1 uses WebDAV while PC2 uses a LAN mapped path expected to be SMB. Therefore the failure is now treated as an architectural incompatibility of the old shared-file multi-writer protocol with the required mixed-transport topology, not as a reason to try a fourth lock-file primitive.
 
-Current deterministic regression coverage proves local exclusion/release semantics for `WorkspaceCommitLease`. Final physical-probe code-side readiness is pinned to source `42b66bc2fc62a423d5ba50907f76a6ae5a4f2230`, focused Actions run `35560190273` **SUCCESS**, artifact `H2Notes-NasAcceptance-win-x64` id `10621219868`, digest `sha256:7c3483af68f857467ebec15a9b75f8e9fc8a476e9bd7ac02ba17570a0e01defb`. The probe requires matching `byte-range-file-lock-v1` protocol + exact source build across both PCs and preserves failure JSON on exceptions. This does **not** close H2-NONAI-004: one fresh physical two-PC run with that exact probe bundle is still required.
+Canonical remediation is `docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`: shared H2 project truth moves to a single-writer Coordinator with immutable project events, snapshots, durable client outbox, structured conflicts and per-project AI queue/lease/barriers. WebDAV/SMB paths may remain for files/legacy/backup but are no longer the H2 project transaction protocol.
+
+H2-NONAI-004 stays OPEN until H2M-133B..K are implemented and real two-PC mixed-topology Coordinator acceptance passes.
 
 ## Required direction
 
@@ -450,7 +453,7 @@ Portable ZIP SHA256: `4a27bf96882a7518baa87e0feeb91a577415f3a957e85435210e9bd741
 # H2-NONAI-006 — Real NAS semantics are not covered by the current automated multi-PC tests
 
 **Severity:** HIGH  
-**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
+**Status:** OPEN-COORDINATOR-REMEDIATION / H2M-133 BLOCKER  
 **First confirmed:** 2026-09-18  
 **Area:** regression/acceptance testing
 
