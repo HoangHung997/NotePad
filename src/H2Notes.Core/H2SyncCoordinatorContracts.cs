@@ -246,7 +246,7 @@ public sealed record H2ProjectSnapshot
         string stateJson,
         string stateSha256,
         DateTimeOffset createdUtc,
-        IEnumerable<H2ProjectRevisionEntry>? revisions = null)
+        IReadOnlyList<H2ProjectRevisionEntry>? revisions = null)
     {
         WorkspaceId = H2CoordinatorContractGuard.NonEmpty(workspaceId, nameof(workspaceId));
         ProjectId = H2CoordinatorContractGuard.NonEmpty(projectId, nameof(projectId));
