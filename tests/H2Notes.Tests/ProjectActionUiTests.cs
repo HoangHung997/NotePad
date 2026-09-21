@@ -1,7 +1,4 @@
-using System.Net;
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -13,85 +10,212 @@ internal static class ProjectActionUiTests
 {
     internal static void Run(Action<string, Action> test)
     {
-        static void Check(bool value, string why) { if (!value) throw new Exception(why); }
-        static void PumpUntil(Func<bool> done, string why)
-        {
-            var end = DateTime.UtcNow.AddSeconds(10);
-            while (!done() && DateTime.UtcNow < end) { Dispatcher.UIThread.RunJobs(); Thread.Sleep(2); }
-            Check(done(), why);
-        }
+        const string LegacyAction =
+            "Đề xuất thao tác\n```h2-actions\n" +
+            "[{\"kind\":\"add_task\",\"text\":\"Kiểm tra hồ sơ\"}]\n```";
 
         foreach (var permission in Enum.GetValues<AiPermissionMode>())
-            test("Composer project edits enforce " + permission + " with one-step permission UX", () =>
+        {
+            test("Legacy h2-actions are read-only history under " + permission, () =>
             {
                 var app = new H2Notes.Avalonia.App();
                 var answer = new AiMessage
                 {
                     Role = "assistant",
                     Status = "complete",
-                    Content = "Đề xuất thao tác\n" + "```h2-actions\n[{\"kind\":\"add_task\",\"text\":\"Kiểm tra hồ sơ\"}]\n```"
+                    Provider = "Legacy provider",
+                    Content = LegacyAction
                 };
-                var conversation = new AiConversation { PermissionMode = permission, Messages = [answer] };
-                if (permission == AiPermissionMode.ProjectAccess) app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
-                var project = new ProjectRecord { Conversations = [conversation] };
-                var panel = new AiChatPanel(app); panel.SetProject(project);
-                var window = new Window { Content = panel, Width = 420, Height = 700 }; window.Show(); Dispatcher.UIThread.RunJobs();
-                var refreshCount = 0;
-                panel.ProjectActionsRequested += (target, actions) =>
+                var conversation = new AiConversation
                 {
-                    Check(target == project, "Wrong target project");
-                    Check(actions.Count == 0, "Host must only refresh; core already applied the mutation");
-                    refreshCount++;
+                    PermissionMode = permission,
+                    Messages = [answer]
                 };
+                if (permission == AiPermissionMode.ProjectAccess)
+                    app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
+
+                var project = new ProjectRecord
+                {
+                    Notes = "Original note",
+                    Conversations = [conversation]
+                };
+                var before = System.Text.Json.JsonSerializer.Serialize(project);
+
+                var panel = new AiChatPanel(app);
+                panel.SetProject(project);
+                var window = new Window
+                {
+                    Content = panel,
+                    Width = 420,
+                    Height = 700
+                };
+                window.Show();
+                Pump();
+
                 try
                 {
-                    var scope = (AiChatScope)typeof(AiChatPanel).GetField("_scope", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;
-                    typeof(AiChatPanel).GetMethod("ApplyAutomaticProjectActions", BindingFlags.Instance | BindingFlags.NonPublic)!
-                        .Invoke(panel, [scope, conversation, answer, permission]);
-                    Dispatcher.UIThread.RunJobs();
+                    var button = panel.GetVisualDescendants()
+                        .OfType<Button>()
+                        .SingleOrDefault(item => item.Name == "ChatProjectActions");
+                    Check(button is not null, "Historical legacy action preview is missing.");
+                    Check((button!.Content?.ToString() ?? "").Contains("chỉ đọc", StringComparison.OrdinalIgnoreCase),
+                        "Historical legacy action is not clearly labeled read-only.");
 
-                    if (permission == AiPermissionMode.ConfirmChanges)
-                    {
-                        PumpUntil(() => window.OwnedWindows.Any(w => w.Title == "AI muốn thay đổi dự án"), "Confirmation did not open automatically");
-                        var confirm = window.OwnedWindows.Single(w => w.Title == "AI muốn thay đổi dự án");
-                        var body = confirm.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.Text?.Contains("Thêm công việc") == true);
-                        Check(body?.Text?.Contains("Kiểm tra hồ sơ") == true, "Confirmation does not show the exact proposed change");
-                        var apply = confirm.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Đồng ý và áp dụng"));
-                        apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        PumpUntil(() => answer.ProjectActionsApplied, "Confirmed project action was not applied");
-                    }
-                    else if (permission == AiPermissionMode.ProjectAccess)
-                    {
-                        PumpUntil(() => answer.ProjectActionsApplied, "Full project access did not auto-apply");
-                        Check(!window.OwnedWindows.Any(w => w.Title == "AI muốn thay đổi dự án"), "Full project access unexpectedly asked for confirmation");
-                    }
-                    else
-                    {
-                        Dispatcher.UIThread.RunJobs();
-                        Check(!answer.ProjectActionsApplied && project.ChecklistItems.Count == 0, "Read-only mutated the project");
-                    }
+                    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Pump();
 
-                    var expected = permission == AiPermissionMode.ReadOnly ? 0 : 1;
-                    Check(project.ChecklistItems.Count == expected, "Project mutation count is wrong");
-                    Check(refreshCount == expected, "Host refresh count is wrong");
-                    if (expected == 1) Check(project.ChecklistItems.Single().DisplayText == "Kiểm tra hồ sơ", "Core action content lost");
-
-                    typeof(AiChatPanel).GetMethod("Render", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(panel, null);
-                    Check(refreshCount == expected, "Rendering applied actions again");
-                    Check(panel.GetVisualDescendants().OfType<Button>().Any(b => b.Name == "ChatProjectActions"), "Action preview missing");
-                    Check(!AiHistory.RequestTurns(conversation).Any(t => t.Content.Contains("Đã áp dụng") && expected == 0), "Unapplied action marked as done in context");
+                    Check(window.OwnedWindows.All(owned =>
+                            owned.Title != "Áp dụng thay đổi vào dự án?"
+                            && owned.Title != "AI muốn thay đổi dự án"),
+                        "Retired pseudo-action execution still opens an apply/confirmation dialog.");
+                    Check(before == System.Text.Json.JsonSerializer.Serialize(project),
+                        "Viewing a legacy h2-actions proposal mutated project truth.");
+                    Check(!answer.ProjectActionsApplied,
+                        "Viewing legacy proposal incorrectly marked it as applied.");
                 }
-                finally { panel.Cancel(); foreach (var owned in window.OwnedWindows.ToArray()) owned.Close(); window.Close(); }
+                finally
+                {
+                    foreach (var owned in window.OwnedWindows.ToArray())
+                        owned.Close();
+                    window.Close();
+                }
             });
+        }
+
+        test("Historically applied h2-actions keep audit evidence without re-execution", () =>
+        {
+            var answer = new AiMessage
+            {
+                Role = "assistant",
+                Status = "complete",
+                Provider = "Legacy provider",
+                Content = LegacyAction,
+                ProjectActionsApplied = true,
+                ProjectActionsAudit = "appliedUtc=2026-09-01T00:00:00.0000000Z; count=1"
+            };
+            var conversation = new AiConversation
+            {
+                PermissionMode = AiPermissionMode.ProjectAccess,
+                Messages = [answer]
+            };
+            var project = new ProjectRecord
+            {
+                Conversations = [conversation],
+                ChecklistItems = [new TaskRecord { Text = "Existing historical result" }]
+            };
+            var app = new H2Notes.Avalonia.App();
+            app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
+            var before = System.Text.Json.JsonSerializer.Serialize(project);
+
+            var panel = new AiChatPanel(app);
+            panel.SetProject(project);
+            var window = new Window { Content = panel, Width = 420, Height = 700 };
+            window.Show();
+            Pump();
+            try
+            {
+                Check(panel.GetVisualDescendants().OfType<TextBlock>()
+                    .Any(text => text.Text?.Contains("appliedUtc=2026-09-01", StringComparison.Ordinal) == true),
+                    "Historical applied-action audit is not visible.");
+                Check(before == System.Text.Json.JsonSerializer.Serialize(project),
+                    "Rendering historical applied-action audit replayed the mutation.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        test("H2 Agent fenced h2-actions text is never interpreted as legacy action UI", () =>
+        {
+            var answer = new AiMessage
+            {
+                Role = "assistant",
+                Status = "complete",
+                Provider = "H2 Agent",
+                Content = LegacyAction
+            };
+            var project = new ProjectRecord
+            {
+                Conversations =
+                [
+                    new AiConversation
+                    {
+                        PermissionMode = AiPermissionMode.ProjectAccess,
+                        Messages = [answer]
+                    }
+                ]
+            };
+            var app = new H2Notes.Avalonia.App();
+            var panel = new AiChatPanel(app);
+            panel.SetProject(project);
+            var window = new Window { Content = panel, Width = 420, Height = 700 };
+            window.Show();
+            Pump();
+            try
+            {
+                Check(!panel.GetVisualDescendants().OfType<Button>()
+                    .Any(item => item.Name == "ChatProjectActions"),
+                    "H2 Agent output was reinterpreted through retired h2-actions UI.");
+                Check(project.ChecklistItems.Count == 0,
+                    "H2 Agent fenced text mutated project state.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        test("Project action UI source has no legacy execution hooks", () =>
+        {
+            var repo = FindRepoRoot();
+            var actions = File.ReadAllText(Path.Combine(
+                repo, "src", "H2Notes.Avalonia", "Controls", "AiChatPanel.Actions.cs"));
+            var responsive = File.ReadAllText(Path.Combine(
+                repo, "src", "H2Notes.Avalonia", "MainWindow.Responsive.cs"));
+            var legacy = File.ReadAllText(Path.Combine(
+                repo, "src", "H2Notes.Core", "AiLegacyRequestContext.cs"));
+
+            foreach (var forbidden in new[]
+            {
+                "AiProjectActions.Validate",
+                "AiProjectActions.Apply",
+                "Dialogs.Confirm",
+                "ProjectActionsRequested",
+                "ApplyAutomaticProjectActions"
+            })
+                Check(!actions.Contains(forbidden, StringComparison.Ordinal),
+                    "Legacy action UI still contains execution hook: " + forbidden);
+
+            Check(!responsive.Contains("ProjectActionsRequested", StringComparison.Ordinal),
+                "MainWindow still subscribes to legacy project action execution.");
+            Check(!legacy.Contains("AiProjectActions.Instructions", StringComparison.Ordinal),
+                "Standalone legacy prompt still instructs the model to emit h2-actions.");
+        });
     }
 
-    private sealed class Handler : HttpMessageHandler
+    private static void Pump()
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        for (var i = 0; i < 6; i++)
+            Dispatcher.UIThread.RunJobs();
+    }
+
+    private static void Check(bool value, string message)
+    {
+        if (!value) throw new Exception(message);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (current is not null)
         {
-            const string answer = "Đề xuất thao tác\n```h2-actions\n[{\"kind\":\"add_task\",\"text\":\"Kiểm tra hồ sơ\"}]\n```";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
-                JsonSerializer.Serialize(new { message = new { content = answer }, done = false }) + "\n{\"done\":true}\n", Encoding.UTF8, "application/x-ndjson") });
+            if (File.Exists(Path.Combine(current.FullName, "AGENTS.md"))
+                && Directory.Exists(Path.Combine(current.FullName, "src")))
+                return current.FullName;
+            current = current.Parent;
         }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 }
