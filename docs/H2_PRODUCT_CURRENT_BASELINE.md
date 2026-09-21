@@ -1,5 +1,9 @@
 # H2 Notes — Current Product Baseline
 
+> **HISTORICAL / CURRENT-IMPLEMENTATION EVIDENCE — NOT FUTURE ARCHITECTURE**
+>
+> This snapshot is retained to prove what H2 Notes implemented at H2M-000 and to support migration/regression comparison. It must not be used as a future-design directive. The canonical future product authority is `docs/H2_PRODUCT_MASTER_SPEC.md` + `docs/H2_PRODUCT_MASTER_TASKS.md`; the independent data/NAS defect authority is `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`.
+
 Status: **H2M-000 COMPLETE**  
 Date: **2026-09-19**  
 Purpose: freeze the factual H2 Notes implementation before AI-first product redesign.
