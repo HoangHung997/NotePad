@@ -73,7 +73,7 @@ internal static class H2DesktopSessionStorageTests
                 {
                     NoteKind = "project-hub",
                     Title = "Projects",
-                    SheetLeft = -1900.875,
+                    SheetLeft = -1900875,
                     SheetTop = 650,
                     SheetWidth = 1600,
                     SheetHeight = 1000,
@@ -98,7 +98,7 @@ internal static class H2DesktopSessionStorageTests
                       || !index.Contains("\"OpenWindowIds\":[", StringComparison.Ordinal),
                     "Shared index appears to contain live desktop session window IDs.");
                 Check(!index.Contains("-2200.125", StringComparison.Ordinal)
-                      && !index.Contains("-1900.875", StringComparison.Ordinal),
+                      && !index.Contains("-1900875", StringComparison.Ordinal),
                     "Shared index leaked monitor-specific coordinates.");
 
                 var noteFile = Directory.EnumerateFiles(Path.Combine(root, "notes"), "*.h2note.json").Single();
