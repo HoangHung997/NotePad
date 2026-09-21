@@ -174,14 +174,14 @@ internal static class Program
             File.WriteAllText(Path.Combine(session, "lock.held"), DateTimeOffset.UtcNow.ToString("O"));
             await WaitFile(Path.Combine(session, "lock.peer-blocked.json"));
             var result = ReadJson<PeerResult>(Path.Combine(session, "lock.peer-blocked.json"));
-            if (!result.Success) throw new InvalidOperationException("Peer acquired the atomic-create commit lease while coordinator still held it.");
+            if (!result.Success) throw new InvalidOperationException("Peer acquired the byte-range commit lock while coordinator still held it.");
         }
 
         File.WriteAllText(Path.Combine(session, "lock.released"), DateTimeOffset.UtcNow.ToString("O"));
         await WaitFile(Path.Combine(session, "lock.peer-after-release.json"));
         var after = ReadJson<PeerResult>(Path.Combine(session, "lock.peer-after-release.json"));
-        if (!after.Success) throw new InvalidOperationException("Peer could not acquire the atomic-create commit lease after release.");
-        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Atomic FileMode.CreateNew commit lease excluded the peer and acquisition succeeded after release."));
+        if (!after.Success) throw new InvalidOperationException("Peer could not acquire the byte-range commit lock after release.");
+        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "SMB byte-range commit lock excluded the peer and acquisition succeeded after release."));
     }
 
     private static async Task PeerLockCase(string session, ProbeReport evidence)
@@ -195,7 +195,7 @@ internal static class Program
         }
         catch (IOException) { blocked = true; }
         WriteJson(Path.Combine(session, "lock.peer-blocked.json"), new PeerResult(blocked, DateTimeOffset.UtcNow, Environment.MachineName));
-        if (!blocked) throw new InvalidOperationException("Atomic-create commit lease was not enforced across nodes.");
+        if (!blocked) throw new InvalidOperationException("Byte-range commit lock was not enforced across nodes.");
 
         await WaitFile(Path.Combine(session, "lock.released"));
         var acquired = false;
@@ -206,8 +206,8 @@ internal static class Program
         }
         catch (IOException) { acquired = false; }
         WriteJson(Path.Combine(session, "lock.peer-after-release.json"), new PeerResult(acquired, DateTimeOffset.UtcNow, Environment.MachineName));
-        if (!acquired) throw new IOException("Could not acquire released atomic-create commit lease.");
-        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Peer was blocked by atomic create while held and acquired after release."));
+        if (!acquired) throw new IOException("Could not acquire released byte-range commit lock.");
+        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Peer was blocked by byte-range locking while held and acquired after release."));
     }
 
     private static async Task CoordinatorFlushCase(string session, ProbeReport evidence)
