@@ -1359,7 +1359,7 @@ Acceptance:
 
 Evidence: `src/H2Notes.Coordinator/H2CoordinatorSqliteStore.cs` provides a Coordinator-local SQLite/WAL/FULL-sync store that rejects UNC/mapped-network database paths, durably registers devices, assigns monotonic project server sequences transactionally, deduplicates `ClientOperationId` retries, rejects incompatible identity reuse, persists verified snapshots/conflicts and durable AI queue/lease/completion state across restart. `H2CoordinatorSqliteStoreTests` additionally proves two concurrent client submissions through the same Coordinator receive unique deterministic server sequence values independent of client clock ordering. Exact functional source `c7ff90810662c2037cca9323001851d9a517e359`; focused Actions run `35565062985` SUCCESS: solution build PASS, H2 Notes regression PASS, NAS harness self-test PASS, publish/artifact steps PASS.
 
-### [~] H2M-133D — Client project sync + durable offline outbox
+### [x] H2M-133D — Client project sync + durable offline outbox
 
 Required:
 
@@ -1377,7 +1377,9 @@ Acceptance:
 - reconnect does not lose either local or remote edits;
 - two clients no longer overwrite the same shared project JSON file.
 
-### [ ] H2M-133E — Revision merge, conflicts, snapshots and compaction
+Evidence: `src/H2Notes.Core/H2CoordinatorClientSync.cs` adds a machine-local durable immutable outbox, authoritative replica watermark/cache, optimistic `ProjectRecord` projection and Coordinator-only synchronization path. Accepted events are applied through the existing `ProjectRecord`/`TaskRecord`/`ProjectLink` models; no `ProjectWorkspaceStore`, `WorkspaceCommitLease` or shared project-index write is used. The outbox is written before optimistic projection, survives restart/offline periods, is retained across submit/ACK interruption, and is removed only after the exact immutable event is observed in authoritative server order. `H2CoordinatorClientSyncTests` prove PC2 offline edit + restart + PC1 remote advance + reconnect convergence, crash after server acceptance without duplicate replay, task/link projection, and legacy shared-workspace primitive exclusion. Exact source `d88d564df7c27e5b17ecee4fd9e4b3031ae72185`; focused Actions run `35565652209` SUCCESS, H2 Notes **509/509**, NAS harness self-test PASS, publish/artifact steps PASS.
+
+### [~] H2M-133E — Revision merge, conflicts, snapshots and compaction
 
 Required:
 
