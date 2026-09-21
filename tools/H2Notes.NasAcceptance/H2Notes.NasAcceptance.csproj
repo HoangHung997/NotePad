@@ -8,4 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/H2Notes.Core/H2Notes.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="PC1_RUN_NAS_TEST.cmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="PC2_RUN_NAS_TEST.cmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="READ_ME_FIRST_NAS_TEST.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
