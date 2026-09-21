@@ -147,9 +147,9 @@ internal static class H2LegacyCleanupTests
             Check(master.Contains("CANONICAL FUTURE H2 PRODUCT SPECIFICATION", StringComparison.Ordinal)
                   && master.Contains("H2_PRODUCT_MASTER_TASKS.md", StringComparison.Ordinal),
                 "Product Master Spec is not clearly canonical.");
-            Check(tasks.Contains("# H2 Notes — Product Master Implementation Tasks", StringComparison.Ordinal)
-                  || tasks.Contains("Product Master", StringComparison.Ordinal),
-                "Product Master Tasks is not identifiable as the active task authority.");
+            Check(tasks.Contains("CANONICAL FUTURE H2 NOTES TRACKER", StringComparison.Ordinal)
+                  && tasks.Contains("Architecture source of truth: `docs/H2_PRODUCT_MASTER_SPEC.md`", StringComparison.Ordinal),
+                "Product Master Tasks is not identifiable as the active canonical tracker.");
             Check(master.Contains("H2_NOTES_NON_AI_BUG_LEDGER.md", StringComparison.Ordinal),
                 "Canonical spec no longer references the independent bug/data-integrity ledger.");
         });
