@@ -1309,7 +1309,7 @@ Evidence:
 - updated `docs/H2_PRODUCT_MASTER_SPEC.md`;
 - physical sessions `nas-final-05` and `nas-final-06` retained as failure evidence.
 
-### [~] H2M-133B — Define Coordinator protocol contracts
+### [x] H2M-133B — Define Coordinator protocol contracts
 
 Implement only stable protocol/domain contracts first:
 
@@ -1333,7 +1333,9 @@ Acceptance:
 - no HTTP/database implementation details leak into H2 product models;
 - no Agent Core internals copied into Coordinator contracts.
 
-### [ ] H2M-133C — Durable single-writer Coordinator store
+Evidence: `src/H2Notes.Core/H2SyncCoordinatorContracts.cs` defines provider/database-neutral DeviceId, immutable event/snapshot/conflict/outbox acknowledgement, AI queue/lease/completion and `IH2SyncCoordinator` contracts. `H2SyncCoordinatorContractTests` proves payload/hash validation, immutable conflict evidence, server-sequence ordering independent from client clocks, lease/barrier invariants and infrastructure/Agent-runtime neutrality. Exact source `29d1d0a37a4a721f759fcb6135f16aa8f84353a8`; focused Actions run `35564555271` SUCCESS: solution build PASS, H2 Notes regression PASS, NAS harness self-test PASS, publish/artifact steps PASS.
+
+### [~] H2M-133C — Durable single-writer Coordinator store
 
 Implement one active Coordinator instance with a local durable store.
 
