@@ -19,44 +19,47 @@ internal static class H2CoordinatorSqliteStoreTests
             var project = Guid.NewGuid();
             var device = H2CoordinatorDeviceIdentity.CreateNew("PC1");
 
+            var baseline = CreateProjectDraft(workspace, project, device.DeviceId, 1);
             var first = Draft(
-                workspace, project, device.DeviceId, deviceSequence: 1,
+                workspace, project, device.DeviceId, deviceSequence: 2,
                 clientOperationId: Guid.NewGuid(),
-                field: "Name",
+                field: "NameRich",
                 value: "First",
                 clientTime: new DateTimeOffset(2026, 9, 21, 10, 5, 0, TimeSpan.FromHours(7)));
             var second = Draft(
-                workspace, project, device.DeviceId, deviceSequence: 2,
+                workspace, project, device.DeviceId, deviceSequence: 3,
                 clientOperationId: Guid.NewGuid(),
-                field: "Deadline",
+                field: "NotesRich",
                 value: "Second",
                 clientTime: new DateTimeOffset(2026, 9, 21, 9, 55, 0, TimeSpan.FromHours(7)));
 
             var store = new H2CoordinatorSqliteStore(db);
             store.RegisterDevice(workspace, device);
+            store.SubmitProjectEvents(workspace, device.DeviceId, new[] { baseline });
             var accepted = store.SubmitProjectEvents(workspace, device.DeviceId, new[] { first, second });
 
-            Equal(1L, accepted.Acknowledgements[0].ServerSequence);
-            Equal(2L, accepted.Acknowledgements[1].ServerSequence);
-            Equal(2L, store.GetProjectHead(workspace, project).ServerSequence);
+            Equal(2L, accepted.Acknowledgements[0].ServerSequence);
+            Equal(3L, accepted.Acknowledgements[1].ServerSequence);
+            Equal(3L, store.GetProjectHead(workspace, project).ServerSequence);
 
             var retry = store.SubmitProjectEvents(workspace, device.DeviceId, new[] { first });
-            Equal(1L, retry.Acknowledgements.Single().ServerSequence);
-            Equal(2, store.GetProjectEvents(workspace, project, 0).Count);
+            Equal(2L, retry.Acknowledgements.Single().ServerSequence);
+            Equal(3, store.GetProjectEvents(workspace, project, 0).Count);
 
             var restarted = new H2CoordinatorSqliteStore(db);
-            Equal(2L, restarted.GetProjectHead(workspace, project).ServerSequence);
+            Equal(3L, restarted.GetProjectHead(workspace, project).ServerSequence);
             var replay = restarted.GetProjectEvents(workspace, project, 0);
-            Equal(2, replay.Count);
-            Equal(first.EventId, replay[0].Draft.EventId);
-            Equal(second.EventId, replay[1].Draft.EventId);
+            Equal(3, replay.Count);
+            Equal(baseline.EventId, replay[0].Draft.EventId);
+            Equal(first.EventId, replay[1].Draft.EventId);
+            Equal(second.EventId, replay[2].Draft.EventId);
 
             // Device registration is durable: after restart the same device can submit without re-registering.
             var third = Draft(
-                workspace, project, device.DeviceId, 3, Guid.NewGuid(),
-                "Notes", "After restart", DateTimeOffset.UtcNow);
+                workspace, project, device.DeviceId, 4, Guid.NewGuid(),
+                "CommentRich", "After restart", DateTimeOffset.UtcNow);
             var afterRestart = restarted.SubmitProjectEvents(workspace, device.DeviceId, new[] { third });
-            Equal(3L, afterRestart.Acknowledgements.Single().ServerSequence);
+            Equal(4L, afterRestart.Acknowledgements.Single().ServerSequence);
         });
 
         test("Coordinator serializes concurrent client submissions into unique server order", () =>
@@ -70,8 +73,11 @@ internal static class H2CoordinatorSqliteStoreTests
             store.RegisterDevice(workspace, pc1);
             store.RegisterDevice(workspace, pc2);
 
-            var a = Draft(workspace, project, pc1.DeviceId, 1, Guid.NewGuid(), "Name", "A", DateTimeOffset.UtcNow.AddMinutes(5));
-            var b = Draft(workspace, project, pc2.DeviceId, 1, Guid.NewGuid(), "Deadline", "B", DateTimeOffset.UtcNow.AddMinutes(-5));
+            var baseline = CreateProjectDraft(workspace, project, pc1.DeviceId, 1);
+            store.SubmitProjectEvents(workspace, pc1.DeviceId, new[] { baseline });
+
+            var a = Draft(workspace, project, pc1.DeviceId, 2, Guid.NewGuid(), "NameRich", "A", DateTimeOffset.UtcNow.AddMinutes(5));
+            var b = Draft(workspace, project, pc2.DeviceId, 1, Guid.NewGuid(), "NotesRich", "B", DateTimeOffset.UtcNow.AddMinutes(-5));
             H2ProjectEventSubmissionResult? resultA = null;
             H2ProjectEventSubmissionResult? resultB = null;
 
@@ -85,10 +91,10 @@ internal static class H2CoordinatorSqliteStoreTests
                 resultB!.Acknowledgements.Single().ServerSequence
             }.OrderBy(value => value).ToArray();
 
-            Equal(1L, sequences[0]);
-            Equal(2L, sequences[1]);
-            Equal(2L, store.GetProjectHead(workspace, project).ServerSequence);
-            Equal(2, store.GetProjectEvents(workspace, project, 0).Count);
+            Equal(2L, sequences[0]);
+            Equal(3L, sequences[1]);
+            Equal(3L, store.GetProjectHead(workspace, project).ServerSequence);
+            Equal(3, store.GetProjectEvents(workspace, project, 0).Count);
         });
 
         test("Coordinator rejects ClientOperationId collision instead of duplicating or overwriting", () =>
@@ -101,14 +107,17 @@ internal static class H2CoordinatorSqliteStoreTests
             var store = new H2CoordinatorSqliteStore(db);
             store.RegisterDevice(workspace, device);
 
-            var first = Draft(workspace, project, device.DeviceId, 1, operation, "Name", "A", DateTimeOffset.UtcNow);
+            var baseline = CreateProjectDraft(workspace, project, device.DeviceId, 1);
+            store.SubmitProjectEvents(workspace, device.DeviceId, new[] { baseline });
+
+            var first = Draft(workspace, project, device.DeviceId, 2, operation, "NameRich", "A", DateTimeOffset.UtcNow);
             store.SubmitProjectEvents(workspace, device.DeviceId, new[] { first });
 
-            var incompatible = Draft(workspace, project, device.DeviceId, 2, operation, "Name", "B", DateTimeOffset.UtcNow);
+            var incompatible = Draft(workspace, project, device.DeviceId, 3, operation, "NameRich", "B", DateTimeOffset.UtcNow);
             Throws<InvalidOperationException>(() =>
                 store.SubmitProjectEvents(workspace, device.DeviceId, new[] { incompatible }));
 
-            Equal(1, store.GetProjectEvents(workspace, project, 0).Count);
+            Equal(2, store.GetProjectEvents(workspace, project, 0).Count);
         });
 
         test("Coordinator persists verified snapshot and structured conflict across restart", () =>
@@ -120,15 +129,16 @@ internal static class H2CoordinatorSqliteStoreTests
             var store = new H2CoordinatorSqliteStore(db);
             store.RegisterDevice(workspace, device);
 
-            var a = Draft(workspace, project, device.DeviceId, 1, Guid.NewGuid(), "Name", "A", DateTimeOffset.UtcNow);
-            var b = Draft(workspace, project, device.DeviceId, 2, Guid.NewGuid(), "Deadline", "B", DateTimeOffset.UtcNow);
-            store.SubmitProjectEvents(workspace, device.DeviceId, new[] { a, b });
+            var baseline = CreateProjectDraft(workspace, project, device.DeviceId, 1);
+            var a = Draft(workspace, project, device.DeviceId, 2, Guid.NewGuid(), "NameRich", "A", DateTimeOffset.UtcNow);
+            var b = Draft(workspace, project, device.DeviceId, 3, Guid.NewGuid(), "NotesRich", "B", DateTimeOffset.UtcNow);
+            store.SubmitProjectEvents(workspace, device.DeviceId, new[] { baseline, a, b });
 
             var state = "{\"project\":\"snapshot\"}";
             var snapshot = new H2ProjectSnapshot(
                 workspace,
                 project,
-                2,
+                3,
                 state,
                 H2ProjectEventDraft.ComputePayloadSha256(state),
                 DateTimeOffset.UtcNow);
@@ -144,7 +154,7 @@ internal static class H2CoordinatorSqliteStoreTests
             store.SaveConflict(conflict);
 
             var restarted = new H2CoordinatorSqliteStore(db);
-            Equal(2L, restarted.GetLatestSnapshot(workspace, project)!.ThroughServerSequence);
+            Equal(3L, restarted.GetLatestSnapshot(workspace, project)!.ThroughServerSequence);
             var conflicts = restarted.GetConflicts(workspace, project);
             Equal(1, conflicts.Count);
             Equal(conflict.ConflictId, conflicts[0].ConflictId);
@@ -212,6 +222,38 @@ internal static class H2CoordinatorSqliteStoreTests
             Equal(H2ProjectAiQueueState.Running, queue[1].State);
             Equal(lease2.LeaseId, restarted.GetRunningProjectAiLease(workspace, project)!.LeaseId);
         });
+    }
+
+    private static H2ProjectEventDraft CreateProjectDraft(
+        Guid workspace,
+        Guid project,
+        Guid device,
+        long deviceSequence)
+    {
+        var model = new ProjectRecord
+        {
+            Id = project,
+            Name = "Baseline",
+            NameRich = RichDocument.Plain("Baseline"),
+            Notes = "",
+            NotesRich = RichDocument.Plain("")
+        };
+        var payload = H2ProjectEventPayload.Serialize(model);
+        return new H2ProjectEventDraft(
+            Guid.NewGuid(),
+            workspace,
+            project,
+            device,
+            deviceSequence,
+            Guid.NewGuid(),
+            H2ProjectEventKind.CreateEntity,
+            new H2ProjectMutationTarget(
+                H2ProjectEntityKind.Project,
+                project,
+                expectedRevision: 0),
+            payload,
+            H2ProjectEventDraft.ComputePayloadSha256(payload),
+            DateTimeOffset.UtcNow);
     }
 
     private static H2ProjectEventDraft Draft(
