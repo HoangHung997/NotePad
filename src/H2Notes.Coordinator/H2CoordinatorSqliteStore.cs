@@ -124,6 +124,7 @@ public sealed class H2CoordinatorSqliteStore
 
             var heads = new Dictionary<Guid, long>();
             var acknowledgements = new List<H2ProjectEventAcknowledgement>(events.Count);
+            var conflicts = new List<H2ProjectConflict>();
 
             foreach (var draft in events)
             {
@@ -131,6 +132,8 @@ public sealed class H2CoordinatorSqliteStore
                     throw new InvalidOperationException("Event WorkspaceId does not match submission workspace.");
                 if (draft.DeviceId != deviceId)
                     throw new InvalidOperationException("Event DeviceId does not match submitting device.");
+                if (draft.Kind == H2ProjectEventKind.ResolveConflict)
+                    throw new InvalidOperationException("Conflict resolution events must use ResolveConflict so the target conflict is explicit.");
 
                 var existing = FindEventByOperation(connection, tx, workspaceId, draft.ClientOperationId);
                 if (existing is not null)
@@ -146,6 +149,8 @@ public sealed class H2CoordinatorSqliteStore
                         draft.ClientOperationId,
                         existing.ServerSequence,
                         existing.AcceptedUtc));
+                    if (existing.ConflictId is { } existingConflictId)
+                        conflicts.Add(ReadConflict(connection, tx, existingConflictId));
                     continue;
                 }
 
@@ -162,6 +167,7 @@ public sealed class H2CoordinatorSqliteStore
                 sequence++;
                 heads[draft.ProjectId] = sequence;
                 var acceptedUtc = DateTimeOffset.UtcNow;
+                var arbitration = ArbitrateMutation(connection, tx, draft);
                 var draftJson = JsonSerializer.Serialize(draft, Json);
 
                 Execute(connection, tx,
@@ -169,11 +175,13 @@ public sealed class H2CoordinatorSqliteStore
                     INSERT INTO project_events(
                         workspace_id, project_id, server_sequence,
                         event_id, device_id, device_sequence, client_operation_id,
-                        payload_sha256, draft_json, accepted_utc)
+                        payload_sha256, draft_json, accepted_utc,
+                        disposition, resulting_revision, resulting_entity_revision, conflict_id)
                     VALUES(
                         $workspace, $project, $sequence,
                         $event, $device, $deviceSequence, $operation,
-                        $payloadHash, $draft, $accepted);
+                        $payloadHash, $draft, $accepted,
+                        $disposition, $revision, $entityRevision, $conflict);
                     """,
                     ("$workspace", Id(workspaceId)),
                     ("$project", Id(draft.ProjectId)),
@@ -184,7 +192,19 @@ public sealed class H2CoordinatorSqliteStore
                     ("$operation", Id(draft.ClientOperationId)),
                     ("$payloadHash", draft.PayloadSha256),
                     ("$draft", draftJson),
-                    ("$accepted", Stamp(acceptedUtc)));
+                    ("$accepted", Stamp(acceptedUtc)),
+                    ("$disposition", (int)arbitration.Disposition),
+                    ("$revision", arbitration.ResultingRevision),
+                    ("$entityRevision", arbitration.ResultingEntityRevision),
+                    ("$conflict", arbitration.Conflict is null ? null : Id(arbitration.Conflict.ConflictId)));
+
+                if (arbitration.Disposition == H2ProjectEventDisposition.Applied)
+                    ApplyRevisionMutation(connection, tx, draft, arbitration);
+                else if (arbitration.Conflict is { } conflict)
+                {
+                    InsertConflict(connection, tx, conflict);
+                    conflicts.Add(conflict);
+                }
 
                 acknowledgements.Add(new H2ProjectEventAcknowledgement(
                     draft.EventId,
@@ -207,7 +227,7 @@ public sealed class H2CoordinatorSqliteStore
             }
 
             tx.Commit();
-            return new H2ProjectEventSubmissionResult(acknowledgements, []);
+            return new H2ProjectEventSubmissionResult(acknowledgements, conflicts);
         }
     }
 
