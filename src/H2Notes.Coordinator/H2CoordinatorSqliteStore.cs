@@ -13,7 +13,7 @@ namespace H2Notes.Coordinator;
 /// </summary>
 public sealed partial class H2CoordinatorSqliteStore
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private static readonly TimeSpan ProjectAiLeaseDuration = TimeSpan.FromSeconds(30);
     private readonly object _gate = new();
     private readonly string _connectionString;
@@ -165,7 +165,7 @@ public sealed partial class H2CoordinatorSqliteStore
                     throw new InvalidOperationException("EventId already exists with another client operation.");
 
                 var byDeviceSequence = FindEventByDeviceSequence(
-                    connection, tx, workspaceId, draft.DeviceId, draft.DeviceSequence);
+                    connection, tx, workspaceId, draft.ProjectId, draft.DeviceId, draft.DeviceSequence);
                 if (byDeviceSequence is not null)
                     throw new InvalidOperationException("DeviceSequence was reused by another accepted project event.");
 
@@ -294,7 +294,7 @@ public sealed partial class H2CoordinatorSqliteStore
             if (FindEventByEventId(connection, tx, resolutionEvent.EventId) is not null)
                 throw new InvalidOperationException("Resolution EventId already exists.");
             if (FindEventByDeviceSequence(
-                    connection, tx, workspaceId, resolutionEvent.DeviceId, resolutionEvent.DeviceSequence) is not null)
+                    connection, tx, workspaceId, resolutionEvent.ProjectId, resolutionEvent.DeviceId, resolutionEvent.DeviceSequence) is not null)
                 throw new InvalidOperationException("Resolution DeviceSequence was already used by another event.");
 
             var payload = Deserialize<H2ConflictResolutionPayload>(resolutionEvent.PayloadJson);
@@ -2015,7 +2015,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 conflict_id TEXT NULL,
                 PRIMARY KEY(workspace_id, project_id, server_sequence),
                 UNIQUE(workspace_id, client_operation_id),
-                UNIQUE(workspace_id, device_id, device_sequence)
+                UNIQUE(workspace_id, project_id, device_id, device_sequence)
             );
 
             CREATE INDEX IF NOT EXISTS ix_project_events_after
@@ -2038,7 +2038,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 conflict_id TEXT NULL,
                 PRIMARY KEY(workspace_id, project_id, server_sequence),
                 UNIQUE(workspace_id, client_operation_id),
-                UNIQUE(workspace_id, device_id, device_sequence)
+                UNIQUE(workspace_id, project_id, device_id, device_sequence)
             );
 
             CREATE INDEX IF NOT EXISTS ix_project_event_archive_after
@@ -2107,7 +2107,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 WHERE state = 3;
 
             INSERT INTO coordinator_meta(key, value)
-            VALUES('schema_version', '2')
+            VALUES('schema_version', '3')
             ON CONFLICT(key) DO NOTHING;
             """;
         command.ExecuteNonQuery();
@@ -2144,6 +2144,73 @@ public sealed partial class H2CoordinatorSqliteStore
                 """;
             migration.ExecuteNonQuery();
             value = "2";
+        }
+
+        if (string.Equals(value, "2", StringComparison.Ordinal))
+        {
+            using var migration = connection.CreateCommand();
+            migration.CommandText =
+                """
+                CREATE TABLE project_events_v3(
+                    workspace_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    server_sequence INTEGER NOT NULL,
+                    event_id TEXT NOT NULL UNIQUE,
+                    device_id TEXT NOT NULL,
+                    device_sequence INTEGER NOT NULL,
+                    client_operation_id TEXT NOT NULL,
+                    payload_sha256 TEXT NOT NULL,
+                    draft_json TEXT NOT NULL,
+                    accepted_utc TEXT NOT NULL,
+                    disposition INTEGER NOT NULL DEFAULT 1,
+                    resulting_revision INTEGER NULL,
+                    resulting_entity_revision INTEGER NULL,
+                    conflict_id TEXT NULL,
+                    PRIMARY KEY(workspace_id, project_id, server_sequence),
+                    UNIQUE(workspace_id, client_operation_id),
+                    UNIQUE(workspace_id, project_id, device_id, device_sequence)
+                );
+
+                INSERT INTO project_events_v3
+                SELECT * FROM project_events;
+
+                DROP TABLE project_events;
+                ALTER TABLE project_events_v3 RENAME TO project_events;
+                CREATE INDEX ix_project_events_after
+                    ON project_events(workspace_id, project_id, server_sequence);
+
+                CREATE TABLE project_event_archive_v3(
+                    workspace_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    server_sequence INTEGER NOT NULL,
+                    event_id TEXT NOT NULL UNIQUE,
+                    device_id TEXT NOT NULL,
+                    device_sequence INTEGER NOT NULL,
+                    client_operation_id TEXT NOT NULL,
+                    payload_sha256 TEXT NOT NULL,
+                    draft_json TEXT NOT NULL,
+                    accepted_utc TEXT NOT NULL,
+                    disposition INTEGER NOT NULL,
+                    resulting_revision INTEGER NULL,
+                    resulting_entity_revision INTEGER NULL,
+                    conflict_id TEXT NULL,
+                    PRIMARY KEY(workspace_id, project_id, server_sequence),
+                    UNIQUE(workspace_id, client_operation_id),
+                    UNIQUE(workspace_id, project_id, device_id, device_sequence)
+                );
+
+                INSERT INTO project_event_archive_v3
+                SELECT * FROM project_event_archive;
+
+                DROP TABLE project_event_archive;
+                ALTER TABLE project_event_archive_v3 RENAME TO project_event_archive;
+                CREATE INDEX ix_project_event_archive_after
+                    ON project_event_archive(workspace_id, project_id, server_sequence);
+
+                UPDATE coordinator_meta SET value='3' WHERE key='schema_version';
+                """;
+            migration.ExecuteNonQuery();
+            value = "3";
         }
 
         if (!string.Equals(value, SchemaVersion.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
@@ -2288,6 +2355,7 @@ public sealed partial class H2CoordinatorSqliteStore
         SqliteConnection connection,
         SqliteTransaction tx,
         Guid workspaceId,
+        Guid projectId,
         Guid deviceId,
         long deviceSequence)
     {
@@ -2307,11 +2375,13 @@ public sealed partial class H2CoordinatorSqliteStore
                 FROM project_events
             ) e
             WHERE workspace_id = $workspace
+              AND project_id = $project
               AND device_id = $device
               AND device_sequence = $deviceSequence
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+        command.Parameters.AddWithValue("$project", Id(projectId));
         command.Parameters.AddWithValue("$device", Id(deviceId));
         command.Parameters.AddWithValue("$deviceSequence", deviceSequence);
         using var reader = command.ExecuteReader();
