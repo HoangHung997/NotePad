@@ -1,0 +1,66 @@
+name: H2 NAS Acceptance Package
+
+on:
+  push:
+    branches:
+      - feature/nas-multi-device-sync
+    paths:
+      - 'src/H2Notes.Core/**'
+      - 'src/H2Notes.Avalonia/**'
+      - 'tests/H2Notes.Tests/**'
+      - 'tools/H2Notes.NasAcceptance/**'
+      - '.github/workflows/h2-nas-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Avalonia solution
+        run: dotnet restore .\H2Notes.Avalonia.slnx
+
+      - name: Build Avalonia solution
+        run: dotnet build .\H2Notes.Avalonia.slnx -c Release --no-restore
+
+      - name: Run H2 Notes regression suite
+        run: dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
+
+      - name: Run NAS acceptance harness self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-nas-acceptance-self-test'
+          dotnet run --project .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release --no-build -- --self-test $out
+          Get-Content -LiteralPath (Join-Path $out 'self-test-result.txt')
+
+      - name: Publish NAS acceptance probe Windows x64
+        shell: pwsh
+        run: |
+          dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
+          @" 
+          Source branch: ${{ github.ref_name }}
+          Source commit: ${{ github.sha }}
+          Actions run: ${{ github.run_id }}
+          Workflow: H2 NAS Acceptance Package
+          Commit lease protocol: byte-range-file-lock-v1
+          Built UTC: $([DateTime]::UtcNow.ToString('O'))
+          "@ | Set-Content -LiteralPath .\artifacts\H2Notes-NasAcceptance\SOURCE.txt -Encoding UTF8
+          .\artifacts\H2Notes-NasAcceptance\H2Notes.NasAcceptance.exe --info
+
+      - name: Upload physical two-PC probe bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: H2Notes-NasAcceptance-win-x64
+          path: artifacts/H2Notes-NasAcceptance/
+          if-no-files-found: error
