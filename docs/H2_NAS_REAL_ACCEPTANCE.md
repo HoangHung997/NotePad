@@ -1,7 +1,7 @@
 # H2M-013 — Real two-PC NAS/SMB acceptance runbook
 
 Status: **READY FOR PHYSICAL TWO-PC RUN — NOT YET ACCEPTED**  
-Date: 2026-09-19
+Date: 2026-09-21
 
 This runbook exists because local temp-folder tests and GitHub-hosted CI cannot prove the SMB/NAS semantics required by H2-NONAI-004 and H2-NONAI-006.
 
@@ -38,26 +38,41 @@ No .NET installation is required for the published artifact.
 
 CI also runs `--self-test`, but that self-test uses a local filesystem and is **not** H2M-013 acceptance evidence.
 
-## H2M-133 final-gate artifact — 2026-09-21
+## H2M-133 final-gate state — 2026-09-21
 
-Use the NAS acceptance probe published by the exact post-physical-failure remediation source:
+Use the NAS acceptance probe built from the **current feature-branch source**, not the earlier atomic-create bundle.
 
-- H2 source: `82ad43d6dff97e0e7d9bf38caecc428ac02fa996`
-- GitHub Actions run: `35555590910` — SUCCESS
-- artifact: `H2Notes-NasAcceptance-win-x64`
-- H2 Notes regression suite: PASS
-- NAS acceptance harness self-test: PASS
-- full Agent/provider/transport/Windows publish pipeline: PASS
+Current verified branch state:
 
-### Physical attempt #1 finding and remediation
+- current published application source metadata: `082b7dea7a386b8103096c50021930a899675d29`;
+- current production commit serialization: persistent `.h2-commit.lock` coordination file + OS/SMB byte-range lock via `FileStream.Lock`;
+- artifact name: `H2Notes-NasAcceptance-win-x64`;
+- deterministic H2 Notes regression for the byte-range lease: PASS in the current branch;
+- NAS acceptance harness local self-test: required before publication, but local self-test is not physical-NAS evidence.
+
+### Physical attempt #1 — `FileShare.None` rejected
 
 The first real two-PC run reached the lock case with two distinct Windows node fingerprints, proving that both physical PCs observed the same shared session. It then failed because the target NAS/share allowed the peer to open the same file with `FileShare.None` while the coordinator still held it.
 
-That is a real storage-semantics finding, not a launcher failure. Production H2 Notes had used the same share-mode assumption for `.h2-commit.lock`, so weakening the probe would have hidden a real multi-writer risk.
+That is a real storage-semantics finding, not a launcher failure. Production H2 Notes had relied on the same share-mode assumption, so the implementation was changed rather than weakening the probe.
 
-The remediation in source `82ad43d6dff97e0e7d9bf38caecc428ac02fa996` replaces cross-device commit serialization with an atomic `FileMode.CreateNew` lease named `.h2-commit.lease`. Lease ownership no longer depends on the NAS honoring Windows share modes. `DeleteOnClose` plus token-checked cleanup is used for crash/release cleanup, and the real probe now exercises the same production lease implementation.
+### Physical attempt #2 — atomic `FileMode.CreateNew` rejected
 
-A new physical run is mandatory; the code/CI result alone does not close H2M-133.
+The next production/probe revision used an atomic-create lease named `.h2-commit.lease`. The real NAS run again reached the cross-PC lock case, but PC2 was still able to acquire the lease while PC1 held it. PC1 reported:
+
+```text
+Peer acquired the atomic-create commit lease while coordinator still held it.
+```
+
+This proves that `CREATE_NEW`/exclusive-create semantics on this mapped/redirected share are also not sufficient for H2's cross-device writer serialization.
+
+### Current remediation — byte-range lock
+
+The current branch therefore no longer relies on either `FileShare.None` or `FileMode.CreateNew` for cross-device commit ownership. `WorkspaceCommitLease` now opens a persistent `.h2-commit.lock` coordination file and acquires byte 0 with `FileStream.Lock(0, 1)`. Correctness depends on the live OS/SMB byte-range lock; metadata in the file is diagnostic only. The lock is tied to the open handle, so process termination/disconnect releases ownership without stale atomic-create lease cleanup.
+
+A fresh physical run with this byte-range build is mandatory; code/CI evidence alone does not close H2M-133.
+
+**Use a new Session ID and the same newly downloaded probe bundle on both PCs.** Do not reuse an atomic-create probe binary or an old session folder.
 
 Do not substitute a local temp-folder self-test for the physical two-PC run.
 
@@ -93,9 +108,9 @@ The protocol records these cases:
    - both machines can observe the same acceptance session.
 
 2. `EXCLUSIVE-LOCK`
-   - PC1 holds the production atomic-create commit lease;
-   - PC2 cannot create the same lease while PC1 holds it, even on shares that do not enforce `FileShare.None`;
-   - PC2 can acquire the lease after PC1 releases it.
+   - PC1 holds the production byte-range commit lock on the persistent `.h2-commit.lock` coordination file;
+   - PC2 cannot lock the same byte range while PC1 holds it, even though this share did not reliably enforce `FileShare.None` or atomic `FileMode.CreateNew`;
+   - PC2 can acquire the same byte-range lock after PC1 releases/disposes its handle.
 
 3. `FLUSH-VISIBILITY`
    - PC1 writes and calls durable flush;
@@ -155,4 +170,4 @@ Required closure evidence:
 - no persistent mixed-generation/hash mismatch after the run;
 - resulting JSON reports committed or otherwise preserved as review evidence.
 
-If the real share fails the production atomic-create lease, durable visibility or recovery semantics, multi-writer NAS mode must be explicitly blocked/limited for that storage type instead of weakening the test.
+If the real share fails the production byte-range commit lock, durable visibility or recovery semantics, multi-writer NAS mode must be explicitly blocked/limited for that storage type instead of weakening the test.
