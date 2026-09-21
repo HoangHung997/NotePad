@@ -12,7 +12,7 @@ namespace H2Notes.Coordinator;
 /// </summary>
 public sealed class H2CoordinatorSqliteStore
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
     private readonly object _gate = new();
     private readonly string _connectionString;
     private static readonly JsonSerializerOptions Json = new()
@@ -770,6 +770,10 @@ public sealed class H2CoordinatorSqliteStore
                 payload_sha256 TEXT NOT NULL,
                 draft_json TEXT NOT NULL,
                 accepted_utc TEXT NOT NULL,
+                disposition INTEGER NOT NULL DEFAULT 1,
+                resulting_revision INTEGER NULL,
+                resulting_entity_revision INTEGER NULL,
+                conflict_id TEXT NULL,
                 PRIMARY KEY(workspace_id, project_id, server_sequence),
                 UNIQUE(workspace_id, client_operation_id),
                 UNIQUE(workspace_id, device_id, device_sequence)
@@ -777,6 +781,21 @@ public sealed class H2CoordinatorSqliteStore
 
             CREATE INDEX IF NOT EXISTS ix_project_events_after
                 ON project_events(workspace_id, project_id, server_sequence);
+
+            CREATE TABLE IF NOT EXISTS project_revisions(
+                workspace_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                entity_kind INTEGER NOT NULL,
+                entity_id TEXT NOT NULL,
+                field_key TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+                last_event_id TEXT NOT NULL,
+                PRIMARY KEY(workspace_id, project_id, entity_kind, entity_id, field_key)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_project_revisions_project
+                ON project_revisions(workspace_id, project_id);
 
             CREATE TABLE IF NOT EXISTS project_snapshots(
                 workspace_id TEXT NOT NULL,
@@ -826,7 +845,7 @@ public sealed class H2CoordinatorSqliteStore
                 WHERE state = 3;
 
             INSERT INTO coordinator_meta(key, value)
-            VALUES('schema_version', '1')
+            VALUES('schema_version', '2')
             ON CONFLICT(key) DO NOTHING;
             """;
         command.ExecuteNonQuery();
@@ -834,6 +853,37 @@ public sealed class H2CoordinatorSqliteStore
         using var version = connection.CreateCommand();
         version.CommandText = "SELECT value FROM coordinator_meta WHERE key='schema_version';";
         var value = version.ExecuteScalar()?.ToString();
+        if (string.Equals(value, "1", StringComparison.Ordinal))
+        {
+            using var migration = connection.CreateCommand();
+            migration.CommandText =
+                """
+                ALTER TABLE project_events ADD COLUMN disposition INTEGER NOT NULL DEFAULT 1;
+                ALTER TABLE project_events ADD COLUMN resulting_revision INTEGER NULL;
+                ALTER TABLE project_events ADD COLUMN resulting_entity_revision INTEGER NULL;
+                ALTER TABLE project_events ADD COLUMN conflict_id TEXT NULL;
+
+                CREATE TABLE IF NOT EXISTS project_revisions(
+                    workspace_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL,
+                    entity_kind INTEGER NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    field_key TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    last_event_id TEXT NOT NULL,
+                    PRIMARY KEY(workspace_id, project_id, entity_kind, entity_id, field_key)
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_project_revisions_project
+                    ON project_revisions(workspace_id, project_id);
+
+                UPDATE coordinator_meta SET value='2' WHERE key='schema_version';
+                """;
+            migration.ExecuteNonQuery();
+            value = "2";
+        }
+
         if (!string.Equals(value, SchemaVersion.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
             throw new InvalidDataException($"Unsupported Coordinator DB schema {value ?? "<missing>"}.");
     }
