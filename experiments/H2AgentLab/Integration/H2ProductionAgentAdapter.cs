@@ -29,7 +29,7 @@ public sealed class H2ProductionAgentAdapter :
     private readonly object _gate = new();
     private readonly string _stateRoot;
     private readonly Func<H2ProductionAgentModel> _modelResolver;
-    private readonly IAgentTransportFactory _transportFactory;
+    private readonly IAgentRuntimeFactory _runtimeFactory;
     private readonly AgentIntegrationTaskArchive _archive;
     private readonly Dictionary<Guid, LiveTask> _live = [];
     private IH2ProjectToolHost? _projectTools;
@@ -38,13 +38,15 @@ public sealed class H2ProductionAgentAdapter :
     public H2ProductionAgentAdapter(
         string stateRoot,
         Func<H2ProductionAgentModel> modelResolver,
-        IAgentTransportFactory? transportFactory = null)
+        IAgentTransportFactory? transportFactory = null,
+        IAgentRuntimeFactory? runtimeFactory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateRoot);
         _stateRoot = Path.GetFullPath(stateRoot);
         Directory.CreateDirectory(_stateRoot);
         _modelResolver = modelResolver ?? throw new ArgumentNullException(nameof(modelResolver));
-        _transportFactory = transportFactory ?? new AgentTransportFactory();
+        _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory(
+            transportFactory ?? new AgentTransportFactory());
         _archive = new AgentIntegrationTaskArchive(Path.Combine(_stateRoot, "integration"));
     }
 
@@ -292,7 +294,7 @@ public sealed class H2ProductionAgentAdapter :
             };
 
             var orchestrator = new AgentOrchestrator(
-                runtimeFactory: new AgentRuntimeFactory(_transportFactory));
+                runtimeFactory: _runtimeFactory);
             var contract = Contract(live);
             var signals = new AgentTaskRoutingSignals(
                 NeedsExternalRetrieval: false,
