@@ -377,7 +377,7 @@ Two real-PC attempts have already rejected weaker lock assumptions on the user's
 
 These are storage-semantics findings, not launcher failures. The probe was not weakened to accept them. Production and probe code were moved to the current byte-range-lock mechanism instead.
 
-Current deterministic regression coverage proves local exclusion/release semantics for `WorkspaceCommitLease`; current published application source metadata `082b7dea7a386b8103096c50021930a899675d29` contains the byte-range implementation. This does **not** close H2-NONAI-004: one fresh physical two-PC run with the current probe bundle is still required.
+Current deterministic regression coverage proves local exclusion/release semantics for `WorkspaceCommitLease`. Final physical-probe code-side readiness is pinned to source `42b66bc2fc62a423d5ba50907f76a6ae5a4f2230`, focused Actions run `35560190273` **SUCCESS**, artifact `H2Notes-NasAcceptance-win-x64` id `10621219868`, digest `sha256:7c3483af68f857467ebec15a9b75f8e9fc8a476e9bd7ac02ba17570a0e01defb`. The probe requires matching `byte-range-file-lock-v1` protocol + exact source build across both PCs and preserves failure JSON on exceptions. This does **not** close H2-NONAI-004: one fresh physical two-PC run with that exact probe bundle is still required.
 
 ## Required direction
 
