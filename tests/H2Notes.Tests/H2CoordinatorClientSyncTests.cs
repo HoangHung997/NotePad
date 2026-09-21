@@ -380,7 +380,10 @@ internal static class H2CoordinatorClientSyncTests
             Guid conflictId,
             H2ProjectEventDraft resolutionEvent,
             CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(store.ResolveConflict(workspaceId, conflictId, resolutionEvent));
+        }
 
         public Task<H2QueuedProjectAiRequest> EnqueueProjectAiAsync(
             H2ProjectAiRequest request,
