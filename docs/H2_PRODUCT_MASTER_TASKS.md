@@ -1156,19 +1156,19 @@ Limitation: `DEFERRED_REAL_NAS`. H2M-116 deterministic/local two-PC ownership/pr
 
 # Stage H12 — Legacy cleanup
 
-## [ ] H2M-120 — Remove legacy AiProjectContext execution dependency
+## [x] H2M-120 — Remove legacy AiProjectContext execution dependency
 
 After parity only.
 
 ---
 
-## [ ] H2M-121 — Remove legacy AiProjectActions execution dependency
+## [x] H2M-121 — Remove legacy AiProjectActions execution dependency
 
 After typed project tools parity only.
 
 ---
 
-## [ ] H2M-122 — Remove direct legacy project AiClient runtime
+## [x] H2M-122 — Remove direct legacy project AiClient runtime
 
 After AgentAdapter parity only.
 
@@ -1176,7 +1176,7 @@ Keep lower-level AI/provider code only if still used elsewhere and architectural
 
 ---
 
-## [ ] H2M-123 — Simplify ProjectAiWindow
+## [x] H2M-123 — Simplify ProjectAiWindow
 
 Decide:
 
@@ -1187,7 +1187,7 @@ Do not keep redundant windows merely for legacy.
 
 ---
 
-## [ ] H2M-124 — Clean obsolete future-design docs
+## [x] H2M-124 — Clean obsolete future-design docs
 
 Do not delete historical evidence.
 
@@ -1203,6 +1203,8 @@ The future H2 source of truth must remain two files:
 - `H2_PRODUCT_MASTER_TASKS.md`;
 
 plus the independent bug ledger.
+
+Evidence for H2M-120..124: `docs/H2_H12_LEGACY_CLEANUP.md`, `H2LegacyCleanupTests`, `H2TypedProjectToolTests` and `ProjectActionUiTests`. Exact functional source `c183c70deea5dab414caf74282e6a98570a2487c`, Actions run `35550915085` SUCCESS, H2 Notes **488/488**, dedicated H2M-120..124 **5/5**, legacy h2-actions read-only/history guard **4/4**, project-Agent pseudo-action guard PASS, NAS harness + complete Agent/provider/transport/Windows publish pipeline PASS. New project Agent execution is free of AiProjectContext/direct AiClient/h2-actions execution; historical pseudo-action content remains viewable but non-executable; ProjectAiWindow is retained only as a detached presentation of the same Agent chat; historical/superseded product docs are labeled while the Product Master pair + bug ledger remain canonical.
 
 ---
 
