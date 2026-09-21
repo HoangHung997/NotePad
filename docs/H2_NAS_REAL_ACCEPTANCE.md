@@ -40,17 +40,24 @@ CI also runs `--self-test`, but that self-test uses a local filesystem and is **
 
 ## H2M-133 final-gate artifact — 2026-09-21
 
-Use the NAS acceptance probe published by the exact H13 functional source:
+Use the NAS acceptance probe published by the exact post-physical-failure remediation source:
 
-- H2 source: `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`
-- GitHub Actions run: `35551667214` — SUCCESS
+- H2 source: `82ad43d6dff97e0e7d9bf38caecc428ac02fa996`
+- GitHub Actions run: `35555590910` — SUCCESS
 - artifact: `H2Notes-NasAcceptance-win-x64`
-- H2 Notes regression in the same run: **489 passed, 0 failed**
+- H2 Notes regression suite: PASS
+- NAS acceptance harness self-test: PASS
 - full Agent/provider/transport/Windows publish pipeline: PASS
 
-The portable H2 app from the same source has SHA256:
+### Physical attempt #1 finding and remediation
 
-`776f087e71aed1c41e0305e9c14469f1e618e0e80c2de08771c0c9df203d187a`
+The first real two-PC run reached the lock case with two distinct Windows node fingerprints, proving that both physical PCs observed the same shared session. It then failed because the target NAS/share allowed the peer to open the same file with `FileShare.None` while the coordinator still held it.
+
+That is a real storage-semantics finding, not a launcher failure. Production H2 Notes had used the same share-mode assumption for `.h2-commit.lock`, so weakening the probe would have hidden a real multi-writer risk.
+
+The remediation in source `82ad43d6dff97e0e7d9bf38caecc428ac02fa996` replaces cross-device commit serialization with an atomic `FileMode.CreateNew` lease named `.h2-commit.lease`. Lease ownership no longer depends on the NAS honoring Windows share modes. `DeleteOnClose` plus token-checked cleanup is used for crash/release cleanup, and the real probe now exercises the same production lease implementation.
+
+A new physical run is mandatory; the code/CI result alone does not close H2M-133.
 
 Do not substitute a local temp-folder self-test for the physical two-PC run.
 
@@ -86,8 +93,9 @@ The protocol records these cases:
    - both machines can observe the same acceptance session.
 
 2. `EXCLUSIVE-LOCK`
-   - PC2 cannot obtain `FileShare.None` while PC1 holds it;
-   - PC2 can obtain it after PC1 releases it.
+   - PC1 holds the production atomic-create commit lease;
+   - PC2 cannot create the same lease while PC1 holds it, even on shares that do not enforce `FileShare.None`;
+   - PC2 can acquire the lease after PC1 releases it.
 
 3. `FLUSH-VISIBILITY`
    - PC1 writes and calls durable flush;
@@ -139,7 +147,7 @@ H2M-013 is not PASS merely because the probe builds or its local self-test passe
 
 Required closure evidence:
 
-- two different physical machine names in the reports;
+- two distinct physical Windows node fingerprints in the reports; computer names may be identical;
 - same session ID;
 - same intended NAS filesystem/share;
 - all six cases PASS on both sides;
@@ -147,4 +155,4 @@ Required closure evidence:
 - no persistent mixed-generation/hash mismatch after the run;
 - resulting JSON reports committed or otherwise preserved as review evidence.
 
-If the real share fails exclusive locking, durable visibility or recovery semantics, multi-writer NAS mode must be explicitly blocked/limited for that storage type instead of weakening the test.
+If the real share fails the production atomic-create lease, durable visibility or recovery semantics, multi-writer NAS mode must be explicitly blocked/limited for that storage type instead of weakening the test.
