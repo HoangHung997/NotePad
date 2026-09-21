@@ -284,7 +284,9 @@ public sealed class H2CoordinatorSqliteStore
             using var command = connection.CreateCommand();
             command.CommandText =
                 """
-                SELECT server_sequence, draft_json, accepted_utc
+                SELECT
+                    server_sequence, draft_json, accepted_utc,
+                    disposition, resulting_revision, resulting_entity_revision, conflict_id
                 FROM project_events
                 WHERE workspace_id = $workspace
                   AND project_id = $project
@@ -305,7 +307,11 @@ public sealed class H2CoordinatorSqliteStore
                 result.Add(new H2AcceptedProjectEvent(
                     draft,
                     reader.GetInt64(0),
-                    ParseStamp(reader.GetString(2))));
+                    ParseStamp(reader.GetString(2)),
+                    (H2ProjectEventDisposition)reader.GetInt32(3),
+                    reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                    reader.IsDBNull(5) ? null : reader.GetInt64(5),
+                    reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6))));
             }
             return result;
         }
