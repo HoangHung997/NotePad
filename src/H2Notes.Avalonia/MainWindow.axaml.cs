@@ -226,7 +226,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         void Add(string title, Action action) { var item = new MenuItem { Header = title }; item.Click += (_, _) => action(); menu.Items.Add(item); }
         Add("＋ Ghi chú thường", _app.NewNote);
-        Add("Tách AI của dự án ra màn hình", ShowProjectAiWindow);
+        Add("Tách Agent dự án ra màn hình", ShowProjectAiWindow);
         Add(WindowState == WindowState.Maximized ? "Trở về kích thước trước" : "Lấp đầy màn hình", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized);
         Add("AI: Ghim bên phải", () => SetAiDock("right"));
         Add("AI: Ghim phía dưới", () => SetAiDock("bottom"));
