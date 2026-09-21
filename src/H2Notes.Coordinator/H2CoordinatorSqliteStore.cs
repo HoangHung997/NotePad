@@ -1404,12 +1404,12 @@ public sealed partial class H2CoordinatorSqliteStore
             command.Transaction = tx;
             command.CommandText =
                 """
-                SELECT draft_json, disposition
+                SELECT server_sequence, draft_json, accepted_utc, disposition
                 FROM (
-                    SELECT workspace_id, project_id, server_sequence, draft_json, disposition
+                    SELECT workspace_id, project_id, server_sequence, draft_json, accepted_utc, disposition
                     FROM project_event_archive
                     UNION ALL
-                    SELECT workspace_id, project_id, server_sequence, draft_json, disposition
+                    SELECT workspace_id, project_id, server_sequence, draft_json, accepted_utc, disposition
                     FROM project_events
                 ) e
                 WHERE workspace_id = $workspace
@@ -1424,10 +1424,16 @@ public sealed partial class H2CoordinatorSqliteStore
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                var disposition = (H2ProjectEventDisposition)reader.GetInt32(1);
+                var disposition = (H2ProjectEventDisposition)reader.GetInt32(3);
                 if (disposition != H2ProjectEventDisposition.Applied) continue;
-                var draft = Deserialize<H2ProjectEventDraft>(reader.GetString(0));
-                rebuilt = H2ProjectEventApplier.Apply(rebuilt, draft);
+                var draft = Deserialize<H2ProjectEventDraft>(reader.GetString(1));
+                rebuilt = H2ProjectEventApplier.Apply(
+                    rebuilt,
+                    new H2AcceptedProjectEvent(
+                        draft,
+                        reader.GetInt64(0),
+                        ParseStamp(reader.GetString(2)),
+                        disposition));
             }
         }
 
