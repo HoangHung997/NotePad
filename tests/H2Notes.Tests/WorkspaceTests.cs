@@ -422,16 +422,19 @@ internal static class WorkspaceTests
             state.Notes[0].Projects[1].Id = state.Notes[0].Projects[0].Id; Fails(() => store.Save(state));
             Check(!File.Exists(store.FilePath));
         });
-        test("Workspace commit lease serializes writers with atomic create and releases cleanly", () =>
+        test("Workspace commit lease serializes writers with visible atomic-create file and releases cleanly", () =>
         {
             var root = Folder();
+            var leasePath = Path.Combine(root, WorkspaceCommitLease.FileName);
             using (var first = WorkspaceCommitLease.Acquire(root, "writer-A", TimeSpan.FromMilliseconds(250)))
             {
+                Check(File.Exists(leasePath));
                 Fails(() => { using var second = WorkspaceCommitLease.Acquire(root, "writer-B", TimeSpan.FromMilliseconds(120)); });
-                Check(File.Exists(Path.Combine(root, WorkspaceCommitLease.FileName)) || OperatingSystem.IsWindows());
+                Check(File.Exists(leasePath));
             }
+            Check(!File.Exists(leasePath));
             using var afterRelease = WorkspaceCommitLease.Acquire(root, "writer-B", TimeSpan.FromSeconds(1));
-            Check(afterRelease.Token.Length == 32);
+            Check(afterRelease.Token.Length == 32 && File.Exists(leasePath));
         });
         test("Workspace instance lock prevents two copies on one PC", () =>
         {
