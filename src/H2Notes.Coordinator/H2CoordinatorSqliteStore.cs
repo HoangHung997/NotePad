@@ -264,10 +264,14 @@ public sealed class H2CoordinatorSqliteStore
 
                 var prior = FindEventByEventId(connection, tx, resolutionEvent.EventId)
                     ?? throw new InvalidDataException("Resolved conflict references a missing resolution event.");
+                if (prior.ClientOperationId != resolutionEvent.ClientOperationId
+                    || prior.DeviceId != resolutionEvent.DeviceId
+                    || !string.Equals(prior.PayloadSha256, resolutionEvent.PayloadSha256, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Resolution retry identity/content does not match the accepted resolution event.");
                 tx.Commit();
                 return new H2ProjectEventAcknowledgement(
                     prior.EventId,
-                    resolutionEvent.ClientOperationId,
+                    prior.ClientOperationId,
                     prior.ServerSequence,
                     prior.AcceptedUtc);
             }
@@ -1507,7 +1511,7 @@ public sealed class H2CoordinatorSqliteStore
         command.Transaction = tx;
         command.CommandText =
             """
-            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc, conflict_id
+            SELECT event_id, project_id, device_id, client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
             FROM project_events
             WHERE workspace_id = $workspace AND client_operation_id = $operation;
             """;
@@ -1519,10 +1523,11 @@ public sealed class H2CoordinatorSqliteStore
             Guid.Parse(reader.GetString(0)),
             Guid.Parse(reader.GetString(1)),
             Guid.Parse(reader.GetString(2)),
-            reader.GetString(3),
-            reader.GetInt64(4),
-            ParseStamp(reader.GetString(5)),
-            reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6)));
+            Guid.Parse(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetInt64(5),
+            ParseStamp(reader.GetString(6)),
+            reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7)));
     }
 
     private static ExistingEvent? FindEventByEventId(
@@ -1534,7 +1539,7 @@ public sealed class H2CoordinatorSqliteStore
         command.Transaction = tx;
         command.CommandText =
             """
-            SELECT event_id, project_id, device_id, payload_sha256, server_sequence, accepted_utc, conflict_id
+            SELECT event_id, project_id, device_id, client_operation_id, payload_sha256, server_sequence, accepted_utc, conflict_id
             FROM project_events
             WHERE event_id = $event;
             """;
@@ -1616,6 +1621,7 @@ public sealed class H2CoordinatorSqliteStore
         Guid EventId,
         Guid ProjectId,
         Guid DeviceId,
+        Guid ClientOperationId,
         string PayloadSha256,
         long ServerSequence,
         DateTimeOffset AcceptedUtc,
