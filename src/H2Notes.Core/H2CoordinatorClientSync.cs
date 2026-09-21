@@ -260,9 +260,23 @@ public static class H2ProjectEventPayload
 /// </summary>
 public static class H2ProjectEventApplier
 {
+    public static ProjectRecord? Apply(ProjectRecord? current, H2AcceptedProjectEvent accepted)
+    {
+        ArgumentNullException.ThrowIfNull(accepted);
+        return ApplyCore(current, accepted.Draft, accepted.ServerSequence);
+    }
+
     public static ProjectRecord? Apply(ProjectRecord? current, H2ProjectEventDraft draft)
     {
         ArgumentNullException.ThrowIfNull(draft);
+        return ApplyCore(current, draft, serverSequence: null);
+    }
+
+    private static ProjectRecord? ApplyCore(
+        ProjectRecord? current,
+        H2ProjectEventDraft draft,
+        long? serverSequence)
+    {
         var project = Clone(current);
 
         return draft.Kind switch
@@ -270,6 +284,7 @@ public static class H2ProjectEventApplier
             H2ProjectEventKind.CreateEntity => ApplyCreate(project, draft),
             H2ProjectEventKind.SetField => ApplySetField(project, draft),
             H2ProjectEventKind.DeleteEntity => ApplyDelete(project, draft),
+            H2ProjectEventKind.AppendMessage => ApplyAppendMessage(project, draft, serverSequence),
             H2ProjectEventKind.ResolveConflict => ApplyResolution(project, draft),
             _ => throw new NotSupportedException(
                 $"Project event kind {draft.Kind} is not part of the initial Coordinator client projection.")
@@ -395,6 +410,50 @@ public static class H2ProjectEventApplier
                 throw new NotSupportedException(
                     $"SetField for {draft.Target.EntityKind} is not implemented in initial project replica.");
         }
+    }
+
+    private static ProjectRecord ApplyAppendMessage(
+        ProjectRecord? project,
+        H2ProjectEventDraft draft,
+        long? serverSequence)
+    {
+        project = RequireProject(project, draft);
+        if (draft.Target.EntityKind != H2ProjectEntityKind.Message)
+            throw new InvalidDataException("AppendMessage target must be Message.");
+
+        var append = H2ProjectEventPayload.Deserialize<H2ProjectMessageAppend>(draft.PayloadJson);
+        if (append.Message.Id != draft.Target.EntityId)
+            throw new InvalidDataException("Appended message identity does not match event target.");
+
+        var conversation = project.Conversations.SingleOrDefault(item => item.Id == append.ConversationId);
+        if (conversation is null)
+        {
+            conversation = new AiConversation
+            {
+                Id = append.ConversationId,
+                Title = string.IsNullOrWhiteSpace(append.ConversationTitle)
+                    ? "Cuộc trao đổi"
+                    : append.ConversationTitle!
+            };
+            project.Conversations.Add(conversation);
+        }
+
+        if (conversation.Messages.Any(message => message.Id == append.Message.Id))
+            return project;
+
+        var message = JsonSerializer.Deserialize<AiMessage>(
+            JsonSerializer.Serialize(append.Message))
+            ?? throw new InvalidDataException("Shared AI message clone failed.");
+        if (serverSequence.HasValue)
+            message.Sequence = serverSequence.Value;
+        if (string.IsNullOrWhiteSpace(message.DeviceId))
+            message.DeviceId = draft.DeviceId.ToString("N");
+
+        conversation.Messages.Add(message);
+        conversation.Revision++;
+        conversation.UpdatedAtUtc = DateTime.UtcNow;
+        project.Revision++;
+        return project;
     }
 
     private static ProjectRecord? ApplyResolution(ProjectRecord? project, H2ProjectEventDraft draft)
@@ -737,7 +796,7 @@ public sealed class H2ProjectSyncClient
 
                 if (accepted.Disposition == H2ProjectEventDisposition.Applied)
                 {
-                    authoritative = H2ProjectEventApplier.Apply(authoritative, accepted.Draft);
+                    authoritative = H2ProjectEventApplier.Apply(authoritative, accepted);
                     ApplyAcceptedRevision(revisions, accepted);
                 }
 
@@ -896,6 +955,45 @@ public sealed class H2ProjectSyncClient
         string? fieldKey)
         => $"{(int)entityKind}:{entityId:N}:{fieldKey ?? "$entity"}";
 
+    public H2ProjectEventDraft QueueAppendMessage(
+        Guid conversationId,
+        string? conversationTitle,
+        AiMessage message,
+        Guid? aiRequestId = null,
+        Guid? aiLeaseId = null,
+        DateTimeOffset? clientCreatedUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        RequireCurrentProject();
+        var payload = H2ProjectEventPayload.Serialize(
+            new H2ProjectMessageAppend(conversationId, conversationTitle, message));
+        return Queue(
+            H2ProjectEventKind.AppendMessage,
+            new H2ProjectMutationTarget(
+                H2ProjectEntityKind.Message,
+                message.Id,
+                expectedRevision: 0),
+            payload,
+            clientCreatedUtc,
+            aiRequestId,
+            aiLeaseId);
+    }
+
+    public async Task<H2ProjectSyncResult> SynchronizeThroughAsync(
+        H2ProjectSyncBarrier barrier,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(barrier);
+        if (barrier.ProjectId != ProjectId)
+            throw new InvalidOperationException("AI sync barrier belongs to another project.");
+
+        var result = await SynchronizeAsync(cancellationToken).ConfigureAwait(false);
+        if (AppliedServerSequence < barrier.RequiredProjectSequence)
+            throw new InvalidDataException(
+                $"Coordinator sync barrier requires project sequence {barrier.RequiredProjectSequence}, but client observed only {AppliedServerSequence}.");
+        return result;
+    }
+
     private H2ProjectEventDraft QueueSetTaskField<T>(
         Guid taskId,
         string field,
@@ -929,7 +1027,9 @@ public sealed class H2ProjectSyncClient
         H2ProjectEventKind kind,
         H2ProjectMutationTarget target,
         string payload,
-        DateTimeOffset? clientCreatedUtc)
+        DateTimeOffset? clientCreatedUtc,
+        Guid? aiRequestId = null,
+        Guid? aiLeaseId = null)
     {
         var deviceSequence = _replica.NextDeviceSequence;
         var draft = new H2ProjectEventDraft(
@@ -943,7 +1043,9 @@ public sealed class H2ProjectSyncClient
             target,
             payload,
             H2ProjectEventDraft.ComputePayloadSha256(payload),
-            clientCreatedUtc ?? DateTimeOffset.UtcNow);
+            clientCreatedUtc ?? DateTimeOffset.UtcNow,
+            aiRequestId,
+            aiLeaseId);
 
         // Durable outbox precedes optimistic projection. A crash cannot expose an edit that has no
         // replayable local operation.
