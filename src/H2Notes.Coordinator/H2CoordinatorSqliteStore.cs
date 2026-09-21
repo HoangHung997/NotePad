@@ -775,7 +775,7 @@ public sealed class H2CoordinatorSqliteStore
                     return MutationArbitration.Applied(resultingRevision: 1, resultingEntityRevision: 1);
                 }
 
-                return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+                return MutationArbitration.FromConflict(CreateConflict(draft, entity.LastEventId));
             }
 
             case H2ProjectEventKind.SetField:
@@ -783,7 +783,7 @@ public sealed class H2CoordinatorSqliteStore
                 if (entity is null)
                     throw new InvalidOperationException("SetField target entity does not exist.");
                 if (entity.IsDeleted)
-                    return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+                    return MutationArbitration.FromConflict(CreateConflict(draft, entity.LastEventId));
 
                 var expected = draft.Target.ExpectedRevision
                     ?? throw new InvalidOperationException("SetField requires ExpectedRevision.");
@@ -797,7 +797,7 @@ public sealed class H2CoordinatorSqliteStore
                     if (field is null)
                         throw new InvalidOperationException(
                             "SetField expected a non-zero revision for a field with no accepted revision history.");
-                    return MutationArbitration.Conflict(CreateConflict(draft, field.LastEventId));
+                    return MutationArbitration.FromConflict(CreateConflict(draft, field.LastEventId));
                 }
 
                 return MutationArbitration.Applied(
@@ -813,7 +813,7 @@ public sealed class H2CoordinatorSqliteStore
                 var expected = draft.Target.ExpectedRevision
                     ?? throw new InvalidOperationException("DeleteEntity requires ExpectedRevision.");
                 if (entity.IsDeleted || expected != entity.Revision)
-                    return MutationArbitration.Conflict(CreateConflict(draft, entity.LastEventId));
+                    return MutationArbitration.FromConflict(CreateConflict(draft, entity.LastEventId));
 
                 return MutationArbitration.Applied(
                     entity.Revision + 1,
@@ -1378,7 +1378,7 @@ public sealed class H2CoordinatorSqliteStore
                 deleteEntity,
                 null);
 
-        public static MutationArbitration Conflict(H2ProjectConflict conflict)
+        public static MutationArbitration FromConflict(H2ProjectConflict conflict)
             => new(H2ProjectEventDisposition.Conflict, null, null, false, conflict);
     }
 
