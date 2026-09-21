@@ -22,18 +22,16 @@ public sealed record WorkspacePendingRestoreResult(
     string? BaseGenerationId,
     string? ObservedRemoteGenerationId);
 
-// Cross-device commit serialization must not depend on SMB share-mode enforcement.
-// Some NAS / redirected-drive implementations allow a second FileShare.None open.
-// This lease relies on atomic FileMode.CreateNew while keeping the directory entry
-// present for the entire critical section. Do NOT use DeleteOnClose here: on some
-// Windows/SMB stacks delete-pending semantics can remove the name early and allow a
-// second create while the original handle is still open. Dispose removes only a file
-// that still contains this lease's unique token; stale crash remnants are recovered
-// conservatively after a bounded age.
+// Cross-device commit serialization must not depend on FileShare.None or CREATE_NEW.
+// Physical two-PC NAS acceptance showed that those primitives are not reliable on every
+// mapped/redirected share. Use a persistent coordination file plus byte-range locking.
+// On SMB this is a distinct server-side lock primitive tied to the open handle, so a
+// process/PC crash or disconnect releases ownership without stale lock-file cleanup.
 public sealed class WorkspaceCommitLease : IDisposable
 {
-    public const string FileName = ".h2-commit.lease";
-    private static readonly TimeSpan StaleLeaseAge = TimeSpan.FromMinutes(2);
+    public const string FileName = ".h2-commit.lock";
+    private const long LockOffset = 0;
+    private const long LockLength = 1;
     private readonly FileStream _stream;
     private int _disposed;
 
@@ -57,40 +55,43 @@ public sealed class WorkspaceCommitLease : IDisposable
 
         do
         {
+            FileStream? stream = null;
             try
             {
-                var token = Guid.NewGuid().ToString("N");
-                var stream = new FileStream(
+                stream = new FileStream(
                     path,
-                    FileMode.CreateNew,
+                    FileMode.OpenOrCreate,
                     FileAccess.ReadWrite,
-                    FileShare.Read,
+                    FileShare.ReadWrite,
                     4096,
                     FileOptions.WriteThrough);
-                try
-                {
-                    var payload = Encoding.UTF8.GetBytes(
-                        token + Environment.NewLine +
-                        owner + Environment.NewLine +
-                        Environment.MachineName + Environment.NewLine +
-                        LocalNodeIdentity() + Environment.NewLine +
-                        Environment.ProcessId + Environment.NewLine +
-                        DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine);
-                    stream.Write(payload);
-                    stream.Flush(true);
-                    return new WorkspaceCommitLease(path, token, stream);
-                }
-                catch
-                {
-                    stream.Dispose();
-                    TryDeleteOwned(path, token);
-                    throw;
-                }
+
+                // FileStream.Lock maps to the OS byte-range locking primitive. On SMB,
+                // a second client attempting the same byte range must fail while this
+                // handle owns it.
+                stream.Lock(LockOffset, LockLength);
+
+                var token = Guid.NewGuid().ToString("N");
+                // Metadata is diagnostic only. Correctness depends solely on Lock().
+                // Keep byte 0 reserved for the lock and write text starting at byte 1.
+                var payload = Encoding.UTF8.GetBytes(
+                    Environment.NewLine +
+                    token + Environment.NewLine +
+                    owner + Environment.NewLine +
+                    Environment.MachineName + Environment.NewLine +
+                    Environment.ProcessId + Environment.NewLine +
+                    DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine);
+                stream.Position = 1;
+                stream.SetLength(1);
+                stream.Write(payload);
+                stream.Flush(true);
+
+                return new WorkspaceCommitLease(path, token, stream);
             }
             catch (IOException ex)
             {
                 last = ex;
-                TryRemoveStale(path);
+                stream?.Dispose();
                 if (DateTime.UtcNow >= deadline) break;
                 Thread.Sleep(60);
             }
@@ -104,110 +105,18 @@ public sealed class WorkspaceCommitLease : IDisposable
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _stream.Dispose();
-        TryDeleteOwned(Path, Token);
-    }
-
-    private static void TryDeleteOwned(string path, string token)
-    {
         try
         {
-            if (!File.Exists(path)) return;
-            string? current;
-            using (var reader = new StreamReader(new FileStream(
-                       path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite),
-                       Encoding.UTF8, true, 1024, leaveOpen: false))
-                current = reader.ReadLine();
-            if (string.Equals(current, token, StringComparison.Ordinal))
-                File.Delete(path);
+            _stream.Unlock(LockOffset, LockLength);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (IOException)
         {
-            // Best effort only. A remnant fails closed until bounded stale recovery.
+            // A lost/disconnected handle already releases its server-side SMB lock.
         }
-    }
-
-    private static void TryRemoveStale(string path)
-    {
-        try
+        finally
         {
-            if (!File.Exists(path)) return;
-
-            var lines = File.ReadAllLines(path);
-            var sameNodeDeadOwner = false;
-            if (lines.Length >= 6 &&
-                string.Equals(lines[3], LocalNodeIdentity(), StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(lines[4], out var pid) &&
-                DateTimeOffset.TryParse(lines[5], out var createdUtc))
-            {
-                sameNodeDeadOwner = IsProcessGoneOrReused(pid, createdUtc);
-            }
-
-            var age = DateTime.UtcNow - File.GetLastWriteTimeUtc(path);
-            if (!sameNodeDeadOwner && age < StaleLeaseAge) return;
-
-            // A live lease keeps this file open without FileShare.Delete, so deletion
-            // fails while the owner is still in the critical section. Same-node crash
-            // remnants can be reclaimed immediately; foreign-node remnants require
-            // the conservative stale-age boundary.
-            File.Delete(path);
+            _stream.Dispose();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
-        {
-            // Active lease or transient NAS condition: fail closed and retry later.
-        }
-    }
-
-    private static bool IsProcessGoneOrReused(int pid, DateTimeOffset leaseCreatedUtc)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            if (process.HasExited) return true;
-            try
-            {
-                // If Windows reused the PID after the recorded lease was created,
-                // the original lease owner is gone.
-                return process.StartTime.ToUniversalTime() > leaseCreatedUtc.UtcDateTime.AddSeconds(1);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        catch (ArgumentException) { return true; }
-        catch (InvalidOperationException) { return true; }
-    }
-
-    private static string LocalNodeIdentity()
-    {
-        string seed;
-        if (OperatingSystem.IsWindows())
-        {
-            try
-            {
-                seed = Microsoft.Win32.Registry.GetValue(
-                           @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography",
-                           "MachineGuid",
-                           null)?.ToString()?.Trim()
-                       ?? "";
-            }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException)
-            {
-                seed = "";
-            }
-        }
-        else
-        {
-            seed = "";
-        }
-
-        if (string.IsNullOrWhiteSpace(seed))
-            seed = Environment.MachineName + "|" + Environment.OSVersion.VersionString;
-
-        return Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes("h2-workspace-node-v1|" + seed.ToUpperInvariant())))
-            .ToLowerInvariant();
     }
 }
 
