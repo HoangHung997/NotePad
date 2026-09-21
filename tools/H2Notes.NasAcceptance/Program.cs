@@ -15,6 +15,8 @@ internal static class Program
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--info")
+                return PrintInfo();
             if (args.Length >= 2 && args[0] == "--self-test")
                 return await SelfTest(Path.GetFullPath(args[1]));
             if (args.Length >= 5 && args[0] == "--node")
@@ -52,6 +54,9 @@ internal static class Program
               PC1: H2Notes.NasAcceptance --node coordinator <shared-root> <session-id> <local-output-dir>
               PC2: H2Notes.NasAcceptance --node peer        <shared-root> <session-id> <local-output-dir>
 
+            Show exact probe/build identity:
+              H2Notes.NasAcceptance --info
+
             CI/local harness self-test:
               H2Notes.NasAcceptance --self-test <output-dir>
 
@@ -59,6 +64,18 @@ internal static class Program
               <shared-root>/.h2-nas-acceptance/<session-id>/
             """);
         return 2;
+    }
+
+    private static int PrintInfo()
+    {
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            ProbeSchema = 3,
+            CommitLeaseProtocol,
+            CommitLockFile = WorkspaceCommitLease.FileName,
+            SourceStamp = ReadSourceStamp()
+        }, Json));
+        return 0;
     }
 
     private static async Task<int> SelfTest(string output)
