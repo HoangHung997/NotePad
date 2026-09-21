@@ -916,7 +916,7 @@ Evidence: `docs/H2_RESPONSIVE_BEHAVIOR_ACCEPTANCE.md` freezes the retained respo
 
 ---
 
-## [ ] H2M-093 — Wire real production H2 ↔ Agent bridge and durable task queries
+## [x] H2M-093 — Wire real production H2 ↔ Agent bridge and durable task queries
 
 **BLOCKING CORRECTION discovered by architecture review.**
 
@@ -971,11 +971,13 @@ Acceptance:
 
 Do not mark H2M-093 complete merely because the UI contract/fake tests pass. It is complete only when the real production bridge is wired.
 
+Evidence: `H2ProductionAgentAdapter` is now the concrete production bridge composed by Avalonia startup and backed by `AgentOrchestrator -> AgentRuntime`; project chat and Work Assistant share this single adapter. The bridge supports `ProjectId = null` quick work, later correlation-only project attachment, bounded Agent-owned recent-task/evidence durability across restart, and interrupted-run fail-closed recovery without embedding Agent state into `ProjectRecord`. `H2ProductionAgentBridgeTests` execute the concrete adapter through the real deferred `tool_search -> read_file -> continuation -> evidence -> completion` runtime path using only a deterministic provider transport, and prove startup composition, project execution/evidence, unscoped quick work + later attachment + restart durability, and the UI/runtime dependency guard. The MB-121 integration guard/documentation was updated for the explicitly accepted post-MB-122 production composition while still forbidding runtime/transport/ToolRegistry internals in ordinary H2 product code. Exact functional source `cce3a2f319697d2541b5c977d40c512298ef1c6c`, Actions run `35546672841` SUCCESS, H2 Notes **473/473**, dedicated H2M-093 **4/4**, NAS harness + complete Agent MB-10..121/reference-extension/provider/Office/Web/Desktop/AutoCAD/MCP/plugin/transport pipeline + Windows publishes PASS. Publish metadata commit `731c31b3ff830431ffc282b007f87a47935922d4`; portable artifact SHA256 `e0076495023bdea3cdb5eecd241e0f41c665b4fc9260d1dfc82327391773bbd8`, 110,144,830 bytes, delivered as GitHub Actions artifact because it exceeds the safe repository-blob threshold.
+
 ---
 
 # Stage H10 — Remove over-designed product models
 
-## [ ] H2M-100 — Explicitly reject giant ProjectState implementation
+## [x] H2M-100 — Explicitly reject giant ProjectState implementation
 
 Add architecture guard/documentation.
 
@@ -983,19 +985,19 @@ No second state store duplicating project and Agent data.
 
 ---
 
-## [ ] H2M-101 — No independent AI Inbox database
+## [x] H2M-101 — No independent AI Inbox database
 
 NeedsAttention remains a projection.
 
 ---
 
-## [ ] H2M-102 — No independent Research database
+## [x] H2M-102 — No independent Research database
 
 Research remains an evidence view.
 
 ---
 
-## [ ] H2M-103 — Defer formal ProjectDecision
+## [x] H2M-103 — Defer formal ProjectDecision
 
 Use notes/pinned knowledge initially.
 
@@ -1003,15 +1005,17 @@ Do not implement supersession/effective-date workflow unless separately approved
 
 ---
 
-## [ ] H2M-104 — No QuickWorkSession model
+## [x] H2M-104 — No QuickWorkSession model
 
 Quick work = AgentTask with no ProjectId.
 
 ---
 
-## [ ] H2M-105 — No AI-generated project percentage
+## [x] H2M-105 — No AI-generated project percentage
 
 Guard UI/data model against arbitrary model-written progress percentage.
+
+Evidence for H2M-100..105: `docs/H2_PRODUCT_ARCHITECTURE_GUARD.md` plus `H2ProductArchitectureGuardTests` enforce all six negative-architecture decisions in executable form: no giant `ProjectState`, no `AIInboxStore`, no `ResearchStore`, no formal `ProjectDecision`, no `QuickWorkSession`, and no model-authored progress percentage. Attention/evidence remain rebuildable projections, quick work remains the same Agent task with nullable ProjectId, and project progress remains deterministic completed/total task data. Exact source `cce3a2f319697d2541b5c977d40c512298ef1c6c`, Actions run `35546672841` SUCCESS, dedicated H2M-100..105 guard **6/6** PASS inside H2 Notes **473/473**, with the same full NAS/Agent/publish pipeline green.
 
 ---
 
