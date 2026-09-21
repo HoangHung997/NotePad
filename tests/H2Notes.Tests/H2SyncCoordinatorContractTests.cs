@@ -17,7 +17,7 @@ internal static class H2SyncCoordinatorContractTests
 
         test("Project event draft preserves idempotency identity and verifies payload hash", () =>
         {
-            var payload = "{"value":"Final dossier"}";
+            var payload = "{\"value\":\"Final dossier\"}";
             var hash = H2ProjectEventDraft.ComputePayloadSha256(payload);
             var eventId = Guid.NewGuid();
             var operationId = Guid.NewGuid();
@@ -74,8 +74,8 @@ internal static class H2SyncCoordinatorContractTests
             var deviceB = Guid.NewGuid();
             var targetA = new H2ProjectMutationTarget(H2ProjectEntityKind.Task, Guid.NewGuid(), "Name", 0);
             var targetB = new H2ProjectMutationTarget(H2ProjectEntityKind.Task, Guid.NewGuid(), "Deadline", 0);
-            var firstPayload = "{"value":"A"}";
-            var secondPayload = "{"value":"B"}";
+            var firstPayload = "{\"value\":\"A\"}";
+            var secondPayload = "{\"value\":\"B\"}";
 
             var clientClockLaterButAcceptedFirst = new H2ProjectEventDraft(
                 Guid.NewGuid(), workspace, project, deviceA, 1, Guid.NewGuid(),
@@ -126,7 +126,7 @@ internal static class H2SyncCoordinatorContractTests
 
         test("Snapshot is hash-verified and bounded to an accepted server watermark", () =>
         {
-            var state = "{"project":"A"}";
+            var state = "{\"project\":\"A\"}";
             var hash = H2ProjectEventDraft.ComputePayloadSha256(state);
             var snapshot = new H2ProjectSnapshot(
                 Guid.NewGuid(), Guid.NewGuid(), 125, state, hash, DateTimeOffset.UtcNow);
