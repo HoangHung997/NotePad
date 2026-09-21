@@ -1265,6 +1265,25 @@ Require:
 - migration rollback path;
 - old data preserved.
 
+Status: **BLOCKED — USER/PHYSICAL EVIDENCE REQUIRED.**
+
+Automated/code readiness is complete: H2M-130..132 exact source `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`, Actions `35551667214` SUCCESS, H2 Notes **489/489**, NAS harness self-test + full Agent/provider/transport/publish pipeline PASS. Migration source preservation/rollback and old-data preservation are covered by the accepted migration/storage suites.
+
+H2M-133 cannot be closed automatically because the independent bug ledger still has three physical-NAS blockers:
+
+- H2-NONAI-001 — second-PC convergence after generation/hash race;
+- H2-NONAI-004 — actual share lock/rename/flush/read-after-commit semantics;
+- H2-NONAI-006 — real two-PC/NAS coverage.
+
+Run the artifact/runbook in `docs/H2_NAS_REAL_ACCEPTANCE.md` on two physical PCs and preserve both JSON reports. All six NAS cases must PASS on both sides.
+
+A second explicit product-policy decision is also required for H2-NONAI-008:
+
+- **Option A:** accept current production boundary = verified LAN/mapped/UNC alias + durable offline pending; no automatic secure Remote/VPN failover.
+- **Option B:** require secure Remote/VPN alias failover implementation and real acceptance before H2M-133 can close.
+
+H2M-134 remains blocked until H2M-133 is resolved.
+
 ---
 
 ## [ ] H2M-134 — User product acceptance
