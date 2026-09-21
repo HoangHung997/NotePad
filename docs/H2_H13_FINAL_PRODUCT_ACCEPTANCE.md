@@ -210,8 +210,10 @@ The broader optional **configured secure Remote/VPN alias failover** is not impl
 
 Therefore H2M-133 must remain open until:
 
-1. physical two-PC/NAS acceptance evidence is recorded; and
+1. physical two-PC/NAS acceptance evidence is recorded using the exact H13 probe artifact from Actions run `35551667214`; and
 2. the user either accepts the current fail-safe LAN/offline policy as the production boundary or requests implementation of secure Remote/VPN alias failover.
+
+The final bug-ledger alignment commit marks H2-NONAI-001/004/006 as explicit H2M-133 real-NAS blockers, H2-NONAI-008 as a partial fix requiring product-policy decision, and H2-NONAI-009 as fixed.
 
 ---
 
