@@ -1174,6 +1174,23 @@ public sealed partial class H2CoordinatorSqliteStore
                 false,
                 resolutionEvent.EventId);
         }
+        else if (payload.Action == H2ConflictResolutionAction.RestoreEntity)
+        {
+            Execute(connection, tx,
+                """
+                DELETE FROM project_revisions
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND entity_kind = $kind
+                  AND entity_id = $entity
+                  AND field_key <> $entityKey;
+                """,
+                ("$workspace", Id(resolutionEvent.WorkspaceId)),
+                ("$project", Id(resolutionEvent.ProjectId)),
+                ("$kind", (int)resolutionEvent.Target.EntityKind),
+                ("$entity", Id(resolutionEvent.Target.EntityId)),
+                ("$entityKey", ToDbFieldKey(null)));
+        }
 
         UpsertRevision(
             connection, tx,
