@@ -659,6 +659,7 @@ H2ResponsiveProductTests.Run(Test);
 H2ProductArchitectureGuardTests.Run(Test);
 H2ProductionAgentBridgeTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
+H2LegacyCleanupTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {
