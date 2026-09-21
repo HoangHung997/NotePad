@@ -231,6 +231,119 @@ public sealed class H2CoordinatorSqliteStore
         }
     }
 
+    public H2ProjectEventAcknowledgement ResolveConflict(
+        Guid workspaceId,
+        Guid conflictId,
+        H2ProjectEventDraft resolutionEvent)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
+        if (conflictId == Guid.Empty) throw new ArgumentException("ConflictId is required.", nameof(conflictId));
+        ArgumentNullException.ThrowIfNull(resolutionEvent);
+        if (resolutionEvent.WorkspaceId != workspaceId)
+            throw new InvalidOperationException("Resolution event WorkspaceId does not match target workspace.");
+        if (resolutionEvent.Kind != H2ProjectEventKind.ResolveConflict)
+            throw new InvalidOperationException("Conflict resolution must use ResolveConflict event kind.");
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+            RequireRegisteredDevice(connection, tx, workspaceId, resolutionEvent.DeviceId);
+
+            var conflict = ReadConflict(connection, tx, conflictId);
+            if (conflict.WorkspaceId != workspaceId
+                || conflict.ProjectId != resolutionEvent.ProjectId
+                || conflict.Target.EntityKind != resolutionEvent.Target.EntityKind
+                || conflict.Target.EntityId != resolutionEvent.Target.EntityId)
+                throw new InvalidOperationException("Resolution event does not target the selected conflict.");
+
+            if (conflict.State == H2ProjectConflictState.Resolved)
+            {
+                if (conflict.ResolvedByEventId != resolutionEvent.EventId)
+                    throw new InvalidOperationException("Conflict was already resolved by another event.");
+
+                var prior = FindEventByEventId(connection, tx, resolutionEvent.EventId)
+                    ?? throw new InvalidDataException("Resolved conflict references a missing resolution event.");
+                tx.Commit();
+                return new H2ProjectEventAcknowledgement(
+                    prior.EventId,
+                    resolutionEvent.ClientOperationId,
+                    prior.ServerSequence,
+                    prior.AcceptedUtc);
+            }
+
+            var existing = FindEventByOperation(connection, tx, workspaceId, resolutionEvent.ClientOperationId);
+            if (existing is not null)
+                throw new InvalidOperationException("Resolution ClientOperationId already belongs to another accepted operation.");
+            if (FindEventByEventId(connection, tx, resolutionEvent.EventId) is not null)
+                throw new InvalidOperationException("Resolution EventId already exists.");
+
+            var payload = Deserialize<H2ConflictResolutionPayload>(resolutionEvent.PayloadJson);
+            var arbitration = ArbitrateResolution(connection, tx, conflict, resolutionEvent, payload);
+
+            EnsureProjectHead(connection, tx, workspaceId, resolutionEvent.ProjectId);
+            var sequence = ReadProjectSequence(connection, tx, workspaceId, resolutionEvent.ProjectId) + 1;
+            var acceptedUtc = DateTimeOffset.UtcNow;
+
+            Execute(connection, tx,
+                """
+                INSERT INTO project_events(
+                    workspace_id, project_id, server_sequence,
+                    event_id, device_id, device_sequence, client_operation_id,
+                    payload_sha256, draft_json, accepted_utc,
+                    disposition, resulting_revision, resulting_entity_revision, conflict_id)
+                VALUES(
+                    $workspace, $project, $sequence,
+                    $event, $device, $deviceSequence, $operation,
+                    $payloadHash, $draft, $accepted,
+                    $disposition, $revision, $entityRevision, NULL);
+                """,
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(resolutionEvent.ProjectId)),
+                ("$sequence", sequence),
+                ("$event", Id(resolutionEvent.EventId)),
+                ("$device", Id(resolutionEvent.DeviceId)),
+                ("$deviceSequence", resolutionEvent.DeviceSequence),
+                ("$operation", Id(resolutionEvent.ClientOperationId)),
+                ("$payloadHash", resolutionEvent.PayloadSha256),
+                ("$draft", JsonSerializer.Serialize(resolutionEvent, Json)),
+                ("$accepted", Stamp(acceptedUtc)),
+                ("$disposition", (int)H2ProjectEventDisposition.Applied),
+                ("$revision", arbitration.ResultingRevision),
+                ("$entityRevision", arbitration.ResultingEntityRevision));
+
+            ApplyResolutionRevision(connection, tx, resolutionEvent, payload, arbitration);
+
+            Execute(connection, tx,
+                """
+                UPDATE project_conflicts
+                SET state = $resolved, resolved_event_id = $event
+                WHERE conflict_id = $conflict AND state = $open;
+                """,
+                ("$resolved", (int)H2ProjectConflictState.Resolved),
+                ("$event", Id(resolutionEvent.EventId)),
+                ("$conflict", Id(conflictId)),
+                ("$open", (int)H2ProjectConflictState.Open));
+
+            Execute(connection, tx,
+                """
+                UPDATE project_heads
+                SET server_sequence = $sequence
+                WHERE workspace_id = $workspace AND project_id = $project;
+                """,
+                ("$sequence", sequence),
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(resolutionEvent.ProjectId)));
+
+            tx.Commit();
+            return new H2ProjectEventAcknowledgement(
+                resolutionEvent.EventId,
+                resolutionEvent.ClientOperationId,
+                sequence,
+                acceptedUtc);
+        }
+    }
+
     public H2ProjectHead GetProjectHead(Guid workspaceId, Guid projectId)
     {
         if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
@@ -743,6 +856,123 @@ public sealed class H2CoordinatorSqliteStore
             }
             return result;
         }
+    }
+
+    private static MutationArbitration ArbitrateResolution(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectConflict conflict,
+        H2ProjectEventDraft resolutionEvent,
+        H2ConflictResolutionPayload payload)
+    {
+        if (!Enum.IsDefined(payload.Action))
+            throw new InvalidDataException("Conflict resolution action is invalid.");
+
+        var entity = ReadRevision(
+            connection, tx,
+            resolutionEvent.WorkspaceId,
+            resolutionEvent.ProjectId,
+            resolutionEvent.Target.EntityKind,
+            resolutionEvent.Target.EntityId,
+            null)
+            ?? throw new InvalidOperationException("Resolution target entity does not exist.");
+
+        switch (payload.Action)
+        {
+            case H2ConflictResolutionAction.SetField:
+            {
+                if (string.IsNullOrWhiteSpace(resolutionEvent.Target.FieldKey)
+                    || !string.Equals(
+                        resolutionEvent.Target.FieldKey,
+                        conflict.Target.FieldKey,
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException("SetField resolution must target the conflicting field.");
+                if (payload.ValueJson is null)
+                    throw new InvalidDataException("SetField resolution requires ValueJson.");
+                if (entity.IsDeleted)
+                    throw new InvalidOperationException("Cannot set a field on a deleted conflict target.");
+
+                var field = ReadRevision(
+                    connection, tx,
+                    resolutionEvent.WorkspaceId,
+                    resolutionEvent.ProjectId,
+                    resolutionEvent.Target.EntityKind,
+                    resolutionEvent.Target.EntityId,
+                    resolutionEvent.Target.FieldKey);
+                var current = field?.Revision ?? 0;
+                if (resolutionEvent.Target.ExpectedRevision != current)
+                    throw new InvalidOperationException("Conflict resolution field revision is stale.");
+
+                return MutationArbitration.Applied(current + 1, entity.Revision + 1);
+            }
+
+            case H2ConflictResolutionAction.DeleteEntity:
+            {
+                if (resolutionEvent.Target.FieldKey is not null)
+                    throw new InvalidOperationException("DeleteEntity resolution must target the whole entity.");
+                if (entity.IsDeleted)
+                    throw new InvalidOperationException("Conflict target is already deleted.");
+                if (resolutionEvent.Target.ExpectedRevision != entity.Revision)
+                    throw new InvalidOperationException("Conflict resolution entity revision is stale.");
+
+                return MutationArbitration.Applied(
+                    entity.Revision + 1,
+                    entity.Revision + 1,
+                    deleteEntity: true);
+            }
+
+            case H2ConflictResolutionAction.RestoreEntity:
+            {
+                if (resolutionEvent.Target.FieldKey is not null)
+                    throw new InvalidOperationException("RestoreEntity resolution must target the whole entity.");
+                if (!entity.IsDeleted)
+                    throw new InvalidOperationException("RestoreEntity requires a deleted target.");
+                if (payload.ValueJson is null)
+                    throw new InvalidDataException("RestoreEntity resolution requires ValueJson.");
+                if (resolutionEvent.Target.ExpectedRevision != entity.Revision)
+                    throw new InvalidOperationException("Conflict resolution entity revision is stale.");
+
+                return MutationArbitration.Applied(
+                    entity.Revision + 1,
+                    entity.Revision + 1);
+            }
+
+            default:
+                throw new NotSupportedException("Unsupported conflict resolution action.");
+        }
+    }
+
+    private static void ApplyResolutionRevision(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        H2ProjectEventDraft resolutionEvent,
+        H2ConflictResolutionPayload payload,
+        MutationArbitration arbitration)
+    {
+        if (payload.Action == H2ConflictResolutionAction.SetField)
+        {
+            UpsertRevision(
+                connection, tx,
+                resolutionEvent.WorkspaceId,
+                resolutionEvent.ProjectId,
+                resolutionEvent.Target.EntityKind,
+                resolutionEvent.Target.EntityId,
+                resolutionEvent.Target.FieldKey,
+                arbitration.ResultingRevision!.Value,
+                false,
+                resolutionEvent.EventId);
+        }
+
+        UpsertRevision(
+            connection, tx,
+            resolutionEvent.WorkspaceId,
+            resolutionEvent.ProjectId,
+            resolutionEvent.Target.EntityKind,
+            resolutionEvent.Target.EntityId,
+            null,
+            arbitration.ResultingEntityRevision!.Value,
+            payload.Action == H2ConflictResolutionAction.DeleteEntity,
+            resolutionEvent.EventId);
     }
 
     private static MutationArbitration ArbitrateMutation(
