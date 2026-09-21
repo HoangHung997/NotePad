@@ -141,6 +141,7 @@ internal static class H2FinalPerformanceTests
                 writerId: "h2m132",
                 recoveryRoot: Path.Combine(root, ".recovery-local"),
                 pendingRoot: Path.Combine(root, ".pending-local"));
+            _ = store.LoadOrImport();
 
             var watch = Stopwatch.StartNew();
             store.Save(state);
