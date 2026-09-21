@@ -11,7 +11,7 @@ namespace H2Notes.Coordinator;
 /// The database path must be local to the Coordinator host. Clients must never open
 /// this SQLite database directly through SMB/WebDAV/mapped network paths.
 /// </summary>
-public sealed class H2CoordinatorSqliteStore
+public sealed partial class H2CoordinatorSqliteStore
 {
     private const int SchemaVersion = 2;
     private readonly object _gate = new();
