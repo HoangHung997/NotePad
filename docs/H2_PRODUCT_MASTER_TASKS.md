@@ -1335,7 +1335,7 @@ Acceptance:
 
 Evidence: `src/H2Notes.Core/H2SyncCoordinatorContracts.cs` defines provider/database-neutral DeviceId, immutable event/snapshot/conflict/outbox acknowledgement, AI queue/lease/completion and `IH2SyncCoordinator` contracts. `H2SyncCoordinatorContractTests` proves payload/hash validation, immutable conflict evidence, server-sequence ordering independent from client clocks, lease/barrier invariants and infrastructure/Agent-runtime neutrality. Exact source `29d1d0a37a4a721f759fcb6135f16aa8f84353a8`; focused Actions run `35564555271` SUCCESS: solution build PASS, H2 Notes regression PASS, NAS harness self-test PASS, publish/artifact steps PASS.
 
-### [~] H2M-133C — Durable single-writer Coordinator store
+### [x] H2M-133C — Durable single-writer Coordinator store
 
 Implement one active Coordinator instance with a local durable store.
 
@@ -1357,7 +1357,9 @@ Acceptance:
 - restart preserves head sequence/queue/conflict state;
 - no correctness dependency on NAS file locking.
 
-### [ ] H2M-133D — Client project sync + durable offline outbox
+Evidence: `src/H2Notes.Coordinator/H2CoordinatorSqliteStore.cs` provides a Coordinator-local SQLite/WAL/FULL-sync store that rejects UNC/mapped-network database paths, durably registers devices, assigns monotonic project server sequences transactionally, deduplicates `ClientOperationId` retries, rejects incompatible identity reuse, persists verified snapshots/conflicts and durable AI queue/lease/completion state across restart. `H2CoordinatorSqliteStoreTests` additionally proves two concurrent client submissions through the same Coordinator receive unique deterministic server sequence values independent of client clock ordering. Exact functional source `c7ff90810662c2037cca9323001851d9a517e359`; focused Actions run `35565062985` SUCCESS: solution build PASS, H2 Notes regression PASS, NAS harness self-test PASS, publish/artifact steps PASS.
+
+### [~] H2M-133D — Client project sync + durable offline outbox
 
 Required:
 
