@@ -172,6 +172,58 @@ internal static class H2CoordinatorConflictSnapshotTests
             Equal(2L, entityRevision.Revision);
         });
 
+        test("Coordinator compacts hot events only behind a verified snapshot and keeps archived events queryable", () =>
+        {
+            var fixture = Fixture();
+            var baseline = CreateProject(fixture, fixture.Pc1, 1);
+            fixture.Store.SubmitProjectEvents(fixture.Workspace, fixture.Pc1.DeviceId, new[] { baseline });
+
+            var name = SetProjectField(
+                fixture, fixture.Pc1, 2, "NameRich", 0,
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("Before compaction")));
+            fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { name });
+
+            var stream = fixture.Store.GetProjectEvents(fixture.Workspace, fixture.Project, 0);
+            var state = Replay(stream);
+            var stateJson = System.Text.Json.JsonSerializer.Serialize(state);
+            var snapshot = new H2ProjectSnapshot(
+                fixture.Workspace,
+                fixture.Project,
+                2,
+                stateJson,
+                H2ProjectEventDraft.ComputePayloadSha256(stateJson),
+                DateTimeOffset.UtcNow,
+                fixture.Store.GetProjectRevisions(fixture.Workspace, fixture.Project));
+            fixture.Store.SaveSnapshot(snapshot);
+
+            Equal((2, 0), fixture.Store.GetProjectEventStorageCounts(fixture.Workspace, fixture.Project));
+            Equal(2, fixture.Store.CompactProjectEventsThrough(fixture.Workspace, fixture.Project, 2));
+            Equal((0, 2), fixture.Store.GetProjectEventStorageCounts(fixture.Workspace, fixture.Project));
+
+            var archivedStream = fixture.Store.GetProjectEvents(fixture.Workspace, fixture.Project, 0);
+            Equal(2, archivedStream.Count);
+            Equal(name.EventId, archivedStream[1].Draft.EventId);
+
+            // Retry of an archived event remains idempotent and does not recreate it in the hot log.
+            var retry = fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { name });
+            Equal(2L, retry.Acknowledgements.Single().ServerSequence);
+            Equal((0, 2), fixture.Store.GetProjectEventStorageCounts(fixture.Workspace, fixture.Project));
+
+            var notes = SetProjectField(
+                fixture, fixture.Pc1, 3, "NotesRich", 0,
+                H2ProjectEventPayload.Serialize(RichDocument.Plain("After compaction")));
+            fixture.Store.SubmitProjectEvents(
+                fixture.Workspace, fixture.Pc1.DeviceId, new[] { notes });
+
+            Equal((1, 2), fixture.Store.GetProjectEventStorageCounts(fixture.Workspace, fixture.Project));
+            Equal(3, fixture.Store.GetProjectEvents(fixture.Workspace, fixture.Project, 0).Count);
+            Equal(0, fixture.Store.CompactProjectEventsThrough(fixture.Workspace, fixture.Project, 2));
+            Throws<InvalidOperationException>(() =>
+                fixture.Store.CompactProjectEventsThrough(fixture.Workspace, fixture.Project, 3));
+        });
+
         test("Coordinator accepts only snapshots that equal applied replay and current revision metadata", () =>
         {
             var fixture = Fixture();
