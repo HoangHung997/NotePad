@@ -444,12 +444,11 @@ public sealed record H2ProjectAiCompletion
         LeaseId = H2CoordinatorContractGuard.NonEmpty(leaseId, nameof(leaseId));
         RequestId = H2CoordinatorContractGuard.NonEmpty(requestId, nameof(requestId));
         ProjectId = H2CoordinatorContractGuard.NonEmpty(projectId, nameof(projectId));
-        if (terminalState is not (
-            H2ProjectAiQueueState.Completed
-            or H2ProjectAiQueueState.Abandoned
-            or H2ProjectAiQueueState.Failed
-            or H2ProjectAiQueueState.Cancelled
-            or H2ProjectAiQueueState.NeedsUserReview))
+        if (terminalState != H2ProjectAiQueueState.Completed
+            && terminalState != H2ProjectAiQueueState.Abandoned
+            && terminalState != H2ProjectAiQueueState.Failed
+            && terminalState != H2ProjectAiQueueState.Cancelled
+            && terminalState != H2ProjectAiQueueState.NeedsUserReview)
             throw new ArgumentException("AI completion requires a resolved terminal state.", nameof(terminalState));
         if (committedThroughProjectSequence < 0)
             throw new ArgumentOutOfRangeException(nameof(committedThroughProjectSequence));
