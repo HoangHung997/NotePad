@@ -16,7 +16,8 @@ public sealed record H2ProjectReplicaSnapshot(
     long AppliedServerSequence,
     long NextDeviceSequence,
     ProjectRecord? AuthoritativeProject,
-    DateTimeOffset UpdatedUtc);
+    DateTimeOffset UpdatedUtc,
+    IReadOnlyList<H2ProjectRevisionEntry>? Revisions = null);
 
 public sealed record H2ProjectSyncResult(
     H2ProjectSyncStatus Status,
@@ -74,7 +75,8 @@ public sealed class H2CoordinatorClientStateStore
                 0,
                 1,
                 null,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                Array.Empty<H2ProjectRevisionEntry>());
 
         var snapshot = JsonSerializer.Deserialize<H2ProjectReplicaSnapshot>(
             File.ReadAllText(_replicaPath),
@@ -90,7 +92,8 @@ public sealed class H2CoordinatorClientStateStore
 
         return snapshot with
         {
-            AuthoritativeProject = Clone(snapshot.AuthoritativeProject)
+            AuthoritativeProject = Clone(snapshot.AuthoritativeProject),
+            Revisions = (snapshot.Revisions ?? Array.Empty<H2ProjectRevisionEntry>()).ToArray()
         };
     }
 
@@ -503,7 +506,7 @@ public sealed class H2ProjectSyncClient
             H2ProjectEntityKind.Project,
             ProjectId,
             "NameRich",
-            CurrentProject?.Revision,
+            ExpectedRevision(H2ProjectEntityKind.Project, ProjectId, "NameRich"),
             name ?? throw new ArgumentNullException(nameof(name)),
             clientCreatedUtc);
 
@@ -512,7 +515,7 @@ public sealed class H2ProjectSyncClient
             H2ProjectEntityKind.Project,
             ProjectId,
             "NotesRich",
-            CurrentProject?.Revision,
+            ExpectedRevision(H2ProjectEntityKind.Project, ProjectId, "NotesRich"),
             notes ?? throw new ArgumentNullException(nameof(notes)),
             clientCreatedUtc);
 
@@ -541,7 +544,10 @@ public sealed class H2ProjectSyncClient
         var task = RequireTask(taskId);
         return Queue(
             H2ProjectEventKind.DeleteEntity,
-            new H2ProjectMutationTarget(H2ProjectEntityKind.Task, task.Id, expectedRevision: task.Revision),
+            new H2ProjectMutationTarget(
+                H2ProjectEntityKind.Task,
+                task.Id,
+                expectedRevision: ExpectedRevision(H2ProjectEntityKind.Task, task.Id, null)),
             "{}",
             clientCreatedUtc);
     }
@@ -632,6 +638,7 @@ public sealed class H2ProjectSyncClient
                 {
                     AuthoritativeProject = project,
                     AppliedServerSequence = snapshot.ThroughServerSequence,
+                    Revisions = snapshot.Revisions.ToArray(),
                     UpdatedUtc = DateTimeOffset.UtcNow
                 };
             }
@@ -658,12 +665,20 @@ public sealed class H2ProjectSyncClient
                 if (accepted.Draft.WorkspaceId != WorkspaceId || accepted.Draft.ProjectId != ProjectId)
                     throw new InvalidDataException("Coordinator returned event for another replica.");
 
+                var authoritative = _replica.AuthoritativeProject;
+                var revisions = (_replica.Revisions ?? Array.Empty<H2ProjectRevisionEntry>()).ToList();
+
+                if (accepted.Disposition == H2ProjectEventDisposition.Applied)
+                {
+                    authoritative = H2ProjectEventApplier.Apply(authoritative, accepted.Draft);
+                    ApplyAcceptedRevision(revisions, accepted);
+                }
+
                 _replica = _replica with
                 {
-                    AuthoritativeProject = H2ProjectEventApplier.Apply(
-                        _replica.AuthoritativeProject,
-                        accepted.Draft),
+                    AuthoritativeProject = authoritative,
                     AppliedServerSequence = accepted.ServerSequence,
+                    Revisions = revisions,
                     UpdatedUtc = DateTimeOffset.UtcNow
                 };
 
@@ -693,6 +708,114 @@ public sealed class H2ProjectSyncClient
         return pulled;
     }
 
+    private long ExpectedRevision(
+        H2ProjectEntityKind entityKind,
+        Guid entityId,
+        string? fieldKey)
+    {
+        var revisions = (_replica.Revisions ?? Array.Empty<H2ProjectRevisionEntry>())
+            .ToDictionary(item => item.StableKey, StringComparer.Ordinal);
+
+        foreach (var pending in _local.Pending())
+            ApplyPendingRevision(revisions, pending);
+
+        var key = RevisionKey(entityKind, entityId, fieldKey);
+        return revisions.TryGetValue(key, out var entry) ? entry.Revision : 0;
+    }
+
+    private static void ApplyPendingRevision(
+        Dictionary<string, H2ProjectRevisionEntry> revisions,
+        H2ProjectEventDraft draft)
+    {
+        var entityKey = RevisionKey(draft.Target.EntityKind, draft.Target.EntityId, null);
+        revisions.TryGetValue(entityKey, out var entity);
+
+        switch (draft.Kind)
+        {
+            case H2ProjectEventKind.CreateEntity:
+                revisions[entityKey] = new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    null,
+                    (entity?.Revision ?? 0) + 1,
+                    false);
+                break;
+
+            case H2ProjectEventKind.SetField:
+            {
+                var fieldKey = RevisionKey(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    draft.Target.FieldKey);
+                revisions.TryGetValue(fieldKey, out var field);
+                revisions[fieldKey] = new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    draft.Target.FieldKey,
+                    (field?.Revision ?? 0) + 1,
+                    false);
+                revisions[entityKey] = new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    null,
+                    (entity?.Revision ?? 0) + 1,
+                    false);
+                break;
+            }
+
+            case H2ProjectEventKind.DeleteEntity:
+                revisions[entityKey] = new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    null,
+                    (entity?.Revision ?? 0) + 1,
+                    true);
+                break;
+        }
+    }
+
+    private static void ApplyAcceptedRevision(
+        List<H2ProjectRevisionEntry> revisions,
+        H2AcceptedProjectEvent accepted)
+    {
+        var draft = accepted.Draft;
+        if (draft.Kind == H2ProjectEventKind.SetField && accepted.ResultingRevision.HasValue)
+            UpsertReplicaRevision(
+                revisions,
+                new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    draft.Target.FieldKey,
+                    accepted.ResultingRevision.Value,
+                    false));
+
+        if (accepted.ResultingEntityRevision.HasValue)
+            UpsertReplicaRevision(
+                revisions,
+                new H2ProjectRevisionEntry(
+                    draft.Target.EntityKind,
+                    draft.Target.EntityId,
+                    null,
+                    accepted.ResultingEntityRevision.Value,
+                    draft.Kind == H2ProjectEventKind.DeleteEntity));
+    }
+
+    private static void UpsertReplicaRevision(
+        List<H2ProjectRevisionEntry> revisions,
+        H2ProjectRevisionEntry next)
+    {
+        var index = revisions.FindIndex(item =>
+            string.Equals(item.StableKey, next.StableKey, StringComparison.Ordinal));
+        if (index >= 0) revisions[index] = next;
+        else revisions.Add(next);
+    }
+
+    private static string RevisionKey(
+        H2ProjectEntityKind entityKind,
+        Guid entityId,
+        string? fieldKey)
+        => $"{(int)entityKind}:{entityId:N}:{fieldKey ?? "$entity"}";
+
     private H2ProjectEventDraft QueueSetTaskField<T>(
         Guid taskId,
         string field,
@@ -704,7 +827,7 @@ public sealed class H2ProjectSyncClient
             H2ProjectEntityKind.Task,
             task.Id,
             field,
-            task.Revision,
+            ExpectedRevision(H2ProjectEntityKind.Task, task.Id, field),
             value,
             clientCreatedUtc);
     }
