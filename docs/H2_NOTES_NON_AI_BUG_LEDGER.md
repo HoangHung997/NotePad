@@ -144,14 +144,14 @@ Disposition:
 
 | ID | Severity | Area | Status | Short description |
 |---|---|---|---|---|
-| H2-NONAI-001 | HIGH | NAS / multi-PC sync | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Code-side recovery is implemented; user explicitly deferred physical two-PC/NAS convergence proof until final app acceptance |
+| H2-NONAI-001 | HIGH | NAS / multi-PC sync | OPEN-REAL-NAS / H2M-133 BLOCKER | Code-side recovery is implemented; physical two-PC/NAS convergence proof is now required at the final data-integrity gate |
 | H2-NONAI-002 | HIGH | Persistence / recovery | FIXED | Journal now survives through final snapshot validation; fault-injection proves rollback after a bad committed generation |
 | H2-NONAI-003 | MEDIUM | Diagnostics / sync UX | FIXED | Structured bounded sync diagnostics are persisted locally and surfaced as transient/persistent/recovery status |
-| H2-NONAI-004 | HIGH | NAS protocol compatibility | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Harness exists and self-tests; real share locking/rename/flush semantics are not yet certified and must be tested before final production acceptance |
+| H2-NONAI-004 | HIGH | NAS protocol compatibility | OPEN-REAL-NAS / H2M-133 BLOCKER | Harness exists and self-tests; real share locking/rename/flush semantics must now be certified on the intended share |
 | H2-NONAI-005 | HIGH | Recovery / availability | FIXED | Validated last-known-good fallback + write lock + explicit quarantine/recovery path implemented and tested |
-| H2-NONAI-006 | HIGH | Test coverage | ACCEPTED_LIMITATION-DEFERRED_REAL_NAS | Real two-PC harness is ready, but user explicitly deferred physical run until the app is more complete |
+| H2-NONAI-006 | HIGH | Test coverage | OPEN-REAL-NAS / H2M-133 BLOCKER | Real two-PC harness is ready; final physical run is now required before production acceptance |
 | H2-NONAI-007 | MEDIUM | Offline durability | FIXED | Durable machine-local pending snapshots survive restart, merge after reconnect, audit conflicts and clear only after shared commit |
-| H2-NONAI-008 | HIGH | Storage location / network failover | PARTIAL-FIX-H2M015-FOLLOWUP | Local/mapped/UNC classification, canonical mapped→UNC resolution, WorkspaceId and identity-checked alias fallback are implemented; optional secure remote/VPN endpoint policy remains H2M-015 |
+| H2-NONAI-008 | HIGH | Storage location / network failover | PARTIAL-FIX / USER-POLICY-DECISION-REQUIRED | Local/mapped/UNC classification, canonical mapped→UNC resolution, WorkspaceId and identity-checked alias fallback are implemented; optional secure Remote/VPN failover still needs final product-policy decision |
 | H2-NONAI-009 | HIGH | Workspace identity / locking | FIXED | Schema 6 WorkspaceId drives logical alias identity, same-machine locking and self-transfer rejection; mapped/UNC alias regressions are green |
 
 ---
@@ -159,7 +159,7 @@ Disposition:
 # H2-NONAI-001 — NAS project/index hash mismatch blocks second-PC refresh
 
 **Severity:** HIGH  
-**Status:** OPEN-REAL-NAS  
+**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
 **First confirmed:** 2026-09-18  
 **Area:** multi-PC NAS synchronization / data integrity
 
@@ -354,7 +354,7 @@ Do not expose secrets or unrelated file contents.
 # H2-NONAI-004 — Shared-filesystem capability assumptions are not verified
 
 **Severity:** HIGH  
-**Status:** OPEN-RISK  
+**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
 **First recorded:** 2026-09-18  
 **Area:** NAS protocol compatibility
 
@@ -438,7 +438,7 @@ Portable ZIP SHA256: `4a27bf96882a7518baa87e0feeb91a577415f3a957e85435210e9bd741
 # H2-NONAI-006 — Real NAS semantics are not covered by the current automated multi-PC tests
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** OPEN-REAL-NAS / H2M-133 BLOCKER  
 **First confirmed:** 2026-09-18  
 **Area:** regression/acceptance testing
 
@@ -535,7 +535,7 @@ The remaining H2-NONAI-008 remote/VPN portion is intentionally not marked fixed.
 # H2-NONAI-008 — Storage location is path-string only; mapped-network detection and endpoint failover are missing
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** PARTIAL-FIX / USER-POLICY-DECISION-REQUIRED  
 **First confirmed:** 2026-09-18  
 **Area:** storage location / mapped network / LAN-remote failover
 
@@ -626,12 +626,33 @@ Only after identity verification may H2 Notes treat these as aliases of one work
 - wrong endpoint with a different WorkspaceId must be rejected;
 - unsupported network provider semantics must not enable multi-writer mode silently.
 
+## Current implementation / final product decision — 2026-09-21
+
+The path-string-only portion of this entry is no longer current:
+
+- Schema 6 stores a stable shared `WorkspaceId`;
+- `WorkspaceLocation` classifies LocalFixed / LocalRemovable / MappedNetwork / UncNetwork / Unsupported;
+- Windows mapped drives are resolved to their network target while the friendly mapped path is retained for display;
+- logical identity, same-machine locking and self-transfer rejection use `WorkspaceId` after the workspace is known;
+- the resolved mapped/UNC alias may be used only when reachable and the candidate exposes the same `WorkspaceId`;
+- H2 never switches endpoint in the middle of a transaction;
+- when the accepted endpoint is unavailable, durable machine-local pending work is retained and replayed after reconnect.
+
+Exact implementation evidence: H2M-014 source `15adb9f3f188943ad9397a349805fe010a590119`, Actions `35475729264` SUCCESS; H2M-015 source `cc2b03ddec6e9fd3524e376c7013426308b70ef4`, Actions `35476297321` SUCCESS.
+
+The remaining unresolved product-policy question is narrower: whether production H2 should also support an explicitly configured secure **Remote/VPN** alias when the preferred LAN endpoint is unavailable. Current behavior deliberately chooses fail-safe LAN/verified-alias + durable offline pending mode instead of inventing Internet/VPN failover semantics.
+
+At H2M-133 the user must choose one:
+
+1. accept the current fail-safe boundary as the production design; or
+2. require implementation and real acceptance of secure Remote/VPN alias failover before production acceptance.
+
 ---
 
 # H2-NONAI-009 — Path aliases can bypass same-workspace identity checks and local instance locking
 
 **Severity:** HIGH  
-**Status:** OPEN  
+**Status:** FIXED  
 **First confirmed:** 2026-09-18  
 **Area:** workspace identity / duplicate instance / folder validation
 
@@ -687,6 +708,24 @@ Path comparison remains useful for local empty folders and traversal protection,
 - source/target aliases of same WorkspaceId -> transfer rejected as self-transfer;
 - two genuinely different workspaces with similar paths -> allowed;
 - endpoint failover between aliases of the same WorkspaceId -> no data migration prompt.
+
+## Resolution evidence — 2026-09-21
+
+H2-NONAI-009 is fixed by the Schema-6 logical workspace identity work:
+
+- stable `WorkspaceId` is persisted in shared workspace metadata;
+- same-machine locks use logical workspace identity after validation;
+- mapped-drive and UNC aliases are recognized as aliases of the same workspace;
+- source/target aliases with the same WorkspaceId are rejected as self-transfer;
+- different workspaces remain allowed;
+- resolved endpoint aliases are accepted only after WorkspaceId verification.
+
+Exact functional source: `15adb9f3f188943ad9397a349805fe010a590119`.  
+GitHub Actions: `35475729264` — SUCCESS.  
+H2 Notes: **345 passed, 0 failed**.  
+NAS harness self-test and the complete Agent/provider/publish pipeline passed in that acceptance run.
+
+Real two-PC NAS semantics remain tracked separately by H2-NONAI-001 / 004 / 006 and do not reopen this logical-identity defect.
 
 ---
 
