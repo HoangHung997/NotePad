@@ -501,6 +501,92 @@ public sealed class H2CoordinatorSqliteStore
         }
     }
 
+    public int CompactProjectEventsThrough(
+        Guid workspaceId,
+        Guid projectId,
+        long throughServerSequence)
+    {
+        if (workspaceId == Guid.Empty) throw new ArgumentException("WorkspaceId is required.", nameof(workspaceId));
+        if (projectId == Guid.Empty) throw new ArgumentException("ProjectId is required.", nameof(projectId));
+        if (throughServerSequence <= 0) throw new ArgumentOutOfRangeException(nameof(throughServerSequence));
+
+        lock (_gate)
+        {
+            using var connection = Open();
+            using var tx = connection.BeginTransaction();
+
+            using (var snapshot = connection.CreateCommand())
+            {
+                snapshot.Transaction = tx;
+                snapshot.CommandText =
+                    """
+                    SELECT MAX(through_sequence)
+                    FROM project_snapshots
+                    WHERE workspace_id = $workspace AND project_id = $project;
+                    """;
+                snapshot.Parameters.AddWithValue("$workspace", Id(workspaceId));
+                snapshot.Parameters.AddWithValue("$project", Id(projectId));
+                var value = snapshot.ExecuteScalar();
+                var snapshotThrough = value is null or DBNull
+                    ? 0
+                    : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+                if (snapshotThrough < throughServerSequence)
+                    throw new InvalidOperationException(
+                        "Project events cannot be compacted beyond the latest verified snapshot.");
+            }
+
+            var moved = Convert.ToInt32(ScalarInt64(
+                connection,
+                tx,
+                """
+                SELECT COUNT(*)
+                FROM project_events
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND server_sequence <= $sequence;
+                """,
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(projectId)),
+                ("$sequence", throughServerSequence)),
+                CultureInfo.InvariantCulture);
+
+            Execute(connection, tx,
+                """
+                INSERT OR IGNORE INTO project_event_archive(
+                    workspace_id, project_id, server_sequence,
+                    event_id, device_id, device_sequence, client_operation_id,
+                    payload_sha256, draft_json, accepted_utc,
+                    disposition, resulting_revision, resulting_entity_revision, conflict_id)
+                SELECT
+                    workspace_id, project_id, server_sequence,
+                    event_id, device_id, device_sequence, client_operation_id,
+                    payload_sha256, draft_json, accepted_utc,
+                    disposition, resulting_revision, resulting_entity_revision, conflict_id
+                FROM project_events
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND server_sequence <= $sequence;
+                """,
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(projectId)),
+                ("$sequence", throughServerSequence));
+
+            Execute(connection, tx,
+                """
+                DELETE FROM project_events
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND server_sequence <= $sequence;
+                """,
+                ("$workspace", Id(workspaceId)),
+                ("$project", Id(projectId)),
+                ("$sequence", throughServerSequence));
+
+            tx.Commit();
+            return moved;
+        }
+    }
+
     public H2ProjectSnapshot? GetLatestSnapshot(Guid workspaceId, Guid projectId)
     {
         lock (_gate)
@@ -1407,6 +1493,29 @@ public sealed class H2CoordinatorSqliteStore
 
             CREATE INDEX IF NOT EXISTS ix_project_events_after
                 ON project_events(workspace_id, project_id, server_sequence);
+
+            CREATE TABLE IF NOT EXISTS project_event_archive(
+                workspace_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                server_sequence INTEGER NOT NULL,
+                event_id TEXT NOT NULL UNIQUE,
+                device_id TEXT NOT NULL,
+                device_sequence INTEGER NOT NULL,
+                client_operation_id TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL,
+                draft_json TEXT NOT NULL,
+                accepted_utc TEXT NOT NULL,
+                disposition INTEGER NOT NULL,
+                resulting_revision INTEGER NULL,
+                resulting_entity_revision INTEGER NULL,
+                conflict_id TEXT NULL,
+                PRIMARY KEY(workspace_id, project_id, server_sequence),
+                UNIQUE(workspace_id, client_operation_id),
+                UNIQUE(workspace_id, device_id, device_sequence)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_project_event_archive_after
+                ON project_event_archive(workspace_id, project_id, server_sequence);
 
             CREATE TABLE IF NOT EXISTS project_revisions(
                 workspace_id TEXT NOT NULL,
