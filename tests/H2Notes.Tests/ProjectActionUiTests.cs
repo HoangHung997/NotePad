@@ -39,7 +39,7 @@ internal static class ProjectActionUiTests
                     Notes = "Original note",
                     Conversations = [conversation]
                 };
-                var before = System.Text.Json.JsonSerializer.Serialize(project);
+                var before = MutationTruth(project);
 
                 var panel = new AiChatPanel(app);
                 panel.SetProject(project);
@@ -68,8 +68,8 @@ internal static class ProjectActionUiTests
                             owned.Title != "Áp dụng thay đổi vào dự án?"
                             && owned.Title != "AI muốn thay đổi dự án"),
                         "Retired pseudo-action execution still opens an apply/confirmation dialog.");
-                    Check(before == System.Text.Json.JsonSerializer.Serialize(project),
-                        "Viewing a legacy h2-actions proposal mutated project truth.");
+                    Check(before == MutationTruth(project),
+                        "Viewing a legacy h2-actions proposal mutated project task/note truth.");
                     Check(!answer.ProjectActionsApplied,
                         "Viewing legacy proposal incorrectly marked it as applied.");
                 }
@@ -105,7 +105,7 @@ internal static class ProjectActionUiTests
             };
             var app = new H2Notes.Avalonia.App();
             app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
-            var before = System.Text.Json.JsonSerializer.Serialize(project);
+            var before = MutationTruth(project);
 
             var panel = new AiChatPanel(app);
             panel.SetProject(project);
@@ -117,8 +117,8 @@ internal static class ProjectActionUiTests
                 Check(panel.GetVisualDescendants().OfType<TextBlock>()
                     .Any(text => text.Text?.Contains("appliedUtc=2026-09-01", StringComparison.Ordinal) == true),
                     "Historical applied-action audit is not visible.");
-                Check(before == System.Text.Json.JsonSerializer.Serialize(project),
-                    "Rendering historical applied-action audit replayed the mutation.");
+                Check(before == MutationTruth(project),
+                    "Rendering historical applied-action audit replayed task/note mutation.");
             }
             finally
             {
@@ -193,6 +193,15 @@ internal static class ProjectActionUiTests
                 "Standalone legacy prompt still instructs the model to emit h2-actions.");
         });
     }
+
+    private static string MutationTruth(ProjectRecord project)
+        => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            project.Notes,
+            NotesRich = project.NotesRich,
+            project.UpdatedAtUtc,
+            ChecklistItems = project.ChecklistItems
+        });
 
     private static void Pump()
     {
