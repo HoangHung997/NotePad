@@ -480,6 +480,20 @@ internal static class H2CoordinatorClientSyncTests
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<bool> ConfirmProjectAiBarrierAsync(
+            Guid leaseId,
+            Guid deviceId,
+            long observedProjectSequence,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<bool> ResolveInterruptedProjectAiAsync(
+            Guid leaseId,
+            Guid deviceId,
+            H2ProjectAiQueueState terminalState,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task CompleteProjectAiAsync(
             H2ProjectAiCompletion completion,
             CancellationToken cancellationToken = default)
@@ -539,6 +553,12 @@ internal static class H2CoordinatorClientSyncTests
         public Task<bool> HeartbeatProjectAiLeaseAsync(Guid leaseId, Guid deviceId, DateTimeOffset heartbeatUtc, CancellationToken cancellationToken = default)
         { EnsureOnline(); return inner.HeartbeatProjectAiLeaseAsync(leaseId, deviceId, heartbeatUtc, cancellationToken); }
 
+        public Task<bool> ConfirmProjectAiBarrierAsync(Guid leaseId, Guid deviceId, long observedProjectSequence, CancellationToken cancellationToken = default)
+        { EnsureOnline(); return inner.ConfirmProjectAiBarrierAsync(leaseId, deviceId, observedProjectSequence, cancellationToken); }
+
+        public Task<bool> ResolveInterruptedProjectAiAsync(Guid leaseId, Guid deviceId, H2ProjectAiQueueState terminalState, CancellationToken cancellationToken = default)
+        { EnsureOnline(); return inner.ResolveInterruptedProjectAiAsync(leaseId, deviceId, terminalState, cancellationToken); }
+
         public Task CompleteProjectAiAsync(H2ProjectAiCompletion completion, CancellationToken cancellationToken = default)
         { EnsureOnline(); return inner.CompleteProjectAiAsync(completion, cancellationToken); }
 
@@ -592,6 +612,12 @@ internal static class H2CoordinatorClientSyncTests
         public Task<bool> HeartbeatProjectAiLeaseAsync(Guid leaseId, Guid deviceId, DateTimeOffset heartbeatUtc, CancellationToken cancellationToken = default)
             => inner.HeartbeatProjectAiLeaseAsync(leaseId, deviceId, heartbeatUtc, cancellationToken);
 
+        public Task<bool> ConfirmProjectAiBarrierAsync(Guid leaseId, Guid deviceId, long observedProjectSequence, CancellationToken cancellationToken = default)
+            => inner.ConfirmProjectAiBarrierAsync(leaseId, deviceId, observedProjectSequence, cancellationToken);
+
+        public Task<bool> ResolveInterruptedProjectAiAsync(Guid leaseId, Guid deviceId, H2ProjectAiQueueState terminalState, CancellationToken cancellationToken = default)
+            => inner.ResolveInterruptedProjectAiAsync(leaseId, deviceId, terminalState, cancellationToken);
+
         public Task CompleteProjectAiAsync(H2ProjectAiCompletion completion, CancellationToken cancellationToken = default)
             => inner.CompleteProjectAiAsync(completion, cancellationToken);
 
@@ -612,6 +638,8 @@ internal static class H2CoordinatorClientSyncTests
         public Task<H2QueuedProjectAiRequest> EnqueueProjectAiAsync(H2ProjectAiRequest request, CancellationToken cancellationToken = default) => throw Offline();
         public Task<H2ProjectAiLease?> TryAcquireProjectAiLeaseAsync(Guid workspaceId, Guid projectId, Guid deviceId, CancellationToken cancellationToken = default) => throw Offline();
         public Task<bool> HeartbeatProjectAiLeaseAsync(Guid leaseId, Guid deviceId, DateTimeOffset heartbeatUtc, CancellationToken cancellationToken = default) => throw Offline();
+        public Task<bool> ConfirmProjectAiBarrierAsync(Guid leaseId, Guid deviceId, long observedProjectSequence, CancellationToken cancellationToken = default) => throw Offline();
+        public Task<bool> ResolveInterruptedProjectAiAsync(Guid leaseId, Guid deviceId, H2ProjectAiQueueState terminalState, CancellationToken cancellationToken = default) => throw Offline();
         public Task CompleteProjectAiAsync(H2ProjectAiCompletion completion, CancellationToken cancellationToken = default) => throw Offline();
         public Task<IReadOnlyList<H2QueuedProjectAiRequest>> GetProjectAiQueueAsync(Guid workspaceId, Guid projectId, int limit = 100, CancellationToken cancellationToken = default) => throw Offline();
     }
