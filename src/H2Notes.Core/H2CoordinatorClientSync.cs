@@ -263,19 +263,28 @@ public static class H2ProjectEventApplier
     public static ProjectRecord? Apply(ProjectRecord? current, H2AcceptedProjectEvent accepted)
     {
         ArgumentNullException.ThrowIfNull(accepted);
-        return ApplyCore(current, accepted.Draft, accepted.ServerSequence);
+        return ApplyCore(
+            current,
+            accepted.Draft,
+            accepted.ServerSequence,
+            accepted.AcceptedUtc);
     }
 
     public static ProjectRecord? Apply(ProjectRecord? current, H2ProjectEventDraft draft)
     {
         ArgumentNullException.ThrowIfNull(draft);
-        return ApplyCore(current, draft, serverSequence: null);
+        return ApplyCore(
+            current,
+            draft,
+            serverSequence: null,
+            draft.ClientCreatedUtc);
     }
 
     private static ProjectRecord? ApplyCore(
         ProjectRecord? current,
         H2ProjectEventDraft draft,
-        long? serverSequence)
+        long? serverSequence,
+        DateTimeOffset eventAt)
     {
         var project = Clone(current);
 
@@ -284,7 +293,8 @@ public static class H2ProjectEventApplier
             H2ProjectEventKind.CreateEntity => ApplyCreate(project, draft),
             H2ProjectEventKind.SetField => ApplySetField(project, draft),
             H2ProjectEventKind.DeleteEntity => ApplyDelete(project, draft),
-            H2ProjectEventKind.AppendMessage => ApplyAppendMessage(project, draft, serverSequence),
+            H2ProjectEventKind.AppendMessage => ApplyAppendMessage(
+                project, draft, serverSequence, eventAt),
             H2ProjectEventKind.ResolveConflict => ApplyResolution(project, draft),
             _ => throw new NotSupportedException(
                 $"Project event kind {draft.Kind} is not part of the initial Coordinator client projection.")
@@ -415,7 +425,8 @@ public static class H2ProjectEventApplier
     private static ProjectRecord ApplyAppendMessage(
         ProjectRecord? project,
         H2ProjectEventDraft draft,
-        long? serverSequence)
+        long? serverSequence,
+        DateTimeOffset eventAt)
     {
         project = RequireProject(project, draft);
         if (draft.Target.EntityKind != H2ProjectEntityKind.Message)
@@ -433,7 +444,9 @@ public static class H2ProjectEventApplier
                 Id = append.ConversationId,
                 Title = string.IsNullOrWhiteSpace(append.ConversationTitle)
                     ? "Cuộc trao đổi"
-                    : append.ConversationTitle!
+                    : append.ConversationTitle!,
+                CreatedAtUtc = eventAt.UtcDateTime,
+                UpdatedAtUtc = eventAt.UtcDateTime
             };
             project.Conversations.Add(conversation);
         }
@@ -451,7 +464,7 @@ public static class H2ProjectEventApplier
 
         conversation.Messages.Add(message);
         conversation.Revision++;
-        conversation.UpdatedAtUtc = DateTime.UtcNow;
+        conversation.UpdatedAtUtc = eventAt.UtcDateTime;
         project.Revision++;
         return project;
     }
