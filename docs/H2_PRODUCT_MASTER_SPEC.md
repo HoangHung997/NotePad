@@ -12,6 +12,7 @@ Implementation timing: **After H2 Agent core passes its master acceptance gate a
 > - `docs/H2_AGENT_MASTER_SPEC.md`
 > - `docs/H2_AGENT_MASTER_TASKS.md`
 > - `docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
+> - `docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`
 >
 > Historical/current-baseline UI documents remain useful for migration and visual comparison, but they do not override this future information architecture.
 
@@ -959,9 +960,9 @@ SheetOperations
 
 ---
 
-### 29.2 KEEP — persistence foundation, but fix bug ledger first
+### 29.2 MODIFY — persistence foundation after mixed-transport evidence
 
-Keep:
+Keep/reuse where appropriate:
 
 ```text
 ProjectWorkspaceStore
@@ -971,21 +972,23 @@ LocalConfiguration
 SecretVault
 ```
 
-But persistent schema expansion must not proceed while critical storage integrity risks are ignored.
+But their roles change for multi-device mode.
 
-Before new shared Agent/project metadata is added, read and resolve/accept the relevant items in:
+Real two-PC evidence on 2026-09-21 proved that the user's mixed WebDAV/SMB access paths do not share reliable cross-client locking semantics. Therefore the future shared-project protocol must not rely on multiple clients directly mutating one shared NAS workspace.
 
-`docs/H2_NOTES_NON_AI_BUG_LEDGER.md`
+Canonical direction is defined in:
 
-Especially:
+`docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`
 
-- cross-PC hash mismatch;
-- journal/final verification ordering;
-- SMB/NAS filesystem assumptions;
-- mixed-generation recovery;
-- real NAS test coverage;
-- network endpoint identity/failover;
-- workspace identity/path aliases.
+Future roles:
+
+- `ProjectWorkspaceStore`: legacy import/migration, local/single-user storage, backup/export compatibility where still useful;
+- `WorkspaceTransfer`: migration/export support;
+- `LocalConfiguration`: Coordinator endpoint, DeviceId and machine-local sync settings;
+- `SecretVault`: machine-local Coordinator/device credentials;
+- H2 Sync Coordinator: authoritative shared project event sequencing, snapshots, conflicts and AI queue/barriers.
+
+Before shared-schema work continues, read the non-AI bug ledger and preserve all accepted recovery/migration evidence. Do not revive NAS file locking as a fallback correctness mechanism.
 
 ---
 
@@ -1164,64 +1167,94 @@ Keep extension points, not unused complexity.
 
 ---
 
-## 31. Project/Agent storage boundary
+## 31. Project/Agent/Coordinator storage boundary
 
-Initial target:
+The future shared-project target is:
 
 ```text
-Shared project workspace
+H2 Sync Coordinator durable store
+  -> immutable accepted project events
+  -> verified project snapshots
+  -> structured conflict records
+  -> device/workspace coordination
+  -> per-project AI queue / lease / sync barriers
+
+H2 project model/projection
   -> ProjectRecord
   -> TaskRecord
   -> Notes
   -> Links
-  -> minimal durable H2 project data
+  -> shared conversation presentation data
 
 Agent state store
   -> Agent tasks/runs
   -> evidence
   -> artifacts
   -> verification
+  -> repair
   -> trace
 
-Local config/state
+Local client state
+  -> durable offline outbox
+  -> last synchronized project projection
   -> window layout
   -> bubble
   -> hotkey
   -> active desktop context
+  -> DeviceId / Coordinator credentials
+
+NAS / external storage
+  -> Coordinator-owned backup/export/archive where configured
+  -> external user files/resources
+  -> legacy import source
 ```
 
-Project association is by ID/reference, not by copying Agent state into the project JSON.
+Project association remains by ID/reference. Do not copy Agent internals into project data.
+
+The Coordinator is not a second Agent engine. It owns only shared H2 sequencing/synchronization/AI-turn coordination.
 
 ---
 
 ## 32. Cross-device implications
 
-Do not assume Agent tasks running on PC1 automatically exist live on PC2.
+Cross-device correctness must not depend on PC1 and PC2 reaching storage through the same filesystem provider.
 
-First version may define:
+The confirmed user topology includes mixed WebDAV and SMB access. Therefore:
 
-- project data sync through existing H2 workspace;
-- Agent task execution stays on the machine running it;
-- completed verified Agent activity may later publish a compact project activity reference if needed.
+- clients synchronize H2 shared project data through the H2 Sync Coordinator protocol;
+- clients do not directly compete to overwrite the same shared H2 project JSON files;
+- server-assigned sequence determines accepted shared-project order;
+- human edits may be durable offline in a machine-local outbox and reconcile later;
+- incompatible same-field concurrent edits become structured conflicts, not silent last-writer-wins;
+- one project-associated mutating AI run is serialized by a Coordinator lease;
+- the next AI run must synchronize through the prior completion barrier before starting;
+- different projects may run AI concurrently;
+- Agent execution itself remains on the client/device unless a later architecture explicitly changes that.
 
-Do not build distributed Agent execution before the NAS/project store itself is stable.
+Do not build Raft/Paxos, peer election or multi-Coordinator active/active for v1.
+
+The complete protocol and invariants are defined in `docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md`.
 
 ---
 
 ## 33. Sync health belongs on the board
 
-Because H2 is multi-device/NAS-aware, Command Center should show project/workspace health.
+Command Center must show Coordinator/project synchronization health rather than reducing all failures to “NAS unavailable”.
 
 Examples:
 
 ```text
-✓ Synced
-● Saving
-⚠ NAS unavailable
-⚠ Workspace conflict/recovery required
+✓ Synced · seq 1842
+● Syncing · 3 local changes
+⚠ Offline · local changes safe
+⚠ Conflict · 1 field needs review
+⚠ Coordinator unavailable
+⚠ AI waiting for project turn
 ```
 
-This state comes from storage/sync service, not the model.
+This state comes from the H2 synchronization/Coordinator service, not the model.
+
+External file/resource availability is a separate signal from H2 project-state synchronization.
 
 ---
 
