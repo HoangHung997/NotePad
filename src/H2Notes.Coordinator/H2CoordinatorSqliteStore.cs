@@ -1055,7 +1055,8 @@ public sealed partial class H2CoordinatorSqliteStore
             row = FindAiQueueByLease(connection, tx, leaseId);
             if (row is null
                 || row.Lease.OwnerDeviceId != deviceId
-                || row.State is not (H2ProjectAiQueueState.WaitingForSync or H2ProjectAiQueueState.Running))
+                || (row.State != H2ProjectAiQueueState.WaitingForSync
+                    && row.State != H2ProjectAiQueueState.Running))
             {
                 tx.Commit();
                 return false;
@@ -1080,10 +1081,9 @@ public sealed partial class H2CoordinatorSqliteStore
         Guid deviceId,
         H2ProjectAiQueueState terminalState)
     {
-        if (terminalState is not (
-            H2ProjectAiQueueState.Abandoned
-            or H2ProjectAiQueueState.Failed
-            or H2ProjectAiQueueState.Cancelled))
+        if (terminalState != H2ProjectAiQueueState.Abandoned
+            && terminalState != H2ProjectAiQueueState.Failed
+            && terminalState != H2ProjectAiQueueState.Cancelled)
             throw new ArgumentException(
                 "Interrupted AI resolution must be Abandoned, Failed or Cancelled.",
                 nameof(terminalState));
@@ -1095,7 +1095,8 @@ public sealed partial class H2CoordinatorSqliteStore
             var row = FindAiQueueByLease(connection, tx, leaseId);
             if (row is null
                 || row.Lease.OwnerDeviceId != deviceId
-                || row.State is not (H2ProjectAiQueueState.WaitingForRepair or H2ProjectAiQueueState.NeedsUserReview))
+                || (row.State != H2ProjectAiQueueState.WaitingForRepair
+                    && row.State != H2ProjectAiQueueState.NeedsUserReview))
             {
                 tx.Commit();
                 return false;
@@ -1123,6 +1124,129 @@ public sealed partial class H2CoordinatorSqliteStore
                 ("$request", Id(row.Request.RequestId)));
             tx.Commit();
             return changed == 1;
+        }
+    }
+
+    private DateTimeOffset ServerNow()
+        => _utcNow().ToUniversalTime();
+
+    private static H2ProjectAiLease RefreshLease(
+        H2ProjectAiLease lease,
+        DateTimeOffset serverNow)
+        => new(
+            lease.LeaseId,
+            lease.RequestId,
+            lease.ProjectId,
+            lease.OwnerDeviceId,
+            lease.QueueSequence,
+            lease.Barrier,
+            lease.GrantedUtc,
+            serverNow,
+            serverNow + ProjectAiLeaseDuration);
+
+    private static AiQueueLeaseRow? FindAiQueueByLease(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid leaseId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText =
+            """
+            SELECT workspace_id, project_id, request_json, state, lease_json
+            FROM ai_queue
+            WHERE lease_json IS NOT NULL
+              AND state IN ($waitingSync, $running, $repair, $review)
+            ORDER BY workspace_id, project_id, queue_sequence;
+            """;
+        command.Parameters.AddWithValue("$waitingSync", (int)H2ProjectAiQueueState.WaitingForSync);
+        command.Parameters.AddWithValue("$running", (int)H2ProjectAiQueueState.Running);
+        command.Parameters.AddWithValue("$repair", (int)H2ProjectAiQueueState.WaitingForRepair);
+        command.Parameters.AddWithValue("$review", (int)H2ProjectAiQueueState.NeedsUserReview);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var lease = Deserialize<H2ProjectAiLease>(reader.GetString(4));
+            if (lease.LeaseId != leaseId) continue;
+            return new AiQueueLeaseRow(
+                Guid.Parse(reader.GetString(0)),
+                Guid.Parse(reader.GetString(1)),
+                Deserialize<H2ProjectAiRequest>(reader.GetString(2)),
+                (H2ProjectAiQueueState)reader.GetInt32(3),
+                lease);
+        }
+        return null;
+    }
+
+    private static void RecoverExpiredProjectAiUnderLock(
+        SqliteConnection connection,
+        SqliteTransaction tx,
+        Guid workspaceId,
+        Guid projectId,
+        DateTimeOffset serverNow)
+    {
+        var rows = new List<(H2ProjectAiRequest Request, H2ProjectAiQueueState State, H2ProjectAiLease Lease)>();
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = tx;
+            command.CommandText =
+                """
+                SELECT request_json, state, lease_json
+                FROM ai_queue
+                WHERE workspace_id = $workspace
+                  AND project_id = $project
+                  AND state IN ($waitingSync, $running)
+                  AND lease_json IS NOT NULL
+                ORDER BY queue_sequence;
+                """;
+            command.Parameters.AddWithValue("$workspace", Id(workspaceId));
+            command.Parameters.AddWithValue("$project", Id(projectId));
+            command.Parameters.AddWithValue("$waitingSync", (int)H2ProjectAiQueueState.WaitingForSync);
+            command.Parameters.AddWithValue("$running", (int)H2ProjectAiQueueState.Running);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                rows.Add((
+                    Deserialize<H2ProjectAiRequest>(reader.GetString(0)),
+                    (H2ProjectAiQueueState)reader.GetInt32(1),
+                    Deserialize<H2ProjectAiLease>(reader.GetString(2))));
+        }
+
+        foreach (var row in rows.Where(item => item.Lease.ExpiresUtc <= serverNow))
+        {
+            if (row.State == H2ProjectAiQueueState.WaitingForSync)
+            {
+                var head = ReadProjectSequence(connection, tx, workspaceId, projectId);
+                var completion = new H2ProjectAiCompletion(
+                    row.Lease.LeaseId,
+                    row.Request.RequestId,
+                    projectId,
+                    H2ProjectAiQueueState.Abandoned,
+                    head,
+                    null,
+                    serverNow);
+                Execute(connection, tx,
+                    """
+                    UPDATE ai_queue
+                    SET state = $abandoned, lease_json = NULL, completion_json = $completion
+                    WHERE request_id = $request AND state = $waitingSync;
+                    """,
+                    ("$abandoned", (int)H2ProjectAiQueueState.Abandoned),
+                    ("$completion", JsonSerializer.Serialize(completion, Json)),
+                    ("$request", Id(row.Request.RequestId)),
+                    ("$waitingSync", (int)H2ProjectAiQueueState.WaitingForSync));
+            }
+            else
+            {
+                Execute(connection, tx,
+                    """
+                    UPDATE ai_queue
+                    SET state = $repair
+                    WHERE request_id = $request AND state = $running;
+                    """,
+                    ("$repair", (int)H2ProjectAiQueueState.WaitingForRepair),
+                    ("$request", Id(row.Request.RequestId)),
+                    ("$running", (int)H2ProjectAiQueueState.Running));
+            }
         }
     }
 
@@ -2235,6 +2359,13 @@ public sealed partial class H2CoordinatorSqliteStore
         => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
     private sealed record RevisionRow(long Revision, bool IsDeleted, Guid LastEventId);
+
+    private sealed record AiQueueLeaseRow(
+        Guid WorkspaceId,
+        Guid ProjectId,
+        H2ProjectAiRequest Request,
+        H2ProjectAiQueueState State,
+        H2ProjectAiLease Lease);
 
     private sealed record MutationArbitration(
         H2ProjectEventDisposition Disposition,
