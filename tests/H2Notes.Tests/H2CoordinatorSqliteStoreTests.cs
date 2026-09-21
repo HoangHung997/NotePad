@@ -202,7 +202,7 @@ internal static class H2CoordinatorSqliteStoreTests
             Equal(lease1.LeaseId, restarted.GetRunningProjectAiLease(workspace, project)!.LeaseId);
             Equal(2, restarted.GetProjectAiQueue(workspace, project).Count);
 
-            restarted.CompleteProjectAi(new H2ProjectAiCompletion(
+            restarted.CompleteProjectAiUncheckedLegacy(new H2ProjectAiCompletion(
                 lease1.LeaseId,
                 r1.RequestId,
                 project,
