@@ -1,6 +1,6 @@
 # H12 Legacy Cleanup — H2M-120..124
 
-Status: implementation candidate; close only after exact-head CI is green.
+Status: COMPLETE. Exact-head H12 acceptance is green.
 
 ## H2M-120 — AiProjectContext execution dependency
 
@@ -63,3 +63,17 @@ Agent master documents remain independent Agent authority and are not superseded
 ## Acceptance guard
 
 `H2LegacyCleanupTests` enforces H2M-120..124 at source/runtime level, while `ProjectActionUiTests` proves that old h2-actions history remains viewable but non-executable.
+
+
+## Exact acceptance evidence
+
+- Functional source: `c183c70deea5dab414caf74282e6a98570a2487c`
+- GitHub Actions: `35550915085` — SUCCESS
+- H2 Notes: **488 passed, 0 failed**
+- H2M-120..124 dedicated guard: **5/5 PASS**
+- Legacy h2-actions read-only/history UI cases: **4/4 PASS**
+- New project Agent pseudo-action-path guard: PASS
+- NAS acceptance harness self-test: PASS
+- Full Agent/provider/transport/DesktopHost/OfficeHost/Windows publish pipeline: PASS
+
+The run's repository /bin publish was allowed to skip stale metadata if the branch advanced; that does not weaken H12 functional acceptance because build/test/publish artifacts for the tested source all completed successfully.
