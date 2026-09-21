@@ -169,55 +169,45 @@ internal static class Program
 
     private static async Task CoordinatorLockCase(string session, ProbeReport evidence)
     {
-        var path = Path.Combine(session, "exclusive.lock");
-        await using (var held = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.WriteThrough))
+        using (var held = WorkspaceCommitLease.Acquire(session, "probe-coordinator", TimeSpan.FromSeconds(2)))
         {
-            var bytes = Encoding.UTF8.GetBytes("held-by=" + Environment.MachineName);
-            held.SetLength(0);
-            await held.WriteAsync(bytes);
-            held.Flush(true);
             File.WriteAllText(Path.Combine(session, "lock.held"), DateTimeOffset.UtcNow.ToString("O"));
             await WaitFile(Path.Combine(session, "lock.peer-blocked.json"));
             var result = ReadJson<PeerResult>(Path.Combine(session, "lock.peer-blocked.json"));
-            if (!result.Success) throw new InvalidOperationException("Peer acquired an exclusive lock while coordinator still held it.");
+            if (!result.Success) throw new InvalidOperationException("Peer acquired the atomic-create commit lease while coordinator still held it.");
         }
 
         File.WriteAllText(Path.Combine(session, "lock.released"), DateTimeOffset.UtcNow.ToString("O"));
         await WaitFile(Path.Combine(session, "lock.peer-after-release.json"));
         var after = ReadJson<PeerResult>(Path.Combine(session, "lock.peer-after-release.json"));
-        if (!after.Success) throw new InvalidOperationException("Peer could not acquire lock after release.");
-        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "FileShare.None was visible across nodes and acquisition succeeded after release."));
+        if (!after.Success) throw new InvalidOperationException("Peer could not acquire the atomic-create commit lease after release.");
+        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Atomic FileMode.CreateNew commit lease excluded the peer and acquisition succeeded after release."));
     }
 
     private static async Task PeerLockCase(string session, ProbeReport evidence)
     {
         await WaitFile(Path.Combine(session, "lock.held"));
-        var path = Path.Combine(session, "exclusive.lock");
         var blocked = false;
         try
         {
-            using var unexpected = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            using var unexpected = WorkspaceCommitLease.Acquire(
+                session, "probe-peer-blocked-check", TimeSpan.FromMilliseconds(500));
         }
         catch (IOException) { blocked = true; }
         WriteJson(Path.Combine(session, "lock.peer-blocked.json"), new PeerResult(blocked, DateTimeOffset.UtcNow, Environment.MachineName));
-        if (!blocked) throw new InvalidOperationException("Exclusive lock was not enforced across nodes.");
+        if (!blocked) throw new InvalidOperationException("Atomic-create commit lease was not enforced across nodes.");
 
         await WaitFile(Path.Combine(session, "lock.released"));
         var acquired = false;
-        var deadline = DateTime.UtcNow + _waitTimeout;
-        do
+        try
         {
-            try
-            {
-                using var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-                acquired = true;
-                break;
-            }
-            catch (IOException) { await Task.Delay(100); }
-        } while (DateTime.UtcNow < deadline);
+            using var stream = WorkspaceCommitLease.Acquire(session, "probe-peer-after-release", _waitTimeout);
+            acquired = true;
+        }
+        catch (IOException) { acquired = false; }
         WriteJson(Path.Combine(session, "lock.peer-after-release.json"), new PeerResult(acquired, DateTimeOffset.UtcNow, Environment.MachineName));
-        if (!acquired) throw new IOException("Could not acquire released lock.");
-        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Peer was blocked while held and acquired after release."));
+        if (!acquired) throw new IOException("Could not acquire released atomic-create commit lease.");
+        evidence.Cases.Add(Pass("EXCLUSIVE-LOCK", "Peer was blocked by atomic create while held and acquired after release."));
     }
 
     private static async Task CoordinatorFlushCase(string session, ProbeReport evidence)
