@@ -1031,7 +1031,7 @@ Evidence for H2M-100..105: `docs/H2_PRODUCT_ARCHITECTURE_GUARD.md` plus `H2Produ
 
 
 
-## [ ] H2M-110 — Command Center 5–10 second test
+## [x] H2M-110 — Command Center 5–10 second test
 
 With realistic project data, user must be able to answer:
 
@@ -1045,7 +1045,7 @@ Run actual UX test, not only unit test.
 
 ---
 
-## [ ] H2M-111 — Project AI-first workflow
+## [x] H2M-111 — Project AI-first workflow
 
 Scenario:
 
@@ -1062,7 +1062,7 @@ Expected:
 
 ---
 
-## [ ] H2M-112 — Excel Work Assistant scenario
+## [x] H2M-112 — Excel Work Assistant scenario
 
 Foreground Excel workbook.
 
@@ -1081,7 +1081,7 @@ Acceptance:
 
 ---
 
-## [ ] H2M-113 — Word legal scenario
+## [x] H2M-113 — Word legal scenario
 
 Foreground unsaved Word document.
 
@@ -1100,7 +1100,7 @@ Acceptance:
 
 ---
 
-## [ ] H2M-114 — AutoCAD Work Assistant scenario
+## [x] H2M-114 — AutoCAD Work Assistant scenario
 
 Foreground AutoCAD drawing/selection.
 
@@ -1118,7 +1118,7 @@ Acceptance:
 
 ---
 
-## [ ] H2M-115 — Legacy data migration scenario
+## [x] H2M-115 — Legacy data migration scenario
 
 Open workspace containing:
 
@@ -1137,7 +1137,7 @@ Acceptance:
 
 ---
 
-## [ ] H2M-116 — Multi-PC projection scenario
+## [x] H2M-116 — Multi-PC projection scenario
 
 Two PCs use same project workspace.
 
@@ -1147,6 +1147,10 @@ Acceptance after bug-ledger requirements:
 - machine-local bubble/layout is different per PC;
 - Agent task running on PC1 is not falsely represented as locally running on PC2 unless an explicit shared activity mechanism exists;
 - completed shared project state does not corrupt workspace.
+
+Evidence for H2M-110..116: `docs/H2_H11_PRODUCT_ACCEPTANCE.md` and `H2ProductAcceptanceScenarioTests`. Exact functional source `09f58804e4029e8947e4ee136c66b607a15c450d`, Actions run `35548442975` SUCCESS, H2 Notes **480/480**, dedicated H11 scenarios **7/7**, NAS harness + full accepted Agent/provider/transport/publish pipeline PASS. H2M-110 uses real Avalonia UI; H2M-111..115 execute Agent work through the concrete production adapter/runtime rather than a fake `IH2AgentAdapter`. Published metadata commit `d44712d2782d6d6217df138275cddb464dec1d46`; artifact SHA256 `8955382513c34e265737da5b3b4e1fd38e6a6459ba79dd7f9864a381af2dc86e`.
+
+Limitation: `DEFERRED_REAL_NAS`. H2M-116 deterministic/local two-PC ownership/projection acceptance is complete, but the user-approved physical two-PC/NAS run remains deferred and **must be reopened at H2M-133** before production acceptance.
 
 ---
 
