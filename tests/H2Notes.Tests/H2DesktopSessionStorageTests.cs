@@ -62,7 +62,7 @@ internal static class H2DesktopSessionStorageTests
                 {
                     NoteKind = "general",
                     Title = "PC A note",
-                    Left = -2200,
+                    Left = -2200.125,
                     Top = 777,
                     Width = 1555,
                     Height = 999,
@@ -73,7 +73,7 @@ internal static class H2DesktopSessionStorageTests
                 {
                     NoteKind = "project-hub",
                     Title = "Projects",
-                    SheetLeft = -1900,
+                    SheetLeft = -1900.875,
                     SheetTop = 650,
                     SheetWidth = 1600,
                     SheetHeight = 1000,
@@ -97,13 +97,13 @@ internal static class H2DesktopSessionStorageTests
                 Check(!index.Contains(note.Id.ToString(), StringComparison.OrdinalIgnoreCase)
                       || !index.Contains("\"OpenWindowIds\":[", StringComparison.Ordinal),
                     "Shared index appears to contain live desktop session window IDs.");
-                Check(!index.Contains("-2200", StringComparison.Ordinal)
-                      && !index.Contains("-1900", StringComparison.Ordinal),
+                Check(!index.Contains("-2200.125", StringComparison.Ordinal)
+                      && !index.Contains("-1900.875", StringComparison.Ordinal),
                     "Shared index leaked monitor-specific coordinates.");
 
                 var noteFile = Directory.EnumerateFiles(Path.Combine(root, "notes"), "*.h2note.json").Single();
                 var noteJson = File.ReadAllText(noteFile);
-                Check(!noteJson.Contains("-2200", StringComparison.Ordinal)
+                Check(!noteJson.Contains("-2200.125", StringComparison.Ordinal)
                       && !noteJson.Contains("1555", StringComparison.Ordinal)
                       && !noteJson.Contains("\"IsPinned\": true", StringComparison.OrdinalIgnoreCase)
                       && !noteJson.Contains("\"IsVisibleOnDesktop\": true", StringComparison.OrdinalIgnoreCase),
