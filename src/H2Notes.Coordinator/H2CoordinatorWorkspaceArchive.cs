@@ -557,6 +557,18 @@ public sealed partial class H2CoordinatorSqliteStore
                 ? H2ProjectEventPayload.Deserialize<H2ConflictResolutionPayload>(draft.PayloadJson).Action
                 : (H2ConflictResolutionAction?)null;
 
+            if (resolutionAction == H2ConflictResolutionAction.RestoreEntity)
+            {
+                foreach (var key in revisions.Values
+                             .Where(item =>
+                                 item.EntityKind == draft.Target.EntityKind
+                                 && item.EntityId == draft.Target.EntityId
+                                 && item.FieldKey is not null)
+                             .Select(item => item.StableKey)
+                             .ToArray())
+                    revisions.Remove(key);
+            }
+
             if ((draft.Kind == H2ProjectEventKind.SetField
                  || resolutionAction == H2ConflictResolutionAction.SetField)
                 && accepted.ResultingRevision.HasValue)
