@@ -82,6 +82,64 @@ internal static class H2CoordinatorClientSyncTests
             Equal("PC2 offline notes", client1.CurrentProject!.NotesText);
         });
 
+        test("Coordinator client retains outbox when submit succeeds but acknowledgement pull is interrupted", () =>
+        {
+            var root = Folder();
+            var workspace = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
+            var device = H2CoordinatorDeviceIdentity.CreateNew("PC1");
+            var store = new H2CoordinatorSqliteStore(Path.Combine(root, "coordinator.db"));
+            var baseService = new StoreCoordinator(store);
+            var localRoot = Path.Combine(root, "local");
+
+            var client = new H2ProjectSyncClient(
+                workspace,
+                projectId,
+                device,
+                baseService,
+                new H2CoordinatorClientStateStore(localRoot, workspace, projectId, device.DeviceId));
+            client.QueueCreateProject(new ProjectRecord
+            {
+                Id = projectId,
+                Name = "Initial",
+                NameRich = RichDocument.Plain("Initial"),
+                Notes = "",
+                NotesRich = RichDocument.Plain("")
+            });
+            client.SynchronizeAsync().GetAwaiter().GetResult();
+            Equal(1L, client.AppliedServerSequence);
+
+            var interrupted = new FailFirstReadAfterSubmitCoordinator(baseService);
+            var mutatingClient = new H2ProjectSyncClient(
+                workspace,
+                projectId,
+                device,
+                interrupted,
+                new H2CoordinatorClientStateStore(localRoot, workspace, projectId, device.DeviceId));
+            mutatingClient.QueueSetProjectNotes(RichDocument.Plain("accepted but pull interrupted"));
+
+            Throws<IOException>(() => mutatingClient.SynchronizeAsync().GetAwaiter().GetResult());
+            Equal(1, mutatingClient.PendingCount);
+            Equal(2L, store.GetProjectHead(workspace, projectId).ServerSequence);
+            Equal(2, store.GetProjectEvents(workspace, projectId, 0).Count);
+
+            // Restart/retry sends the same ClientOperationId. Coordinator returns the original ack,
+            // the event is not duplicated, and outbox clears only after sequence 2 is observed.
+            var recovered = new H2ProjectSyncClient(
+                workspace,
+                projectId,
+                device,
+                baseService,
+                new H2CoordinatorClientStateStore(localRoot, workspace, projectId, device.DeviceId));
+            var result = recovered.SynchronizeAsync().GetAwaiter().GetResult();
+
+            Equal(H2ProjectSyncStatus.Synced, result.Status);
+            Equal(0, recovered.PendingCount);
+            Equal(2L, recovered.AppliedServerSequence);
+            Equal("accepted but pull interrupted", recovered.CurrentProject!.NotesText);
+            Equal(2, store.GetProjectEvents(workspace, projectId, 0).Count);
+        });
+
         test("Coordinator client durable outbox stores immutable events before optimistic projection", () =>
         {
             var root = Folder();
@@ -407,6 +465,59 @@ internal static class H2CoordinatorClientSyncTests
 
         public Task<IReadOnlyList<H2QueuedProjectAiRequest>> GetProjectAiQueueAsync(Guid workspaceId, Guid projectId, int limit = 100, CancellationToken cancellationToken = default)
         { EnsureOnline(); return inner.GetProjectAiQueueAsync(workspaceId, projectId, limit, cancellationToken); }
+    }
+
+    private sealed class FailFirstReadAfterSubmitCoordinator(IH2SyncCoordinator inner) : IH2SyncCoordinator
+    {
+        private bool _submitted;
+        private bool _failedRead;
+
+        public Task RegisterDeviceAsync(Guid workspaceId, H2CoordinatorDeviceIdentity device, CancellationToken cancellationToken = default)
+            => inner.RegisterDeviceAsync(workspaceId, device, cancellationToken);
+
+        public Task<H2ProjectHead> GetProjectHeadAsync(Guid workspaceId, Guid projectId, CancellationToken cancellationToken = default)
+            => inner.GetProjectHeadAsync(workspaceId, projectId, cancellationToken);
+
+        public Task<H2ProjectSnapshot?> GetProjectSnapshotAsync(Guid workspaceId, Guid projectId, long? atOrBeforeSequence = null, CancellationToken cancellationToken = default)
+            => inner.GetProjectSnapshotAsync(workspaceId, projectId, atOrBeforeSequence, cancellationToken);
+
+        public Task<IReadOnlyList<H2AcceptedProjectEvent>> GetProjectEventsAsync(Guid workspaceId, Guid projectId, long afterServerSequence, int limit = 500, CancellationToken cancellationToken = default)
+        {
+            if (_submitted && !_failedRead)
+            {
+                _failedRead = true;
+                throw new IOException("Interrupted after Coordinator accepted submit.");
+            }
+            return inner.GetProjectEventsAsync(workspaceId, projectId, afterServerSequence, limit, cancellationToken);
+        }
+
+        public async Task<H2ProjectEventSubmissionResult> SubmitProjectEventsAsync(Guid workspaceId, Guid deviceId, IReadOnlyList<H2ProjectEventDraft> events, CancellationToken cancellationToken = default)
+        {
+            var result = await inner.SubmitProjectEventsAsync(workspaceId, deviceId, events, cancellationToken);
+            _submitted = true;
+            return result;
+        }
+
+        public Task<IReadOnlyList<H2ProjectConflict>> GetProjectConflictsAsync(Guid workspaceId, Guid projectId, CancellationToken cancellationToken = default)
+            => inner.GetProjectConflictsAsync(workspaceId, projectId, cancellationToken);
+
+        public Task<H2ProjectEventAcknowledgement> ResolveConflictAsync(Guid workspaceId, Guid conflictId, H2ProjectEventDraft resolutionEvent, CancellationToken cancellationToken = default)
+            => inner.ResolveConflictAsync(workspaceId, conflictId, resolutionEvent, cancellationToken);
+
+        public Task<H2QueuedProjectAiRequest> EnqueueProjectAiAsync(H2ProjectAiRequest request, CancellationToken cancellationToken = default)
+            => inner.EnqueueProjectAiAsync(request, cancellationToken);
+
+        public Task<H2ProjectAiLease?> TryAcquireProjectAiLeaseAsync(Guid workspaceId, Guid projectId, Guid deviceId, CancellationToken cancellationToken = default)
+            => inner.TryAcquireProjectAiLeaseAsync(workspaceId, projectId, deviceId, cancellationToken);
+
+        public Task<bool> HeartbeatProjectAiLeaseAsync(Guid leaseId, Guid deviceId, DateTimeOffset heartbeatUtc, CancellationToken cancellationToken = default)
+            => inner.HeartbeatProjectAiLeaseAsync(leaseId, deviceId, heartbeatUtc, cancellationToken);
+
+        public Task CompleteProjectAiAsync(H2ProjectAiCompletion completion, CancellationToken cancellationToken = default)
+            => inner.CompleteProjectAiAsync(completion, cancellationToken);
+
+        public Task<IReadOnlyList<H2QueuedProjectAiRequest>> GetProjectAiQueueAsync(Guid workspaceId, Guid projectId, int limit = 100, CancellationToken cancellationToken = default)
+            => inner.GetProjectAiQueueAsync(workspaceId, projectId, limit, cancellationToken);
     }
 
     private sealed class AlwaysOfflineCoordinator : IH2SyncCoordinator
