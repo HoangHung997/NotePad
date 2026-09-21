@@ -14,15 +14,20 @@ namespace H2Notes.Coordinator;
 public sealed partial class H2CoordinatorSqliteStore
 {
     private const int SchemaVersion = 2;
+    private static readonly TimeSpan ProjectAiLeaseDuration = TimeSpan.FromSeconds(30);
     private readonly object _gate = new();
     private readonly string _connectionString;
+    private readonly Func<DateTimeOffset> _utcNow;
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public H2CoordinatorSqliteStore(string databasePath)
+    public H2CoordinatorSqliteStore(
+        string databasePath,
+        Func<DateTimeOffset>? utcNow = null)
     {
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
         DatabasePath = ValidateLocalDatabasePath(databasePath);
         Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
 
