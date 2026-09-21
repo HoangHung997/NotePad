@@ -1,8 +1,10 @@
 # H13 Final Product Acceptance Report
 
-Status: **H2M-130 / H2M-131 / H2M-132 implementation candidate.**
+Status: **H2M-130 / H2M-131 / H2M-132 COMPLETE.**
 H2M-133 is intentionally **BLOCKED_REAL_NAS_AND_PRODUCT_POLICY** until the required physical NAS evidence and remaining endpoint-policy decision are resolved.
 H2M-134 remains **USER_ACCEPTANCE_REQUIRED**.
+
+Exact final automated evidence for H2M-130..132: source `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`, Actions run `35551667214` SUCCESS, H2 Notes **489/489**, NAS harness self-test + complete accepted Agent/provider/transport + Windows publish pipeline PASS. Published metadata commit `47c9ebb6324cd4585eda20dbdbccafa23971696a`; portable artifact SHA256 `776f087e71aed1c41e0305e9c14469f1e618e0e80c2de08771c0c9df203d187a`, 110,143,172 bytes, delivered as GitHub Actions artifact.
 
 This report does not convert deferred physical/native checks into automated PASS claims.
 
@@ -152,7 +154,21 @@ A dedicated `H2FinalPerformanceTests` suite measures on the GitHub Windows CI ru
 
 These are regression measurements, **not user-hardware benchmarks**. Broad time/memory ceilings exist only to catch catastrophic regressions; no optimization is justified from CI numbers alone.
 
-Exact metrics: **PENDING_EXACT_H13_CI**.
+Exact Windows CI metrics from source `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`, Actions run `35551667214`:
+
+| Measurement | Result |
+| --- | ---: |
+| MainWindow startup proxy | 58.34 ms |
+| Command Center refresh ×20 | 5.59 ms total |
+| Project Workspace switch ×25 | 133.01 ms total |
+| Agent progress presentation refresh ×100 | 1.25 ms total |
+| Work Assistant bubble idle ×250 dispatcher pumps | 0.11 ms total |
+| Work Assistant managed-memory delta in idle proxy | 230,168 bytes |
+| Workspace save: 250 projects / 1,250 tasks | 4,167.04 ms |
+| ProjectGrid layout: 1,000 projects / 10,000 tasks | 567.04 ms |
+| ProjectGrid visual elements at 10,000 tasks | 27 |
+
+The pre-existing large-data regression in the same run also measured 2,706 ms for its older 1,000-project/10,000-task first-layout fixture, still with 27 visual elements. The difference between fixtures is why these values are regression observations, not a hardware benchmark or SLA.
 
 An older established large-data baseline in the regression suite already verifies bounded visuals for 1,000 projects / 10,000 tasks rather than materializing all rows into the visual tree.
 
