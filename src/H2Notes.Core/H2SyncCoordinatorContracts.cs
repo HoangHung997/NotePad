@@ -117,7 +117,7 @@ public sealed record H2ProjectEventDraft
         Kind = kind;
         Target = target ?? throw new ArgumentNullException(nameof(target));
 
-        payloadJson ??= throw new ArgumentNullException(nameof(payloadJson));
+        if (payloadJson is null) throw new ArgumentNullException(nameof(payloadJson));
         if (payloadJson.Length > MaxPayloadChars)
             throw new ArgumentException("Project event payload is too large; external bytes belong in resources/artifacts.", nameof(payloadJson));
         PayloadJson = payloadJson;
@@ -182,7 +182,7 @@ public sealed record H2ProjectSnapshot
         ProjectId = H2CoordinatorContractGuard.NonEmpty(projectId, nameof(projectId));
         if (throughServerSequence < 0) throw new ArgumentOutOfRangeException(nameof(throughServerSequence));
         ThroughServerSequence = throughServerSequence;
-        stateJson ??= throw new ArgumentNullException(nameof(stateJson));
+        if (stateJson is null) throw new ArgumentNullException(nameof(stateJson));
         if (stateJson.Length > MaxStateChars) throw new ArgumentException("Project snapshot is too large.", nameof(stateJson));
         StateJson = stateJson;
         StateSha256 = H2CoordinatorContractGuard.Sha256(stateSha256, nameof(stateSha256));
