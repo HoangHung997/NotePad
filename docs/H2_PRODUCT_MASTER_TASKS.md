@@ -1267,7 +1267,9 @@ Require:
 
 Status: **BLOCKED — USER/PHYSICAL EVIDENCE REQUIRED.**
 
-Automated/code readiness is complete: H2M-130..132 exact source `d15ecdca6eceb3dec2fa7783eeb69e3710812a11`, Actions `35551667214` SUCCESS, H2 Notes **489/489**, NAS harness self-test + full Agent/provider/transport/publish pipeline PASS. Migration source preservation/rollback and old-data preservation are covered by the accepted migration/storage suites.
+Automated/code readiness is complete through the real-NAS lock remediation. The first physical two-PC run on 2026-09-21 proved rendezvous across two distinct Windows node fingerprints but failed the legacy `FileShare.None` lock case because the target NAS/share allowed the peer to open the same file while the coordinator still held it. Production H2 Notes had relied on the same share-mode assumption, so this was treated as a real data-integrity defect rather than weakening the probe.
+
+Cross-device commit serialization is now changed to an atomic `FileMode.CreateNew` lease (`.h2-commit.lease`) with crash/release cleanup, and the NAS probe exercises that exact production mechanism. Exact remediation source `82ad43d6dff97e0e7d9bf38caecc428ac02fa996`, Actions `35555590910` SUCCESS: H2 Notes regression suite PASS, NAS harness self-test PASS, full Agent/provider/transport/publish pipeline PASS. A fresh physical two-PC run remains mandatory. Migration source preservation/rollback and old-data preservation are covered by the accepted migration/storage suites.
 
 H2M-133 cannot be closed automatically because the independent bug ledger still has three physical-NAS blockers:
 
