@@ -203,7 +203,7 @@ public static class ToolOutcomeBridge
             ? ToolRetryClass.ReconcileRequired : code switch {
                 "invalid_arguments" => ToolRetryClass.CorrectInput,
                 "needs_configuration" or "provider_unavailable" => ToolRetryClass.Configure,
-                "stale_resource" or "resource_not_found" or "ambiguous_target" => ToolRetryClass.Reobserve,
+                "stale_resource" or "resource_not_found" or "ambiguous_target" or "target_not_grounded" => ToolRetryClass.Reobserve,
                 "provider_busy" or "modal_blocked" or "rate_limited" or "deadline_exceeded" or "connection_lost" => ToolRetryClass.WaitThenReobserve,
                 _ => ToolRetryClass.Never };
         var candidates = retry switch {
@@ -343,7 +343,7 @@ public static class ToolOutcomeBridge
             or "outside_resource_scope" or "expired_permission" or "boundary" => "permission_denied",
         "unavailable" => "provider_unavailable", "file_busy" => "provider_busy",
         "timeout" => "deadline_exceeded", "validation_failed" => "verification_failed",
-        "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
+        "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
             or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"
             or "deadline_exceeded" or "rate_limited" or "partial_result" or "verification_failed"
@@ -360,6 +360,7 @@ public static class ToolOutcomeBridge
             "unsupported_operation" => "This backend does not support the requested operation.",
             "resource_not_found" => "The selected resource could not be found; observe exact resources again.",
             "ambiguous_target" => "More than one target matches; select an exact resource.",
+            "target_not_grounded" => "The target does not match a host-selected project, linked, explicit or captured resource. Select the exact target; more permission alone does not resolve it.",
             "stale_resource" => "The resource changed; read its current state before proceeding.",
             "provider_busy" or "modal_blocked" => "The provider is busy or blocked by a modal state.",
             "permission_denied" => "Permission is missing, expired or denied. Do not route around it.",

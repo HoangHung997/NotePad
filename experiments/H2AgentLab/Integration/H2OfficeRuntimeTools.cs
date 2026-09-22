@@ -154,7 +154,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             else
             {
                 target = Resolve(application, observed.Resources, session.Length == 0 ? null : session);
-                if (!target.Resolved) throw new ToolPreflightException(target.Code);
+                if (!target.Resolved) throw new ToolPreflightException(target.Code == "outside_resource_scope" ? "target_not_grounded" : target.Code);
                 session = target.Binding!.DocumentSessionId!;
                 ValidateScope(session, target.Binding.CanonicalPath); // execution permission remains separate
                 _selected[application] = target;
@@ -187,7 +187,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 var saved = name.StartsWith("excel.") ? await Client.SaveExcelCopyAsync(request, ct).ConfigureAwait(false)
                     : await Client.SaveWordCopyAsync(request, ct).ConfigureAwait(false);
                 var actual = SafeWorkspace.Hash(await File.ReadAllBytesAsync(destination, ct).ConfigureAwait(false));
-                if (saved.SessionId != session) throw new OfficeHostClientException("stale_resource", "Save-copy response changed source identity.");
+                if (saved.SessionId != session || !H2AgentTargetScope.PathComparer.Equals(saved.DestinationPath, destination)) throw new OfficeHostClientException("stale_resource", "Save-copy response changed source identity.");
                 await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                 Record(call, string.Equals(actual, saved.SavedCopySha256, StringComparison.OrdinalIgnoreCase), "saved-copy:" + actual);
                 result = saved;
@@ -291,6 +291,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 var mutating = StructuredOfficeCapabilityCatalog.All.Any(item => item.Name == name && item.Access == AgentToolAccess.Mutating);
                 if (result is ExcelLiveSnapshot x) ValidateSnapshot(target, x.SessionId, x.FullName, x.ActiveSheet + "!" + x.SelectionAddress, mutating);
                 else if (result is WordLiveSnapshot w) ValidateSnapshot(target, w.SessionId, w.FullName, w.SelectionText, mutating);
+                else if (result is WordLanguageEvidenceResult language && language.SessionId != session)
+                    throw new ToolPreflightException("stale_resource");
                 await RevalidateAsync(application, target, ct, mutating).ConfigureAwait(false);
             }
             return JsonSerializer.Serialize(result);

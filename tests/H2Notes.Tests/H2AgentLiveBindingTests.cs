@@ -47,7 +47,7 @@ internal static class H2AgentLiveBindingTests
             var context = new H2AgentTaskContext(project, null, PermissionScope: Full(), ActiveWorkContext: Capture("outside", outside));
             var wire = new Wire(Search("excel.read_range"), Call("read","excel.read_range",new { session_id="inside" }));
             var result = Execute(project, Guid.NewGuid(), "Read the active workbook", context, office, wire, readOnly:false);
-            Rejected(result,"outside_resource_scope"); Check(office.Reads.Count == 0, "Full Access bypassed active-target grounding.");
+            Rejected(result,"target_not_grounded"); Check(office.Reads.Count == 0, "Full Access bypassed active-target grounding.");
         }));
         test("AR-012 RC-24 production Global capture does not follow later provider foreground", () => Temp(root =>
         {
@@ -157,6 +157,22 @@ internal static class H2AgentLiveBindingTests
             Check(wire.Results.Any(r=>r.Content.Contains("UNSAVED-ONLY")),"Live Word marker missing.");
             Check(result.Progress.Any(p=>p.TargetBinding?.Binding is {CanonicalPath:null,Provenance:"LiveDocument"}),"Unsaved identity became a disk file.");
         }));
+        test("AR-012 language evidence from a different Word session is not exposed", () => Temp(root =>
+        {
+            var office=new OfficeFixture(root);var path=Path.Combine(root,"A.docx");office.AddWord("a",path,"DOC-A");office.WrongLanguageSession="b";
+            var wire=new Wire(Search("word.extract_legal_citations"),Call("language","word.extract_legal_citations",new{session_id="a",state_token="v1"}));
+            var result=Execute(root,null,"Read citations from the open document",new(root,null),office,wire);
+            Rejected(result,"stale_resource");Check(wire.Results.All(r=>!r.Content.Contains("CONTROLLED-LANGUAGE-MARKER")),"Wrong-session language evidence was exposed.");
+        }));
+        test("AR-012 grounding rejection remains distinct from permission denial in UI metadata", () =>
+        {
+            var call=new H2AgentLab.ToolCall("call","fixture",JsonSerializer.SerializeToElement(new{}));
+            var output=H2AgentLab.Tools.ToolOutcomeBridge.Failure(call,null,"target_not_grounded",H2AgentLab.Tools.ToolErrorPhase.Preflight,H2AgentLab.Tools.ToolMutationEffect.None);
+            var projected=H2ToolOutcomeProjection.ToProduct(output.Outcome);
+            Check(projected.ErrorCode=="target_not_grounded" && projected.Effect==H2ToolMutationEffect.None,
+                "Grounding was conflated with permission or mutation.");
+            Check(output.Outcome.Error!.RetryClass==H2AgentLab.Tools.ToolRetryClass.Reobserve,"Grounding advice retries without selecting target.");
+        });
         test("AR-012 stale captured native process blocks production reads despite Full Access", () => Temp(root =>
         {
             var office=new OfficeFixture(root);var path=Path.Combine(root,"A.xlsx");office.AddExcel("a",path,"NO-READ");
@@ -244,14 +260,14 @@ internal static class H2AgentLiveBindingTests
         public AgentTransportCapabilities Capabilities=>AgentTransportCapabilities.ChatCompletionsFallback;
         public IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest request,CancellationToken ct=default)=>Round(ct);
         public IAsyncEnumerable<AgentTransportEvent> ContinueAsync(AgentTransportContinuationRequest request,CancellationToken ct=default){Results.AddRange(request.ToolResults);foreach(var item in request.ToolResults)AfterResult?.Invoke(item);return Round(ct);}
-        private async IAsyncEnumerable<AgentTransportEvent> Round([EnumeratorCancellation]CancellationToken ct){ct.ThrowIfCancellationRequested();await Task.Yield();if(index<calls.Length)yield return AgentTransportEvent.Tool(calls[index++]);else yield return AgentTransportEvent.TextDeltaEvent("Synthetic final candidate; host gates decide.");yield return AgentTransportEvent.Complete();}
+        private async IAsyncEnumerable<AgentTransportEvent> Round([EnumeratorCancellation]CancellationToken ct){ct.ThrowIfCancellationRequested();await Task.Delay(1,ct).ConfigureAwait(false);if(index<calls.Length)yield return AgentTransportEvent.Tool(calls[index++]);else yield return AgentTransportEvent.TextDeltaEvent("Synthetic final candidate; host gates decide.");yield return AgentTransportEvent.Complete();}
         public void Cancel(){} public ValueTask DisposeAsync()=>ValueTask.CompletedTask;
     }
     private sealed class OfficeFixture(string root):IOfficeSessionClient
     {
         public string InstanceIdentity{get;set;}="fixture-office-connection-1";
         public Dictionary<string,ExcelLiveSnapshot> Books{get;}=[];public Dictionary<string,WordLiveSnapshot> Documents{get;}=[];
-        public List<string> Reads{get;}=[];public int Writes;public string? Active;public Action? BeforeRead;public string? WrongReadSession;public string? RenameAfterWrite;
+        public List<string> Reads{get;}=[];public int Writes;public string? Active;public Action? BeforeRead;public string? WrongReadSession;public string? WrongLanguageSession;public string? RenameAfterWrite;
         public void AddExcel(string id,string path,string marker)=>Books.Add(id,new(id,Path.GetFileName(path),path,true,"Data","A1",[new("Data","visible",[new("A1",marker,"",false,false,null,"General","general","bottom")],[],[],[])],"v1"));
         public void AddWord(string id,string path,string marker)=>Documents.Add(id,new(id,Path.GetFileName(path),path,false,0,0,"",[new(0,marker,"Normal",[])],[],[],[],[],"v1"));
         public void Rename(string id,string path)=>Books[id]=Books[id] with {Name=Path.GetFileName(path),FullName=path};
@@ -271,7 +287,8 @@ internal static class H2AgentLiveBindingTests
         public Task<ExcelLiveSnapshot> RecalculateExcelAsync(ExcelRecalculateRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
         public Task<OfficeSaveCopyResult> SaveExcelCopyAsync(OfficeSaveCopyRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
         public Task<OfficeSaveCopyResult> SaveWordCopyAsync(OfficeSaveCopyRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
-        public Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(WordLanguageEvidenceRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(WordLanguageEvidenceRequest r,CancellationToken ct=default)
+        {ct.ThrowIfCancellationRequested();Reads.Add(r.SessionId);return Task.FromResult(new WordLanguageEvidenceResult(WrongLanguageSession??r.SessionId,"v1",[],[],[],"CONTROLLED-LANGUAGE-MARKER"));}
         public void Dispose(){}
     }
 }

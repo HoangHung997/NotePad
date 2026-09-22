@@ -186,7 +186,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
         {
-            return AgentRuntimePermissionDecision.Deny("outside_resource_scope",
+            return AgentRuntimePermissionDecision.Deny("target_not_grounded",
                 "Chỉ chọn workspace hoặc đúng tệp được chỉ định. Quyền Full Access không tự chọn đích ngoài phạm vi.", key);
         }
     }
