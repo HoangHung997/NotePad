@@ -2,9 +2,7 @@ name: AR-020 native discovery implementation validation
 on:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/h2-ar020-validation.yml'
-      - 'tools/agent-reliability/ar020-transfer-*.txt'
+    paths: ['.github/workflows/h2-ar020-validation.yml']
 permissions:
   contents: read
 concurrency:
@@ -28,56 +26,57 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Deliver only reviewed source with exact branch and hash guards
+      - name: Apply only the reviewed nine-file repair on the existing source
         id: save
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import base64,gzip,hashlib,json,os,subprocess
           from pathlib import Path
-          BASE='619a86d8777e3d02bcb5ed45d3aa7c036636cc82'
+          BASE='9e2536970263eaa92ceea89131969fcd55a8ff3c'
           MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0'
           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
           def require(value,message):
               if not value: raise RuntimeError(message)
-          head=os.environ['AR_HEAD']; branch=os.environ['AR_BRANCH']
+          head=os.environ['AR_HEAD'];branch=os.environ['AR_BRANCH']
           require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong or dirty checkout')
           require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main advanced; reconcile first')
-          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Branch advanced; preserve other work')
-          paths={'.github/workflows/h2-ar020-validation.yml',*(f'tools/agent-reliability/ar020-transfer-{i}.txt' for i in range(3))}
-          require(set(git('diff','--name-only',BASE,head).splitlines())==paths,'Unexpected prior work; do not overwrite checkpoint')
-          encoded=''.join(Path(f'tools/agent-reliability/ar020-transfer-{i}.txt').read_text() for i in range(3))
-          # Two transfer-only character omissions were identified by blob readback. Reconstruct
-          # the reviewed bytes, then require BOTH original encoded and decoded cryptographic hashes.
-          encoded=encoded.replace('zwpwNxdn9','zwpwNnxdn9').replace('ja765sbW5vfmt','ja765sbW5v1fmt')
-          require(hashlib.sha256(encoded.encode()).hexdigest()=='f460f2503ae389eace0fee34e38b45e84267184e43d70f503867fd9f617aeb10','Transfer differs from reviewed bytes')
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Branch advanced; do not overwrite')
+          require(set(git('diff','--name-only',BASE,head).splitlines())=={'.github/workflows/h2-ar020-validation.yml'},'Unexpected concurrent work')
+          # This exact reviewed UTF-8 patch blob belongs to this same repository, not an external provider.
+          blob=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/5c8f78c3f51fc999e5bb52b161e0527aac22771a']))
+          encoded=base64.b64decode(blob['content'])
+          require(hashlib.sha256(encoded).hexdigest()=='91399f386c600f173b57b5defe71d50efc2daab4706b2ea72fdcb18f7d55bfed','Transfer hash differs; no writes')
           patch=gzip.decompress(base64.b64decode(encoded,validate=True))
-          require(len(patch)==100507 and hashlib.sha256(patch).hexdigest()=='d91ee896194c0e7c701ea30d0b0a4fe8ab447e4bbbd65b4fae3b39c8ac205f05','Reviewed patch hash mismatch')
+          require(len(patch)==30388 and hashlib.sha256(patch).hexdigest()=='a9e68b80a1250fcf95efdd12aa7d1a0c816b28034bb61e9164c3a9e1bf1297a3','Reviewed patch mismatch')
           out=Path(os.environ['RUNNER_TEMP'])/'ar020-delivery';out.mkdir()
           patchfile=out/'review.patch';patchfile.write_bytes(patch)
           subprocess.run(['git','apply','--index','--check',str(patchfile)],check=True)
           subprocess.run(['git','apply','--index',str(patchfile)],check=True)
           changed=git('diff','--cached','--name-only').splitlines()
-          require(len(changed)==23 and all(p.startswith(('src/','experiments/','tests/','docs/')) for p in changed),'Unexpected staged paths')
+          allowed={'docs/agent-reliability/AR-020/implementation.md','docs/agent-reliability/AR-020/native-runbook.md','experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs','experiments/H2AgentLab.OfficeHost/OfficeNativeMarkerProbe.cs','experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs','experiments/H2AgentLab.OfficeHost/Program.cs','experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs','tests/H2Notes.Tests/H2OfficeDiscoveryTests.cs','tools/agent-reliability/Invoke-Ar020NativeProbe.ps1'}
+          require(set(changed)==allowed,'Unexpected staged paths')
           subprocess.run(['git','diff','--cached','--check'],check=True)
-          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent work; retained patch only')
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent work; preserve patch instead')
           git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
-          subprocess.run(['git','commit','-m','feat(AR-020): bind native Office discovery to process and window views'],check=True)
+          subprocess.run(['git','commit','-m','fix(AR-020): revalidate borrowed views and add opt-in read-only native marker probe'],check=True)
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
           code=git('rev-parse','HEAD')
           require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+branch).split()[0]==code,'Saved source not verified')
           (out/'saved.json').write_text(json.dumps({'code_sha':code,'base_sha':BASE,'branch':branch,'paths':changed,'working_tree':'CLEAN','E3':'NOT_RUN'},indent=2))
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('code='+code+'\n')
           PY
-      - name: Dispatch the unchanged full required Avalonia CI
+      - name: Dispatch unchanged full required CI on the saved source
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref="$AR_BRANCH"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AR020-Source-Delivery
+          name: AR020-Review-Delivery
           path: ${{ runner.temp }}/ar020-delivery/
           if-no-files-found: error
           retention-days: 14
@@ -106,6 +105,10 @@ jobs:
             $office+=@{prog_id=$id;registered=$registered;activation='NOT_RUN';native_markers='NOT_RUN'}
           }
           @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';os=[Environment]::OSVersion.VersionString;interactive=[Environment]::UserInteractive;office=$office;E3='AWAITING_ENVIRONMENT: no native marker corpus run';E4='NOT_RUN';E5='AR-083 DEFERRED_BY_USER'} | ConvertTo-Json -Depth 6 | Set-Content artifacts/ar020/identity.json
+          $tokens=$null;$errors=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/agent-reliability/Invoke-Ar020NativeProbe.ps1),[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count) { throw 'Native runbook wrapper PowerShell syntax failed' }
+          'PASS: syntax only; native helper not invoked.' | Set-Content artifacts/ar020/native-wrapper-syntax.txt
           dotnet --info | Set-Content artifacts/ar020/dotnet-info.txt
           dotnet restore H2Notes.Avalonia.slnx
           if ($LASTEXITCODE) { throw 'Restore failed' }
@@ -117,7 +120,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $failures=@()
           foreach($name in 'AR-020-1','AR-020-2','AR-020-3','AR-012','AR-011','AR-010','AR-001') {
-            $task=$name.Substring(0,6); $log="artifacts/ar020/$name.log"
+            $task=$name.Substring(0,6);$log="artifacts/ar020/$name.log"
             dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $task 2>&1 | Tee-Object $log
             if ($LASTEXITCODE -ne 0 -or (Get-Content $log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { $failures+=$name }
           }
