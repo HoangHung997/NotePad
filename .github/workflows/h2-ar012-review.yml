@@ -1,0 +1,152 @@
+name: AR-012 bounded Word revision review
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar012-review.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar012-word-review
+  cancel-in-progress: false
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      code_sha: ${{ steps.apply.outputs.code_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Apply four reviewed files only from exact preimages
+        id: apply
+        env:
+          AR_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import base64, gzip, hashlib, json, os, subprocess
+          from pathlib import Path
+          BASE = "3ee09035e06bb8a02a483d684e141419769b5160"
+          BRANCH = "feature/h2-agent-reliability-ar-000"
+          MAIN = "1283bc13e07c3cd47d04886166de3dfc595422c0"
+          EXPECTED = {'docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md': '4988df6ed3cf2ddc88ddc0164624cc04bda9e242cfab408f01c0d4ac2c4c66f3', 'docs/agent-reliability/AR-012/implementation.md': '63afffe9d28df96aa69633090d71e4eb0a84fd5b57601af380574264fc3d4981', 'experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs': '5daa9e115386d4d49f745d9ca550ccb12cc60821328666762c606472ddda28a5', 'tests/H2Notes.Tests/H2AgentLiveBindingTests.cs': 'e8c042fe05726b6a981c18112744bcd41aedc786094e86634c4df5853a16c537'}
+          def git(*a): return subprocess.check_output(["git", *a], text=True).strip()
+          def check(v, why):
+              if not v: raise RuntimeError(why)
+          head = os.environ["AR_HEAD"]
+          check(os.environ["GITHUB_REPOSITORY"] == "HoangHung997/NotePad", "Wrong repository")
+          check(git("rev-parse", "HEAD") == head and not git("status", "--porcelain"), "Wrong or dirty checkout")
+          check(git("ls-remote", "origin", "refs/heads/main").split()[0] == MAIN, "Main advanced; reconcile")
+          check(git("ls-remote", "origin", "refs/heads/" + BRANCH).split()[0] == head, "Branch advanced; reconcile")
+          check(set(git("diff", "--name-only", BASE, "HEAD").splitlines()) == {".github/workflows/h2-ar012-review.yml"}, "Other work appeared")
+          for path, digest in EXPECTED.items():
+              check(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest, "Preimage changed: " + path)
+          patch = gzip.decompress(base64.b64decode("H4sIAAAAAAAC/+1b23Iby3V911e04IoDFAeD+40MZEMgJMGHh2JASopLVuE0ZhrEmIMZZGbAi2VVpSpfkKq85SVV/oE85CVx5em48h/Ol2Tt3T2DK2nyyMd5iU7ZBDF92b0va6+9e+h606koFi+9RMiSGzpx6U113Hs9OL0YjwYnw97L4cnw4pfj4bdnJ4Nv8W3vYvj2dHzRO//m3J67YvL0Oc+8wFW3ol6dThrthm1XW+12VVZFpVxu1uvPisXiD5Hk2cHBwQ+S5uc/F8V6q2xVm+LA/MRXFypOhBPO5zJwxfyPv/8XTyxmf/zP33niD//03//2x9//zsGHP/xjcCmuvv8vcf39v4YiWgaBikr9IUZ+/x9ihkELS1zNvv/34PKZECIXqUUYe0kY3eUORe5NKIPLN8vgstNplU7DRJ1JN2fxQEcGYeA50h9PIhk4Mxo+l15gHkcqVjJyZuOJjJXvBWoczySNkW7bqZTbVdWqVhv1psTKk7pqtSfNdqvTLrv1VrPZrFanWKeIdRYzzKd5vVGxXIHO+hfD94Px8PRi8HqktfS+dzI85o+Yc3D/nA9vR8fQ9vvhOc2iD4MPRlrpJN61GicyvlrNM8+8+cJXcxUkMvHCYBzj5zLmUbxstoKjFgkUodZGnL6Fed+d7l9opbapwoRIlWbVorzE82IEjcmJ53vJXVFGxXK5vCnnIsK0mlZQeAODjmMVx1iUVnNmMrlcJJiIM2CpeDlXxWq52iyWO8Vq1ejVl3EydkJXjcmBvIRm1tqy2pGyqdz2pC6rbsttVVoT2EK23OakU1PVqlOtytb6EtfS91yZKPfPuBhph+T2eaFX705OYK2/fTccDY7H/eF4AIueHo9PB697bNf+29OL0duT8/FZ7/zcuMCf0MrUC6QP3Vx76mZTNwf36Uapcqdca6hyczJpy3JV1ts1t9muq0od/3Vazc6kUWmW15e4Xzc/fLFN3QxP3wxGwwvopTciT691bmusHIaWVp1VAk19gALPesPR+B3i5hzjsyBekOeNnZlyriDnTCG+sW5ZubWmU5k0mtOpUpNW25lCtHrLnVSVdJRq1BuyXu3U02Vo+iL0gsQccuyH4dVyQUsRaPvhpShWgODTMJrLpPtXb/BZPBkGjavchNGVF1yOk0hxlJ9FXhgJN5JTpAcgYaBuBERRlxGrS8jFwveUK268ZCbULWJILCLlzRFrMQYKx1cyEIBEPka4TI4ExiylLxIALCaev+mJ+RJYO1EigobENArn4gNSRHgTCziRqxD3tngXq6h41hckmKDY7/X7g/Pz4cuTgW1MuS3766WMXGwxDZcRvNJXYiETZyaAIZfKbHStIm9KB4DbiBgDHXVkzjFdkvl25IQRlJ6LU5F0CZDkT8pHllwG2oDktCQOwdjHT1rva1aO5TUGyGS8TBw6xiqELirlw0bzsNay661qq9U4KJcPy6kjP3KFymGjclhr241OpVlpZiuwp4UEoiRdMvPitQAnIXXeoSREKvaC8Sasf6RTYMiIw15rsKj1KSZLz3ctUasXHeQOMYFtsQYUGS2WsQWrJ1gVKubMUCmVK+VSuVxhd5O+j+d/v/Qiek74LeKlB5PY2l9XOwaSxClOwmXgyuhO+B40zT4a80pT71aEExgJqhEEGSUyrFBRFEbxET1maw+PY8SOCEIYWkWJN72D1f3EK3pBzBlIvJ1OPTjk9v7TJUTtD+k4cO7FcuJ78aw0U/5CRSKeh1fwK7KLWCUzEQb+nbiZqUCQFjNnF16MU9I2Hg5s58i8tNEyEB/CyBUErWQZBOMlnxrnCZIo9IW8lCSnCH3XyCluIoSoio5SNYpkRh6Kw/iqiFCd+t7lDM4uPR/nj00sme109IK2SG0ATt2ibgypDShua6kN77MgcShJtGfHhAc7Ksys3R+WtrQ4POvTTvPwmqJyvggjMrSLfI4ovhNJGPrkV7TrlqahQ+xjvJgRn4w/NvSO45AeCfGZ2WCr1rJABulHpfUjkUE+eGrAsTEgB2sFMBXHChFTRxwtlEPwk9oHPsPWxfKJByA6YESm08Q6inldpplYl9drlKoNNhKlsbKAfSoV/gUWqtRKFXrCZmnVS6362iqS/B9xPPYob1XKzXaz0SrXqhVtti/GfJ/1DyJhNK7WaFXLrXqz1elY2RMNojpVG676tDzNq3Ae5rmdUq2DM209q2Tn3XpQpgd88M0HZZ7BSlh/QNqgB6lCDu5TSKfcanca5dpqCA5XbTSZeNbKZdWs1mRlMm23mvVO2SlXHHeiVNVtu65S9UZNtqayU69UOjh7q4ysrxoSP1sVd+LmtB2+rHluChBgAI6GNvZcdtlW1WrBZds168fz2HVZFopRfLwEpI5d5TAirWe0QN0mY84DnCo0U+zDz71gqVIoIQS0xYjyfjJTKTUgl04ZACcPjdVgOissj0BBdIKKmXyAWogbJa8U5ScBuJh7/LSUphuKqYiVZm9hI9D+RqDY8mNIEof+tXqL0/FOC8CpMInQwFAJJGImZCJcL2Y+USLaMpHO1RGwKL5KwoWAUmLiCL/BMoYGWrxeIqNLlWQpEEC/iMJf6xAHMIfLS2JRXpzQ03dDWwxqpUFdmFrHYrW1a9hnisSlXFsc61wl3WvOKJxHJgpUUG3m4IxIGbbwaOsQ4GQSPaKY4mOejcRPamTXXTKwP4OVUsTSUKatrDPqkck/+O4ug0GL3CXQME+gQvTMWiVQzVRvE62P1D3gpb6M6ByaLBjlgt8OGgZzU6rG6qHJY2+aMh03DLLCt5pyJk4mBozH+og/rE7jmCK9hMvYELgd5v/EJd2dzs6O0Ura0qXN8nmtr/P4GaarU3E7zXp5YtvlcqfZart7ujpPWHOtp/OEWQSIDasmDhpWpUJoeM5dg0OhuwqilAYUSoOIgWe7rCGD+luOu1aSPBMXmLTg2qjS0WxI10gzCchSxOgiGcQ6SsFMeJMsjHR3wtKRy3ur4BIUuBSDJKHWOd2SRmPTxhIueDogLqBfnQxPFmBAzp2uTgzG7aAUIF2pRUwQWTTIxjBH1IqQCME3n3iXS/ihmCO0fIzyDUIxemEkQCvhoQbjdISU9ECWGEiCENKgx35MMGqWSVEyLZ5SwNJABMxLD4ltGORL1OyigKXVODtfLKPgPdN+QLeBUHGmf5Ze++FE+qXBLVQUUKWpQRdLLMD0V6lBAHuA06DCdxBuIaFtKP+VN03IgGQWJBmIosiGZGMY/1ZFSHWKjYF4b3aU+b5pJuAyWKR/3MS8Ii4FKqDRNLcKeAfKamFphRWW5RlXTKanWEtQvQJEYIw/oqpLpNLTneg41PjKP/DUKS9bcM/FMnGpoM3tt1S5nw+MSQzK8wgmJNVvaVIgs/MZKMZrAR1gvCedwrxl2RrVA3UZXCzksvWVxTnvnYPgenF5XS55j2gIRF8EoICSAEXmqv0QkgGMa5MUwSY2LNLXqnIoFdY4tQqjAuFLmJbSm6aUgmQt5jVwgJz7qKi9IS1cCcy5tiDkjFgB9Jv9y6oCYfkgwL3rRxEtY6a+QZnqoFKDos/BGRecQwS+d3SFnBJSgOUgD8fYc2SZwJ+Et4jNk7+DoEA68gySEx4ESMVxb5GRxSL4H6FoSNlkCGegyJK8mxiTm2A+IxvIqnDarbjUCbKT9ozTtHw9eDUbUqHv5y/G788HIfnbw7OAnPyHWgk10WoVc//MP/2xaGJvJNqv2aBoBmBfMVOQl7N0AEGqnie8ey8u/MylTeMCBmgHB1CUH1bQ6zOt6EzlcwYpEvwoPl/yt+kaVSE0k5FfItaorvjsSKSIg74Nvi+++lm1/J24kVf43gR9KahqRKGlzyAbcwxOYrRHkpzzDIPhaQT9lYJgi9MMbsrWmLmyntMilBgVGSW2dv44FkXmfiFbandAOTDlLXYQgtKQu4B0JJXwQJifjQRm1Acpo3CBQghQvB6/ejgacOEiMM8oAtF0vvgscm7MXpnEraxJ57iW3EGKU3lA8REHYIi65LyZNWiBDBwtsBTW9C66Au8CHZeB7VxoMqWy/htww3ODWQVxcUvdNb8VuyKHLeE1E92Yrn12geD9L/ZMWWGhcJTxlfVBjlhMxIfS12oDmMEAQJhuArGmkq1dfevFsve8hQsSnBip9OK4i8jCWLx1V0o3UElATmAZvlYL7w9yeLFIKXXUNY6wOZKQ7GH3KtI8EkOZOKJmUqw+tD0HYirS+mOnUKIO05qE8HcaEZ7pVeUOBaTwJG03u4CeogbDigiwlbmaeM9MdSd2WS62iyW+YcMjJxE4zAovnyzvYHXB7acoPGhh7SBOcUQhW2Zvh8+SzKWojWSx0Wwq0yN8s3k7T/gNVjqtOLjk7rZiQnYm962MaMkXdVJP1+bpgvVfzaPDb4LfUKYk8glrqezOCnMhJabiiUfhaZ8WRpuvkcrHtgK99xWTDelUNIClbtt2qSVDy+ibr/YrlNQH+igWIC1frNastDuhHh+gwcUtmRjH4BwUQhbvYt4I4FEPeznx5HJKrvdfuH1lieExum3aMVv9GuovXWwKeIu83LGK+cLQ78FpGxhHYP7tC3kjYs+9z6/M8kIt4FiYZdOUNYQBtSQo26tUpmCr2oUn5qfRjtW+T9+auKF0urxmhtbazfa4XHrob3xI5OJVztTXU0NwLprjptsXtbb0psh8D+PPuxvwM2Qu7k+ifxnvxC1CIc6ga0v9GRXb2MU/k47MIr6Au3tzSbWz8mtNYSbekKmdlLKNLPVbpihvanmBsnOFQnNVAThrsNFlowdNWAtAMgGHnxBcc9GBb3lJJJ0jw6jnfsOBzls1MKtpOQWcaG3XyyNLX3rV1SiMSS2fARwD+NdFNxtVYTtWK2hhAJxcPCV1BjTGS4JEB1d7d4BFW0hmLOd/+PJXPbeao3D4vpFXPUrWzOj5+WuWDeM8MEi2A94lul2+3XFvnpDHVVrnC7oTPm5ioYflNlV4uiO0L85uGD6SEl7pq5O81Dj5tgsE+p9mZlusd257WKrKB7Tew74lLarx74iTCuEq7TD17+lHfAjlqDDgZyO1d5dkOKOl74O7gVjnLROXhgokVAA2s3Hq3khIr1XaTMLzKWXCQtYFnWaF5TunzkLAkX7B6PAvOcNXXRfJhX1co+ZzMWVQIFQpWyEhs3QBDLR3ipoxhKDvci3Qjw9PyWnRr1yf7RMHyem2bjhEDQgHs3W7Zyp0zM0KscSmUVV0365xgw6+/FNaxgOJGIvTzpDx2Wo9raPj4Z+O8hl+NUf9eEjrpb+kG+W6sOVf25bqfY6PNqCXvyJv3SLZKnNgcIkUDasfgSNdUz4emtGbAy9HNCQN7viC6L8QFinC2HX7Z3O3zLmTQEbUWgayECjpxvtLcj5fZB5M0jQvdLqHhDLqfT0ActcvoWzA6hI2a8Ta3bwFjuZ7r0qnzrCqojNbEfA20+ydOGBSR9WKS+F5I2Z1J/34mdMIxuXfsUZ5ON+dsMdYAim9D3y1el1koA2xjjRJdUbboALFK9GfakGb0Xl0MRjDy/r0Pv2rvWNuHfVCvkz0arqTalASpni7YuiKJlkp8of/usSVFp3GAD/iYP+eXshixUTX0UXuZvFA08mqHIysU7vMPHbtYdQN4BAOKyL1bcI1O4BPSFQU7f9pioA1SADITtiFIaAwqWMaVLD7DisIc7PK4TUwRexLd/vAw1WWXd7BHPD22z7leykcUcpFNyZTUNHTZHdd0VbDf6gWe71nfwJgeYOveLi2wYsa2pr/0/2YdPcpOz7Pf2X7601Rue8CECjzmszijN94O96/Ow3iAnbECC1pLors+5Zt7pq0GQCLDlO6LAAj1PJXqVCk3HlG/yPF8zzTpMuROQY8gG2b35UT53MlYY0HzpWmT77XcRoL4EHH/BYots2b0t8fG2+KPOgo/2RmniT+WP9kXHEzdDI7uP9QrlLk293rj/D48NI1Q2w8vc+Sy5pyJaYkg2Sidh/WZQAYVx0wY7R5uM1c9kEB0pa+Lb1if30jikp9vAw1n1b2LrYI+93Aq2UojGymEREjR/6Ek8gDo7Muw0Nn6ymzPfI5PaKJs3waPRqCpF6HYz86fNr9+fGC6x0sr5FXsVERter5PrrjXs+jwRdP3thOi0gV2WU4Avwpev+uNjlfX/qt/OWZfm42eNKCok2s8QnuJ/pYadYY47TmD1rV9vpzPZXS3C2UXMr4yyNVPX87aFQvH3lpokN729oK7vCKnVLYu2nV//kx3brs6yRX+xFF1NLiebitR13ezd0cJnl4HoOIxvWVKW2TRIVOtbfkINtdV8uj43GyCySk4ftpa0mLqZlgMyFt1wxwZrBpiP0qcpuh4EsZKjzISag3/GHFMmjBhvPe5Pu3/B/oPCvQTUm7mZmmspyHAJYu+YuEXJEy39r4ofzwDWrNpSoCQhXbl+ywGnBzvoRffGkzSg+ysXc9hZz+NnWiuoUbpa3lf9qmrR3FYTK+as9sJNqpP97sOlRxy45pis2Gzl5I8BJLPnw6Sz78SJREUBlTY681J+N6I3yxRazdGuR1021++7lyKZ1fHUXYfn9bkN3y5pt9vNBf3BihM8DGuPVurXHdbrXT71CXQOdb76Qu7YTANUavkrEq5YlWqNaveaFq5wd/1Byc5K2egTvc3ylYZo/h/BavTtFg1R6bN3KAWTLXdtirtr2jBPGD2590HjE6tGXNVtXrH2DzjN4E2+xcb25yZVw3YFxbdF4v14oHrABNxb6p7IuwUGPBFhEyTdXLrh67qdunVpAIUmb7FufL/zOtF7oBGHeSOVi3T3MG9rd9tcXUvekfigv1hppBVwu6L8HmXoLiQ+aCpMxaRd00Ib2yz0cLYm+nihN+d4oS39ebnk1si93QyHtEW2d/ouK84gTD3PuK7RZR3682Cj5vAoR0+2xGfTqlP5ePTxweemab8+o/Cp22WRfMrmGWS0L6ldx9RtO0s/GmjQ2EuD/Sxzff7Ta4DKX0bJU1Fe7iEsbznrjXigJbc4fBc65723uMbN9eV7ST8VR0c3bRJ3X3r0MCP7QasSBuw5pzpHZP5lVuy3Rdsry1oxGL09y86XXwDzLH57pthNAe4rlUPm41DzDrELCDp+V0A5gQxcla6CTfvdGNZm6w4AwnIWcd0++Ch5n+XOKfhzf2nISNusSxDsj5zKza86W6tdWRchE60s8C3ACN79U6MZQaMTMOH1+eTfosCHGFq7RfBNlfHZlQ6/Rt1xxnDNLUhHP2PcOBbLwAHjfOVMoDqy97D9jzAHl+Om595Y5bCZ5La7+YMUSuuXrrKWRibhE7od3k6f7Tp/d6e15/JxHopY/UuwtxZkiziw1IJtI5yhk1pugTP/GKSG79ZfVCrta3q194vvAzDq/gj/aUDnq1uHj91uZ458qb5kaJeIdOqD6YX8fkLQpu+dQv6aX5nASsdsHUzYOxNOdN+FYVzzUX5GpH9lS+jzJf6BsxiSax0h77y/SzXON0XDlmM8k8BSacXRfIuX9jgOF9WF5v8RxwOb/43+gos2+zF1q1gfu05bywiq0/vBPg+R5h+G8ZJuq6aSsyH+Vc3c6dhcr5cEJIpd3Uxt54kjCQTAJ3YLtR2h/1AgfVPav/uyg2ISiW/t+AEm7igMw2n6yuY5ZWb31fJmVvarlgluV3nuodb62Gr6H0N+Caqwk0Fs8bqTaRuekW69iXwP6UNYPX0Lpv3iNbHSnNLX8X2++wvMJk+pW6YybDK0gV+bUUXqcNA9+uma7RF/5Hf7rbpJXU61uOq0KO39FCixNp1Yv3O+/prPau6l27BY/3OV7DzTo39oHoz6W2Uq/kFZc+FbpWaw4jf/lZsqeQEu8d5Paxgn6jgkq6OUP7qSiROnX2tFeUnHstMku5qgFyFzwBP2SPZRXjsMSUF3U5FPNtItvsW1C2Y1C1SUnVOL7CvXk9Y9yCk+ypTvbUMb3xqTZiU1z7mOo6uyZ/zweyL6O61SuBMSwXNsdD85mV29kIhRcPFnv53+ig9hm5ma3Xy55/9zNjNEqNlQKIvbPqQyqvLejN9f+t735qRWfOlvnniZ/yZn9Ena/9iw0QSVpkp5jeepD9b4h10ELFTmEGrL3jc6tcva2C+c+f14EPdmjk4OHoQgOjlHs5vm5O5kQMapYIHWzkbtwH4/QP9afavgh0n5+VYoKc1hoiUEt2zfxF6QT6HlS0t7j1eafygsNNaI2/czi7rb5AM3669NtJfvSiedZv8EDyCmSy32VYvBmaBfk+36YE0v5XHMnjVaX4fGmwedQsHNrP+qs+xIgDrSZQ5BjGi9P2rF2KkHOk7/NYhP9XZlD+uPfpzsoC9kukilcCqHy7u0hxPv7Mo9KWWbHvg/5lcZMi/hFj/CxRmnQgWRgAA", validate=True))
+          check(len(patch) < 100000 and hashlib.sha256(patch).hexdigest() == "f358e8122d7e0c0ecd7d179e3c122a898d99378db73e1e5e9fdd7b5ff2acc2e8", "Patch identity mismatch")
+          out = Path(os.environ["RUNNER_TEMP"]) / "ar012-delivery"; out.mkdir()
+          p = out / "review.patch"; p.write_bytes(patch)
+          subprocess.run(["git", "apply", "--check", str(p)], check=True)
+          subprocess.run(["git", "apply", str(p)], check=True)
+          check(set(git("diff", "--name-only").splitlines()) == set(EXPECTED), "Unexpected changed paths")
+          subprocess.run(["git", "diff", "--check"], check=True)
+          subprocess.run(["git", "add", "--", *EXPECTED], check=True)
+          check(set(git("diff", "--cached", "--name-only").splitlines()) == set(EXPECTED), "Unexpected staged paths")
+          check(git("ls-remote", "origin", "refs/heads/" + BRANCH).split()[0] == head, "Concurrent work; preserve patch")
+          git("config", "user.name", "github-actions[bot]")
+          git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
+          subprocess.run(["git", "commit", "-m", "fix(AR-012): preserve no-effect proof for stale Word revisions"], check=True)
+          subprocess.run(["git", "push", "origin", "HEAD:refs/heads/" + BRANCH], check=True)
+          code = git("rev-parse", "HEAD")
+          check(not git("status", "--porcelain") and git("ls-remote", "origin", "refs/heads/" + BRANCH).split()[0] == code, "Push not verified")
+          (out / "saved.json").write_text(json.dumps({"code_sha":code,"working_tree":"CLEAN","base":BASE,"paths":list(EXPECTED)},indent=2))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f: f.write("code_sha=" + code + "\n")
+          PYTHON
+      - name: Dispatch unchanged full required CI on the saved source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.apply.outputs.code_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/feature/h2-agent-reliability-ar-000 | cut -f1)" = "$CODE"
+          gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref=feature/h2-agent-reliability-ar-000
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR012-Word-Review-Delivery
+          path: ${{ runner.temp }}/ar012-delivery/
+          if-no-files-found: error
+          retention-days: 14
+  tests:
+    needs: delivery
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.delivery.outputs.code_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Reproduce old Word preflight classification with new negative controls
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar012-review | Out-Null
+          if(git status --porcelain){throw 'Dirty initial checkout'}
+          $path='experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs'
+          $saved=[IO.File]::ReadAllBytes($path)
+          $old=Join-Path $env:RUNNER_TEMP 'ar012-old-office.cs'
+          $env:AR_OLD_FILE=$old
+          python -c "import os,subprocess;from pathlib import Path;Path(os.environ['AR_OLD_FILE']).write_bytes(subprocess.check_output(['git','show','3ee09035e06bb8a02a483d684e141419769b5160:experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs']))"
+          if($LASTEXITCODE){throw 'Old code not found'}
+          try {
+            [IO.File]::WriteAllBytes($path,[IO.File]::ReadAllBytes($old))
+            @{new_tests_code_sha=(git rev-parse HEAD);old_runtime_sha='3ee09035e06bb8a02a483d684e141419769b5160';dirty_file=$path;intent='TEST_ONLY_NEGATIVE_CONTROL'} | ConvertTo-Json | Set-Content artifacts/ar012-review/negative-identity.json
+            dotnet restore H2Notes.Avalonia.slnx
+            if($LASTEXITCODE){throw 'Restore failed'}
+            dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar012-review/negative-build.log
+            if($LASTEXITCODE){throw 'Negative build failed'}
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter 'AR-012 Word revision' 2>&1 | Tee-Object artifacts/ar012-review/negative.log
+            $exit=$LASTEXITCODE
+            $text=Get-Content artifacts/ar012-review/negative.log -Raw
+            if($exit -eq 0 -or $text -notmatch 'RESULT: 2 passed, 3 failed'){throw 'Expected three stale-preflight failures were not reproduced'}
+            foreach($operation in 'word.replace_range','word.apply_format','word.insert_text') {
+              if(!$text.Contains('FAIL AR-012 Word revision stale preflight has proven no effect for '+$operation)){throw 'Expected operation did not fail'}
+            }
+          } finally { [IO.File]::WriteAllBytes($path,$saved) }
+          if(git status --porcelain){throw 'Positive source was not restored clean'}
+      - name: Test the exact repaired source and retain accepted corpora
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          if(git status --porcelain){throw 'Dirty positive checkout'}
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';os=[Environment]::OSVersion.VersionString;evidence='E1/E2 controlled Office client, real temporary files, scripted transport; native E3/E4/E5 NOT_RUN'} | ConvertTo-Json | Set-Content artifacts/ar012-review/identity.json
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore -t:Rebuild 2>&1 | Tee-Object artifacts/ar012-review/build.log
+          if($LASTEXITCODE){throw 'Positive rebuild failed'}
+          $failed=@()
+          foreach($name in 'AR-012-1','AR-012-2','AR-012-3','AR-011','AR-010','AR-001') {
+            $task=$name.Substring(0,6);$log="artifacts/ar012-review/$name.log"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $task 2>&1 | Tee-Object $log
+            if($LASTEXITCODE -ne 0 -or (Get-Content $log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed'){$failed += $name}
+          }
+          if($failed.Count){throw ('Failed positive corpora: '+($failed -join ', '))}
+      - name: Run every mandatory Agent suite with aggregate failure status
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar012-review/all-agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR012-Word-Review-Evidence
+          path: artifacts/ar012-review/
+          if-no-files-found: error
+          retention-days: 14
