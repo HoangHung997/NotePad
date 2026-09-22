@@ -47,6 +47,8 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         ArgumentNullException.ThrowIfNull(contextManager);
         ArgumentNullException.ThrowIfNull(telemetry);
 
+        // Validate the host hook factory before allocating a transport or provider resources.
+        var hooks = _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null.");
         var registry = NormalRuntimeToolRegistry.Create(tools);
         var domainVerifiers = new List<IAgentRuntimeDomainVerifier>
         {
@@ -68,6 +70,6 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
                 new ArtifactStore(tools.StateRoot)),
-            hooks: _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null."));
+            hooks: hooks);
     }
 }

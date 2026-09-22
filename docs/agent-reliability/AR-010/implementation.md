@@ -19,3 +19,7 @@ H2AgentRuntimeHookTests is registered in H2Notes.Tests/Program.cs and supports t
 Main 1283bc13e07c3cd47d04886166de3dfc595422c0; accepted AR-001 source f3ebc4d336b8d6752436412840675fb2e7204e1d; existing PR #3 branch feature/h2-agent-reliability-ar-000. Current text snapshot e0a2935d565ca5fe83b68f743c0b3ab3ef9a0736 was hash-verified against the exact-source Actions artifact. All mandatory reference docs except the current tracker are unchanged from the previous task. User-PC working tree is inaccessible. Local container has no .NET/PowerShell or direct GitHub DNS, so no local C# PASS is claimed.
 
 E3/E4 remain NOT_RUN / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER.
+
+## Review repair before acceptance
+
+The initial exact-source build and three focused iterations passed. Further code review found that a throwing/null host-hook factory could leave a newly constructed transport without an owner. Hook construction/validation now precedes registry/provider/transport allocation. Two registered regressions require the original hook error and zero transport allocations for exception/null cases. This change needs its own exact-source test results; no earlier PASS is transferred to it.

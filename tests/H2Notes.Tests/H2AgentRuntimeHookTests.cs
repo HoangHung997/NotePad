@@ -141,6 +141,29 @@ internal static class H2AgentRuntimeHookTests
             finally { Drain(adapter); }
         }));
 
+        foreach (var returnNull in new[] { false, true })
+        {
+            var nullHook = returnNull;
+            test("AR-010 invalid hook factory allocates no transport: " + (nullHook ? "null" : "exception"), () => InWorkspace(root =>
+            {
+                var traces = new ConcurrentQueue<AgentRuntimeHookEvent>();
+                var transport = new ScriptFactory([], traces);
+                var factory = new AgentRuntimeFactory(transport, _ => nullHook ? null! : throw new InvalidOperationException("hook-factory-failure"));
+                using var tools = new AgentTools(new SafeWorkspace(root), Path.Combine(root, "lab-state"),
+                    (_, _) => Task.FromResult(false), (_, _) => { }) { ReadOnly = true };
+                try
+                {
+                    _ = factory.Create(Profile(), "", tools, new H2AgentLab.Context.AgentContextManager(), new());
+                    throw new Exception("Invalid hook factory was accepted.");
+                }
+                catch (InvalidOperationException error)
+                {
+                    Check(error.Message.Contains(nullHook ? "returned null" : "hook-factory-failure"), "The original hook factory error was hidden.");
+                }
+                Check(transport.Sessions.Count == 0, "Hook factory failure leaked a newly allocated transport.");
+            }));
+        }
+
         foreach (var kind in Enum.GetValues<AgentRuntimeHookKind>())
         {
             var target = kind;
