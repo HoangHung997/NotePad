@@ -77,7 +77,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | DONE |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
-| AR-020 | Office discovery đa instance/view | 012 | E3 | ACTIVE / AWAITING_ENVIRONMENT |
+| AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
@@ -184,6 +184,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test E3:** RC-03/05; hai Excel/Word instances, hai views cùng tài liệu, tên gần nhau, unsaved, Save As, đóng/mở lại, modal; ghi lựa chọn thực và file đối chứng. App/build nào không gắn được ghi support gap.
 
 **Acceptance:** đọc đúng marker DOC-A/B/UNSAVED-ONLY trên app thật; không gán một COM active object duy nhất thành toàn bộ máy. Không kill app người dùng để resolve lỗi; chỉ dọn helper của task.
+
+**AR-020 implementation checkpoint (2026-09-22):** IMPLEMENTED / AWAITING_ENVIRONMENT, **not DONE**. Exact-source full CI and E2 fixtures passed; 28/28 AR-020 x3, retained corpora and 74/74 Agent suites. Native Office E3 is NOT_RUN because the measured runner has neither Word nor Excel registered. [Implementation evidence](agent-reliability/AR-020/implementation-evidence.json). AR-083 remains DEFERRED_BY_USER.
 
 ### [ ] AR-021 — Excel read range/pagination và token nội dung
 
@@ -473,68 +475,60 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-020_ACTIVE_NATIVE_DISCOVERY",
+  "phase": "AR-020_IMPLEMENTED_AWAITING_NATIVE_E3",
   "active_task": "AR-020",
-  "implementation_status": "ACTIVE",
+  "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar020-2026-09-22",
-  "last_code_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-  "last_validated_code_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-  "last_validation_result": "FULL_REQUIRED_CI_E2_AND_WORD_NEGATIVE_CONTROLS_PASS",
+  "owner_session": "chatgpt-ar020-final-review-2026-09-22",
+  "last_code_commit": "577a5237375257c147bddcd6a96b039b620df966",
+  "last_validated_code_commit": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+  "last_validation_result": "FULL_CI_AND_E2_PASS_NATIVE_E3_NOT_RUN",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Offline UTF-8 review snapshot of 619a86d verified against tracked blob hashes; not remote Git history. Guarded delivery stages only enumerated task files and verifies clean CI checkout/non-force push. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Positive Windows test checkout CLEAN after restoring exact pre-control bytes; local offline review snapshot clean and matches delivered source, not remote Git history. Checkpoint stages only three docs and verifies non-force push/remote HEAD. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T12:29:39.406778+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T14:00:41.576559+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Validate native-window catalog, targeted capture and retained regression on exact Windows CI source.",
-    "Native Word/Excel E3 RC-03/05 multi-instance/view/unsaved/Save As/modal marker readback NOT_RUN; no installed native environment in assistant container."
+    "Actual native E3 multi-instance/view Office acceptance and any resulting compatibility repairs; see native-runbook.md."
   ],
   "last_test_commands": [
     {
-      "command": "dotnet restore H2Notes.Avalonia.slnx",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
+      "command": "dotnet restore H2Notes.Avalonia.slnx; dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
+      "run_id": 35735271906,
+      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "PASS"
     },
     {
-      "command": "dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
+      "command": "H2Notes.Tests --filter AR-020 (3 repetitions)",
+      "run_id": 35735271906,
+      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "28/28 x3; E1/E2 only"
     },
     {
-      "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
-    },
-    {
-      "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-012 (three repetitions)",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
-    },
-    {
-      "command": "same test runner --filter AR-011 / AR-010 / AR-001",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
+      "command": "H2Notes.Tests --filter AR-012 / AR-011 / AR-010 / AR-001",
+      "run_id": 35735271906,
+      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "44/44,25/25,11/11,13/13"
     },
     {
       "command": "tools/agent-reliability/run_agent_suites.ps1",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
+      "run_id": 35735271906,
+      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "74/74"
     },
     {
-      "command": "Existing full Avalonia CI suite/publish/packaged-helper smoke commands",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "PASS",
-      "evidence": "AR-012 acceptance.json: full run 35724401082 / focused run 35724340135"
+      "command": "All mandatory Avalonia CI build/test/publish/helper IPC steps",
+      "run_id": 35735271912,
+      "code_sha": "d7a0b5d88b38be37445c4b8bef24431b57b4c1ff",
+      "source_head": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "PASS; 711 H2 tests / 0 failures"
+    },
+    {
+      "command": "Invoke-Ar020NativeProbe.ps1 on native Office test documents",
+      "result": "NOT_RUN / AWAITING_ENVIRONMENT"
     }
   ],
   "ci_runs": [
@@ -765,6 +759,29 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "negative": "2 passed / 3 expected old-runtime failures",
       "artifact_id": 10693511176,
       "artifact_sha256": "a5e4de1a41d72247faeba39036ec8c7bd43cc468d00f0625e9a21ff0ac32a6e3"
+    },
+    {
+      "id": 35734416863,
+      "code_sha": "577a5237375257c147bddcd6a96b039b620df966",
+      "result": "FAILURE",
+      "stage": "Negative-control clean-restore guard; positives NOT_RUN"
+    },
+    {
+      "id": 35735271906,
+      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "result": "SUCCESS",
+      "evidence_level": "E2",
+      "AR020": "28/28 x3",
+      "Agent_suites": "74/74"
+    },
+    {
+      "id": 35735271912,
+      "source_head": "3486e6badb38c8984aa756696e2a113f49bc3d15",
+      "actual_checkout_sha": "d7a0b5d88b38be37445c4b8bef24431b57b4c1ff",
+      "result": "SUCCESS",
+      "H2_tests": "711/711",
+      "publish_helper_IPC": "PASS",
+      "native_E3": "NOT_RUN"
     }
   ],
   "evidence_locations": [
@@ -779,20 +796,21 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-011/acceptance.json",
     "docs/agent-reliability/AR-011/implementation.md",
     "docs/agent-reliability/AR-012/acceptance.json",
-    "docs/agent-reliability/AR-012/implementation.md"
+    "docs/agent-reliability/AR-012/implementation.md",
+    "docs/agent-reliability/AR-020/implementation-evidence.json",
+    "docs/agent-reliability/AR-020/implementation.md",
+    "docs/agent-reliability/AR-020/native-runbook.md"
   ],
   "known_failures": [
-    "No observed AR-012/011/010/001 or mandatory suite failure at the accepted code SHA.",
-    "E3 native Office/provider/model and E4 real H2 UI+model+tools remain NOT_RUN / AWAITING_ENVIRONMENT. Headless chip checks are not visual acceptance.",
-    "AR-083 remains DEFERRED_BY_USER; NAS package/local harness are not physical E5. One-PC native tests remain mandatory.",
-    "Native Office multi-instance PID/window/view enumeration and genuinely separate content/UI revisions remain AR-020/021. Missing provider identity fields are not invented.",
-    "Exact-file/parent/sibling and reparse preflight are not race-free handle-based OS I/O. Unproven mapped/UNC alias equivalence is rejected, not certified. Arbitrary FullAccess shell/Python is not an OS sandbox.",
-    "Document/session grounding and captured-selection preconditions do not certify every native cell/range, layout, paging, durable-job/restart or cross-PC operation. AR-021/022/023/031/040/041 and MB-124–127/H2M-133 remain open.",
-    "No personal document, paid model, new user credential/endpoint or external user message was used. User-PC working tree remains NOT_ACCESSIBLE."
+    "E1/E2 native-object probes and controlled Office clients are not E3 native Office acceptance.",
+    "Excel.Application and Word.Application are both unregistered on the measured Windows runner; no activation or native marker read was attempted.",
+    "E4 actual H2 UI/model/tools remains NOT_RUN. AR-083 remains DEFERRED_BY_USER, not E5_PASS.",
+    "Native Office/build compatibility, multi-instance/view marker selection, Save As, close/reopen and modal behavior still require the E3 matrix.",
+    "Document/view identities are helper-local; no durable job/resume, semantic-memory, complete Office paging/layout, NAS alias or OS-sandbox guarantee is added.",
+    "No new user model endpoint/credential, paid model call, personal-document mutation, outbound user message or main merge occurred."
   ],
   "external_blockers": [
-    "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
-    "AR-083 physical two-PC/NAS is DEFERRED_BY_USER, not waived or passed."
+    "No authorized native Windows Office environment accessible; both Office ProgIDs unregistered in CI."
   ],
   "deferred_acceptance": [
     {
@@ -803,13 +821,15 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "blocks_claim_of_certified_multi_pc": true
     }
   ],
-  "pending_user_decisions": [],
-  "next_exact_action": "Continue only AR-020 on feature/h2-agent-reliability-ar-000 and PR #3. Inspect exact-source Windows build/AR-020 and retained corpora, fix failures and run full required CI. Collect E3 marker evidence only on an approved native Office environment; otherwise keep AR-020 AWAITING_ENVIRONMENT, not DONE. No model endpoint or personal document tests.",
+  "pending_user_decisions": [
+    "Provide/authorize a Windows Office test environment or return its dedicated read-only native matrix evidence. Do not waive E3 implicitly."
+  ],
+  "next_exact_action": "Keep AR-020 active on feature/h2-agent-reliability-ar-000 and PR #3. Reconcile latest refs/checkpoint before work. Obtain an authorized Windows environment with installed Word/Excel and dedicated small test documents, or receive its native evidence. Follow docs/agent-reliability/AR-020/native-runbook.md: exact read-only catalog and DOC-A/DOC-B/UNSAVED-ONLY marker identity, two instances/views, Save As, close/reopen, busy/modal and frozen-capture matrix. Do not start or close user Office apps automatically. Record actual native versions, IDs, code SHA, incomplete/unsupported cases and failures. Do not mark AR-020 DONE or AR-083 passed from these fixture/helper results.",
   "next_task_if_active_done": "AR-021",
-  "last_runtime_source_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
+  "last_runtime_source_commit": "577a5237375257c147bddcd6a96b039b620df966",
   "previous_saved_checkpoint_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-  "finalization_checked_head": "0aed2aca0965ccb88dc0de09834505159e6288f9",
-  "additional_ci_after_recorded_run": "Documentation/finalizer cleanup may trigger later CI. Do not transfer accepted exact-source PASS to an unobserved SHA.",
+  "finalization_checked_head": "e5a0c1098d881472b039852183f1e13a71042479",
+  "additional_ci_after_recorded_run": "Later documentation/writer-removal commits are not the exact source tested above. Their runs are separate and not assumed PASS.",
   "last_completed_task": {
     "id": "AR-012",
     "implementation_status": "IMPLEMENTED",
@@ -832,7 +852,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
     "full_ci_run": 35709818021
   },
-  "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs"
+  "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs",
+  "last_full_ci_checkout_sha": "d7a0b5d88b38be37445c4b8bef24431b57b4c1ff",
+  "implemented_this_session": [
+    {
+      "id": "AR-020",
+      "code_sha": "577a5237375257c147bddcd6a96b039b620df966",
+      "validated_level": "E2",
+      "acceptance_status": "AWAITING_ENVIRONMENT",
+      "done": false
+    }
+  ]
 }
 ```
 
