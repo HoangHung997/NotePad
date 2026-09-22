@@ -26,13 +26,13 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Apply exact reviewed patch on unchanged owned branch
+      - name: Apply reviewed boundary repair on exact owned branch
         id: save
         shell: python
         run: |
-          import base64,gzip,hashlib,io,json,os,pathlib,subprocess
+          import base64,hashlib,json,os,pathlib,subprocess
           REPO='HoangHung997/NotePad';BRANCH='feature/h2-agent-reliability-ar-000'
-          BASE='be3d498fcdc9fc8483e6df167da5a3d5d8e96046';MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0'
+          BASE='b49d7ae9930926031581bf1fb1aa72bf2cfbdceb';MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0'
           WORKFLOW='.github/workflows/h2-ar031-implementation.yml'
           def require(ok,msg):
               if not ok: raise RuntimeError(msg)
@@ -40,60 +40,35 @@ jobs:
           def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
           head=os.environ['CHECKED_HEAD']
           require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong/dirty checkout')
-          require(git('rev-parse','HEAD^')=='e33158327f2aa7c5a41f319599cd281608af52c7' and git('diff','--name-only',BASE,head)==WORKFLOW,'Other work appeared; reconcile')
+          require(git('rev-parse','HEAD^')==BASE and git('diff','--name-only',BASE,head)==WORKFLOW,'Concurrent work; reconcile')
           require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main advanced')
           require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Branch advanced')
-          chunks=[]
-          for sha in ['e8afaf4540d2e2bf4a5cf28ca3cadf3690d41e70','73756cf33463afe8a4732737215d76888420c480','a5dd8d647f3d92ae0b99dc9fe0d43d66c7d7bb7d','14cb6881e3c58dcf09638050fdca44a0cbf97963']:
-              response=json.loads(subprocess.check_output(['gh','api','repos/'+REPO+'/git/blobs/'+sha],timeout=60))
-              b=base64.b64decode(response['content']);require(blob(b)==sha and len(b)<=8401,'Transfer chunk hash/size mismatch')
-              chunks.append(b)
-          require(chunks[2].count(b'DCLPi04e/cxoR7')==1,'Transport correction drift')
-          chunks[2]=chunks[2].replace(b'DCLPi04e/cxoR7',b'DCLPi04e/xoR7')
-          require(blob(chunks[2])=='05c8d888f8eaf659524c15c33bef2228c8eea774','Corrected transfer hash differs')
-          compressed=base64.b64decode(b''.join(chunks),validate=True)
-          require(len(compressed)==25150,'Compressed length differs')
-          with gzip.GzipFile(fileobj=io.BytesIO(compressed)) as f:
-              patch=f.read(99478);require(len(patch)==99477 and f.read(1)==b'','Patch size differs')
-          require(hashlib.sha256(patch).hexdigest()=='23fdff943f0ae347e284491da8a917de7f007da10f64f57ddb4686550e95011b','Reviewed source patch mismatch')
+          sha='f2c647183dc28e9a09794e7a28b1b8a146ec4849'
+          response=json.loads(subprocess.check_output(['gh','api','repos/'+REPO+'/git/blobs/'+sha],timeout=60))
+          patch=base64.b64decode(response['content'])
+          require(blob(patch)==sha and len(patch)==17772 and hashlib.sha256(patch).hexdigest()=='1d21040ff69ee23a8c0aefe7e3978e5dfce658f1669c05a0111ad3cffcffb295','Reviewed patch differs')
           entries=[
-              ('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md','e03e108eb371d86cb384d478481b17a6f3ea4b1c','6794c840d6d7ecf95e24db8bd7c119f416863579'),
-              ('docs/agent-reliability/AR-031/implementation.md',None,'b00b7ab3106b9720c98ffbefea5e8f4d16d23f29'),
-              ('experiments/H2AgentLab/ArchiveTestVisibility.cs',None,'e567b0343d41b8fc39ca91cce2a0a846c56cfef5'),
-              ('experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs',None,'d8828cc5b4709c509e8ad2182fafe3f81659034f'),
-              ('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Chat.cs','102283ba6ecd47ac3af02003f9102fd3f2a85c28','d1a9c0c21c01c697bb52811b8ed37ad758b90e20'),
-              ('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs','25950d96b7bf9f7fc5571a42995dd899f4f92e26','633b4c3baee64a5c57e0691ca190fdcf8cfff303'),
-              ('experiments/H2AgentLab/Runtime/AgentRuntime.cs','9ee2b2f70239f51df705acca0e752983bfe77703','5c49ba8b37215f443b426cc4bd097f1c8c1c9d8e'),
-              ('experiments/H2AgentLab/Tools/ToolExecutionScheduler.cs','4b4be21eb7717aac858fa6d3fe94f2ed1c6f357f','a7aecc04370b954c7117d3be1dc7831cb92e5e6a'),
-              ('src/H2Notes.Avalonia/Controls/AiChatPanel.Agent.cs','27cde50f4f6ab6a88452c4a605ded45ea234b01d','ebd8df22b7844aafc016b8e75d45325b7822fcd4'),
-              ('src/H2Notes.Core/H2AgentAdapter.cs','256fefe78f816d2fd52e4ded6fc3143a8696f923','147ad42cb4c7b7b7d30d8bfd53652956a82ef834'),
-              ('src/H2Notes.Core/H2AgentArchiveStatus.cs',None,'1a8e805e8999e61004e8bcea3c09ff1f500d50b8'),
-              ('tests/H2Notes.Tests/H2AgentArchiveJournalTests.cs',None,'6f52147a45c7921ac3126dfd381e963782246fd4'),
-              ('tests/H2Notes.Tests/Program.cs','b5009df20769b55b4d27f27ca8588ea5a959a749','77d602a294d954229e709fb8580a38dda58eb633')]
+              ('experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs','d8828cc5b4709c509e8ad2182fafe3f81659034f','18dc332320077502a34d55ec744027fe4cf2798c'),
+              ('tests/H2Notes.Tests/H2AgentArchiveJournalTests.cs','6f52147a45c7921ac3126dfd381e963782246fd4','ccf7f69e1ef32508ec5b60a4ae5cff54ea439b6c'),
+              ('tests/H2Notes.Tests/H2AgentArchiveBoundaryTests.cs',None,'2977b2e799390d1d3079a2304efbebf00c9d54df')]
           for path,old,new in entries:
               p=pathlib.Path(path);require((blob(p.read_bytes()) if p.exists() else None)==old,'Preimage differs: '+path)
           out=pathlib.Path(os.environ['RUNNER_TEMP'])/'ar031-source';out.mkdir()
-          patchfile=out/'implementation.patch';patchfile.write_bytes(patch)
+          patchfile=out/'boundary.patch';patchfile.write_bytes(patch)
           subprocess.run(['git','apply','--index','--check',str(patchfile)],check=True)
           subprocess.run(['git','apply','--index',str(patchfile)],check=True)
           for path,old,new in entries: require(blob(pathlib.Path(path).read_bytes())==new,'Postimage differs: '+path)
-          # Keep the whitespace gate. The first delivery identified one trailing empty line.
-          adapter=pathlib.Path('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs')
-          original=adapter.read_bytes();require(original.endswith(b'\n}\n\n'),'Trailing-line fix no longer applies')
-          normalized=original[:-1];require(blob(normalized)=='3b250246ef95ac91a0939ae5a468e5814f927d35','Normalized adapter differs')
-          adapter.write_bytes(normalized);subprocess.run(['git','add','--',str(adapter)],check=True)
           require(set(git('diff','--cached','--name-only').splitlines())=={e[0] for e in entries},'Unexpected stage')
           subprocess.run(['git','diff','--cached','--check'],check=True)
-          (out/'applied.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary']))
           require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch work')
           git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
-          subprocess.run(['git','commit','-m','feat(AR-031): journal Agent state with validated local recovery and crash tests'],check=True)
+          subprocess.run(['git','commit','-m','fix(AR-031): preserve corrupt-prefix uncertainty and bound archive admission'],check=True)
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+BRANCH],check=True,timeout=120)
           code=git('rev-parse','HEAD');require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==code,'Save not verified')
           (out/'source.json').write_text(json.dumps({'code_sha':code,'prior_head':BASE,'paths':[e[0] for e in entries],'tests':'NOT_RUN_YET','working_tree':'CLEAN'},indent=2))
           with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('code='+code+'\n')
-          print('Saved AR-031 source:',code)
-      - name: Run unchanged full Avalonia workflow on the saved branch
+          print('Saved AR-031 repair:',code)
+      - name: Dispatch unchanged full Avalonia workflow
         run: gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref=feature/h2-agent-reliability-ar-000
       - uses: actions/upload-artifact@v4
         if: always()
@@ -110,6 +85,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.integrate.outputs.code }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
@@ -126,6 +102,31 @@ jobs:
           if ($LASTEXITCODE) { throw 'Restore failed' }
           dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar031/build.log
           if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Reproduce prior archive admission and recovery-boundary defects
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs'
+          $original=[IO.File]::ReadAllBytes((Resolve-Path $path))
+          try {
+            python -c "import pathlib,subprocess,sys;p=sys.argv[1];pathlib.Path(p).write_bytes(subprocess.check_output(['git','show','b49d7ae9930926031581bf1fb1aa72bf2cfbdceb:'+p]))" $path
+            if ($LASTEXITCODE) { throw 'Prior source missing' }
+            @{test_sha=(git rev-parse HEAD);prior_archive_sha='b49d7ae9930926031581bf1fb1aa72bf2cfbdceb';substituted=$path} | ConvertTo-Json | Set-Content artifacts/ar031/negative-identity.json
+            dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar031/negative-build.log
+            if ($LASTEXITCODE) { throw 'Compile failure is not a valid counterexample' }
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter 'AR-031 boundary' 2>&1 | Tee-Object artifacts/ar031/negative.log
+            $exit=$LASTEXITCODE;$text=Get-Content artifacts/ar031/negative.log -Raw
+            if ($exit -eq 0 -or $text -notmatch 'RESULT: 2 passed, 4 failed') { throw 'Expected archive boundary failures did not reproduce' }
+            foreach($message in 'Full archive still admits new work.','A completed prefix was presented as current completion after source loss.','A duplicate source event identity survived validated replay.','Oversized legacy sources were retained into a partial migration before quota preflight.') {
+              if (-not $text.Contains($message)) { throw ('Expected diagnostic missing: '+$message) }
+            }
+          } finally {
+            [IO.File]::WriteAllBytes((Join-Path $PWD $path),$original)
+          }
+          if (git status --porcelain) { throw 'Positive source not restored clean' }
+          'CLEAN: original source bytes restored' | Set-Content artifacts/ar031/restored.txt
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar031/positive-build.log
+          if ($LASTEXITCODE) { throw 'Positive rebuild failed' }
       - name: Run archive crashes and all retained corpora
         id: corpora
         shell: pwsh
