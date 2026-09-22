@@ -22,7 +22,7 @@ public sealed record AgentArchiveOptions(int RecentLimit = 200, int MaxEvents = 
 /// Source records are flushed and validated before activation. Checkpoints are disposable indexes.
 /// Corrupt source yields a read-only verified prefix with explicit diagnostics, never healthy-empty.
 /// Legacy JSON is imported once without modification and is not written in parallel with v2.</summary>
-internal sealed class AgentIntegrationTaskArchive : IDisposable
+internal sealed partial class AgentIntegrationTaskArchive : IDisposable
 {
     private const int Version = 2;
     internal const int MaxRecordBytes = 4 * 1024 * 1024;
@@ -310,6 +310,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
                 if (e.Kind == "operation-dispatched" && (!_operations.TryGetValue(key, out var intent) || intent.State != "Prepared")) throw new InvalidDataException("missing-intent");
                 _operations[key] = operation; break;
         }
+        IndexHistory(e);
     }
 
     private IndexCheckpoint CurrentIndex()

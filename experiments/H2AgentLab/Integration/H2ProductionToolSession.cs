@@ -20,6 +20,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly H2AgentTaskContext? _context;
     private readonly IH2ProjectToolHost? _projects;
     private readonly Guid _taskId;
+    private readonly H2HistoryRuntimeTools? _history;
     private SafeWorkspace? _fileTargets;
     private readonly H2AgentTargetBindingPolicy? _targetPolicy;
     private readonly Action<H2AgentTargetResolution>? _targetObserved;
@@ -32,9 +33,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         H2AgentTargetBindingPolicy? targetPolicy = null,
         Action<H2AgentTargetResolution>? targetObserved = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
-        Func<H2ActiveWorkContext, bool>? captureValidator = null)
+        Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null)
     {
-        _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
+        _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
         _targetPolicy = targetPolicy; _targetObserved = targetObserved;
         _officeClientFactory = officeClientFactory; _captureValidator = captureValidator;
@@ -54,6 +55,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             verifiers.Add(projectTools);
         }
         H2AttachmentRuntimeTools.Register(registry, _context);
+        _history?.Register(registry);
         ConfigureDomains(tools, registry, verifiers);
         if (tools.Desktop is null && _desktopBindingFailure is not null)
             registry.RegisterCapabilityNotice(new("desktop.bound_window", "Desktop actions require a current host-captured target; Full Access does not choose one.",

@@ -84,7 +84,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
-| AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | NOT_STARTED |
+| AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | ACTIVE |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | NOT_STARTED |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | NOT_STARTED |
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
@@ -249,7 +249,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** sau restart biết verified/attempted/pending/unknown; không biến corrupt archive thành rỗng và báo healthy. Runtime chưa auto-resume ghi ở task này; giữ boundary chờ AR-041.
 
-### [ ] AR-032 — Retrieval có nguồn thay cửa sổ chỉ Completed
+### [~] AR-032 — Retrieval có nguồn thay cửa sổ chỉ Completed
 
 **Sửa:** production context builders, archive query, evidence reader, memory tools theo same registry.
 
@@ -477,31 +477,24 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-031_ACCEPTED_NEXT_AR-032",
+  "phase": "AR-032_ACTIVE_SCOPED_HISTORY_VALIDATION",
   "active_task": "AR-032",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar031-cancellation-final",
+  "owner_session": "chatgpt-ar032-scoped-history-2026-09-23",
   "last_code_commit": "268079a566f3f6f10f31d99852c31bb050d39ec4",
   "last_validated_code_commit": "268079a566f3f6f10f31d99852c31bb050d39ec4",
   "last_validation_result": "AR031_E1_E2_AND_FULL_CI_PASS; CANCELLATION_VERIFIED; NATIVE_DEBT_REMAINS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact Windows CI checkout CLEAN; final docs-only commit verifies unchanged refs and non-force push. Local review snapshot is not a full clone; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "CI source delivery requires exact preimages, unchanged main/branch, nine staged source/test/docs paths and clean verified push. Local review is an offline snapshot; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T21:32:05.181324+00:00",
-  "completed_this_session": [
-    {
-      "task": "AR-031",
-      "implementation": "IMPLEMENTED",
-      "acceptance": "E2_PASS",
-      "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4"
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T22:02:58.302027+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-032 NOT_STARTED; scoped retrieval implementation and RC-15/16/26/34 evidence remain."
+    "Compile and run AR-032 on the newly saved source; repair failures and inspect exact full CI before E2 acceptance."
   ],
   "last_test_commands": [
     {
@@ -963,7 +956,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On the same branch and PR #3, reconcile latest refs, working tree and SESSION HANDOFF. Start only AR-032: scoped TaskId/ThreadId history and evidence retrieval with source IDs, pagination and current unfinished work. Reuse the existing Agent archive and registry; do not add a parallel store or replay unknown writes. Keep AR-020 native E3 pending, AR-083 deferred and retained AR-031/030/020/012/011/010/001 regressions.",
+  "next_exact_action": "Keep AR-032 the only ACTIVE implementation. Inspect source delivery and Windows validation/full Avalonia workflow_dispatch on its exact saved SHA. Fix every failing new/retained test; inspect artifacts and source receipts before acceptance. Reuse existing archive/registry; AR-020 E3 pending, E4 NOT_RUN, AR-083 DEFERRED_BY_USER.",
   "next_task_if_active_done": "AR-033",
   "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
@@ -1023,7 +1016,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "Strengthened mutation contract passes existing orchestrator guard."
   ],
   "last_test_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-  "last_native_acceptance": "E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER"
+  "last_native_acceptance": "E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER",
+  "pending_code_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Integration/H2HistoryRuntimeTools.cs"
 }
 ```
 
