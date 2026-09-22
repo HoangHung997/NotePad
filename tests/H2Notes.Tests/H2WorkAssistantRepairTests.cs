@@ -75,15 +75,54 @@ internal static class H2WorkAssistantRepairTests
                 var marker = Path.Combine(root, full ? "full.txt" : "scoped.txt");
                 var script = new Script([
                     new("load", "tool_search", "{\"query\":\"exec_command\"}"),
-                    new("exec", "exec_command", JsonSerializer.Serialize(new { command = "[IO.File]::WriteAllText('" + marker.Replace("'", "''") + "', 'command-result'); Write-Output 'command-result'" }))]);
+                    new("exec", "exec_command", JsonSerializer.Serialize(new { command = "[IO.File]::WriteAllText('" + marker.Replace("'", "''") + "', 'command-result'); Write-Output 'command-result'", timeout_seconds = 20 }))]);
                 using var adapter = Adapter(root, script);
                 var context = full ? new H2AgentTaskContext(root, "", PermissionScope: WorkAssistantPermissionScopeMapper.ForWorkspace(H2AgentPermissionMode.FullAccess, root, DateTime.UtcNow).PermissionScope) : Context(root);
-                var done = Wait(adapter, adapter.StartTaskAsync(null, "Run command", context, false).Result);
+                // Budget covers the explicit 20-second command deadline plus teardown margin.
+                var done = Wait(adapter, adapter.StartTaskAsync(null, "Run command", context, false).Result, 30_000);
                 Check(File.Exists(marker) == full, "Local command escaped scoped policy or full access did not execute: " + full + " " + done.Error + string.Join("\n", script.Results.Select(r => r.Content)));
                 if (full) Check(done.Status == H2AgentTaskStatus.Completed && script.Results.Any(r => r.Content.Contains("command-result") && !r.IsError), done.Error ?? "Shell failed");
                 else Check(done.Status == H2AgentTaskStatus.Blocked && !script.Loaded.Contains("exec_command"), "Scoped mode exposed command execution");
             }
         }));
+
+        test("AR-001 forced wait timeout drains owned command and preserves the primary failure", () =>
+        {
+            string? workspace = null;
+            int processId = 0;
+            Exception? observed = null;
+            try
+            {
+                InWorkspace(root =>
+                {
+                    workspace = root;
+                    var pidFile = Path.Combine(root, "owned-process.txt");
+                    var script = new Script([
+                        new("load", "tool_search", "{\"query\":\"exec_command\"}"),
+                        new("exec", "exec_command", JsonSerializer.Serialize(new { command =
+                            "[IO.File]::WriteAllText('" + pidFile.Replace("'", "''") + "', [string]$PID); Start-Sleep -Seconds 60",
+                            timeout_seconds = 90 }))]);
+                    using var adapter = Adapter(root, script);
+                    var context = new H2AgentTaskContext(root, "", PermissionScope:
+                        WorkAssistantPermissionScopeMapper.ForWorkspace(H2AgentPermissionMode.FullAccess, root, DateTime.UtcNow).PermissionScope);
+                    var id = adapter.StartTaskAsync(null, "Disposable command teardown fixture", context, false).Result;
+                    var deadline = Environment.TickCount64 + 30_000;
+                    while ((!File.Exists(pidFile) || new FileInfo(pidFile).Length == 0) && Environment.TickCount64 < deadline)
+                    { Pump(); Thread.Sleep(10); }
+                    Check(File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile), out processId), "Fixture process did not start.");
+                    _ = Wait(adapter, id, 50);
+                });
+            }
+            catch (Exception ex) { observed = ex; }
+            Check(observed is TimeoutException, "The original timeout was lost or replaced by cleanup: " + observed);
+            Check(workspace is not null && !Directory.Exists(workspace), "Workspace deleted before drain or leaked after shutdown.");
+            try
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(processId);
+                Check(process.HasExited, "Owned command survived awaited adapter shutdown.");
+            }
+            catch (ArgumentException) { /* The owned PID no longer exists. */ }
+        });
 
         test("Work Assistant full access expires and never survives read-only override", () => InWorkspace(root =>
         {
@@ -277,16 +316,48 @@ internal static class H2WorkAssistantRepairTests
 
     private static H2AgentTaskContext Context(string root) => new(root, "Synthetic test",
         PermissionScope: WorkAssistantPermissionScopeMapper.ForWorkspace(H2AgentPermissionMode.AllowScopedChanges, root, DateTime.UtcNow).PermissionScope);
-    private static H2ProductionAgentAdapter Adapter(string root, Script script) => new(Path.Combine(root, "state-" + Guid.NewGuid().ToString("N")),
-        () => new(new AiProfile { Name = "test", Model = "script", BaseUrl = "https://example.test/v1", Protocol = AiProtocol.OpenAiChat }, ""), script);
+    [ThreadStatic] private static List<H2ProductionAgentAdapter>? _workspaceAdapters;
+    private static H2ProductionAgentAdapter Adapter(string root, Script script)
+    {
+        var adapter = new H2ProductionAgentAdapter(Path.Combine(root, "state-" + Guid.NewGuid().ToString("N")),
+            () => new(new AiProfile { Name = "test", Model = "script", BaseUrl = "https://example.test/v1", Protocol = AiProtocol.OpenAiChat }, ""), script);
+        _workspaceAdapters?.Add(adapter);
+        return adapter;
+    }
     private static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     private static void InWorkspace(Action<string> body)
-    { var root = Path.Combine(Path.GetTempPath(), "h2-assistant-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
-        try { body(root); } finally { Directory.Delete(root, true); } }
+    {
+        var root = Path.Combine(Path.GetTempPath(), "h2-assistant-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var previous = _workspaceAdapters;
+        var owned = _workspaceAdapters = new List<H2ProductionAgentAdapter>();
+        Exception? failure = null;
+        var cleanupErrors = new List<Exception>();
+        try { body(root); }
+        catch (Exception ex) { failure = ex; }
+        finally
+        {
+            foreach (var adapter in owned)
+            {
+                try { adapter.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult(); }
+                catch (Exception ex) { cleanupErrors.Add(ex); }
+            }
+            if (cleanupErrors.Count == 0)
+            {
+                try { Directory.Delete(root, true); }
+                catch (Exception ex) { cleanupErrors.Add(ex); }
+            }
+            _workspaceAdapters = previous;
+        }
+        if (cleanupErrors.Count > 0)
+            throw new AggregateException("Fixture teardown failed; evidence retained at " + root,
+                failure is null ? cleanupErrors : new[] { failure }.Concat(cleanupErrors));
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
     private static void Pump(Window? window = null)
     { for (var i = 0; i < 5; i++) { Dispatcher.UIThread.RunJobs(); window?.UpdateLayout(); AvaloniaHeadlessPlatform.ForceRenderTimerTick(); } }
-    private static H2AgentTaskSummary Wait(IH2AgentAdapter adapter, Guid id)
-    { var until = Environment.TickCount64 + 10000; while (Environment.TickCount64 < until) {
+    private static H2AgentTaskSummary Wait(IH2AgentAdapter adapter, Guid id, int budgetMilliseconds = 10000)
+    { var until = Environment.TickCount64 + budgetMilliseconds; while (Environment.TickCount64 < until) {
         var result = adapter.GetTaskSummary(id);
         if (result.Status is H2AgentTaskStatus.Completed or H2AgentTaskStatus.Failed or H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Cancelled) return result;
         Pump(); Thread.Sleep(10); } throw new TimeoutException(JsonSerializer.Serialize(adapter.ObserveTask(id))); }

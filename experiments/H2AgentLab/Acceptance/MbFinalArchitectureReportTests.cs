@@ -115,8 +115,9 @@ public static class MbFinalArchitectureReportTests
                 (_, _) => { });
 
             var registry = NormalRuntimeToolRegistry.Create(host);
-            Check(registry.Tools.Count == 19,
-                "Normal built-in ToolRegistry descriptor count changed from 19.");
+            Check(registry.Tools.Count == 20 && registry.TryGet("read_tool_output", out var reader)
+                  && reader.Namespace.Name == "evidence" && !reader.IsMutating && reader.SupportsParallel,
+                "Expected 19 historical tools plus the read-only evidence reader, with unchanged access policy.");
 
             var exposure = new DeferredToolDiscovery(registry).BuildInitialExposure();
             var names = exposure.CallableSchemas
@@ -129,7 +130,7 @@ public static class MbFinalArchitectureReportTests
             Check(report.Contains("19 callable descriptors", StringComparison.Ordinal)
                   && report.Contains("schema count is **2**", StringComparison.Ordinal)
                   && report.Contains("less than half", StringComparison.Ordinal),
-                "Final report tool/schema metrics do not match canonical runtime.");
+                "Historical report lost its frozen tool/schema measurements.");
             return Task.CompletedTask;
         });
 

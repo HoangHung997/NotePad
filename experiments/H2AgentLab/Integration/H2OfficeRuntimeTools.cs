@@ -36,7 +36,7 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
             if (name.StartsWith("excel.") && name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
             {
                 properties["sheet_name"] = new { type = "string" };
-                properties["cells"] = new { type = "array", minItems = 1, maxItems = 200, items = new { type = "object", properties = new {
+                properties["cells"] = new { type = "array", minItems = ExcelPatchLimits.MinCells, maxItems = ExcelPatchLimits.MaxCells, items = new { type = "object", properties = new {
                     address = new { type = "string" }, value = new { type = "string" }, clearValue = new { type = "boolean" },
                     formula = new { type = "string" }, bold = new { type = "boolean" }, italic = new { type = "boolean" },
                     fillColor = new { type = "integer" }, numberFormat = new { type = "string" } }, required = new[] { "address" }, additionalProperties = false } };
@@ -73,6 +73,16 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
 
     private async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+        // Count preflight precedes discovery/snapshot/IPC and any native write.
+        if (call.Name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
+        {
+            var count = call.Arguments.TryGetProperty("cells", out var batch)
+                && batch.ValueKind == JsonValueKind.Array ? batch.GetArrayLength() : -1;
+            if (ExcelPatchLimits.ValidationError(count) is { } problem)
+                return JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode,
+                    message = problem, mutationApplied = false });
+        }
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -135,7 +145,8 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                 {
                     RequireAuthorization();
                     var cells = call.Arguments.GetProperty("cells").Deserialize<ExcelCellPatch[]>(Json) ?? [];
-                    if (cells.Length is < 1 or > 200) throw new ArgumentException("Patch must contain 1–200 cells.");
+                    if (ExcelPatchLimits.ValidationError(cells.Length) is { } problem)
+                        throw new ArgumentException(problem);
                     var sheetName = H2ProductionToolSession.Arg(call, "sheet_name") ?? "";
                     var patch = await Client.PatchExcelAsync(new(session, token, true, sheetName, cells), ct).ConfigureAwait(false);
                     var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);

@@ -9,6 +9,7 @@ public static class MbRetireAgentToolsSwitchTests
     [
         "list_skills",
         "read_skill",
+        "read_tool_output",
         "update_plan",
         "run_python",
         "inspect_artifact",
@@ -99,8 +100,8 @@ public static class MbRetireAgentToolsSwitchTests
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
-            Check(executors.Length == 6,
-                "Expected six domain executors, got: " + string.Join(", ", executors));
+            Check(executors.Length == 7,
+                "Expected seven domain executors including evidence, got: " + string.Join(", ", executors));
             Check(executors.All(x => x.StartsWith("normal.", StringComparison.Ordinal)),
                 "Normal registry still includes a legacy giant-switch executor.");
 

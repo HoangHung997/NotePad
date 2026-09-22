@@ -8,6 +8,16 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
     private readonly ExcelFixture _excel = new();
     private readonly WordFixture _word = new();
 
+    public FixtureOfficeBackend(int extraExcelRows = 0)
+    {
+        if (extraExcelRows is < 0 or > 256) throw new ArgumentOutOfRangeException(nameof(extraExcelRows));
+        for (var row = 3; row < 3 + extraExcelRows; row++)
+        {
+            var address = "A" + row;
+            _excel.Cells.Add(address, new ExcelCellFixture(address, "UNCHANGED-" + row, "", false, false, null, "General"));
+        }
+    }
+
     public ExcelDiscovery DiscoverExcel()
     {
         var snapshot = ExcelSnapshot();
@@ -26,13 +36,13 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem);
         var before = SnapshotExcel(request.SessionId);
         OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
 
         if (!string.Equals(request.SheetName, _excel.SheetName, StringComparison.Ordinal))
             throw new OfficeHostFaultException("sheet_not_found", "Fixture Excel sheet not found.");
-        if (request.Cells.Count is < 1 or > 128)
-            throw new OfficeHostFaultException("invalid_request", "Excel patch must contain 1..128 cells.");
 
         var changed = new List<string>();
         foreach (var patch in request.Cells)

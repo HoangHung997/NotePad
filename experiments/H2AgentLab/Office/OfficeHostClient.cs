@@ -63,7 +63,13 @@ public sealed class OfficeHostClient : IDisposable
             cancellationToken);
 
     public Task<ExcelPatchResult> PatchExcelAsync(ExcelPatchRequest request, CancellationToken cancellationToken = default)
-        => CallAsync<ExcelPatchResult>("excel.patch", request, null, cancellationToken);
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            return Task.FromException<ExcelPatchResult>(new OfficeHostClientException(ExcelPatchLimits.ErrorCode, problem));
+        return CallAsync<ExcelPatchResult>("excel.patch", request, null, cancellationToken);
+    }
 
     public Task<ExcelLiveSnapshot> RecalculateExcelAsync(ExcelRecalculateRequest request, CancellationToken cancellationToken = default)
         => CallAsync<ExcelLiveSnapshot>("excel.recalculate", request, null, cancellationToken);

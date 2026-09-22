@@ -18,6 +18,7 @@ public static class MbRetireV1ToolRegistryAdapterTests
         "read_file",
         "read_run",
         "read_skill",
+        "read_tool_output",
         "run_python",
         "search_files",
         "type_control",

@@ -60,13 +60,13 @@ public sealed class ComOfficeBackend : IOfficeBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem);
         var (app, workbook) = FindExcel(request.SessionId);
         try
         {
             var before = SnapshotExcelInternal(app, workbook);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-            if (request.Cells.Count is < 1 or > 128)
-                throw new OfficeHostFaultException("invalid_request", "Excel patch must contain 1..128 single-cell operations.");
 
             dynamic? sheet = null;
             try

@@ -474,12 +474,24 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "last_validation_result": "CI_RED_H2_PROCESS_FIXTURE_CLEANUP_FAILURE",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "CI checkout verified clean before finalization; finalization push requires clean tree and matching remote HEAD; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Offline source snapshot verified by hash; guarded source changes applied to isolated CI checkout. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T05:25:51.995280+00:00",
-  "completed_this_session": [],
+  "checkpoint_saved_at_utc": "2026-09-22T05:42:50.712895+00:00",
+  "completed_this_session": [
+    {
+      "task": "AR-001",
+      "implementation_status": "ACTIVE",
+      "changes": [
+        "canonical skill prompt constants",
+        "shared Excel 128-cell preflight through schema adapter client server backends",
+        "exact-set evidence-reader guards with historical measurements preserved",
+        "awaited adapter teardown and timeout/error-preservation regression"
+      ],
+      "acceptance_status": "NOT_RUN"
+    }
+  ],
   "remaining_in_active_task": [
-    "Reproduce B11 process/fixture cleanup; repair B01 skill name, B02 Excel batch parity, B03 canonical registry guards; RC-02 and full required CI/publish smoke."
+    "Run RC-02 and teardown corpus 3x and full required CI on committed patch; repair all failures before closing AR-001."
   ],
   "last_test_commands": [
     {
@@ -551,7 +563,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Inspect isolated AR-001 source workspace, reproduce B11 with bounded Windows fixture tests, implement only AR-001 and run all required CI. Keep this branch and PR #3; do not reset/force-push/merge.",
+  "next_exact_action": "Run full Avalonia CI on the committed AR-001 source, inspect exact SHA and all suites/artifacts; repair AR-001 regressions on this same branch/PR #3. Do not advance AR-010 yet.",
   "next_task_if_active_done": "AR-010",
   "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",

@@ -162,7 +162,7 @@ public sealed class OfficeHostServer
 
             "excel.discover" => _backend.DiscoverExcel(),
             "excel.snapshot" => _backend.SnapshotExcel(Parameters<ExcelSnapshotRequest>(request).SessionId),
-            "excel.patch" => _backend.PatchExcel(Parameters<ExcelPatchRequest>(request)),
+            "excel.patch" => PatchExcel(Parameters<ExcelPatchRequest>(request)),
             "excel.recalculate" => _backend.RecalculateExcel(Parameters<ExcelRecalculateRequest>(request)),
             "excel.saveCopy" => _backend.SaveExcelCopy(Parameters<OfficeSaveCopyRequest>(request)),
 
@@ -176,6 +176,14 @@ public sealed class OfficeHostServer
             "fixture.crash" when _fixtureMode => CrashFixture(),
             _ => throw new OfficeHostFaultException("unknown_method", $"OfficeHost method '{request.Method}' is not supported.")
         };
+    }
+
+    private ExcelPatchResult PatchExcel(ExcelPatchRequest request)
+    {
+        OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem);
+        return _backend.PatchExcel(request);
     }
 
     private static object FixtureDelay(
