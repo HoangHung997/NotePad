@@ -377,6 +377,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 PromptCacheKey: null,
                 MaxToolRounds: 64,
                 MaxRepairRounds: 8,
+                Invocation: new(live.ProjectId.HasValue ? AgentRuntimeEntryPoint.Project : AgentRuntimeEntryPoint.Global, live.ProjectId),
                 Images: live.RequestContext?.Images,
                 Files: live.RequestContext?.Files,
                 TakeSupplementalInput: closing => TakeSupplementalInput(live, closing),

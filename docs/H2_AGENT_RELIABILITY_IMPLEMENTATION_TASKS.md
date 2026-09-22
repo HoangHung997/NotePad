@@ -74,7 +74,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 |---|---|---|---|---|
 | AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
 | AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | DONE |
-| AR-010 | Chung production context/runtime hooks | 001 | E2 | NOT_STARTED |
+| AR-010 | Chung production context/runtime hooks | 001 | E2 | ACTIVE |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | NOT_STARTED |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | NOT_STARTED |
@@ -136,7 +136,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-001 acceptance — 2026-09-22:** code `f3ebc4d336b8d6752436412840675fb2e7204e1d`; full CI `35694774117` SUCCESS including nonempty publish/helper IPC; focused `35694729061` 13/13 x3 and 74/74 Agent suites. [Exact evidence](agent-reliability/AR-001/acceptance.json). E1/E2 only; E3/E4 NOT_RUN and AR-083 DEFERRED_BY_USER. No other AR task or old native gate is closed.
 
-### [ ] AR-010 — Chung điểm nối production context và runtime
+### [~] AR-010 — Chung điểm nối production context và runtime
 
 **Mục tiêu:** H2 và Lab dùng cùng primitive chuẩn; vẫn một engine.
 
@@ -464,32 +464,24 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-001_ACCEPTED_NEXT_AR-010",
+  "phase": "AR-010_IMPLEMENTATION_ACTIVE",
   "active_task": "AR-010",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar001-2026-09-22",
-  "last_code_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+  "owner_session": "chatgpt-ar010-2026-09-22",
+  "last_code_commit": null,
   "last_validated_code_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
   "last_validation_result": "FULL_REQUIRED_CI_AND_E2_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact-source CI checkout and repair-delivery artifact verified clean. This finalization stages only four documentation files, and the save step verifies non-force push/remote HEAD. User-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Delivery must verify clean exact-head CI checkout, apply only the declared AR-010 patch, and non-force push. User-PC tree NOT_ACCESSIBLE. Offline text review is not a remote checkout.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T06:36:39.684311+00:00",
-  "completed_this_session": [
-    {
-      "id": "AR-001",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "E2_PASS",
-      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
-      "full_ci_run": 35694774117
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T06:54:29.855577+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-010 has not started: shared production/Lab context/runtime hooks and concrete Global/Project execution trace coverage."
+    "Compile and run AR-010 / RC-01 concrete hook tests, repair any failures, then full required CI and publish/helper smoke."
   ],
   "last_test_commands": [
     {
@@ -677,7 +669,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Keep this branch and PR #3. Reconcile current main/checkpoint/working tree; read AR-010 and current production/Lab context composition; implement shared runtime/context hooks with concrete Global/Project execution traces, preserving the AR-001 regression corpus. Do not create a new engine or branch.",
+  "next_exact_action": "Continue AR-010 on this existing branch/PR #3. Validate the code commit resolved from AgentRuntimeHooks.cs; run --filter AR-010, preserve --filter AR-001, then full CI and inspect actual artifacts. Do not call in-memory checkpoint boundaries durable resume or certify E3/E4/E5.",
   "next_task_if_active_done": "AR-011",
   "last_runtime_source_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
@@ -696,7 +688,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "B03 architecture guard failure; downstream suites and publish did not run",
     "B04-B10 remain open source-observed limitations/risks; see baseline",
     "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions."
-  ]
+  ],
+  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Runtime/AgentRuntimeHooks.cs"
 }
 ```
 

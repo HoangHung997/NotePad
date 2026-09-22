@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using H2AgentLab.Context;
 using H2AgentLab.Prompting;
+using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
@@ -27,7 +28,9 @@ public sealed record AgentRuntimeRequest(
     Action<string>? PublicTextObserver = null,
     Action<string>? CommentaryObserver = null,
     Action<IReadOnlyList<AgentEvidenceReference>>? EvidenceObserver = null,
-    Action<VerificationReport, int>? VerificationObserver = null);
+    Action<VerificationReport, int>? VerificationObserver = null,
+    AgentRuntimeInvocation? Invocation = null,
+    RuntimeCompactionResult? ContextCheckpoint = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -105,6 +108,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     private readonly IAgentRuntimeVerifier? _verifier;
     private readonly IAgentRuntimePermissionPolicy _permissionPolicy;
     private readonly AgentRuntimeEvidenceProjector? _evidenceProjector;
+    private readonly IAgentRuntimeHooks _hooks;
     private bool _disposed;
 
     public AgentRuntime(
@@ -116,7 +120,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         AgentRepairController? repairController = null,
         IAgentRuntimeVerifier? verifier = null,
         IAgentRuntimePermissionPolicy? permissionPolicy = null,
-        AgentRuntimeEvidenceProjector? evidenceProjector = null)
+        AgentRuntimeEvidenceProjector? evidenceProjector = null,
+        IAgentRuntimeHooks? hooks = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
@@ -127,6 +132,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         _verifier = verifier;
         _permissionPolicy = permissionPolicy ?? new ScopedAgentRuntimePermissionPolicy();
         _evidenceProjector = evidenceProjector;
+        _hooks = hooks ?? new AgentRuntimeHooks();
     }
 
     public async Task<AgentRuntimeResult> RunAsync(
@@ -144,6 +150,12 @@ public sealed class AgentRuntime : IAsyncDisposable
         if (request.MaxRepairRounds is < 0 or > 16)
             throw new ArgumentOutOfRangeException(nameof(request.MaxRepairRounds));
 
+        cancellationToken.ThrowIfCancellationRequested();
+        var invocation = request.Invocation ?? new AgentRuntimeInvocation(AgentRuntimeEntryPoint.Lab);
+        invocation.Validate();
+        // Both composition roots use this same bounded-context primitive. Lab may also pass
+        // metadata for the real CompactionManager checkpoint it prepared; production does not
+        // invent a durable checkpoint when its current context is only an in-memory snapshot.
         var contextSnapshot = _contextManager.Build(request.Context);
         var initialExposure = _discovery.BuildInitialExposure();
         var stable = request.StablePrefix with
@@ -174,6 +186,8 @@ public sealed class AgentRuntime : IAsyncDisposable
 
         var taskId = request.Contract.TaskId;
         var turnId = Guid.NewGuid();
+        var hookScope = new AgentRuntimeHookScope(taskId, turnId, invocation);
+        var modelRequests = 0;
         var initialTools = initialExposure.CallableSchemas
             .Select(ToTransportTool)
             .ToArray();
@@ -194,18 +208,12 @@ public sealed class AgentRuntime : IAsyncDisposable
 
         try
         {
-            var round = await ReadRoundAsync(
-                _transport.StartAsync(
-                    new AgentTransportStartRequest(
-                        taskId,
-                        turnId,
-                        messages,
-                        initialTools,
-                        promptCacheKey,
-                        _transport.Capabilities.ParallelToolCalls),
-                    cancellationToken),
-                usage,
-                cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+            await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ContextPrepared,
+                contextSnapshot, ContextCheckpoint: request.ContextCheckpoint), cancellationToken).ConfigureAwait(false);
+            var round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests,
+                new AgentTransportStartRequest(taskId, turnId, messages, initialTools,
+                    promptCacheKey, _transport.Capabilities.ParallelToolCalls), null,
+                usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
 
             while (true)
             {
@@ -218,8 +226,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                     {
                         if (++toolRounds > request.MaxToolRounds)
                             throw new InvalidOperationException("Đã tới giới hạn số lượt bổ sung; nội dung bổ sung được giữ trong lịch sử.");
-                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
-                            SupplementalUserMessages: supplements), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
+                            new(taskId, turnId, [], SupplementalUserMessages: supplements),
+                            usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
                         continue;
                     }
                     if (unresolvedCalls.Any(f => f.FailureId is not null) && !completionRepairRequested
@@ -229,10 +238,14 @@ public sealed class AgentRuntime : IAsyncDisposable
                         var feedback = "The host still has unresolved failed attempts: " + string.Join("; ",
                             unresolvedCalls.Select(f => f.Name + " (failureId=" + f.FailureId + ")"))
                             + ". Follow the failed tool's recovery instructions and verify the requested output. Do not repeat an unrelated successful call or claim completion.";
-                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
-                            SupplementalUserMessages: [feedback]), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
+                            new(taskId, turnId, [], SupplementalUserMessages: [feedback]),
+                            usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
                         continue;
                     }
+                    await _hooks.BeforeCompletionAsync(new(hookScope, effectiveContract, round.Text,
+                        latestVerification, unresolvedCalls.Count, mutationAwaitingVerification), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (unresolvedCalls.Count > 0)
                         throw new AgentVerificationRequiredException(
                             "Chưa hoàn thành: công cụ vẫn còn lỗi — " + string.Join("; ",
@@ -241,6 +254,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                     if (mutationAwaitingVerification)
                         throw new AgentVerificationRequiredException("The latest mutation has no verifier report.");
                     EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
+                    await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.CompletionValidated,
+                        contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
                     return new AgentRuntimeResult(
                         round.Text,
                         toolRounds,
@@ -271,6 +287,21 @@ public sealed class AgentRuntime : IAsyncDisposable
                     round.ToolCalls,
                     failedMutationSignatures,
                     cancellationToken).ConfigureAwait(false);
+
+                var results = execution.Results.ToArray();
+                var observation = new AgentRuntimeVerificationContext(
+                    execution.ExecutedMutationSignatures.Count > 0 ? effectiveContract.WithExecutedMutation() : effectiveContract,
+                    toolRounds, execution.Calls, results)
+                {
+                    Evidence = execution.Evidence,
+                    RawToolOutputs = execution.RawToolOutputs,
+                    MutationCallIds = execution.Calls.Where(call =>
+                        execution.RawToolOutputs.ContainsKey(call.Id)
+                        && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
+                        .Select(call => call.Id).ToArray()
+                };
+                await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 evidenceHistory.AddRange(execution.Evidence);
                 request.EvidenceObserver?.Invoke(execution.Evidence);
@@ -345,24 +376,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                     // An earlier successful mutation cannot verify a later, different write.
                     mutationAwaitingVerification = true;
                 }
-                var results = execution.Results.ToArray();
                 if (_verifier is not null)
                 {
-                    var report = await _verifier.VerifyAsync(
-                        new AgentRuntimeVerificationContext(
-                            effectiveContract,
-                            toolRounds,
-                            execution.Calls,
-                            results)
-                        {
-                            Evidence = execution.Evidence,
-                            RawToolOutputs = execution.RawToolOutputs,
-                            MutationCallIds = execution.Calls.Where(call =>
-                                execution.RawToolOutputs.ContainsKey(call.Id)
-                                && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
-                                .Select(call => call.Id).ToArray()
-                        },
-                        cancellationToken).ConfigureAwait(false);
+                    var report = await _verifier.VerifyAsync(observation, cancellationToken).ConfigureAwait(false);
 
                     if (report is not null)
                     {
@@ -410,19 +426,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                     }
                 }
 
-                round = await ReadRoundAsync(
-                    _transport.ContinueAsync(
-                        new AgentTransportContinuationRequest(
-                            taskId,
-                            turnId,
-                            results,
-                            execution.NewlyLoadedTools.Count == 0
-                                ? null
-                                : execution.NewlyLoadedTools,
-                            request.TakeSupplementalInput?.Invoke(false)),
-                        cancellationToken),
-                    usage,
-                    cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
+                    contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
+                round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
+                    new AgentTransportContinuationRequest(taskId, turnId, results,
+                        execution.NewlyLoadedTools.Count == 0 ? null : execution.NewlyLoadedTools,
+                        request.TakeSupplementalInput?.Invoke(false)),
+                    usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -430,6 +440,24 @@ public sealed class AgentRuntime : IAsyncDisposable
             _transport.Cancel();
             throw;
         }
+    }
+
+    // Every engine-level start/continuation, including steering and completion-repair, goes
+    // through this awaited boundary BEFORE invoking the transport. Wire serialization and
+    // provider-native continuation state remain owned by the existing transport implementation.
+    private async Task<RuntimeRound> SendRequestAsync(AgentRuntimeHookScope scope,
+        AgentContextSnapshot context, int requestIndex, AgentTransportStartRequest? start,
+        AgentTransportContinuationRequest? continuation, MutableUsage usage,
+        CancellationToken cancellationToken, Action<string>? publicTextObserver)
+    {
+        var registeredNames = Array.AsReadOnly(_registry.Tools.Select(tool => tool.Name).ToArray());
+        await _hooks.BeforeModelRequestAsync(new(scope, requestIndex, context, registeredNames,
+            start, continuation), cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await ReadRoundAsync(start is not null
+                ? _transport.StartAsync(start, cancellationToken)
+                : _transport.ContinueAsync(continuation!, cancellationToken),
+            usage, cancellationToken, publicTextObserver).ConfigureAwait(false);
     }
 
     public void Cancel()

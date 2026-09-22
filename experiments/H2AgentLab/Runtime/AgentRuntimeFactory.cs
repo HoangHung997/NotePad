@@ -26,10 +26,13 @@ public interface IAgentRuntimeFactory
 public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 {
     private readonly IAgentTransportFactory _transportFactory;
+    private readonly Func<AgentRunTelemetry, IAgentRuntimeHooks> _hooksFactory;
 
-    public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null)
+    public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null,
+        Func<AgentRunTelemetry, IAgentRuntimeHooks>? hooksFactory = null)
     {
         _transportFactory = transportFactory ?? new AgentTransportFactory();
+        _hooksFactory = hooksFactory ?? (telemetry => new AgentRuntimeHooks(telemetry));
     }
 
     public AgentRuntime Create(
@@ -64,6 +67,7 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             permissionPolicy: tools.ProductionSession ?? (IAgentRuntimePermissionPolicy)new ScopedAgentRuntimePermissionPolicy(
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
-                new ArtifactStore(tools.StateRoot)));
+                new ArtifactStore(tools.StateRoot)),
+            hooks: _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null."));
     }
 }

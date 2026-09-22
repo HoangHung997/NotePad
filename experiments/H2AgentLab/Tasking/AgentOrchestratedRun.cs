@@ -178,7 +178,9 @@ public sealed class AgentOrchestratedRun
             PromptCacheKey: null,
             MaxToolRounds: 24,
             MaxRepairRounds: 4,
-            PromptCacheScope: AgentPromptCacheIdentityBuilder.Scope(profile));
+            PromptCacheScope: AgentPromptCacheIdentityBuilder.Scope(profile),
+            Invocation: new(AgentRuntimeEntryPoint.Lab),
+            ContextCheckpoint: compaction);
 
         labSession.Add("user", prompt.Trim());
         save();
