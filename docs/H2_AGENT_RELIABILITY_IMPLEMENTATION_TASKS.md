@@ -72,7 +72,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 | ID | Task | Dependency chính | Evidence yêu cầu | Status |
 |---|---|---|---|---|
-| AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | NOT_STARTED |
+| AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
 | AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | NOT_STARTED |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | NOT_STARTED |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | NOT_STARTED |
@@ -108,7 +108,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 ## 5. Task chi tiết
 
-### [ ] AR-000 — Baseline và hợp nhất quyền điều hành đợt AR
+### [x] AR-000 — Baseline và hợp nhất quyền điều hành đợt AR
 
 **Mục tiêu:** biết đúng đang tiếp quản code nào, task nào và bằng chứng nào; không reset lịch sử.
 
@@ -121,6 +121,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Acceptance:** exact HEAD/branch/code status được ghi; danh sách test có thể chạy/không thể chạy rõ; source owner xác định; lỗi CI hiện tại phân loại; links hợp lệ. Không có runtime behavior change. Baseline chưa green vẫn cho đóng AR-000 nếu thất bại được ghi trung thực và giao AR-001 khắc phục.
 
 **Bàn giao:** task tiếp theo AR-001 cùng command đầu tiên và lỗi cần xử lý, không kết luận sản phẩm hoàn tất.
+
+**AR-000 evidence — 2026-09-22:** [baseline and source owners](agent-reliability/AR-000/baseline.md) and [machine-readable manifest](agent-reliability/AR-000/baseline.json). E0 baseline accepted with existing CI RED; no runtime repair or E3/E4/E5 PASS is claimed. Only AR-000 is closed. AR-001 is next, NOT_STARTED; MB-124–127 and all old acceptance debts remain unchanged.
 
 ### [ ] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI
 
@@ -454,42 +456,94 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 > **Cập nhật khối này mỗi checkpoint trước khi kết thúc phiên.** Nếu có worker khác đã ghi tiến độ mới, reconcile theo Git/CI thực; không overwrite bằng template ban đầu.
 
 ```yaml
-schema_version: 1
-spec_version: H2-AR-SPEC-1.0
-repository: HoangHung997/NotePad
-canonical_branch: main
-research_baseline_sha: ad8c1082e722546a997b4e78b687980d4766622f
-phase: NOT_STARTED
-active_task: AR-000
-implementation_status: NOT_STARTED
-acceptance_status: NOT_RUN
-implementation_branch: NOT_ASSIGNED
-active_pr: null
-owner_session: NOT_ASSIGNED
-last_code_commit: null
-last_validated_code_commit: null
-working_tree: NOT_INSPECTED
-uncommitted_files: []
-checkpoint_saved_at_utc: null
-completed_this_session: []
-remaining_in_active_task:
-  - Read current repository, spec, tracker and source report
-  - Resolve branch/HEAD/worker ownership and current CI
-  - Record actual baseline and next command without changing runtime
-last_test_commands: []
-ci_runs: []
-evidence_locations: []
-known_failures: []
-external_blockers: []
-deferred_acceptance:
-  - id: AR-083
-    status: DEFERRED_BY_USER
-    scope: Physical two-PC/NAS acceptance
-    blocks_independent_implementation: false
-    blocks_claim_of_certified_multi_pc: true
-pending_user_decisions: []
-next_exact_action: Read README and git status/branches, then reconcile AR-000 baseline
-next_task_if_active_done: AR-001
+{
+  "schema_version": 1,
+  "spec_version": "H2-AR-SPEC-1.0",
+  "repository": "HoangHung997/NotePad",
+  "canonical_branch": "main",
+  "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
+  "phase": "AR-000_BASELINE_ACCEPTED_NEXT_AR-001",
+  "active_task": "AR-001",
+  "implementation_status": "NOT_STARTED",
+  "acceptance_status": "NOT_RUN",
+  "implementation_branch": "feature/h2-agent-reliability-ar-000",
+  "active_pr": 3,
+  "owner_session": "chatgpt-ar000-2026-09-22",
+  "last_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "last_validated_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "last_validation_result": "CI_RED_BASELINE_NOT_FULL_PASS",
+  "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
+  "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
+  "working_tree": "CI checkout clean before capture; docs-only commit/push step must finish clean; user-PC tree NOT_ACCESSIBLE",
+  "uncommitted_files": [],
+  "checkpoint_saved_at_utc": "2026-09-22T05:10:21.907322+00:00",
+  "completed_this_session": [
+    {
+      "task": "AR-000",
+      "implementation_status": "IMPLEMENTED",
+      "evidence": "E0 + execution inventory",
+      "baseline_acceptance": "ACCEPTED_WITH_CI_RED"
+    }
+  ],
+  "remaining_in_active_task": [
+    "AR-001 has not been implemented; fix B01/B02/B03 and run its required corpus/full CI."
+  ],
+  "last_test_commands": [
+    {
+      "source": ".github/workflows/avalonia-ci.yml at 1283bc13e07c3cd47d04886166de3dfc595422c0",
+      "run": 35687637186,
+      "note": "Exact executed commands live in that workflow and job log; commands_for_AR001 are proposed reproduction commands, not newly executed .NET commands."
+    },
+    {
+      "command": "python3 tools/agent-reliability/capture_baseline.py --self-test",
+      "execution": "AR000_DOCUMENTATION_TESTS_ONLY"
+    },
+    {
+      "command": "python3 tools/agent-reliability/capture_baseline.py",
+      "execution": "E0_SOURCE_CI_INVENTORY_ONLY"
+    }
+  ],
+  "ci_runs": [
+    {
+      "id": 35687637186,
+      "code_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+      "result": "FAILURE",
+      "owner": "AR-001"
+    },
+    {
+      "url": "https://github.com/HoangHung997/NotePad/actions/runs/35689629807",
+      "checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
+      "source_checks": "E0_CAPTURED",
+      "job_final_status": "Consult run; checkpoint written before commit/push"
+    }
+  ],
+  "evidence_locations": [
+    "docs/agent-reliability/AR-000/baseline.json",
+    "docs/agent-reliability/AR-000/baseline.md"
+  ],
+  "known_failures": [
+    "B01 skill-name drift",
+    "B02 200/128 Excel contract drift",
+    "B03 architecture guard failure; downstream suites and publish did not run",
+    "B04-B10 remain open source-observed limitations/risks; see baseline"
+  ],
+  "external_blockers": [
+    "No local checkout/.NET/PowerShell in assistant container; GitHub CI is the executable environment",
+    "User model/Office/CAD/session not accessible: E3/E4 NOT_RUN / AWAITING_ENVIRONMENT; one-PC tests still required"
+  ],
+  "deferred_acceptance": [
+    {
+      "id": "AR-083",
+      "status": "DEFERRED_BY_USER",
+      "scope": "Physical two-PC/NAS acceptance",
+      "blocks_independent_implementation": false,
+      "blocks_claim_of_certified_multi_pc": true
+    }
+  ],
+  "pending_user_decisions": [],
+  "next_exact_action": "On existing branch feature/h2-agent-reliability-ar-000, first inspect git status --short --branch and fetch origin without reset; reconcile newer main/checkpoint/PR work, then run the v2 guard command recorded in this manifest to reproduce B03. Execute AR-001 only: canonical skill name, read_tool_output exact-set guard, shared Excel 128/129/200 verdict, RC-02 and full CI/publish smoke. Do not start paging/memory or create a duplicate branch.",
+  "next_task_if_active_done": "AR-010"
+}
 ```
 
 ### 7.1. Trước khi đầy context

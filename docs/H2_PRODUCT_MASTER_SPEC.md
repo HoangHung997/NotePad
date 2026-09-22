@@ -1407,3 +1407,8 @@ Ask Agent to work.
 Use H2 to understand.
 Open details only when needed.
 ```
+
+
+## Agent reliability implementation — AR checkpoint (2026-09-22)
+
+The approved [AR specification](H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. [AR-000 baseline](agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.
