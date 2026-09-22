@@ -229,7 +229,7 @@ public static class V2Phase11Tests
             var expected = new[]
             {
                 "web.search", "web.fetch", "web.download",
-                "web.extract", "web.get_metadata", "web.open_browser"
+                "web.extract", "web.read_feed", "web.get_metadata", "web.open_browser"
             };
             Check(summaries.Select(x => x.Name).SequenceEqual(expected),
                 "WebResearchHost capability surface is incomplete or unordered.");
@@ -238,6 +238,25 @@ public static class V2Phase11Tests
             Check(definitions.Count == 1
                 && definitions[0].Summary.Name == "web.search",
                 "WebResearchHost did not lazily load selected schema only.");
+
+            // AR-001 feed execution contract: keep exact inventory/order and prove the added
+            // callable uses the existing backend/parser rather than weakening the guard.
+            var feedDefinitions = await host.LoadToolDefinitionsAsync(["web.read_feed"], CancellationToken.None);
+            Check(feedDefinitions.Count == 1 && feedDefinitions[0].Summary.Name == "web.read_feed"
+                && feedDefinitions[0].Summary.Access == AgentToolAccess.ReadOnly
+                && feedDefinitions[0].Summary.SupportsParallel
+                && feedDefinitions[0].Summary.ResourceScope == "web:public",
+                "Feed schema was eagerly mixed with other tools or changed permission metadata.");
+            WebFeedPage? observedFeed = null;
+            host.FeedObserved = page => observedFeed = page;
+            using var feed = JsonDocument.Parse(await host.ExecuteToolAsync("web.read_feed",
+                JsonSerializer.SerializeToElement(new { url = "https://feed.example.test/ar001.xml", max_items = 1 }),
+                CancellationToken.None));
+            Check(feed.RootElement.GetProperty("Items").GetArrayLength() == 1
+                && feed.RootElement.GetProperty("Items")[0].GetProperty("Title").GetString() == "Tin thử AR-001"
+                && feed.RootElement.GetProperty("Items")[0].GetProperty("Url").GetString() == "https://feed.example.test/item-1"
+                && observedFeed is { TotalItems: 1 } && observedFeed.Items.Count == 1,
+                "Feed execution lost source content, paging bound or host observation.");
 
             var search = await host.SearchAsync("Nghị định fixture", 5, CancellationToken.None);
             Check(search.Count >= 1 && search[0].Url.Contains("gov.vn", StringComparison.OrdinalIgnoreCase),
@@ -560,6 +579,10 @@ public static class V2Phase11Tests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (url == "https://feed.example.test/ar001.xml")
+                return Task.FromResult(new WebFetchedDocument(url, "application/rss+xml",
+                    Encoding.UTF8.GetBytes("<rss version=\"2.0\"><channel><title>Fixture</title><item><title>Tin thử AR-001</title><link>https://feed.example.test/item-1</link><description>Observed fixture only</description></item></channel></rss>"),
+                    "Fixture feed", "Fixture", null, null));
             var official = url.Contains("gov.vn", StringComparison.OrdinalIgnoreCase);
             var body = official
                 ? "Official legal text: Nghị định 99/2026/NĐ-CP AMENDED Nghị định 12/2024/NĐ-CP effective 2026-08-01."

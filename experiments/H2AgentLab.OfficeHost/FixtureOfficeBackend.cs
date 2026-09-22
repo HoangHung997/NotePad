@@ -36,8 +36,9 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
-            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem);
+        var countError = ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1);
+        if (request.Cells is null || countError is not null)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, countError ?? "Excel patch cells are required.");
         var before = SnapshotExcel(request.SessionId);
         OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
 
