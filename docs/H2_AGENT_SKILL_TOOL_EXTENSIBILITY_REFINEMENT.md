@@ -1,3 +1,12 @@
+> **SUPERSEDED AS NORMATIVE AGENT ARCHITECTURE AFTER THE CURRENT IN-FLIGHT AGENT LAB TASK FINISHES (2026-09-18).**
+>
+> This document is retained as design-history evidence. Its accepted useful ideas were consolidated and simplified into:
+>
+> - `docs/H2_AGENT_MASTER_SPEC.md`
+> - `docs/H2_AGENT_MASTER_TASKS.md`
+>
+> In particular, the master specification intentionally removes/defer some over-designed capability/catalog layers from mandatory core work.
+
 # H2 Agent Lab — Skill / Tool Extensibility Refinement
 
 Status: **Required refinement during Phase 11 before Phase 12 acceptance**  

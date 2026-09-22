@@ -1,3 +1,12 @@
+> **SUPERSEDED AS NORMATIVE AGENT ARCHITECTURE AFTER THE CURRENT IN-FLIGHT AGENT LAB TASK FINISHES (2026-09-18).**
+>
+> This document is retained as requirement/history evidence. The consolidated source of truth is now:
+>
+> - `docs/H2_AGENT_MASTER_SPEC.md`
+> - `docs/H2_AGENT_MASTER_TASKS.md`
+>
+> Do not implement this file independently if it conflicts with the master specification.
+
 # H2 Agent — MCP / Web / Office integration requirements
 
 This file records additional **Agent Lab / H2 AI requirements** that must be considered before the accepted Agent Lab engine is integrated into production H2 Notes.
