@@ -243,8 +243,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 RequireAuthorization();
                 var beforeWord = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
                 ValidateSnapshot(target, beforeWord.SessionId, beforeWord.FullName, beforeWord.SelectionText, false);
-                if (token != beforeWord.StateToken)
-                    return JsonSerializer.Serialize(new { ok = false, error = "stale_state", message = "Read word.read_paragraphs for the current state token before editing." });
+                // This mismatch is observed BEFORE PatchWordAsync. Preserve the no-effect
+                // proof instead of converting a safe preflight reject into an uncertain write.
+                if (token != beforeWord.StateToken) throw new ToolPreflightException("stale_resource");
                 WordParagraphPatch[] paragraphs;
                 if (name == "word.insert_text")
                 {

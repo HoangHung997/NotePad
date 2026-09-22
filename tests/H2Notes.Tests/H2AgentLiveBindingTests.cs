@@ -180,6 +180,49 @@ internal static class H2AgentLiveBindingTests
             var result=Execute(root,null,"Read the active workbook",new(root,null,PermissionScope:Full(),ActiveWorkContext:Capture("a",path)),office,wire,false,captureValid:false);
             Rejected(result,"stale_resource");Check(office.Reads.Count==0,"Stale process identity was accepted.");
         }));
+        foreach (var name in new[] { "word.replace_range", "word.apply_format", "word.insert_text" })
+            test("AR-012 Word revision stale preflight has proven no effect for " + name, () => Temp(root =>
+            {
+                var office = new OfficeFixture(root);
+                var path = Path.Combine(root, "Revision.docx");
+                office.AddWord("word", path, "BEFORE");
+                object args = name == "word.insert_text"
+                    ? new { session_id = "word", state_token = "old-v0", paragraph_index = 0, offset = 0, text = "AFTER" }
+                    : new { session_id = "word", state_token = "old-v0", paragraphs = new[] { new { paragraphIndex = 0, text = "AFTER", bold = true } } };
+                var wire = new Wire(Search(name), Call("stale-word", name, args));
+                var result = Execute(root, null, "Update the open Word document", new(root, null, PermissionScope: Full()), office, wire, false);
+                Rejected(result, "stale_resource");
+                var outcome = wire.Results.Single(r => r.ToolCallId == "stale-word").Outcome!;
+                Check(outcome.Status == H2AgentLab.Tools.ToolOutcomeStatus.Rejected
+                    && outcome.Error is { Phase: H2AgentLab.Tools.ToolErrorPhase.Preflight, RetryClass: H2AgentLab.Tools.ToolRetryClass.Reobserve }
+                    && !outcome.NeedsReconciliation, "Stale preflight was mislabeled an uncertain mutation.");
+                Check(office.Writes == 0 && office.Documents["word"].Paragraphs[0].Text == "BEFORE"
+                    && !File.Exists(Path.Combine(root, "effects.log")), "Stale token reached the mutating executor.");
+            }));
+        test("AR-012 Word revision valid write is read back and preserves the guard paragraph", () => Temp(root =>
+        {
+            var office = WordRevisionFixture(root);
+            var wire = new Wire(Search("word.replace_range"), WordRevisionWrite("valid-word"));
+            var result = Execute(root, null, "Update the first paragraph of the open Word document", new(root, null, PermissionScope: Full()), office, wire, false);
+            Check(office.Writes == 1 && File.ReadAllText(Path.Combine(root, "word-content.txt")) == "AFTER\nGUARD",
+                "Valid Word fixture mutation or guard preservation failed.");
+            Check(result.Summary.Status == H2AgentTaskStatus.Completed
+                && result.Summary.Evidence.Any(e => e.VerificationPassed == true),
+                "Valid Word write did not pass the existing independent readback verifier: " + result.Summary.Error);
+        }));
+        test("AR-012 Word revision lost response after actual write remains unknown and cannot repeat", () => Temp(root =>
+        {
+            var office = WordRevisionFixture(root); office.LoseWordResponse = true;
+            var wire = new Wire(Search("word.replace_range"), WordRevisionWrite("lost-word"), WordRevisionWrite("repeat-word"));
+            var result = Execute(root, null, "Update the first paragraph of the open Word document", new(root, null, PermissionScope: Full()), office, wire, false);
+            Check(office.Writes == 1 && File.ReadAllText(Path.Combine(root, "word-content.txt")) == "AFTER\nGUARD",
+                "Lost-response fixture did not apply exactly one write.");
+            Check(wire.Results.Single(r => r.ToolCallId == "lost-word").Outcome is
+                { Effect: H2AgentLab.Tools.ToolMutationEffect.Unknown, Error.RetryClass: H2AgentLab.Tools.ToolRetryClass.ReconcileRequired },
+                "After-dispatch failure falsely became a no-effect preflight rejection.");
+            Check(result.Summary.Status != H2AgentTaskStatus.Completed
+                && !result.Summary.Evidence.Any(e => e.VerificationPassed == true), "Unknown Word effect was declared verified.");
+        }));
         test("AR-012 selected desktop controller rejects process window and session replacement", () =>
         {
             var bound=new DesktopWindowInfo("s",101,123,456,"EXCEL","Fixture",new(0,0,100,100),96,true);
@@ -245,6 +288,18 @@ internal static class H2AgentLiveBindingTests
         Check(result.Summary.Status!=H2AgentTaskStatus.Completed,"Rejected binding completed task.");
         Check(result.Progress.Any(p=>p.ToolOutcome is {Effect:H2ToolMutationEffect.None} o && o.ErrorCode==code),"Expected no-effect rejection "+code+"; observed "+JsonSerializer.Serialize(result.Progress.Select(p=>p.ToolOutcome).Where(o=>o!=null)));
     }
+    private static OfficeFixture WordRevisionFixture(string root)
+    {
+        var office = new OfficeFixture(root);
+        office.AddWord("word", Path.Combine(root, "Revision.docx"), "BEFORE");
+        office.Documents["word"] = office.Documents["word"] with { Paragraphs = [
+            new(0, "BEFORE", "Normal", [new(0, "BEFORE", "Normal", false, false, false)]),
+            new(1, "GUARD", "Normal", [new(0, "GUARD", "Normal", true, false, false)])] };
+        return office;
+    }
+    private static AgentTransportToolCall WordRevisionWrite(string id)
+        => Call(id, "word.replace_range", new { session_id = "word", state_token = "v1",
+            paragraphs = new[] { new { paragraphIndex = 0, text = "AFTER" } } });
     private static H2ActiveWorkContext Capture(string session,string path)=>new(123,456,"EXCEL",H2ApplicationKind.Excel,101,"win32:65:123:456","Synthetic",session,path,null,"office-host",DateTime.UtcNow);
     private static H2AgentPermissionScope Full(){var now=DateTime.UtcNow;return new(H2AgentPermissionMode.FullAccess,H2AgentResourceScopeKind.Machine,H2AgentPermissionScope.CurrentMachineResourceKey,true,false,now,now.AddMinutes(10));}
     private static AiProfile Profile()=>new(){Model="fixture-no-network",Protocol=AiProtocol.OpenAiChat,BaseUrl="https://example.test/v1"};
@@ -283,7 +338,29 @@ internal static class H2AgentLiveBindingTests
             Books[request.SessionId]=after;if(RenameAfterWrite is{} renamed)Rename(request.SessionId,renamed);
             return Task.FromResult(new ExcelPatchResult(before,after,request.Cells.Select(c=>c.Address).ToArray()));
         }
-        public Task<WordPatchResult> PatchWordAsync(WordPatchRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
+        public bool LoseWordResponse;
+        public Task<WordPatchResult> PatchWordAsync(WordPatchRequest request, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            var before = Documents[request.SessionId];
+            Check(request.PermissionGranted && request.StateToken == before.StateToken, "Fixture precondition failed.");
+            Check(WordPatchRules.ValidationError(before, request.Paragraphs) is null, "Invalid fixture Word patch.");
+            // This fixture intentionally supports only single-line paragraph edits, not native Word layout.
+            Check(request.Paragraphs.All(p => p.Text is null || WordPatchRules.Lines(p.Text).Length == 1), "Unsupported fixture multiline edit.");
+            var edits = request.Paragraphs.ToDictionary(p => p.ParagraphIndex);
+            var after = before with { Saved = false, StateToken = "v2", Paragraphs = before.Paragraphs.Select(p =>
+            {
+                if (!edits.TryGetValue(p.Index, out var edit)) return p;
+                return p with { Text = edit.Text ?? p.Text, Runs = p.Runs.Select(r => r with {
+                    Text = edit.Text ?? r.Text, Bold = edit.Bold ?? r.Bold,
+                    Italic = edit.Italic ?? r.Italic, Underline = edit.Underline ?? r.Underline }).ToArray() };
+            }).ToArray() };
+            Writes++; Documents[request.SessionId] = after;
+            File.AppendAllText(Path.Combine(root, "effects.log"), "WRITE\n");
+            File.WriteAllText(Path.Combine(root, "word-content.txt"), string.Join("\n", after.Paragraphs.Select(p => p.Text)));
+            if (LoseWordResponse) throw new IOException("Controlled response loss AFTER the disposable fixture write.");
+            return Task.FromResult(new WordPatchResult(before, after, request.Paragraphs.Select(p => p.ParagraphIndex).ToArray()));
+        }
         public Task<ExcelLiveSnapshot> RecalculateExcelAsync(ExcelRecalculateRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
         public Task<OfficeSaveCopyResult> SaveExcelCopyAsync(OfficeSaveCopyRequest r,CancellationToken ct=default)=>throw new NotSupportedException();
         public Task<OfficeSaveCopyResult> SaveWordCopyAsync(OfficeSaveCopyRequest r,CancellationToken ct=default)=>throw new NotSupportedException();

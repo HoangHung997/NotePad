@@ -470,26 +470,26 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-012_ACTIVE_INTEGRATION_VALIDATION",
+  "phase": "AR-012_ACTIVE_WORD_REVISION_REVIEW",
   "active_task": "AR-012",
   "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar012-resume-2026-09-22",
-  "last_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-  "last_validated_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-  "last_validation_result": "FULL_REQUIRED_CI_E2_AND_NEGATIVE_CONTROLS_PASS",
+  "owner_session": "chatgpt-ar012-final-review-2026-09-22",
+  "last_code_commit": "3ee09035e06bb8a02a483d684e141419769b5160",
+  "last_validated_code_commit": "3ee09035e06bb8a02a483d684e141419769b5160",
+  "last_validation_result": "INHERITED_AR012_39x3_AND_AGENT74_PASS_NEW_REPAIR_UNTESTED",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Prior draft and new integration applied with exact preimages in clean CI checkout; actual tested SHA must be read from Windows evidence. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Guarded four-file patch staged from verified 3ee source; exact future tested SHA must come from CI identity. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T10:56:37.472775+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T11:51:38.591616+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Review exact-source build, 34-case binding corpus, retained AR-011/010/001 and all required Agent suites.",
-    "Review native-boundary limitations and fix observed code/test errors; fixture IDs do not certify multi-instance Office.",
-    "Review full CI, real publish/helper smoke; save acceptance only when task evidence is sufficient."
+    "Run Word revision negative control against old Office wrapper; require three stale-preflight failures.",
+    "Run clean repaired AR-012 44-case corpus x3, retain AR-011/010/001 and all mandatory Agent suites.",
+    "Review full required CI/publish/helper IPC, remove temporary delivery tooling and save acceptance."
   ],
   "last_test_commands": [
     {
@@ -737,6 +737,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "negative_control": "21 passed, 4 expected failures on old runtime + new tests",
       "positive": "25/25 x3, AR010 11/11, AR001 13/13, Agent 74/74",
       "artifact_id": 10686570321
+    },
+    {
+      "id": 35720746799,
+      "tested_code_sha": "3ee09035e06bb8a02a483d684e141419769b5160",
+      "AR012": "39/39 x3",
+      "AR011": "25/25",
+      "AR010": "11/11",
+      "AR001": "13/13",
+      "Agent": "74/74",
+      "artifact_id": 10690789503,
+      "sha256": "f300e623a1bf876490c01cdbee2d8ddee453a7fa94119a4870a42e5a70a71dbd"
     }
   ],
   "evidence_locations": [
@@ -772,7 +783,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue AR-012 only. Read the actual new Windows build/test logs and fix regressions without weakening permission/binding assertions. Office wrapper now calls ResolveOpen and pins session/helper/path at dispatch/readback; desktop uses frozen capture, and target binding is projected through existing UI. E3/E4 NOT_RUN, AR-083 deferred. Do not advance task before exact-source evidence.",
+  "next_exact_action": "Continue AR-012 only on existing feature/h2-agent-reliability-ar-000 and PR #3. Review exact-source Word revision negative/positive tests and full CI; repair any failures, then save code SHA, evidence and next task without declaring native E3/E4 or E5 passed.",
   "next_task_if_active_done": "AR-020",
   "last_runtime_source_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
   "previous_saved_checkpoint_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
