@@ -1,6 +1,6 @@
 # AR-020 — enumeration failure repair
 
-Status: IMPLEMENTED / VALIDATION_PENDING. Required native E3 remains AWAITING_ENVIRONMENT; AR-020 is NOT DONE.
+Status: IMPLEMENTED / E1_E2_VALIDATED. Full CI passed on the exact repair SHA. Required native E3 remains AWAITING_ENVIRONMENT; AR-020 is NOT DONE.
 
 Resumes the local `H2_AR020_Enumeration_Repair.zip` draft against remote `a7eb37fab7bc5b8e6e3aa39442e82e7d4a8dc17a`, on `feature/h2-agent-reliability-ar-000`, PR #3. The native-probe and eight-case test postimages match the handed-off SHA256/blob hashes. Test registration is instead delegated from the existing H2OfficeDiscoveryTests.Run; Program.cs remains unchanged. The old local NOT_PUSHED tracker template was not copied over remote history.
 
@@ -25,3 +25,11 @@ Local container: no .NET/PowerShell and Git remote DNS unavailable. There is no 
 ## Acceptance debt
 
 Native Office E3 requires the existing dedicated marker, multi-instance/view, unsaved, Save As, close/reopen, modal/busy and frozen-capture matrix; see native-runbook.md. E4 remains NOT_RUN. AR-083 remains DEFERRED_BY_USER, not certified multi-PC. Existing implementation-evidence.json describes the PRE-REPAIR source and must not be used to certify this new code.
+
+## Verified repair checkpoint
+
+Code `b270de5c22bfe880055975aaa35fbeebd6934f09`, focused run 35743581894: **36/36 AR-020 in each of three repetitions**, retained AR-012/011/010/001 **44/44, 25/25, 11/11, 13/13**, all independent Agent suites **74/74**. The guard-only control compiles and reproduces **0 passed / 3 expected failures**, then restores exact checkout bytes before rebuilding the positive source. The old lifetime-cache controls remain green as negative-control checks.
+
+Full CI 35743581725 tested PR checkout `11754bda798e13e0311ec7d0c763ca52afa97fa1` with application/test sources verified equal to `b270de5c22bfe880055975aaa35fbeebd6934f09`: **719 H2 tests, 0 failures**, all required steps, Windows publish and real packaged-helper startup/IPC pass. These are not native Office operations. The measured environment and package identities are in [repair evidence](enumeration-repair-evidence.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER.
+
+Reconcile current main/branch/PR and clean working tree. The AR-020 enumeration repair is saved and E1/E2 validated; do not reapply the stale local ZIP. If new native Office evidence is supplied, inspect it under the existing AR-020 runbook and repair any demonstrated defect. Otherwise leave AR-020 IMPLEMENTED/AWAITING_ENVIRONMENT, and start only READY independent AR-030 on this same branch/PR: set the sole active implementation task to AR-030, read its approved specification/current contracts, then implement outcome obligations and user-sourced goal revisions with RC-11/12 E2 tests. AR-030 requires DONE AR-010/011, not Office E3. Do not mark AR-020 DONE, bypass dependent native gates, or repeatedly block independent core work on the absent Office device. AR-083 stays DEFERRED_BY_USER.
