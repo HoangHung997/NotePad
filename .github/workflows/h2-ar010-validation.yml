@@ -4,65 +4,25 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/h2-ar010-validation.yml'
-      - 'tools/agent-reliability/ar010_*'
+      - 'experiments/H2AgentLab/Runtime/**'
+      - 'experiments/H2AgentLab/Integration/**'
+      - 'experiments/H2AgentLab/Tasking/**'
+      - 'experiments/H2AgentLab/Metrics/**'
+      - 'tests/H2Notes.Tests/**'
 permissions:
   contents: read
 concurrency:
   group: h2-ar010-validation
   cancel-in-progress: false
 jobs:
-  delivery:
-    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-      actions: write
-    outputs:
-      code_sha: ${{ steps.apply.outputs.code_sha }}
-    env:
-      AR_BRANCH: feature/h2-agent-reliability-ar-000
-      AR_HEAD: ${{ github.event.pull_request.head.sha }}
-      PYTHONDONTWRITEBYTECODE: '1'
+  runtime-tests:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-      - name: Apply only the exact reviewed AR-010 source and tests
-        id: apply
-        run: python3 tools/agent-reliability/ar010_apply.py
-      - name: Dispatch existing full Avalonia CI on saved branch
-        if: steps.apply.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test "$(git ls-remote origin refs/heads/$AR_BRANCH | cut -f1)" = '${{ steps.apply.outputs.code_sha }}'
-          gh api --method POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref="$AR_BRANCH"
-      - name: Retain delivery identity and any scoped patch
-        if: always()
-        run: |
-          mkdir -p "$RUNNER_TEMP/ar010-delivery"
-          git rev-parse HEAD > "$RUNNER_TEMP/ar010-delivery/checkout-sha.txt"
-          git status --porcelain > "$RUNNER_TEMP/ar010-delivery/working-tree.txt"
-          git diff HEAD --binary > "$RUNNER_TEMP/ar010-delivery/uncommitted.patch"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: AR010-Delivery
-          path: ${{ runner.temp }}/ar010-delivery/
-          if-no-files-found: error
-          retention-days: 14
-  runtime-tests:
-    needs: delivery
-    runs-on: windows-latest
-    timeout-minutes: 20
-    env:
-      PYTHONDONTWRITEBYTECODE: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.delivery.outputs.code_sha }}
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
@@ -74,7 +34,7 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'ar010-evidence'
           New-Item -ItemType Directory -Force $out | Out-Null
           $sha = (git rev-parse HEAD).Trim()
-          if ($sha -ne '${{ needs.delivery.outputs.code_sha }}') { throw 'Unexpected tested source SHA' }
+          if ($sha -ne '${{ github.event.pull_request.head.sha }}') { throw 'Unexpected tested source SHA' }
           if (git status --porcelain) { throw 'Dirty test checkout' }
           @{code_sha=$sha; working_tree='CLEAN'; evidence='E1/E2 only'; model='Scripted transport, no external model'; native_office='NOT_RUN'; E4='AWAITING_ENVIRONMENT'; E5='DEFERRED_BY_USER'} | ConvertTo-Json | Set-Content (Join-Path $out 'identity.json')
           dotnet restore H2Notes.Avalonia.slnx 2>&1 | Tee-Object -FilePath (Join-Path $out 'restore.log')
