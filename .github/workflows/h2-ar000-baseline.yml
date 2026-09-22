@@ -1,0 +1,103 @@
+name: AR-000 baseline capture (not product acceptance)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - tools/agent-reliability/capture_baseline.py
+      - .github/workflows/h2-ar000-baseline.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: h2-ar000-baseline
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    if: >-
+      github.repository == 'HoangHung997/NotePad' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      AR_BRANCH: feature/h2-agent-reliability-ar-000
+      AR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      AR_PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Keep an accepted baseline frozen on later AR work
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f docs/agent-reliability/AR-000/baseline.json; then
+            echo 'capture=false' >> "$GITHUB_OUTPUT"
+            echo 'AR-000 snapshot already exists. This is not a test of subsequent AR runtime work.'
+          else
+            echo 'capture=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test documentation checkpoint safety (not Agent E1/E2)
+        if: steps.gate.outputs.capture == 'true'
+        run: python3 tools/agent-reliability/capture_baseline.py --self-test
+      - name: Capture exact source observations and existing RED CI inventory
+        if: steps.gate.outputs.capture == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/agent-reliability/capture_baseline.py
+      - name: Commit only AR-000 documents to the existing feature branch
+        if: steps.gate.outputs.capture == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$AR_BRANCH" = 'feature/h2-agent-reliability-ar-000'
+          remote="$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)"
+          test "$remote" = "$AR_HEAD_SHA" || { echo 'Branch changed; refusing to push. Reconcile the saved patch.'; exit 1; }
+          mapfile -t outputs < "$RUNNER_TEMP/ar000-outputs.txt"
+          test "${#outputs[@]}" -eq 8
+          git add -- "${outputs[@]}"
+          git diff --cached --check
+          python3 - <<'PY'
+          import subprocess
+          allowed = {
+              'README.md', 'docs/H2_AGENT_MASTER_SPEC.md', 'docs/H2_AGENT_MASTER_TASKS.md',
+              'docs/H2_PRODUCT_MASTER_SPEC.md', 'docs/H2_PRODUCT_MASTER_TASKS.md',
+              'docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md',
+              'docs/agent-reliability/AR-000/baseline.json', 'docs/agent-reliability/AR-000/baseline.md'}
+          changed = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
+          if changed != allowed:
+              raise SystemExit('Unexpected staged paths; no commit/push allowed.')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(AR-000): record red baseline, source ownership and AR-001 handoff'
+          git push origin "HEAD:refs/heads/$AR_BRANCH"
+          test -z "$(git status --porcelain)"
+          test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
+          echo "Saved checkpoint commit: $(git rev-parse HEAD)"
+      - name: Preserve bounded docs/patch evidence even if saving fails
+        if: always() && steps.gate.outputs.capture == 'true'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ar000-evidence"
+          git diff --binary "$AR_HEAD_SHA" -- README.md docs/H2_AGENT_MASTER_SPEC.md docs/H2_AGENT_MASTER_TASKS.md docs/H2_PRODUCT_MASTER_SPEC.md docs/H2_PRODUCT_MASTER_TASKS.md docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md docs/agent-reliability/AR-000 > "$RUNNER_TEMP/ar000-evidence/checkpoint.patch"
+          if test -d docs/agent-reliability/AR-000; then
+            cp docs/agent-reliability/AR-000/*.json docs/agent-reliability/AR-000/*.md "$RUNNER_TEMP/ar000-evidence/"
+          fi
+          printf 'This artifact is AR-000 E0 documentation evidence, not Agent/Office/model/NAS acceptance.\n' > "$RUNNER_TEMP/ar000-evidence/README.txt"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.capture == 'true'
+        with:
+          name: ar000-baseline-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/ar000-evidence
+          if-no-files-found: error
+          retention-days: 14
