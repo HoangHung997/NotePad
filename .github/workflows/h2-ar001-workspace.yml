@@ -1,0 +1,104 @@
+name: AR-001 isolated implementation workspace
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar001-workspace.yml'
+      - 'tools/agent-reliability/ar001.patch'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar001-workspace
+  cancel-in-progress: false
+jobs:
+  workspace:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      AR_BRANCH: feature/h2-agent-reliability-ar-000
+      AR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Claim AR-001 without replacing historical task evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime, json, os, re, subprocess
+          from pathlib import Path
+          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+          def require(ok, reason):
+              if not ok: raise SystemExit(reason)
+          require(git('rev-parse','HEAD') == os.environ['AR_HEAD'], 'Wrong checkout')
+          require(not git('status','--porcelain'), 'Dirty checkout')
+          require(git('rev-parse','origin/main') == '1283bc13e07c3cd47d04886166de3dfc595422c0', 'Main advanced: reconcile first')
+          path = Path('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md')
+          text = path.read_bytes().decode('utf-8')
+          m = re.search(r'```yaml\n(\{\n.*?\n\})\n```', text, re.S)
+          require(m is not None, 'Missing checkpoint')
+          state = json.loads(m[1])
+          require(state['active_task'] == 'AR-001', 'Another AR task owns checkpoint')
+          require(state['implementation_branch'] == os.environ['AR_BRANCH'], 'Wrong branch')
+          if state['implementation_status'] == 'NOT_STARTED':
+              require(git('rev-parse','HEAD:'+str(path)) == '9a7a0d3d3656e4af224953c8a8abed1cabe19364', 'Checkpoint changed: reconcile')
+              state.update(phase='AR-001_IMPLEMENTATION', implementation_status='ACTIVE', acceptance_status='REPAIR_REQUIRED', owner_session='chatgpt-ar001-2026-09-22', checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
+              state['completed_this_session'] = []
+              state['remaining_in_active_task'] = ['Reproduce B11 process/fixture cleanup; repair B01 skill name, B02 Excel batch parity, B03 canonical registry guards; RC-02 and full required CI/publish smoke.']
+              state['external_blockers'] = ['Assistant container has no checkout/.NET/PowerShell and GitHub DNS is unavailable; source transfer and Windows tests use the existing authorized GitHub Actions environment.', 'Real Office/model/H2 UI still NOT_RUN; AR-083 DEFERRED_BY_USER.']
+              state['next_exact_action'] = 'Inspect isolated AR-001 source workspace, reproduce B11 with bounded Windows fixture tests, implement only AR-001 and run all required CI. Keep this branch and PR #3; do not reset/force-push/merge.'
+              text = text[:m.start(1)] + json.dumps(state,ensure_ascii=False,indent=2) + text[m.end(1):]
+              text = text.replace('| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | NOT_STARTED |','| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | ACTIVE |',1)
+              text = text.replace('### [ ] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI','### [~] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI',1)
+              path.write_bytes(text.encode('utf-8'))
+          else:
+              require(state['implementation_status'] == 'ACTIVE' and state['owner_session'] == 'chatgpt-ar001-2026-09-22', 'Unexpected owner/status; reconcile first')
+          PY
+          if ! git diff --quiet; then
+            test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$AR_HEAD"
+            git add -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md
+            git diff --cached --check
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'docs(AR-001): resume existing branch with explicit repair-required checkpoint'
+            git push origin "HEAD:refs/heads/$AR_BRANCH"
+          fi
+          test -z "$(git status --porcelain)"
+      - name: Export tracked text source only for offline implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess, zipfile
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])/'ar001-workspace'
+          root.mkdir()
+          paths = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          suffixes = {'.cs','.csproj','.slnx','.sln','.props','.targets','.axaml','.json','.md','.yml','.yaml','.py','.ps1','.sh','.cmd','.txt','.config'}
+          manifest = {'head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'branch':os.environ['AR_BRANCH'], 'files':{}}
+          with zipfile.ZipFile(root/'source.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for name in paths:
+                  if not name: continue
+                  path = Path(name)
+                  if path.is_symlink() or not path.is_file() or path.stat().st_size > 2000000: continue
+                  if any(part in {'bin','obj','.git','.artifacts','audit-evidence'} for part in path.parts): continue
+                  if path.suffix.lower() not in suffixes and name != '.gitignore': continue
+                  data = path.read_bytes()
+                  try: data.decode('utf-8-sig')
+                  except UnicodeDecodeError: continue
+                  archive.writestr(name,data)
+                  manifest['files'][name] = {'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)}
+              archive.writestr('AR001_SOURCE_MANIFEST.json',json.dumps(manifest,indent=2))
+          print('Exported tracked source files:',len(manifest['files']))
+          print('Exact source checkout:',manifest['head'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ar001-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/ar001-workspace/source.zip
+          if-no-files-found: error
+          retention-days: 7
