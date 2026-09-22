@@ -12,19 +12,47 @@ namespace H2AgentLab.OfficeHost;
 /// COM can block despite WM_NULL; the owning OfficeHostClient hard deadline isolates that call.</summary>
 public sealed class OfficeNativeWindowProbe : IOfficeWindowProbe
 {
+    private readonly Func<Func<nint, bool>, bool> _enumerateRoots;
+
+    public OfficeNativeWindowProbe() : this(EnumerateRootWindows) { }
+
+    /// <summary>Injects only top-level enumeration for deterministic boundary tests.
+    /// Production still uses the same Win32/COM probe; this creates no Office application.</summary>
+    public OfficeNativeWindowProbe(Func<Func<nint, bool>, bool> enumerateRoots)
+        => _enumerateRoots = enumerateRoots ?? throw new ArgumentNullException(nameof(enumerateRoots));
+
+    private static bool EnumerateRootWindows(Func<nint, bool> visit)
+        => EnumWindows((hwnd, _) => visit(hwnd), 0);
+
     public long ForegroundRoot => GetAncestor(GetForegroundWindow(),2).ToInt64();
     public OfficeWindowScan Enumerate(string application,long? rootHandle=null)
     {
         if(!OperatingSystem.IsWindows()) return new([], [new("unsupported_operation")],false,0);
         if(Thread.CurrentThread.GetApartmentState()!=ApartmentState.STA)
             throw new OfficeHostFaultException("invalid_apartment","Office discovery requires the helper STA.",true);
+        if(application is not ("excel" or "word"))
+            throw new OfficeHostFaultException("invalid_arguments","Unsupported Office application.",true);
         var roots=new List<nint>();var issues=new List<OfficeDiscoveryIssue>();var truncated=false;
-        EnumWindows((h,_)=>{
-            if(rootHandle.HasValue && h.ToInt64()!=rootHandle.Value)return true;
-            if(ClassName(h)!=(application=="excel"?"XLMAIN":"OpusApp"))return true;
-            if(roots.Count==OfficeDiscoveryLimits.MaxWindows){truncated=true;return false;}
-            roots.Add(h);return true;
-        },0);
+        try
+        {
+            var enumerationSucceeded=_enumerateRoots(h=>{
+                if(rootHandle.HasValue && h.ToInt64()!=rootHandle.Value)return true;
+                if(ClassName(h)!=(application=="excel"?"XLMAIN":"OpusApp"))return true;
+                if(roots.Count==OfficeDiscoveryLimits.MaxWindows){truncated=true;return false;}
+                roots.Add(h);return true;
+            });
+            // EnumWindows FALSE means either our deliberate limit stop or an API failure.
+            // A failed enumeration is NOT proof that there are no Office windows. Do not
+            // attach to a partially enumerated set and accidentally report a unique target.
+            // EnumChildWindows has a different contract: its BOOL return is unused.
+            if(!enumerationSucceeded && !truncated)
+                return new([], [new("native_object_unavailable",rootHandle)],false,roots.Count);
+        }
+        catch(Exception ex) when(IsProbeFailure(ex))
+        {
+            // Do not include raw native/provider exception messages in discovery metadata.
+            return new([], [new(FaultCode(ex),rootHandle)],false,roots.Count);
+        }
         var result=new List<OfficeWindowCandidate>();var clock=Stopwatch.StartNew();
         foreach(var root in roots)
         {

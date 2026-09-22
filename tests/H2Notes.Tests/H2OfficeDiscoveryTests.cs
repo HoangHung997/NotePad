@@ -13,6 +13,7 @@ internal static class H2OfficeDiscoveryTests
 {
     public static void Run(Action<string,Action> test)
     {
+        H2OfficeEnumerationFailureTests.Run(test);
         test("AR-020 discovery distinguishes two processes with near-identical names",()=>{
             var p=new Probe();p.Add(11,101,1001,"A.xlsx");p.Add(12,102,2001,"A.xlsx");
             using var b=new ComOfficeBackend(p);var d=b.DiscoverExcel();

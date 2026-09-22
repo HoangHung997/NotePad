@@ -8,6 +8,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'tools/agent-reliability/Invoke-Ar020NativeProbe.ps1'
+      - 'tools/agent-reliability/Test-Ar020EnumerationFailure.ps1'
 permissions:
   contents: read
 concurrency:
@@ -93,6 +94,9 @@ jobs:
           git diff --name-status | Set-Content artifacts/ar020/post-control-diff.txt
           git ls-files --eol -- $files | Set-Content artifacts/ar020/post-control-eol.txt
           if ($status.Count) { throw 'Positive checkout was not restored clean; inspect saved status/diff evidence' }
+      - name: Reproduce failed enumeration with a guard-only mutation control
+        shell: pwsh
+        run: tools/agent-reliability/Test-Ar020EnumerationFailure.ps1 -OutputDirectory artifacts/ar020
       - name: Build exact current source and repeat retained production regression
         shell: pwsh
         run: |
@@ -110,6 +114,14 @@ jobs:
       - name: Run all required independent Agent suites with aggregate failure
         shell: pwsh
         run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar020/all-agent-suites
+      - name: Preserve exact validated source for reproducible offline review
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          if (git status --porcelain) { throw 'Validated source checkout is not clean' }
+          git archive --format=zip --output=artifacts/ar020/validated-source.zip HEAD
+          if ($LASTEXITCODE) { throw 'Source export failed' }
+          @{code_sha=(git rev-parse HEAD);source_sha256=(Get-FileHash artifacts/ar020/validated-source.zip).Hash.ToLowerInvariant();working_tree='CLEAN'} | ConvertTo-Json | Set-Content artifacts/ar020/validated-source.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
