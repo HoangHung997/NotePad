@@ -84,8 +84,102 @@ jobs:
           test -z "$(git status --porcelain)"
           test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
           echo "Saved checkpoint commit: $(git rev-parse HEAD)"
+      - name: Record completed PR CI result once without repairing runtime
+        if: steps.gate.outputs.capture == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f docs/agent-reliability/AR-000/ci-final-review.json; then
+            echo 'AR-000 final review already saved; do not change later task checkpoints.'
+            exit 0
+          fi
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+          sys.dont_write_bytecode = True
+          sys.path.insert(0, 'tools/agent-reliability')
+          from capture_baseline import api, git, require, BASE, BRANCH, TRACKER, OUT
+          saved = '98b93dcc3b525bea98ac3378854b7e1651ff4654'
+          head = os.environ['AR_HEAD_SHA']
+          require(os.environ['AR_BRANCH'] == BRANCH and git('rev-parse', 'HEAD') == head, 'Unexpected branch/head.')
+          require(not git('status', '--porcelain'), 'Dirty checkout.')
+          require(git('rev-parse', 'origin/main') == BASE, 'Main changed; reconcile first.')
+          require(set(git('diff', '--name-only', saved, head).splitlines()) == {'.github/workflows/h2-ar000-baseline.yml'}, 'Other work appeared; do not overwrite its checkpoint.')
+          require(not git('diff', BASE, head, '--', 'src', 'experiments', 'tests'), 'AR-000 must not change runtime/tests.')
+          run_id = 35689629766
+          run = api(f'/actions/runs/{run_id}')
+          require(run['status'] == 'completed' and run['conclusion'] == 'failure', 'PR CI result changed; inspect it again.')
+          require(run['head_sha'] == '0ed36c1b56ffeeb78cfe1447db2eacee545a4294', 'Wrong CI head.')
+          jobs = api(f'/actions/runs/{run_id}/jobs?per_page=100')
+          require(jobs['total_count'] == len(jobs['jobs']) == 1, 'Incomplete job inventory.')
+          job = jobs['jobs'][0]
+          require(job['id'] == 106623650447, 'Unexpected CI attempt.')
+          steps = {x['name']: x['conclusion'] for x in job['steps']}
+          require(steps['Run H2 Notes tests'] == 'failure' and steps['Run H2 Agent Lab v2 architecture guard'] == 'skipped', 'Failure stage changed.')
+          artifacts = api(f'/actions/runs/{run_id}/artifacts?per_page=100')
+          require(artifacts['total_count'] == 0, 'Artifact inventory changed.')
+          capture_run = api('/actions/runs/35689629807')
+          require(capture_run['conclusion'] == 'success', 'Initial AR-000 capture was not successful.')
+          failure = 'B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions.'
+          checkout = 'c62851a76351028906d495ba3c00b4401e8f4831'
+          evidence_path = OUT + '/ci-final-review.json'
+          review = {'task': 'AR-000', 'source': 'Completed GitHub Actions run metadata and decoded job log reviewed by the implementation session',
+              'run_id': run_id, 'job_id': job['id'], 'url': run['html_url'], 'head_sha': run['head_sha'],
+              'tested_checkout_sha': checkout, 'checkout_kind': 'GitHub PR test merge, not a merge into main',
+              'runtime_source_sha': BASE, 'runtime_diff': 'EMPTY_VERIFIED', 'conclusion': 'FAILURE',
+              'build': {'warnings': 31, 'errors': 0}, 'h2_tests': {'passed': 589, 'failed': 1},
+              'architecture_guard': 'NOT_RUN_SKIPPED_AFTER_H2_FAILURE', 'downstream_suites_and_publish': 'NOT_RUN',
+              'artifact_count': 0, 'finding': failure, 'owner': 'AR-001', 'evidence_level': 'E2 concrete runtime / scripted model and disposable process fixture, not E3/E4 Office-model acceptance',
+              'historical_baseline_run_preserved': 35687637186, 'captured_at_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'finalization_checked_head': head, 'new_finalization_commit_full_ci': 'NOT_CLAIMED; this records the completed run above, not any newly triggered CI'}
+          text = Path(TRACKER).read_bytes().decode('utf-8')
+          matches = list(re.finditer(r'```yaml\n(\{\n.*?\n\})\n```', text, re.S))
+          require(len(matches) == 1, 'Expected one canonical handoff.')
+          match = matches[0]
+          state = json.loads(match.group(1))
+          require(state['active_task'] == 'AR-001' and state['implementation_status'] == 'NOT_STARTED' and state['capture_checked_head'] == run['head_sha'], 'Another worker changed task state.')
+          state['last_validated_code_commit'] = checkout
+          state['last_runtime_source_commit'] = BASE
+          state['last_validation_result'] = 'CI_RED_H2_PROCESS_FIXTURE_CLEANUP_FAILURE'
+          state['ci_runs'][1]['job_final_status'] = 'SUCCESS_VERIFIED'
+          state['ci_runs'].append({'id': run_id, 'head_sha': run['head_sha'], 'tested_checkout_sha': checkout, 'result': 'FAILURE', 'h2_tests': '589 passed / 1 failed', 'architecture_guard': 'SKIPPED', 'owner': 'AR-001'})
+          state['known_failures'].append(failure)
+          state['last_test_commands'].append({'command': 'dotnet run --project .\\tests\\H2Notes.Tests\\H2Notes.Tests.csproj -c Release --no-build', 'run': run_id, 'tested_checkout_sha': checkout, 'result': '589 passed / 1 failed'})
+          state['evidence_locations'].append(evidence_path)
+          state['previous_saved_checkpoint_commit'] = saved
+          state['checkpoint_saved_at_utc'] = review['captured_at_utc']
+          state['finalization_checked_head'] = head
+          state['working_tree'] = 'CI checkout verified clean before finalization; finalization push requires clean tree and matching remote HEAD; user-PC tree NOT_ACCESSIBLE.'
+          state['uncommitted_files'] = []
+          state['additional_ci_after_recorded_run'] = 'Any CI triggered by this docs/workflow finalization is not the completed run recorded above; inspect the PR checks on resume. No full CI PASS is claimed.'
+          state['next_exact_action'] = 'On existing branch ' + BRANCH + ', inspect git status and current main/PR before editing. Reproduce the H2WorkAssistantRepairTests local-command cleanup failure B11 (test line 71, InWorkspace line 285); then execute AR-001 B01/B02/B03 fixes, RC-02, all required CI and nonempty publish smoke. Do not disable assertions, label the failure flaky without evidence, start another AR, or create a duplicate branch.'
+          replacement = json.dumps(state, ensure_ascii=False, indent=2)
+          Path(TRACKER).write_bytes((text[:match.start(1)] + replacement + text[match.end(1):]).encode('utf-8'))
+          Path(evidence_path).write_text(json.dumps(review, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          report = Path(OUT + '/baseline.md')
+          report.write_bytes(report.read_bytes() + ('\n\n## Final session CI observation\n\nThe initial main baseline above is preserved. A new PR run **35689629766** tested merge checkout `' + checkout + '` (head `' + run['head_sha'] + '`, runtime unchanged from `' + BASE + '`). Build succeeds, but H2 tests are **589 passed / 1 failed**. ' + failure + '\n\nThe architecture guard and later suites/publish were skipped in this run; no artifact exists. This is not the prior 590/590 result. The canonical SESSION HANDOFF now includes this failure and AR-001 reproduction priority. [Structured final CI review](ci-final-review.json). AR-000 capture run **35689629807** succeeded and saved checkpoint `' + saved + '`; neither capture success nor this docs-only finalization is product acceptance.\n').encode('utf-8'))
+          print('AR-000 final CI review recorded. Runtime unchanged; AR-001 NOT_STARTED; E3/E4 NOT_RUN; AR-083 deferred.')
+          PY
+          test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$AR_HEAD_SHA"
+          git add -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md docs/agent-reliability/AR-000/baseline.md docs/agent-reliability/AR-000/ci-final-review.json
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(AR-000): preserve actual PR CI failure and exact restart action'
+          git push origin "HEAD:refs/heads/$AR_BRANCH"
+          test -z "$(git status --porcelain)"
+          test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
+          echo "Saved final checkpoint: $(git rev-parse HEAD)"
       - name: Preserve bounded docs/patch evidence even if saving fails
-        if: always() && steps.gate.outputs.capture == 'true'
+        if: always()
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/ar000-evidence"
@@ -95,7 +189,7 @@ jobs:
           fi
           printf 'This artifact is AR-000 E0 documentation evidence, not Agent/Office/model/NAS acceptance.\n' > "$RUNNER_TEMP/ar000-evidence/README.txt"
       - uses: actions/upload-artifact@v4
-        if: always() && steps.gate.outputs.capture == 'true'
+        if: always()
         with:
           name: ar000-baseline-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/ar000-evidence
