@@ -1,0 +1,132 @@
+name: AR-010 one-time documentation checkpoint
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar010-handoff.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar010-doc-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000' && github.actor == 'HoangHung997'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AR_HEAD: ${{ github.event.pull_request.head.sha }}
+      AR_BRANCH: feature/h2-agent-reliability-ar-000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 3
+      - name: Verify existing evidence and update only three documentation files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, re, subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          CODE = '14767f0fdaf3ead109867c41caf34111adb8c02a'
+          MAIN = '1283bc13e07c3cd47d04886166de3dfc595422c0'
+          READONLY = 'd9c3831e65f2616dabbd9a69643bbfd4e2cf265a'
+          TRACKER = Path('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md')
+          REPORT = Path('docs/agent-reliability/AR-010/implementation.md')
+          ACCEPTANCE = Path('docs/agent-reliability/AR-010/acceptance.json')
+          OUTPUTS = [str(TRACKER), str(REPORT), str(ACCEPTANCE)]
+          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+          def require(value, message):
+              if not value: raise RuntimeError(message)
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', 'repos/HoangHung997/NotePad' + path], text=True))
+          require(git('rev-parse', 'HEAD') == os.environ['AR_HEAD'], 'Wrong checkout')
+          require(not git('status', '--porcelain'), 'Dirty checkout; preserve all work')
+          require(git('ls-remote', 'origin', 'refs/heads/main').split()[0] == MAIN, 'Main advanced: reconcile first')
+          require(git('ls-remote', 'origin', 'refs/heads/' + os.environ['AR_BRANCH']).split()[0] == os.environ['AR_HEAD'], 'Branch advanced: reconcile first')
+          require(not git('diff', '--name-only', CODE, 'HEAD', '--', 'src', 'experiments', 'tests'), 'Application/test source differs from accepted code')
+          require(hashlib.sha256(TRACKER.read_bytes()).hexdigest() == '88a4f2ff35f07f41d5669d8f4bb814cb0dc67c7edcd29602dd19503b176b527d', 'Tracker changed: do not overwrite another checkpoint')
+          require(hashlib.sha256(REPORT.read_bytes()).hexdigest() == 'fecdac8f129c10a634efbbacde1e295fa046e9ab1d04430effec35272ba1ad44', 'Report changed')
+          require(not ACCEPTANCE.exists(), 'Acceptance already exists')
+          full = api('/actions/runs/35698496546')
+          require(full['head_sha'] == CODE and full['status'] == 'completed' and full['conclusion'] == 'success', 'Exact-source full CI is not successful')
+          jobs = api('/actions/runs/35698496546/jobs?per_page=100')
+          require(jobs['total_count'] == len(jobs['jobs']) == 1, 'Unexpected full-CI job inventory')
+          job = jobs['jobs'][0]
+          require(job['id'] == 106650670642 and job['conclusion'] == 'success', 'Wrong full-CI job')
+          require(all(step['status'] == 'completed' and step['conclusion'] == 'success' for step in job['steps']), 'Skipped/failed required step cannot count as PASS')
+          for name in ['Run H2 Notes tests', 'Publish self-contained Windows x64', 'Verify packaged Agent helpers start and answer IPC', 'Upload Avalonia portable build']:
+              require(any(s['name'] == name for s in job['steps']), 'Required step missing: ' + name)
+          evidence = []
+          for run_id, trigger, code, artifact_id, digest in [
+              (35698479792, 'd9ea0e0d0f276f7a01170c353e79348139664e43', CODE, 10680529565, '34928dd7e2a8466bcbb08e6f83df6ce39869731db9d3c05ec2502fb1b33e0afe'),
+              (35698742558, READONLY, READONLY, 10681393961, '60b785cb60cee3ce34283b0dc66b2e57c3ef368ac3b3e3eaa67a1098e866e883')]:
+              run = api('/actions/runs/' + str(run_id))
+              require(run['head_sha'] == trigger and run['status'] == 'completed' and run['conclusion'] == 'success', 'Focused validation is not successful')
+              artifact = api('/actions/artifacts/' + str(artifact_id))
+              require(not artifact['expired'] and artifact['digest'] == 'sha256:' + digest and artifact['size_in_bytes'] > 0, 'Evidence artifact mismatch')
+              evidence.append({'run_id': run_id, 'trigger_head': trigger, 'tested_code_sha': code, 'artifact_id': artifact_id, 'artifact_sha256': digest, 'AR010': '11/11 in each of 3 iterations', 'AR001_regression': '13/13', 'required_Agent_suites': '74/74', 'verification': 'Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization.'})
+          artifact = api('/actions/artifacts/10680959654')
+          require(artifact['workflow_run']['head_sha'] == CODE and artifact['size_in_bytes'] == 109950921 and artifact['digest'] == 'sha256:1acf562abd12eb53c691d485fd5b83380a2ad52ede2c39ac8910512a33167485', 'Published package differs')
+          out = Path(os.environ['RUNNER_TEMP']) / 'ar010-handoff'; out.mkdir(exist_ok=True)
+          log = subprocess.check_output(['gh', 'api', 'repos/HoangHung997/NotePad/actions/jobs/106650670642/logs'])
+          require(len(log) < 4000000, 'Unexpected job-log size')
+          log_text = log.decode('utf-8-sig')
+          require(CODE in log_text, 'Exact code SHA missing from executed job log')
+          results = re.findall(r'RESULT: (\d+) passed, (\d+) failed', log_text)
+          require(results and results[0][1] == '0', 'H2 test summary missing or failing')
+          (out / 'full-ci.log').write_bytes(log)
+          now = datetime.now(timezone.utc).isoformat()
+          limitations = ['E1/E2 concrete runtime and scripted transport only; no new model credential/endpoint or personal document.', 'E3 native Office/provider/model and E4 H2 UI+model+real tools remain NOT_RUN / AWAITING_ENVIRONMENT.', 'AR-083 remains DEFERRED_BY_USER; NAS package and local harness are not physical E5.', 'Checkpoint hooks are in-memory boundaries except a referenced existing Lab CompactionManager durable checkpoint. AR-031/041/050/051 and B04-B10 are not implemented or closed by AR-010.', 'MB-124-127, H2M-133 and historical native acceptance debts are not re-awarded.']
+          next_action = 'On feature/h2-agent-reliability-ar-000 and PR #3, reconcile current main, checkpoint, working tree and checks. Start only AR-011: read SPEC section 6 and task acceptance; extend existing ToolDescriptor/registry and production wrappers with status/effect/verification/completeness and bounded error/readiness metadata, preserve existing domain payloads and permission gates, and add concrete executor-to-runtime-to-UI tests. Retain AR-010 and AR-001 corpora. Do not create a second engine/store, change NAS protocol, or call E3/E4/E5 complete.'
+          accepted = {'id': 'AR-010', 'implementation_status': 'IMPLEMENTED', 'acceptance_status': 'E2_PASS', 'code_sha': CODE, 'full_ci_run': full['id']}
+          manifest = {'task': 'AR-010', 'spec_version': 'H2-AR-SPEC-1.0', 'status': 'DONE', 'evidence_level': 'E2', 'branch': os.environ['AR_BRANCH'], 'pr': 3, 'main_sha': MAIN, 'tested_code_sha': CODE, 'read_only_workflow_head': READONLY, 'captured_at_utc': now, 'working_tree_at_test': 'CLEAN', 'full_ci': {'id': full['id'], 'head_sha': full['head_sha'], 'status': full['status'], 'conclusion': full['conclusion'], 'started_at': full['run_started_at'], 'updated_at': full['updated_at'], 'job_id': job['id'], 'steps': job['steps'], 'h2_tests': {'passed': int(results[0][0]), 'failed': int(results[0][1])}, 'log_sha256': hashlib.sha256(log).hexdigest()}, 'focused_evidence': evidence, 'rc01': {'goal': 'Read marker.txt and report the observed marker.', 'paths': ['Global concrete production adapter', 'Project concrete production adapter', 'Lab AgentOrchestratedRun'], 'observed': '10 ordered actual hook events per path, 3 actual provider sends each, deferred read_file executes against distinct temporary files, no identity crossing; same concrete hook implementation.'}, 'review_repair': 'Throwing/null hook factories now reject before allocating registry/provider/transport resources; two new negative tests pass on the final code.', 'package': {'artifact_id': artifact['id'], 'size_in_bytes': artifact['size_in_bytes'], 'sha256': artifact['digest'][7:], 'zip_entries': 482, 'verification': 'Assistant downloaded exact archive, checked SHA256 and all entry CRCs; app and Office/Desktop helper DLLs nonempty. Packaged helper startup/IPC was executed successfully by full CI.'}, 'commands': ['dotnet restore H2Notes.Avalonia.slnx', 'dotnet build H2Notes.Avalonia.slnx -c Release --no-restore', 'dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build', 'dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-010 (3 iterations)', 'dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001', 'tools/agent-reliability/run_agent_suites.ps1', 'All existing .github/workflows/avalonia-ci.yml required suites/publish/helper commands'], 'limitations': limitations, 'next_task': 'AR-011 NOT_STARTED', 'next_exact_action': next_action}
+          text = TRACKER.read_text()
+          start = text.index('```yaml\n', text.index('## 7. SESSION HANDOFF')) + len('```yaml\n')
+          end = text.index('\n```', start)
+          handoff = json.loads(text[start:end])
+          require(handoff['active_task'] == 'AR-010' and handoff['implementation_status'] == 'ACTIVE', 'Wrong active task')
+          handoff['previous_completed_task'] = handoff.get('last_completed_task')
+          handoff.update({'phase': 'AR-010_ACCEPTED_NEXT_AR-011', 'active_task': 'AR-011', 'implementation_status': 'NOT_STARTED', 'acceptance_status': 'NOT_RUN', 'last_code_commit': CODE, 'last_runtime_source_commit': CODE, 'last_validated_code_commit': CODE, 'last_validation_result': 'FULL_REQUIRED_CI_AND_E2_PASS', 'completed_this_session': [accepted], 'last_completed_task': accepted, 'remaining_in_active_task': ['AR-011 has not started. Existing runtime hooks are ready; outcome/error/readiness semantics still require implementation and tests.'], 'checkpoint_saved_at_utc': now, 'finalization_checked_head': os.environ['AR_HEAD'], 'previous_saved_checkpoint_commit': '89a4964d57a8fa5a129b76cb341f23ac1d471262', 'working_tree': 'CI test checkouts verified CLEAN. Documentation finalization stages only three declared docs and verifies non-force push/remote HEAD. Offline source review is committed as a non-authoritative local snapshot; no unpublished runtime diff remains. User-PC tree NOT_ACCESSIBLE.', 'uncommitted_files': [], 'pending_user_decisions': [], 'next_exact_action': next_action, 'next_task_if_active_done': 'AR-012', 'known_failures': ['No failure remains observed in AR-010/AR-001 and all required suites at accepted code SHA.', *limitations[1:]], 'additional_ci_after_recorded_run': 'Later documentation/finalization-workflow removal may trigger separate runs; do not transfer exact-source PASS to an unobserved later SHA. Accepted code and package remain pinned above.'})
+          handoff['last_test_commands'] = [{'command': c, 'code_sha': CODE, 'result': 'PASS', 'source': 'Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json'} for c in manifest['commands']]
+          handoff['ci_runs'].extend([{'id': full['id'], 'tested_code_sha': CODE, 'result': 'SUCCESS', 'all_required_steps': 'PASS', 'h2_tests': manifest['full_ci']['h2_tests'], 'packaged_helper_IPC': 'PASS'}, *evidence])
+          handoff['evidence_locations'].extend([str(ACCEPTANCE), str(REPORT)])
+          handoff['code_commit_lookup'] = 'git log -1 --format=%H -- experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs'
+          text = text[:start] + json.dumps(handoff, ensure_ascii=False, indent=2) + text[end:]
+          old = '| AR-010 | Chung production context/runtime hooks | 001 | E2 | ACTIVE |'
+          require(text.count(old) == 1, 'AR-010 table anchor changed')
+          text = text.replace(old, old.replace('ACTIVE', 'DONE'), 1)
+          text = text.replace('### [~] AR-010', '### [x] AR-010', 1)
+          summary = '\n**AR-010 acceptance - 2026-09-22:** IMPLEMENTED / E2_PASS / DONE on `' + CODE + '`; full CI `35698496546` and packaged-helper IPC/publish PASS; AR-010 11/11 x3, AR-001 13/13 and 74/74 Agent suites on exact code in `35698479792`, repeated on read-only workflow head in `35698742558`. [Evidence](agent-reliability/AR-010/acceptance.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER; no other task closed.\n\n'
+          text = text.replace('### [ ] AR-011', summary + '### [ ] AR-011', 1)
+          TRACKER.write_text(text)
+          report = REPORT.read_text().replace('Status: ACTIVE / NOT_RUN until exact-source Windows CI is reviewed.', 'Status: IMPLEMENTED / E2_PASS / DONE on ' + CODE + '.', 1)
+          REPORT.write_text(report + '\n## Accepted execution evidence\n\nFull CI **35698496546** passed all required steps on `' + CODE + '`, including Windows publish and packaged-helper IPC. H2 tests: **' + str(results[0][0]) + ' passed, 0 failed**. Focused run **35698479792**: **11/11 AR-010 cases x3**, AR-001 **13/13**, Agent suites **74/74**. Read-only workflow run **35698742558** repeats those results on `' + READONLY + '`. Both downloaded evidence archives had SHA256/ZIP CRC and identities/results/traces verified. Detailed exact steps, artifact hashes, commands and limits are in [acceptance.json](acceptance.json).\n\nThe reviewed factory resource-ownership repair is included in these results. No native Office/model/UI or physical two-PC acceptance is claimed. The temporary source-delivery payload/script have been removed; normal AR-010 CI is read-only. SESSION HANDOFF advances only to **AR-011 NOT_STARTED**, on the same branch/PR. No merge is authorized.\n')
+          ACCEPTANCE.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
+          subprocess.run(['git', 'add', '--', *OUTPUTS], check=True)
+          require(set(git('diff', '--cached', '--name-only').splitlines()) == set(OUTPUTS), 'Unexpected staged files')
+          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
+          (out / 'documentation.patch').write_bytes(subprocess.check_output(['git', 'diff', '--cached', '--binary']))
+          require(git('ls-remote', 'origin', 'refs/heads/' + os.environ['AR_BRANCH']).split()[0] == os.environ['AR_HEAD'], 'Concurrent branch update; retain patch instead')
+          git('config', 'user.name', 'github-actions[bot]')
+          git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git', 'commit', '-m', 'docs(AR-010): accept exact-source evidence and hand off AR-011'], check=True)
+          subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/' + os.environ['AR_BRANCH']], check=True)
+          saved = git('rev-parse', 'HEAD')
+          require(not git('status', '--porcelain'), 'Dirty finalization tree')
+          require(git('ls-remote', 'origin', 'refs/heads/' + os.environ['AR_BRANCH']).split()[0] == saved, 'Remote handoff not verified')
+          (out / 'saved.json').write_text(json.dumps({'checkpoint_sha': saved, 'tested_code_sha': CODE, 'files': OUTPUTS, 'working_tree': 'CLEAN'}, indent=2))
+          print('Verified checkpoint:', saved, '; full H2 tests:', results[0], '; next task AR-011 NOT_STARTED.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR010-Saved-Handoff
+          path: ${{ runner.temp }}/ar010-handoff/
+          if-no-files-found: error
+          retention-days: 14
