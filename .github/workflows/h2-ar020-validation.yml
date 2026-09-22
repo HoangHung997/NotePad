@@ -53,6 +53,14 @@ jobs:
           $ErrorActionPreference='Stop'
           $files=@('experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs','experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Context.cs')
           $old='0827e036264bd4884f17a778e36b63b15d10f35c'
+          $backup=Join-Path $env:RUNNER_TEMP 'ar020-negative-originals'
+          New-Item -ItemType Directory -Force $backup | Out-Null
+          if (git status --porcelain) { throw 'Negative control must begin clean' }
+          foreach($path in $files) {
+            $copy=Join-Path $backup ([IO.Path]::GetFileName($path))
+            [IO.File]::WriteAllBytes($copy,[IO.File]::ReadAllBytes((Resolve-Path $path)))
+          }
+          git ls-files --eol -- $files | Set-Content artifacts/ar020/pre-control-eol.txt
           try {
             foreach($path in $files) {
               python -c "import subprocess,pathlib,sys;pathlib.Path(sys.argv[2]).write_bytes(subprocess.check_output(['git','show',sys.argv[1]+':'+sys.argv[2]]))" $old $path
@@ -73,11 +81,18 @@ jobs:
             }
           } finally {
             foreach($path in $files) {
-              python -c "import subprocess,pathlib,sys;pathlib.Path(sys.argv[1]).write_bytes(subprocess.check_output(['git','show','HEAD:'+sys.argv[1]]))" $path
-              if ($LASTEXITCODE) { throw 'Failed to restore exact source after control' }
+              # Restore the original checkout bytes, including its Windows line endings.
+              # The backup was captured only after the clean HEAD check above.
+              $copy=Join-Path $backup ([IO.Path]::GetFileName($path))
+              [IO.File]::WriteAllBytes((Join-Path $PWD $path),[IO.File]::ReadAllBytes($copy))
+              if ((Get-FileHash $path).Hash -ne (Get-FileHash $copy).Hash) { throw 'Exact pre-control bytes were not restored' }
             }
           }
-          if (git status --porcelain) { throw 'Positive checkout was not restored clean' }
+          $status=@(git status --porcelain)
+          $status | Set-Content artifacts/ar020/post-control-status.txt
+          git diff --name-status | Set-Content artifacts/ar020/post-control-diff.txt
+          git ls-files --eol -- $files | Set-Content artifacts/ar020/post-control-eol.txt
+          if ($status.Count) { throw 'Positive checkout was not restored clean; inspect saved status/diff evidence' }
       - name: Build exact current source and repeat retained production regression
         shell: pwsh
         run: |
