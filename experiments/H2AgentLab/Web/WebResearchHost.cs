@@ -133,6 +133,7 @@ public sealed class WebResearchHost : ICapabilityProvider
 
     public ProviderProvenance Provenance { get; }
     public ProviderHealthState Health => _health;
+    public Action<WebFeedPage>? FeedObserved { get; init; }
 
     public Task<IReadOnlyList<WebSearchHit>> SearchAsync(
         string query,
@@ -222,6 +223,16 @@ public sealed class WebResearchHost : ICapabilityProvider
         EnsureReady();
         switch (toolName)
         {
+            case "web.read_feed":
+            {
+                var document = await _backend.FetchAsync(RequiredString(arguments, "url", 4_000), cancellationToken).ConfigureAwait(false);
+                var feed = WebFeedReader.Read(document, DateTimeOffset.UtcNow,
+                    OptionalInt(arguments, "max_items", 20, 1, 50), OptionalInt(arguments, "max_age_hours", 0, 0, 8760));
+                FeedObserved?.Invoke(feed);
+                return JsonSerializer.Serialize(new { feed.Source, feed.FetchedAtUtc, feed.TotalItems, feed.ExcludedItems, feed.Items,
+                    next = "For saved news reports discover save_news_digest; it preserves exact source titles/URLs/dates. For truncated evidence use read_tool_output, not read_run." },
+                    new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            }
             case "web.search":
             {
                 var query = RequiredString(arguments, "query", 2_000);
@@ -245,6 +256,7 @@ public sealed class WebResearchHost : ICapabilityProvider
                     document.Publisher,
                     document.PublishedAt,
                     document.EffectiveAt,
+                    fetchedAtUtc = DateTime.UtcNow,
                     bodyBase64 = toolName == "web.download"
                         ? Convert.ToBase64String(document.Bytes)
                         : null,
@@ -352,6 +364,9 @@ public sealed class WebResearchHost : ICapabilityProvider
                 new { url = new { type = "string" } }, ["url"]),
             Def("web.extract", "Extract bounded text from previously downloaded bytes.",
                 new { content_type = new { type = "string" }, body_base64 = new { type = "string" } }, ["content_type", "body_base64"]),
+            Def("web.read_feed", "Read live RSS/Atom news with observed titles, article URLs, summaries and publication dates. Filters duplicates and optionally age in hours using host UTC time. Use for reading/filtering current news; never fabricate feed items.",
+                new { url = new { type = "string" }, max_items = new { type = "integer", minimum = 1, maximum = 50 },
+                    max_age_hours = new { type = "integer", minimum = 0, maximum = 8760 } }, ["url"]),
             Def("web.get_metadata", "Fetch current URL metadata/hash without putting the full body in context.",
                 new { url = new { type = "string" } }, ["url"]),
             Def("web.open_browser", "Fallback browser navigation only when structured web access is insufficient.",

@@ -97,7 +97,7 @@ public sealed class ArtifactStore
         if (boundedSummary.Length == 0)
             boundedSummary = $"{kind} output stored outside active context.";
         var contextText = boundedSummary + "\n" +
-            $"[artifact:{id}] kind={kind}; bytes={bytes.LongLength}; sha256={sha}; full content available by explicit artifact read";
+            $"[artifact:{id}] kind={kind}; bytes={bytes.LongLength}; sha256={sha}; read remaining content using read_tool_output(artifact_id, offset). This is not a Python run ID.";
         if (contextText.Length > MaxContextHandleCharacters)
             throw new InvalidOperationException("Artifact context projection exceeded its bounded handle size.");
 

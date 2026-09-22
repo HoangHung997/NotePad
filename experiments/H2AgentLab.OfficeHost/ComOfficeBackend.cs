@@ -32,17 +32,14 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 dynamic workbook = app.Workbooks[i];
                 try
                 {
-                    var snapshot = SnapshotExcelInternal(app, workbook);
+                    // Discovery must remain cheap and must not read every open workbook's cells.
+                    // A state token is issued only by an explicit snapshot of the selected session.
+                    var sessionId = SessionIdForExcel(app, workbook);
                     list.Add(new ExcelWorkbookInfo(
-                        snapshot.SessionId,
-                        snapshot.Name,
-                        snapshot.FullName,
-                        snapshot.Saved,
-                        snapshot.ActiveSheet,
-                        snapshot.SelectionAddress,
-                        snapshot.StateToken));
-                    if (active is not null && SessionIdForExcel(app, active) == snapshot.SessionId)
-                        activeSession = snapshot.SessionId;
+                        sessionId, (string)workbook.Name, (string)workbook.FullName,
+                        (bool)workbook.Saved, "", "", ""));
+                    if (active is not null && SessionIdForExcel(app, active) == sessionId)
+                        activeSession = sessionId;
                 }
                 finally { Release(workbook); }
             }
@@ -174,18 +171,14 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 dynamic document = app.Documents[i];
                 try
                 {
-                    var snapshot = SnapshotWordInternal(app, document);
+                    // Do not enumerate paragraphs/runs in unrelated user documents merely to
+                    // locate a test/selected document. Request word.get_document before editing.
+                    var sessionId = SessionIdForWord(app, document);
                     list.Add(new WordDocumentInfo(
-                        snapshot.SessionId,
-                        snapshot.Name,
-                        snapshot.FullName,
-                        snapshot.Saved,
-                        snapshot.SelectionStart,
-                        snapshot.SelectionEnd,
-                        snapshot.SelectionText,
-                        snapshot.StateToken));
-                    if (active is not null && SessionIdForWord(app, active) == snapshot.SessionId)
-                        activeSession = snapshot.SessionId;
+                        sessionId, (string)document.Name, (string)document.FullName,
+                        (bool)document.Saved, 0, 0, "", ""));
+                    if (active is not null && SessionIdForWord(app, active) == sessionId)
+                        activeSession = sessionId;
                 }
                 finally { Release(document); }
             }
@@ -211,16 +204,29 @@ public sealed class ComOfficeBackend : IOfficeBackend
         {
             var before = SnapshotWordInternal(app, document);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-            if (request.Paragraphs.Count is < 1 or > 128)
-                throw new OfficeHostFaultException("invalid_request", "Word patch must contain 1..128 paragraph operations.");
+            if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
+                throw new OfficeHostFaultException("word_patch_rejected", problem);
 
-            var paragraphCount = Convert.ToInt32(document.Paragraphs.Count, CultureInfo.InvariantCulture);
-            var changed = new List<int>();
-            foreach (var patch in request.Paragraphs)
+            // Inspect every target before the first write. Text replacement is restricted to
+            // plain body paragraphs; fields, tables and embedded content need narrower tools.
+            foreach (var patch in request.Paragraphs.Where(p => p.Text is not null))
             {
-                if (patch.ParagraphIndex < 0 || patch.ParagraphIndex >= paragraphCount)
-                    throw new OfficeHostFaultException("paragraph_not_found", $"Word paragraph {patch.ParagraphIndex} does not exist.");
-
+                dynamic paragraph = document.Paragraphs[patch.ParagraphIndex + 1];
+                dynamic range = paragraph.Range;
+                try
+                {
+                    var text = (string?)range.Text ?? "";
+                    if (Convert.ToInt32(range.Tables.Count) != 0 || Convert.ToInt32(range.Fields.Count) != 0
+                        || Convert.ToInt32(range.InlineShapes.Count) != 0 || Convert.ToInt32(range.ContentControls.Count) != 0
+                        || text.Contains('\f'))
+                        throw new OfficeHostFaultException("word_patch_rejected", "Text replacement cannot remove a table, field, embedded object, content control or section break. Select a plain body paragraph.");
+                }
+                finally { Release(range); Release(paragraph); }
+            }
+            var changed = new List<int>();
+            // Work backwards so a multiline replacement cannot shift later input indexes.
+            foreach (var patch in request.Paragraphs.OrderByDescending(p => p.ParagraphIndex))
+            {
                 dynamic paragraph = document.Paragraphs[patch.ParagraphIndex + 1];
                 dynamic range = paragraph.Range;
                 dynamic? contentRange = null;
@@ -229,7 +235,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
                     var start = Convert.ToInt32(range.Start, CultureInfo.InvariantCulture);
                     var end = Convert.ToInt32(range.End, CultureInfo.InvariantCulture);
                     contentRange = document.Range(start, Math.Max(start, end - 1));
-                    if (patch.Text is not null) contentRange.Text = patch.Text;
+                    if (patch.Text is not null) contentRange.Text = WordPatchRules.NormalizeText(patch.Text).Replace('\n', '\r');
                     if (patch.Bold is bool bold) contentRange.Font.Bold = bold ? -1 : 0;
                     if (patch.Italic is bool italic) contentRange.Font.Italic = italic ? -1 : 0;
                     if (patch.Underline is bool underline) contentRange.Font.Underline = underline ? 1 : 0;
@@ -299,6 +305,10 @@ public sealed class ComOfficeBackend : IOfficeBackend
             else
                 copy.SaveAs2(destination);
 
+            // Word holds an exclusive file lock while the newly saved copy is open.
+            // Close only this method's temporary document before hashing the saved bytes.
+            copy.Close(false);
+            Release(copy); copy = null;
             var bytes = File.ReadAllBytes(destination);
             return new OfficeSaveCopyResult(
                 snapshot.SessionId,
@@ -710,12 +720,25 @@ public sealed class ComOfficeBackend : IOfficeBackend
         var start = Convert.ToInt32(paragraphRange.Start, CultureInfo.InvariantCulture);
         var end = Math.Max(start, Convert.ToInt32(paragraphRange.End, CultureInfo.InvariantCulture) - 1);
         var runs = new List<WordRunState>();
+        if (start == end)
+        {
+            // Empty paragraphs still have formatting on their paragraph mark. Keep it in
+            // the snapshot so inserting into a blank document has a checkable expectation.
+            runs.Add(new WordRunState(0, "", StyleName(paragraphRange), SafeBool(() => paragraphRange.Font.Bold),
+                SafeBool(() => paragraphRange.Font.Italic), SafeLong(() => paragraphRange.Font.Underline) is long u && u != 0));
+        }
+        int[]? boundaries = null;
+        try { boundaries = WordRunBoundaries.TryRead((string)paragraphRange.WordOpenXML, CleanWordText((string)paragraphRange.Text)); }
+        catch (System.Runtime.InteropServices.COMException) { }
+        if (boundaries?.Sum() != end - start) boundaries = null;
+        var segment = 0;
         for (var position = start; position < end;)
         {
             if (budget-- <= 0)
                 throw new OfficeHostFaultException("snapshot_too_large", $"Word live snapshot exceeds {MaxWordRuns} formatting runs.");
 
-            dynamic character = document.Range(position, position + 1);
+            var length = boundaries is null ? 1 : boundaries[segment++];
+            dynamic character = document.Range(position, position + length);
             try
             {
                 var bold = SafeBool(() => character.Font.Bold);
@@ -745,7 +768,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 }
             }
             finally { Release(character); }
-            position++;
+            position += length;
         }
         return runs;
     }
@@ -1062,7 +1085,9 @@ public sealed class ComOfficeBackend : IOfficeBackend
     {
         if (value is not null && Marshal.IsComObject(value))
         {
-            try { Marshal.FinalReleaseComObject(value); } catch { }
+            // Different COM property accesses can share one RCW (e.g. ActiveSheet and
+            // Worksheets[index]). Releasing every reference invalidates an outer operation.
+            try { Marshal.ReleaseComObject(value); } catch { }
         }
     }
 

@@ -106,7 +106,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         if (!_started) throw new InvalidOperationException("OpenAI Responses transport turn chưa bắt đầu.");
         if (request.TaskId != _taskId || request.TurnId != _turnId)
             throw new InvalidOperationException("Continuation không thuộc task/turn đang chạy.");
-        if (_pendingCalls.Count == 0)
+        if (_pendingCalls.Count == 0 && request.SupplementalUserMessages is not { Count: > 0 })
             throw new InvalidOperationException("Không có Responses function call đang chờ kết quả.");
 
         var byId = request.ToolResults
@@ -153,6 +153,8 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         if (_stateMode == OpenAiResponsesStateMode.StoredContinuation)
             _requestInput = continuationInput;
 
+        foreach (var input in request.SupplementalUserMessages ?? [])
+            _requestInput.Add(new JsonObject { ["role"] = "user", ["content"] = input });
         _completedOutputItems.Clear();
         _pendingCalls = [];
 

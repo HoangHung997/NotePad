@@ -1,0 +1,56 @@
+Window: "Work Assistant · Kiểm thử", App: H2Notes.Avalonia.exe.
+	0 window Work Assistant · Kiểm thử Secondary Actions: Raise
+		1 group WindowChrome ID: AvaloniaWindowChrome
+		2 button Work Assistant ▾ ID: WorkAssistantThreads
+		3 button Cuộc trò chuyện mới Description: Cuộc trò chuyện mới ID: WorkAssistantNewChat
+		4 button Thu gọn về bong bóng Description: Thu gọn về bong bóng ID: WorkAssistantClose
+		5 button Ứng dụng đang mở ID: WorkAssistantWorkspace
+		6 scroll viewer ID: WorkAssistantHistoryScroll
+			7 text Kiểm thử tài liệu mẫu: hãy tạo 3 tệp bằng công cụ run_python: gioi-thieu.docx giới thiệu H2 Assistant trong 2 đoạn ngắn; bang-mau.csv có 5 hàng tên và số lượng; gioi-thieu.pdf có dòng H2 Assistant preview test. Chỉ dùng dữ liệu mẫu, không đọc tài liệu có sẵn. Lưu các tệp vào output trong môi trường Python rồi công bố kết quả. Dùng python-docx và reportlab. Trả lời tiếng Việt ngắn gọn kèm danh sách tệp và bảng Markdown 3 dòng.
+			8 group ID: AgentTurnActivity
+				9 button Đã xử lý trong 9 giây · 6 thao tác ID: ExpanderHeader
+			10 text Đã tạo và công bố thành công 3 tệp mẫu: ID: MarkdownParagraph
+			11 text Danh sách tệp: ID: MarkdownParagraph
+			12 text •
+			13 text gioi-thieu.docx ID: MarkdownListText
+			14 text •
+			15 text bang-mau.csv ID: MarkdownListText
+			16 text •
+			17 text gioi-thieu.pdf ID: MarkdownListText
+			18 text Dữ liệu tệp CSV: ID: MarkdownParagraph
+			19 button Sao chép bảng
+			20 text 2 hàng
+			21 scroll viewer
+				22 text Tên ID: MarkdownTableCell
+				23 text Số lượng ID: MarkdownTableCell
+				24 text Sản phẩm A ID: MarkdownTableCell
+				25 text 10 ID: MarkdownTableCell
+				26 text Sản phẩm B ID: MarkdownTableCell
+				27 text 20 ID: MarkdownTableCell
+			28 button Tệp · bang-mau.csv Description: bang-mau.csv ID: AgentArtifact
+			29 button Tệp · gioi-thieu.docx Description: gioi-thieu.docx ID: AgentArtifact
+			30 button Tệp · gioi-thieu.pdf Description: gioi-thieu.pdf ID: AgentArtifact
+			31 group
+				32 button Bằng chứng và kiểm tra · 8 ID: ExpanderHeader
+					33 text Bằng chứng và kiểm tra · 8
+			34 button Sao chép trả lời
+			35 scroll bar (settable, float) Value: 437.59999999999997 ID: PART_VerticalScrollBar
+				36 button Line up ID: PART_LineUpButton
+				37 button Page up ID: PART_PageUpButton
+				38 button Page down ID: PART_PageDownButton
+				39 thumb Position
+				40 button Line down ID: PART_LineDownButton
+		41 text Ngữ cảnh gửi kèm · bấm × để bỏ. ID: WorkAssistantContextHint
+		42 button MouseWithoutBordersHelper × ID: WorkAssistantContextApplicationChip
+		43 edit (settable, string) Description: Enter để gửi · Shift+Enter để xuống dòng ID: WorkAssistantPrompt
+		44 button Thêm ngữ cảnh · chọn thư mục làm việc Description: Thêm ngữ cảnh · chọn thư mục làm việc ID: WorkAssistantChooseFolder
+		45 button Quyền: Chỉ quan sát Description: Chỉ quan sát Đọc và trả lời; không sửa dữ liệu hoặc chạy lệnh trên máy. ID: WorkAssistantPermissionPreset
+			46 text Chỉ quan sát ID: WorkAssistantPermissionLabel
+		47 button Model: gemma4:cloud · Description: Ollama trên máy · gemma4:cloud Ollama Cloud · xử lý online ID: WorkAssistantModelPicker
+			48 text gemma4:cloud
+			49 text
+		50 button Nhập giọng nói Windows · Win+H Description: Nhập giọng nói Windows · Win+H ID: WorkAssistantDictation
+		51 button Nhập giọng nói Windows · Win+H Description: Nhập giọng nói Windows · Win+H ID: WorkAssistantSendButton
+		52 text Sẵn sàng · chưa gửi yêu cầu. ID: WorkAssistantCompactStatus
+
+The focused UI element is 43 edit (settable, string) Description: Enter để gửi · Shift+Enter để xuống dòng ID: WorkAssistantPrompt.

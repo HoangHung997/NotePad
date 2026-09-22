@@ -5,6 +5,102 @@ internal static class H2ProjectAiQueueTests
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Project AI grant and barrier confirmation recover lost responses across Coordinator restart", () =>
+        {
+            var fixture = Fixture();
+            var client = Client(fixture, fixture.ProjectA, fixture.Pc1, "pc1");
+            client.QueueCreateProject(Project(fixture.ProjectA, "Project A"));
+            client.SynchronizeAsync().GetAwaiter().GetResult();
+            fixture.Store.RegisterDevice(fixture.Workspace, fixture.Pc2);
+            var request = Request(Guid.NewGuid(), fixture, fixture.ProjectA,
+                fixture.Pc1, Guid.NewGuid(), null);
+            fixture.Store.EnqueueProjectAi(request);
+            var lease = fixture.Store.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc1.DeviceId)!;
+
+            // Simulate a committed grant whose response never reached PC1.
+            var restarted = Restart(fixture);
+            Equal(lease, restarted.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc1.DeviceId));
+            True(restarted.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc2.DeviceId) is null);
+            True(!restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, lease.Barrier.RequiredProjectSequence - 1));
+            True(!restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, long.MaxValue));
+
+            client.SynchronizeThroughAsync(lease.Barrier).GetAwaiter().GetResult();
+            True(restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, client.AppliedServerSequence));
+            var runningLease = restarted.GetRunningProjectAiLease(fixture.Workspace, fixture.ProjectA)!;
+            fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+            restarted = Restart(fixture);
+            True(restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, client.AppliedServerSequence));
+            Equal(runningLease, restarted.GetRunningProjectAiLease(fixture.Workspace, fixture.ProjectA));
+            True(!restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc2.DeviceId, client.AppliedServerSequence));
+            True(restarted.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc1.DeviceId) is null);
+
+            fixture.Clock.Advance(TimeSpan.FromSeconds(30));
+            True(!restarted.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, client.AppliedServerSequence));
+            Equal(H2ProjectAiQueueState.WaitingForRepair,
+                restarted.GetProjectAiQueue(fixture.Workspace, fixture.ProjectA).Single().State);
+        });
+
+        test("Project AI completion receipt survives lost response restart and later project turns", () =>
+        {
+            var fixture = Fixture();
+            var client = Client(fixture, fixture.ProjectA, fixture.Pc1, "pc1");
+            client.QueueCreateProject(Project(fixture.ProjectA, "Project A"));
+            client.SynchronizeAsync().GetAwaiter().GetResult();
+            fixture.Store.RegisterDevice(fixture.Workspace, fixture.Pc2);
+            var conversation = Guid.NewGuid();
+            var request = Request(Guid.NewGuid(), fixture, fixture.ProjectA,
+                fixture.Pc1, conversation, null);
+            fixture.Store.EnqueueProjectAi(request);
+            var lease = fixture.Store.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc1.DeviceId)!;
+            True(fixture.Store.ConfirmProjectAiBarrier(lease.LeaseId,
+                fixture.Pc1.DeviceId, client.AppliedServerSequence));
+            var message = client.QueueAppendMessage(conversation, "AI",
+                Message("assistant", "Committed answer", request.RequestId),
+                request.RequestId, lease.LeaseId);
+            client.SynchronizeAsync().GetAwaiter().GetResult();
+            var completion = new H2ProjectAiCompletion(lease.LeaseId, request.RequestId,
+                fixture.ProjectA, H2ProjectAiQueueState.Completed,
+                client.AppliedServerSequence, message.EventId, fixture.Clock.UtcNow);
+            fixture.Store.CompleteProjectAi(completion);
+
+            var restarted = Restart(fixture);
+            restarted.CompleteProjectAi(completion);
+            var next = Request(Guid.NewGuid(), fixture, fixture.ProjectA,
+                fixture.Pc2, conversation, null);
+            restarted.EnqueueProjectAi(next);
+            var nextLease = restarted.TryAcquireProjectAiLease(
+                fixture.Workspace, fixture.ProjectA, fixture.Pc2.DeviceId)!;
+            True(restarted.ConfirmProjectAiBarrier(nextLease.LeaseId,
+                fixture.Pc2.DeviceId, client.AppliedServerSequence));
+
+            // A late ACK retry must neither release the next owner nor duplicate messages.
+            restarted.CompleteProjectAi(completion);
+            Equal(nextLease.LeaseId,
+                restarted.GetRunningProjectAiLease(fixture.Workspace, fixture.ProjectA)!.LeaseId);
+            Equal(2, restarted.GetProjectEvents(fixture.Workspace, fixture.ProjectA, 0).Count);
+            Throws<InvalidOperationException>(() => restarted.CompleteProjectAi(
+                new H2ProjectAiCompletion(lease.LeaseId, request.RequestId,
+                    fixture.ProjectA, H2ProjectAiQueueState.Failed,
+                    completion.CommittedThroughProjectSequence, message.EventId, completion.CompletedUtc)));
+            Throws<InvalidOperationException>(() => restarted.CompleteProjectAi(
+                new H2ProjectAiCompletion(Guid.NewGuid(), request.RequestId,
+                    fixture.ProjectA, H2ProjectAiQueueState.Completed,
+                    completion.CommittedThroughProjectSequence, message.EventId, completion.CompletedUtc)));
+            Equal(H2ProjectAiQueueState.Completed,
+                restarted.GetProjectAiQueue(fixture.Workspace, fixture.ProjectA)[0].State);
+        });
+
         test("Project AI queue is FIFO while user messages remain shared and different projects run concurrently", () =>
         {
             var fixture = Fixture();
@@ -189,6 +285,7 @@ internal static class H2ProjectAiQueueTests
             var client = Client(fixture, fixture.ProjectA, fixture.Pc1, "pc1");
             client.QueueCreateProject(Project(fixture.ProjectA, "Project A"));
             client.SynchronizeAsync().GetAwaiter().GetResult();
+            fixture.Store.RegisterDevice(fixture.Workspace, fixture.Pc2);
 
             var r1 = Request(
                 Guid.NewGuid(), fixture, fixture.ProjectA, fixture.Pc1, Guid.NewGuid(), null);
@@ -356,6 +453,9 @@ internal static class H2ProjectAiQueueTests
                 .GetAwaiter().GetResult() is not null);
         });
     }
+
+    private static H2CoordinatorSqliteStore Restart(FixtureState fixture)
+        => new(Path.Combine(fixture.Root, "coordinator.db"), () => fixture.Clock.UtcNow);
 
     private static FixtureState Fixture()
     {

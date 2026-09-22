@@ -174,9 +174,12 @@ internal static class H2CoordinatorSqliteStoreTests
             var project = Guid.NewGuid();
             var pc1 = H2CoordinatorDeviceIdentity.CreateNew("PC1");
             var pc2 = H2CoordinatorDeviceIdentity.CreateNew("PC2");
-            var store = new H2CoordinatorSqliteStore(db);
+            var now = new DateTimeOffset(2026, 9, 21, 6, 0, 0, TimeSpan.Zero);
+            var store = new H2CoordinatorSqliteStore(db, () => now);
             store.RegisterDevice(workspace, pc1);
             store.RegisterDevice(workspace, pc2);
+            store.SubmitProjectEvents(workspace, pc1.DeviceId,
+                new[] { CreateProjectDraft(workspace, project, pc1.DeviceId, 1) });
 
             var r1 = Request(workspace, project, pc1.DeviceId);
             var r2 = Request(workspace, project, pc2.DeviceId);
@@ -185,48 +188,99 @@ internal static class H2CoordinatorSqliteStoreTests
             Equal(1L, q1.QueueSequence);
             Equal(2L, q2.QueueSequence);
 
-            var now = DateTimeOffset.UtcNow;
-            var lease1 = new H2ProjectAiLease(
-                Guid.NewGuid(),
-                r1.RequestId,
-                project,
-                pc1.DeviceId,
-                q1.QueueSequence,
-                new H2ProjectSyncBarrier(project, 0),
-                now,
-                now,
-                now.AddMinutes(1));
-            store.SaveProjectAiLease(lease1);
+            Equal<H2ProjectAiLease?>(null,
+                store.TryAcquireProjectAiLease(workspace, project, pc2.DeviceId));
+            var lease1 = store.TryAcquireProjectAiLease(workspace, project, pc1.DeviceId)
+                ?? throw new Exception("PC1 should acquire the FIFO head.");
+            Equal(1L, lease1.Barrier.RequiredProjectSequence);
+            Equal(true, store.ConfirmProjectAiBarrier(lease1.LeaseId, pc1.DeviceId, 1));
 
-            var restarted = new H2CoordinatorSqliteStore(db);
+            var restarted = new H2CoordinatorSqliteStore(db, () => now);
             Equal(lease1.LeaseId, restarted.GetRunningProjectAiLease(workspace, project)!.LeaseId);
             Equal(2, restarted.GetProjectAiQueue(workspace, project).Count);
+            Equal<H2ProjectAiLease?>(null,
+                restarted.TryAcquireProjectAiLease(workspace, project, pc2.DeviceId));
 
-            restarted.CompleteProjectAiUncheckedLegacy(new H2ProjectAiCompletion(
+            var assistant = new AiMessage
+            {
+                Id = Guid.NewGuid(),
+                AiRunId = r1.RequestId,
+                ParentId = r1.UserMessageId,
+                Role = "assistant",
+                Content = "Verified answer after restart",
+                CreatedAt = now.UtcDateTime
+            };
+            var payload = H2ProjectEventPayload.Serialize(
+                new H2ProjectMessageAppend(r1.ConversationId!.Value, "AI", assistant));
+            var assistantEvent = new H2ProjectEventDraft(
+                Guid.NewGuid(), workspace, project, pc1.DeviceId, 2, Guid.NewGuid(),
+                H2ProjectEventKind.AppendMessage,
+                new H2ProjectMutationTarget(H2ProjectEntityKind.Message, assistant.Id, expectedRevision: 0),
+                payload, H2ProjectEventDraft.ComputePayloadSha256(payload), now,
+                r1.RequestId, lease1.LeaseId);
+            restarted.SubmitProjectEvents(workspace, pc1.DeviceId, new[] { assistantEvent });
+            restarted.CompleteProjectAi(new H2ProjectAiCompletion(
                 lease1.LeaseId,
                 r1.RequestId,
                 project,
                 H2ProjectAiQueueState.Completed,
-                0,
-                Guid.NewGuid(),
-                DateTimeOffset.UtcNow));
+                2,
+                assistantEvent.EventId,
+                now));
 
-            var lease2 = new H2ProjectAiLease(
-                Guid.NewGuid(),
-                r2.RequestId,
-                project,
-                pc2.DeviceId,
-                q2.QueueSequence,
-                new H2ProjectSyncBarrier(project, 0),
-                now.AddSeconds(1),
-                now.AddSeconds(1),
-                now.AddMinutes(1));
-            restarted.SaveProjectAiLease(lease2);
+            var lease2 = restarted.TryAcquireProjectAiLease(workspace, project, pc2.DeviceId)
+                ?? throw new Exception("PC2 should acquire after PC1's committed completion.");
+            Equal(r2.RequestId, lease2.RequestId);
+            Equal(2L, lease2.Barrier.RequiredProjectSequence);
+            Equal(false, restarted.ConfirmProjectAiBarrier(lease2.LeaseId, pc2.DeviceId, 1));
+            Equal(H2ProjectAiQueueState.WaitingForSync,
+                restarted.GetProjectAiQueue(workspace, project)[1].State);
+            Equal(true, restarted.ConfirmProjectAiBarrier(lease2.LeaseId, pc2.DeviceId, 2));
 
             var queue = restarted.GetProjectAiQueue(workspace, project);
             Equal(H2ProjectAiQueueState.Completed, queue[0].State);
             Equal(H2ProjectAiQueueState.Running, queue[1].State);
             Equal(lease2.LeaseId, restarted.GetRunningProjectAiLease(workspace, project)!.LeaseId);
+        });
+
+        test("Coordinator AI enqueue retries preserve exact content and server acceptance time", () =>
+        {
+            var db = Path.Combine(Folder(), "coordinator.db");
+            var workspace = Guid.NewGuid();
+            var project = Guid.NewGuid();
+            var device = H2CoordinatorDeviceIdentity.CreateNew("PC1");
+            var serverNow = new DateTimeOffset(2026, 9, 21, 13, 0, 0, TimeSpan.FromHours(7));
+            var store = new H2CoordinatorSqliteStore(db, () => serverNow);
+            store.RegisterDevice(workspace, device);
+            var request = Request(workspace, project, device.DeviceId);
+            var queued = store.EnqueueProjectAi(request);
+            Equal(serverNow.ToUniversalTime(), queued.AcceptedUtc);
+            Equal(TimeSpan.Zero, queued.AcceptedUtc.Offset);
+
+            serverNow = serverNow.AddMinutes(5);
+            var restarted = new H2CoordinatorSqliteStore(db, () => serverNow);
+            var retry = restarted.EnqueueProjectAi(request);
+            Equal(queued, retry);
+
+            H2ProjectAiRequest Changed(Guid? conversationId, Guid? userMessageId, DateTimeOffset clientTime)
+                => new(request.RequestId, request.WorkspaceId, request.ProjectId,
+                    request.OwnerDeviceId, request.ClientRequestId, conversationId,
+                    userMessageId, clientTime);
+
+            foreach (var incompatible in new[]
+            {
+                Changed(Guid.NewGuid(), request.UserMessageId, request.ClientCreatedUtc),
+                Changed(null, request.UserMessageId, request.ClientCreatedUtc),
+                Changed(request.ConversationId, Guid.NewGuid(), request.ClientCreatedUtc),
+                Changed(request.ConversationId, null, request.ClientCreatedUtc),
+                Changed(request.ConversationId, request.UserMessageId, request.ClientCreatedUtc.AddSeconds(1))
+            })
+                Throws<InvalidOperationException>(() => restarted.EnqueueProjectAi(incompatible));
+
+            Equal(queued, restarted.GetProjectAiQueue(workspace, project).Single());
+            var next = restarted.EnqueueProjectAi(Request(workspace, project, device.DeviceId));
+            Equal(2L, next.QueueSequence);
+            Equal(serverNow.ToUniversalTime(), next.AcceptedUtc);
         });
     }
 

@@ -18,7 +18,6 @@ public partial class MainWindow
     private bool _manualSidebarCollapsed;
     private bool _updatingNavigator;
     private string _navigatorSignature = "";
-    private bool _wasFullscreen;
     private const string ProjectWorkspaceAgentMode = "agent";
     private const string ProjectWorkspaceTasksMode = "tasks";
     private const string ProjectWorkspaceNotesMode = "notes";
@@ -64,21 +63,16 @@ public partial class MainWindow
             ApplyResponsive();
         };
         NotesNavButton.Click += (_, _) => ShowNotesMenu();
-        AiNavButton.Click += (_, _) =>
-        {
-            if (_notesProject is null) return;
-            if (_showCommandCenter) _showCommandCenter = false;
-            ShowAgentWorkspace();
-        };
+        AiNavButton.Click += (_, _) => _app.ShowWorkAssistantFull();
         var aiMenu = new ContextMenu();
         var projectAi = new MenuItem { Header = "Agent của dự án", Icon = new AppIcon(IconKind.Folder) };
-        projectAi.Click += (_, _) => SetAiDock("floating"); aiMenu.Items.Add(projectAi);
+        projectAi.Click += (_, _) => ShowAgentWorkspace(); aiMenu.Items.Add(projectAi);
         var standaloneAi = new MenuItem { Header = "Tách Agent dự án ra màn hình", Icon = new AppIcon(IconKind.Sparkle) };
         standaloneAi.Click += (_, _) => ShowProjectAiWindow(); aiMenu.Items.Add(standaloneAi); AiNavButton.ContextMenu = aiMenu;
-        ToolTip.SetTip(AiNavButton, "Agent dự án · chuột phải để mở cửa sổ riêng");
+        ToolTip.SetTip(AiNavButton, "Mở H2 Assistant · chuột phải để mở Agent của dự án");
         AskAiButton.Click += (_, _) => ShowAgentWorkspace();
         SettingsNavButton.Click += (_, _) => _app.ShowSettings(this);
-        ProjectPickerButton.Click += (_, _) => { _pickerTimer.Stop(); _pickerTimer.Start(); };
+        ProjectPickerButton.Click += (_, _) => { _drawerOpen = !_drawerOpen; ApplyResponsive(); };
         _pickerTimer.Tick += (_, _) => { _pickerTimer.Stop(); _drawerOpen = !_drawerOpen; ApplyResponsive(); };
         ProjectPickerButton.DoubleTapped += (_, e) => { _pickerTimer.Stop(); RenameProject(); e.Handled = true; };
         CompactProjectPicker.Click += (_, _) => { _drawerOpen = !_drawerOpen; ApplyResponsive(); };
@@ -151,6 +145,7 @@ public partial class MainWindow
     private void SelectCurrent(ProjectRecord? project)
     {
         if (_notesProject?.Id == project?.Id && project is not null) { UpdateSummary(); return; }
+        _documentInspector.IsVisible = false; _openDocument = null; _documentInspector.Child = null;
         Flush(); EndRename(); _notesProject = project; _board.SelectedProjectId = project?.Id;
         _switching = true;
         if (project is not null) Sheet.FocusProject(project);
@@ -165,6 +160,7 @@ public partial class MainWindow
     {
         if (_notesProject is null) return;
         ReturnProjectAiToBoard();
+        _showCommandCenter = false;
         _projectWorkspaceMode = ProjectWorkspaceAgentMode;
         _drawerOpen = false;
         ApplyResponsive();
@@ -217,8 +213,9 @@ public partial class MainWindow
         var query = SearchBox.Text?.Trim() ?? "";
         var items = _board.Projects.Select((p, index) => new ProjectNavItem(p, index + 1)).Where(i => query.Length == 0
             || i.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || i.Project.NotesText.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || i.Project.Conversations.Any(c => c.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
             || i.Project.ChecklistItems.Any(t => (t.DisplayText + " " + t.CommentText).Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
-        var signature = string.Join("|", items.Select(i => i.Project.Id + i.Title + i.Summary)) + _notesProject?.Id;
+        var signature = string.Join("|", items.Select(i => i.Project.Id + i.Title + i.Summary + i.Project.SelectedAiConversationId + string.Join(";", i.Project.Conversations.Select(c => c.Id + c.Title)))) + _notesProject?.Id;
         if (signature == _navigatorSignature) return;
         _navigatorSignature = signature; _updatingNavigator = true;
         ProjectList.ItemsSource = items; ProjectList.SelectedItem = items.FirstOrDefault(i => i.Project.Id == _notesProject?.Id);
@@ -227,183 +224,81 @@ public partial class MainWindow
 
     private void ApplyResponsive()
     {
-        if (RootBody is null || WorkAndAi is null) return;
+        if (RootBody is null || WorkAndAi is null || _chat is null) return;
         var width = Bounds.Width > 0 ? Bounds.Width : Width;
         var height = Bounds.Height > 0 ? Bounds.Height : Height;
-        _wide = _wide ? width >= 880 : width >= 900;
-
-        var layout = _notesProject?.Layout ?? new ProjectLayout();
-        var localLayout = _notesProject is null
-            ? new LocalProjectLayout()
-            : _app.LocalSettings.GetProjectLayout(_notesProject.Id);
+        _wide = width >= 980;
         var projectOpen = !_showCommandCenter && _notesProject is not null;
-        var primaryAgent = projectOpen
-            && _projectWorkspaceMode == ProjectWorkspaceAgentMode
-            && DetachedAiWindow?.IsVisible != true;
-        var resourcesMode = projectOpen
-            && _projectWorkspaceMode == ProjectWorkspaceResourcesMode;
-        var historyMode = projectOpen
-            && _projectWorkspaceMode == ProjectWorkspaceHistoryMode;
-        var evidenceMode = projectOpen
-            && _projectWorkspaceMode == ProjectWorkspaceEvidenceMode;
-
-        var fullscreen = WindowState == WindowState.Maximized;
-        if (!primaryAgent
-            && fullscreen
-            && !_wasFullscreen
-            && DetachedAiWindow?.IsVisible != true
-            && _notesProject is { Layout.AiExplicitlyHidden: false })
-            _notesProject.Layout.AiDock = "right";
-        _wasFullscreen = fullscreen;
-
-        // Explicit legacy docking still works in detail mode. Agent-first mode ignores the
-        // persisted legacy AiDock default and always presents the same AiChatPanel as primary.
-        var legacyAi = projectOpen
-            && !primaryAgent
-            && DetachedAiWindow?.IsVisible != true
-            && layout.AiDock != "hidden";
-        var inlineAi = legacyAi && width < 900;
-        var dockRight = legacyAi && !inlineAi && layout.AiDock == "right";
-        var dockBottom = legacyAi && !inlineAi && layout.AiDock == "bottom";
-        var floating = legacyAi && !inlineAi && !dockRight && !dockBottom;
-
-        var sidebar = _wide
-            && !_manualSidebarCollapsed
-            && !primaryAgent
-            && !(dockRight && width < 1280);
-        RootBody.ColumnDefinitions[1].Width = new GridLength(sidebar ? 250 : 0);
+        var primaryAgent = projectOpen && _projectWorkspaceMode == ProjectWorkspaceAgentMode;
+        var tasks = projectOpen && _projectWorkspaceMode == ProjectWorkspaceTasksMode;
+        var notes = projectOpen && _projectWorkspaceMode == ProjectWorkspaceNotesMode;
+        var files = projectOpen && _projectWorkspaceMode == ProjectWorkspaceResourcesMode;
+        var history = projectOpen && _projectWorkspaceMode == ProjectWorkspaceHistoryMode;
+        var evidence = projectOpen && _projectWorkspaceMode == ProjectWorkspaceEvidenceMode;
+        var document = projectOpen && _documentInspector.IsVisible && (primaryAgent || files || history || evidence);
+        var documentPage = document && width < 980;
+        var sidebar = projectOpen && width >= 1280 && !_manualSidebarCollapsed;
+        RootBody.ColumnDefinitions[1].Width = new GridLength(sidebar ? 220 : 0);
         Sidebar.IsVisible = sidebar || _drawerOpen;
-        Sidebar.Width = sidebar ? double.NaN : Math.Min(360, width - 76);
+        Sidebar.Width = sidebar ? double.NaN : Math.Min(390, width - 76);
         Sidebar.HorizontalAlignment = sidebar ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         Grid.SetColumnSpan(Sidebar, sidebar ? 1 : 2);
         DrawerShade.IsVisible = _drawerOpen && !sidebar;
         CloseDrawerButton.IsVisible = _drawerOpen && !sidebar;
-
-        var shortWindow = height < 730;
-        var notesTab = shortWindow && layout.Tab == "notes";
+        var dock = projectOpen && (tasks || notes) && width >= 1200 && _notesProject?.Layout.AiExplicitlyHidden != true && DetachedAiWindow?.IsVisible != true;
+        var narrow = width < 700;
+        var shortWindow = height <= 650;
+        CompactProjectPicker.IsVisible = false;
+        ProjectTitle.FontSize = narrow ? 22 : 24;
+        ProjectProgress.IsVisible = !shortWindow;
+        ProjectProgress.MaxLines = 1; ProjectProgress.TextTrimming = TextTrimming.CharacterEllipsis;
+        ProjectNextSummary.IsVisible = false;
+        PriorityButton.IsVisible = false;
         CompactTabs.IsVisible = projectOpen;
-        CompactProjectPicker.IsVisible = projectOpen && !_wide;
-        CompactPickerLabel.Text = "Dự án / " + (_notesProject is null
-            ? ""
-            : (_board.Projects.IndexOf(_notesProject) + 1).ToString());
-
-        PriorityButton.IsEnabled = _notesProject is not null;
-        ProjectTitle.FontSize = !_wide ? 26 : 22;
-        Sheet.SetCompact(width - 56 - (sidebar ? 250 : 0) - (dockRight ? 345 : 0) - 32 < 600);
-
+        NotesTabButton.IsVisible = !shortWindow || !narrow;
+        ResourcesTabButton.IsVisible = HistoryTabButton.IsVisible = !narrow;
+        EvidenceTabButton.IsVisible = false;
+        TabsOverflowButton.IsVisible = true;
+        foreach (var (button, selected) in new[] { (AgentTabButton,primaryAgent), (TasksTabButton,tasks), (NotesTabButton,notes),
+            (ResourcesTabButton,files), (HistoryTabButton,history), (EvidenceTabButton,evidence) })
+        { button.IsEnabled = true; button.Classes.Set("selected",selected); button.Foreground = RichEditor.Brush(selected ? "#A4573D" : "#495363"); }
         CommandCenter.IsVisible = _showCommandCenter;
-        WorkContent.IsVisible = projectOpen && !inlineAi;
-        EditorSplit.IsVisible = projectOpen && !primaryAgent && !resourcesMode && !historyMode && !evidenceMode && !inlineAi;
-        ProjectResourcesPane.IsVisible = projectOpen && resourcesMode && !inlineAi;
-        ProjectHistoryPane.IsVisible = projectOpen && historyMode && !inlineAi;
-        ProjectEvidencePane.IsVisible = projectOpen && evidenceMode && !inlineAi;
-
-        // Detail mode keeps the mature task/note editor behavior. It is secondary now because
-        // opening a project starts in primaryAgent; tabs expose this surface in one click.
-        TasksPane.IsVisible = !notesTab;
-        NotesPane.IsVisible = !shortWindow || notesTab;
-        NotesSplitter.IsVisible = !primaryAgent
-            && !shortWindow
-            && !layout.TasksCollapsed
-            && !layout.NotesCollapsed;
-
-        var fraction = localLayout.HasCustomSplit && double.IsFinite(localLayout.NotesFraction)
-            ? Math.Clamp(localLayout.NotesFraction, .15, .85)
-            : _wide ? .52 : .44;
-        EditorSplit.RowDefinitions[0].Height = notesTab
-            ? new GridLength(0)
-            : layout.TasksCollapsed ? new GridLength(96) : new GridLength(1 - fraction, GridUnitType.Star);
-        EditorSplit.RowDefinitions[1].Height = new GridLength(NotesSplitter.IsVisible ? ResizeSplitter.HitSize : 0);
-        EditorSplit.RowDefinitions[2].Height = shortWindow && !notesTab
-            ? new GridLength(0)
-            : layout.NotesCollapsed ? new GridLength(38) : new GridLength(fraction, GridUnitType.Star);
-
-        Sheet.IsVisible = !layout.TasksCollapsed;
-        TasksCollapseIcon.Kind = layout.TasksCollapsed ? IconKind.ChevronUp : IconKind.ChevronDown;
-        NotesCollapseIcon.Kind = layout.NotesCollapsed ? IconKind.ChevronUp : IconKind.ChevronDown;
-        NotesToolbar.IsVisible = NotesEditorBorder.IsVisible = !layout.NotesCollapsed;
-
-        AgentTabButton.IsEnabled = !primaryAgent;
-        TasksTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || evidenceMode || layout.Tab != "tasks";
-        NotesTabButton.IsEnabled = primaryAgent || resourcesMode || historyMode || evidenceMode || layout.Tab != "notes";
-        ResourcesTabButton.IsEnabled = !resourcesMode;
-        HistoryTabButton.IsEnabled = !historyMode;
-        EvidenceTabButton.IsEnabled = !evidenceMode;
-        AgentTabButton.Foreground = RichEditor.Brush(primaryAgent ? "#FFFFFF" : "#796C62");
-        TasksTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && !evidenceMode && !notesTab ? "#A4573D" : "#796C62");
-        NotesTabButton.Foreground = RichEditor.Brush(!primaryAgent && !resourcesMode && !historyMode && !evidenceMode && notesTab ? "#A4573D" : "#796C62");
-        ResourcesTabButton.Foreground = RichEditor.Brush(resourcesMode ? "#A4573D" : "#796C62");
-        HistoryTabButton.Foreground = RichEditor.Brush(historyMode ? "#A4573D" : "#796C62");
-        EvidenceTabButton.Foreground = RichEditor.Brush(evidenceMode ? "#A4573D" : "#796C62");
-
-        AiHostBorder.IsVisible = primaryAgent || legacyAi;
-
-        if (primaryAgent)
-        {
-            // Wide: compact project summary on the left, Agent gets the majority on the right.
-            // Narrow: keep the project header/tabs above and overlay Agent only below that header.
-            WorkAndAi.ColumnDefinitions[0].Width = _wide
-                ? new GridLength(310)
-                : new GridLength(1, GridUnitType.Star);
-            WorkAndAi.ColumnDefinitions[1].Width = new GridLength(_wide ? 12 : 0);
-            WorkAndAi.ColumnDefinitions[2].Width = _wide
-                ? new GridLength(1, GridUnitType.Star)
-                : new GridLength(0);
-            WorkAndAi.RowDefinitions[1].Height = new GridLength(0);
-            WorkAndAi.RowDefinitions[2].Height = new GridLength(0);
-
-            AiVerticalSplitter.IsVisible = false;
-            AiHorizontalSplitter.IsVisible = false;
-            Grid.SetColumn(AiHostBorder, _wide ? 2 : 0);
-            Grid.SetRow(AiHostBorder, 0);
-            Grid.SetColumnSpan(AiHostBorder, _wide ? 1 : 3);
-            Grid.SetRowSpan(AiHostBorder, 3);
-            AiHostBorder.HorizontalAlignment = HorizontalAlignment.Stretch;
-            AiHostBorder.VerticalAlignment = VerticalAlignment.Stretch;
-            AiHostBorder.Width = double.NaN;
-            AiHostBorder.Height = double.NaN;
-            AiHostBorder.Margin = _wide
-                ? new Thickness(0)
-                : new Thickness(0, 155, 0, 0);
-            AiResizeGrip.IsVisible = false;
-        }
-        else
-        {
-            WorkAndAi.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-            WorkAndAi.ColumnDefinitions[2].Width = new GridLength(dockRight ? 340 : 0);
-            WorkAndAi.ColumnDefinitions[1].Width = new GridLength(dockRight ? ResizeSplitter.HitSize : 0);
-            WorkAndAi.RowDefinitions[2].Height = new GridLength(
-                dockBottom ? Math.Clamp(height * .38, 240, 360) : 0);
-            WorkAndAi.RowDefinitions[1].Height = new GridLength(dockBottom ? ResizeSplitter.HitSize : 0);
-
-            AiVerticalSplitter.IsVisible = dockRight;
-            AiHorizontalSplitter.IsVisible = dockBottom;
-            Grid.SetColumn(AiHostBorder, dockRight ? 2 : 0);
-            Grid.SetRow(AiHostBorder, dockBottom ? 2 : 0);
-            Grid.SetColumnSpan(AiHostBorder, dockRight ? 1 : 3);
-            Grid.SetRowSpan(AiHostBorder, floating || inlineAi ? 3 : 1);
-            AiHostBorder.HorizontalAlignment = floating ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
-            AiHostBorder.VerticalAlignment = floating ? VerticalAlignment.Top : VerticalAlignment.Stretch;
-
-            var workWidth = width - 56 - (sidebar ? 250 : 0);
-            var workHeight = height - 72;
-            AiHostBorder.Width = floating
-                ? Math.Clamp(localLayout.AiWidth, 300, Math.Max(300, workWidth - 24))
-                : double.NaN;
-            AiHostBorder.Height = floating
-                ? Math.Clamp(localLayout.AiHeight, 350, Math.Max(350, workHeight - 24))
-                : double.NaN;
-            AiHostBorder.Margin = floating
-                ? new Thickness(
-                    Math.Clamp(localLayout.AiX < 0 ? workWidth - AiHostBorder.Width - 12 : localLayout.AiX, 0, Math.Max(0, workWidth - AiHostBorder.Width)),
-                    Math.Clamp(localLayout.AiY < 0 ? workHeight - AiHostBorder.Height - 12 : localLayout.AiY, 0, Math.Max(0, workHeight - AiHostBorder.Height)),
-                    0,
-                    0)
-                : new Thickness(0);
-            AiResizeGrip.IsVisible = floating;
-        }
-
-        _chat.SetCompact(primaryAgent && !_wide || inlineAi);
+        WorkContent.IsVisible = projectOpen && !documentPage;
+        EditorSplit.IsVisible = tasks || notes;
+        ProjectResourcesPane.IsVisible = files;
+        ProjectHistoryPane.IsVisible = history;
+        ProjectEvidencePane.IsVisible = evidence;
+        TasksPane.IsVisible = tasks; NotesPane.IsVisible = notes;
+        NotesSplitter.IsVisible = false;
+        EditorSplit.RowDefinitions[0].Height = tasks ? new GridLength(1,GridUnitType.Star) : new GridLength(0);
+        EditorSplit.RowDefinitions[1].Height = new GridLength(0);
+        EditorSplit.RowDefinitions[2].Height = notes ? new GridLength(1,GridUnitType.Star) : new GridLength(0);
+        Sheet.IsVisible = true; NotesToolbar.IsVisible = NotesEditorBorder.IsVisible = true;
+        Sheet.SetCompact(width - 56 - (sidebar ? 220 : 0) - (dock ? 360 : 0) - 32 < 600);
+        AiHostBorder.IsVisible = !documentPage && (primaryAgent || dock) && DetachedAiWindow?.IsVisible != true;
+        AskAiButton.IsVisible = !primaryAgent;
+        var targetParent = primaryAgent ? WorkContent : WorkAndAi;
+        if (AiHostBorder.Parent != targetParent)
+        { (AiHostBorder.Parent as Panel)?.Children.Remove(AiHostBorder); targetParent.Children.Add(AiHostBorder); }
+        Grid.SetColumn(AiHostBorder,primaryAgent ? 0 : 2);
+        Grid.SetRow(AiHostBorder,primaryAgent ? 2 : 0);
+        Grid.SetColumnSpan(AiHostBorder,1); Grid.SetRowSpan(AiHostBorder,1);
+        AiHostBorder.HorizontalAlignment = HorizontalAlignment.Stretch; AiHostBorder.VerticalAlignment = VerticalAlignment.Stretch;
+        AiHostBorder.Width = AiHostBorder.Height = double.NaN; AiHostBorder.Margin = new Thickness(0);
+        AiHostBorder.BorderThickness = new Thickness(primaryAgent ? 0 : 1,0,0,0); AiHostBorder.CornerRadius = new CornerRadius(0);
+        AiResizeGrip.IsVisible = AiVerticalSplitter.IsVisible = AiHorizontalSplitter.IsVisible = false;
+        var inspectorWidth = width < 1280 ? 360 : 400;
+        WorkAndAi.ColumnDefinitions[0].Width = new GridLength(1,GridUnitType.Star);
+        WorkAndAi.ColumnDefinitions[1].Width = new GridLength(0);
+        WorkAndAi.ColumnDefinitions[2].Width = new GridLength(document && !documentPage ? inspectorWidth : dock ? 360 : 0);
+        WorkAndAi.RowDefinitions[1].Height = WorkAndAi.RowDefinitions[2].Height = new GridLength(0);
+        Grid.SetColumn(_documentInspector,documentPage ? 0 : 2);
+        Grid.SetRowSpan(_documentInspector,3);
+        _documentInspector.IsVisible = document;
+        _chat.MoveComposerTo(dock ? WorkContent : null);
+        _chat.SetWorkspacePresentation(primaryAgent);
+        _chat.SetCompact(false);
+        UpdateOverviewCardWidth(width);
     }
 
     private void SetAiDock(string mode)

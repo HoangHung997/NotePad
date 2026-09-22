@@ -4,5 +4,6 @@ public enum AiPermissionMode
 {
     ReadOnly,
     ConfirmChanges,
-    ProjectAccess
+    ProjectAccess,
+    FullAccess
 }

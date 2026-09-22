@@ -98,12 +98,11 @@ public static class MbToolRegistryExecutionTests
                 new AgentContextManager(),
                 registry);
 
-            var result = await runtime.RunAsync(
-                Request("Attempt unknown tool."),
-                CancellationToken.None);
-
-            Check(result.FinalText == "unknown-tool-blocked",
-                "Runtime did not continue after fail-closed unknown tool result.");
+            var blocked = false;
+            try { await runtime.RunAsync(Request("Attempt unknown tool."), CancellationToken.None); }
+            catch (AgentVerificationRequiredException ex) when (ex.Message.Contains("unknown_tool", StringComparison.Ordinal))
+            { blocked = true; }
+            Check(blocked, "Unknown operation was incorrectly reported as completed.");
             Check(executed == 0,
                 "Unknown tool call reached an unrelated/fallback executor.");
         });

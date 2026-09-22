@@ -1,0 +1,15 @@
+{
+  "DraftsUnchanged": true,
+  "AssistantEnabled": true,
+  "NewShortcut": "C:\\Users\\hoang\\OneDrive\\Desktop\\H2 Notes.lnk",
+  "OriginalJsonFiles": 33,
+  "Running": [
+    {
+      "Id": 33284,
+      "Path": "D:\\VSstudio\\H2Notes\\.artifacts\\repair-2026-09-21\\assistant-release\\H2Notes.Avalonia.exe",
+      "StartTime": "2026-09-21T17:02:38.2167873+07:00"
+    }
+  ],
+  "AiSettingsUnchanged": true,
+  "ChangedProjectFiles": []
+}

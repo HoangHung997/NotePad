@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         InitializeProjectResources();
         InitializeProjectHistory();
         InitializeProjectEvidenceInspector();
+        InitializeDocumentWorkspace();
         Sheet.SelectionChanged += OnSelection;
         Sheet.DataChanged += () =>
         {
@@ -128,7 +129,7 @@ public partial class MainWindow : Window
         StatusLabel.Text = $"{_board.Projects.Count} dự án  ·  {_notesProject?.ChecklistItems.Count ?? 0} công việc trong dự án đang chọn";
         AddTaskButton.IsEnabled = _notesProject is not null;
         ProjectTitle.Text = _notesProject is null ? "Chọn dự án" : _notesProject.DisplayName;
-        ProjectProgress.Text = _notesProject is null ? "" : $"{_notesProject.Progress} công việc hoàn thành";
+        ProjectProgress.Text = _notesProject is null ? "" : $"{_notesProject.Progress} công việc · Tiếp theo: {(_notesProject.Next?.DisplayText ?? "Chưa có việc tiếp theo")}";
         ProjectNextSummary.Text = _notesProject?.Next is { } summaryNext
             ? "Tiếp theo: " + summaryNext.DisplayText
             : _notesProject is null ? "" : "Tiếp theo: Đã hoàn thành";
@@ -142,6 +143,7 @@ public partial class MainWindow : Window
             : projectAttention == 0
                 ? "Không có việc cần bạn xử lý"
                 : $"⚠ {projectAttention} cần bạn xem";
+        ProjectAttentionSummary.IsVisible = projectAttention > 0;
         TasksTitle.Text = $"Công việc  {_notesProject?.Progress ?? "0/0"}";
         DetachedAiWindow?.UpdateProject(_notesProject);
         RefreshNavigator();
@@ -230,7 +232,7 @@ public partial class MainWindow : Window
         Add(WindowState == WindowState.Maximized ? "Trở về kích thước trước" : "Lấp đầy màn hình", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized);
         Add("AI: Ghim bên phải", () => SetAiDock("right"));
         Add("AI: Ghim phía dưới", () => SetAiDock("bottom"));
-        Add("AI: Cửa sổ nổi", () => SetAiDock("floating"));
+        Add("AI: Cửa sổ riêng", ShowProjectAiWindow);
         Add("Khôi phục bố cục mặc định", () => { if (_notesProject is not null) { _notesProject.Layout = new(); _app.LocalSettings.ResetProjectLayout(_notesProject.Id); _app.LocalSettings.Save(); _app.ScheduleSave(); } _manualSidebarCollapsed = false; _notesCollapsed = false; ApplyResponsive(); });
         foreach (var board in _app.State.Notes.Where(n => n.IsBoard && !n.IsArchived))
             Add("▦ " + board.Title, () => { Sheet.CommitEdit(); SetBoard(board); ShowCommandCenter(); });

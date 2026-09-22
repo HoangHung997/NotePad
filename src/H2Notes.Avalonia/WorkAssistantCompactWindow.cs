@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using H2Notes.Core;
@@ -23,7 +24,8 @@ public sealed partial class WorkAssistantCompactWindow : Window
 {
     private readonly WorkAssistantSettings _settings;
     private readonly TextBox _prompt;
-    private readonly ComboBox _permission;
+    private readonly Button _permission;
+    private H2AgentPermissionMode _permissionMode;
     private readonly TextBlock _status;
     private readonly Button _send;
     private readonly WrapPanel _contextChips;
@@ -36,174 +38,94 @@ public sealed partial class WorkAssistantCompactWindow : Window
     public WorkAssistantCompactWindow(WorkAssistantSettings settings)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        Title = "Work Assistant";
-        Width = 460;
-        Height = 352;
-        MinWidth = 380;
-        MinHeight = 300;
-        CanResize = true;
-        ShowInTaskbar = false;
-        CanMinimize = false;
-        CanMaximize = false;
+        Title = "H2 Assistant";
+        Width = 640; Height = 610; MinWidth = 380; MinHeight = 610;
+        CanResize = true; ShowInTaskbar = false; CanMinimize = false; CanMaximize = false;
         Topmost = settings.AlwaysOnTop;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowStartupLocation = WindowStartupLocation.Manual;
         Background = Brush.Parse("#FCFAF7");
 
-        var title = new TextBlock
+        var title = new Button { Name = "WorkAssistantThreads", Content = "H2 Assistant  ▾", FontSize = 16,
+            Background = Brushes.Transparent, BorderThickness = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Left };
+        title.Click += (_, _) =>
         {
-            Text = "Work Assistant",
-            FontSize = 16,
-            FontWeight = FontWeight.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var close = new Button
-        {
-            Content = "×",
-            Width = 30,
-            Height = 28,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-
-        var header = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            Margin = new Thickness(12, 8, 8, 4)
-        };
-        header.Children.Add(title);
-        Grid.SetColumn(close, 1);
-        header.Children.Add(close);
-
-        _contextChips = new WrapPanel
-        {
-            Name = "WorkAssistantContextChips",
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-        _contextHint = new TextBlock
-        {
-            Name = "WorkAssistantContextHint",
-            Text = "Không có ngữ cảnh ứng dụng.",
-            FontSize = 10,
-            Foreground = Brush.Parse("#796C62"),
-            TextWrapping = TextWrapping.Wrap,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _contextReset = new Button
-        {
-            Name = "WorkAssistantContextReset",
-            Content = "Đặt lại scope",
-            FontSize = 10,
-            Padding = new Thickness(7, 3),
-            IsVisible = false,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-
-        var contextHeader = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            Margin = new Thickness(12, 2, 12, 0)
-        };
-        contextHeader.Children.Add(_contextHint);
-        Grid.SetColumn(_contextReset, 1);
-        contextHeader.Children.Add(_contextReset);
-
-        var contextArea = new StackPanel
-        {
-            Name = "WorkAssistantContextArea",
-            Spacing = 4,
-            Children = { contextHeader, _contextChips }
-        };
-
-        _permission = new ComboBox
-        {
-            Name = "WorkAssistantPermissionPreset",
-            Margin = new Thickness(12, 4),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            ItemsSource = PermissionOptions,
-            SelectedIndex = 0
-        };
-        _permission.ItemTemplate = new FuncDataTemplate<WorkAssistantPermissionOption>(
-            (item, _) => new TextBlock
+            var menu = new ContextMenu();
+            foreach (var thread in Threads)
             {
-                Text = item?.Label ?? "",
-                FontSize = 11
-            });
-
-        var permissionArea = new StackPanel
-        {
-            Spacing = 2,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = "Quyền cho lượt gửi này",
-                    FontSize = 10,
-                    Foreground = Brush.Parse("#796C62"),
-                    Margin = new Thickness(12, 0, 12, 0)
-                },
-                _permission
+                var item = new MenuItem { Header = thread.Title + (thread.ThreadId == ConversationId ? "  ✓" : "") };
+                item.Click += (_, _) => ConversationSelected?.Invoke(thread.ThreadId); menu.Items.Add(item);
             }
+            if (menu.Items.Count > 0) menu.Open(title);
         };
+        var close = Controls.AppIcon.Button(Controls.IconKind.Close, "Thu gọn về bong bóng");
+        close.Name = "WorkAssistantClose";
+        var startNew = Controls.AppIcon.Button(Controls.IconKind.Plus, "Cuộc trò chuyện mới");
+        startNew.Name = "WorkAssistantNewChat";
+        startNew.Click += (_, _) => NewConversationRequested?.Invoke();
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto,Auto,Auto"),
+            Margin = new Thickness(16, 8, 8, 6) };
+        var brand = new Border { Width=28, Height=28, CornerRadius=new CornerRadius(7), Background=Brush.Parse("#A4573D"),
+            Child=new TextBlock { Text="H2",FontSize=15,FontWeight=FontWeight.SemiBold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center } };
+        header.Children.Add(brand); Grid.SetColumn(title,1); header.Children.Add(title);
+        var pin=Controls.AppIcon.Button(Controls.IconKind.Pin,"Ghim trên cùng"); pin.Click+=(_,_)=>Topmost=!Topmost;
+        var expand=Controls.AppIcon.Button(Controls.IconKind.Dock,"Mở cửa sổ đầy đủ / thu gọn"); expand.Click+=(_,_)=>SetFullMode(!FullMode);
+        Grid.SetColumn(pin,2); header.Children.Add(pin); Grid.SetColumn(expand,3); header.Children.Add(expand);
+        Grid.SetColumn(startNew,4); header.Children.Add(startNew); Grid.SetColumn(close,5); header.Children.Add(close);
 
-        _prompt = new TextBox
-        {
-            Name = "WorkAssistantPrompt",
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            Watermark = "Bạn muốn làm gì?",
-            MinHeight = 72,
-            Margin = new Thickness(12, 4)
-        };
-        _status = new TextBlock
-        {
-            Name = "WorkAssistantCompactStatus",
-            Text = "Hotkey chỉ mở trợ lý · chưa gửi hoặc thay đổi dữ liệu.",
-            FontSize = 10,
-            Foreground = Brush.Parse("#796C62"),
-            TextWrapping = TextWrapping.Wrap,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _send = new Button
-        {
-            Name = "WorkAssistantSendButton",
-            Content = "Gửi",
-            MinWidth = 74,
-            Padding = new Thickness(12, 6),
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
+        _contextChips = new WrapPanel { Name = "WorkAssistantContextChips", Orientation = Orientation.Horizontal };
+        _contextHint = new TextBlock { Name = "WorkAssistantContextHint", FontSize = 10,
+            Foreground = Brush.Parse("#796C62"), TextWrapping = TextWrapping.Wrap };
+        _contextReset = new Button { Name = "WorkAssistantContextReset", Content = "Đặt lại ngữ cảnh",
+            FontSize = 10, Padding = new Thickness(5, 2), IsVisible = false };
+        var contextHeader = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 4 };
+        contextHeader.Children.Add(_contextHint); Grid.SetColumn(_contextReset, 1); contextHeader.Children.Add(_contextReset);
+        var contextArea = new StackPanel { Name = "WorkAssistantContextArea", Spacing = 3,
+            Margin = new Thickness(14, 0, 14, 5), Children = { contextHeader, _contextChips } };
 
-        var footer = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            Margin = new Thickness(12, 4, 12, 10)
-        };
-        footer.Children.Add(_status);
-        Grid.SetColumn(_send, 1);
-        footer.Children.Add(_send);
+        _permission = ComposerButton("WorkAssistantPermissionPreset");
+        _permission.Click += (_, _) => OpenPermissionMenu();
+        _prompt = new TextBox { Name = "WorkAssistantPrompt", AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap, Watermark = "Giao việc hoặc hỏi tiếp…", MinHeight = 50, MaxHeight = 160,
+            FontSize = 14, Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            Padding = new Thickness(2, 6, 2, 9) };
+        // The Fluent template draws a separate focus border inside the TextBox.
+        _prompt.Resources["TextControlBorderBrushFocused"] = Brushes.Transparent;
+        _prompt.Resources["TextControlBorderThicknessFocused"] = new Thickness(0);
+        _prompt.Resources["TextControlBackgroundFocused"] = Brushes.Transparent;
+        _prompt.Resources["TextControlBackgroundPointerOver"] = Brushes.Transparent;
+        ToolTip.SetTip(_prompt, "Enter để gửi · Shift+Enter để xuống dòng");
+        _status = new TextBlock { Name = "WorkAssistantCompactStatus", Text = "Sẵn sàng · chưa gửi yêu cầu.",
+            FontSize = 10, Foreground = Brush.Parse("#796C62"), TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(14, 3, 14, 8) };
+        _send = Controls.AppIcon.Button(Controls.IconKind.ArrowUp, "Gửi yêu cầu");
+        _send.Name = "WorkAssistantSendButton"; _send.Width = _send.Height = 34;
+        _send.MinHeight = 34; _send.Padding = new Thickness(8); _send.CornerRadius = new CornerRadius(18);
+        _send.Background = Brushes.Black; _send.Foreground = Brushes.White; _send.BorderThickness = new Thickness(0);
 
-        var root = new Grid
-        {
-            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto")
-        };
-        root.Children.Add(header);
-        Grid.SetRow(contextArea, 1);
-        root.Children.Add(contextArea);
-        Grid.SetRow(permissionArea, 2);
-        root.Children.Add(permissionArea);
-        Grid.SetRow(_prompt, 3);
-        root.Children.Add(_prompt);
-        Grid.SetRow(footer, 4);
-        root.Children.Add(footer);
-        InitializeCompletionUi(root);
-        Content = root;
-
+        var composer = new StackPanel { Spacing = 2, Children = { new ScrollViewer { MaxHeight=72,Content=_draftAttachmentRows },_prompt, BuildConversationOptions() } };
+        var surface = new Border { Name = "WorkAssistantComposerSurface", CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12, 9, 10, 8), Margin = new Thickness(12, 0, 12, 0),
+            Background = Brushes.White, BorderBrush = Brush.Parse("#D9D5CF"), BorderThickness = new Thickness(1),
+            BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 2, Blur = 8, Color = Color.Parse("#08000000") }),
+            Child = composer };
+        var bottom = new StackPanel { Children = { _busySendMode, surface, _status } };
+        InitializeCompletionUi(_history);
+        Content = BuildAssistantShell(header,contextArea,bottom);
         close.Click += (_, _) => Hide();
         _contextReset.Click += (_, _) => ResetContextScope();
-        _send.Click += async (_, _) => await SubmitPromptAsync();
+        _send.Click += async (_, _) => { if (_preparingAttachments || _taskBusy && string.IsNullOrWhiteSpace(PromptText)) CancelTaskRequested?.Invoke(); else if (string.IsNullOrWhiteSpace(PromptText) && DraftAttachments.Count==0) OpenVoiceTyping(); else await SubmitPromptAsync(); };
+        _prompt.PastingFromClipboard+=async(_,e)=> { e.Handled=true;await PasteAttachmentsOrText(); };
+        _prompt.TextChanged += (_, _) => { RefreshSendAction(); DraftChanged?.Invoke(PromptText);if(!_taskBusy && PromptText.EndsWith('@'))OpenAttachmentMenu(_prompt); };
+        RefreshSendAction(); RefreshPermissionButton();
+        _prompt.AddHandler(KeyDownEvent, async (_, e) =>
+        {
+            if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None)
+            { e.Handled = true; if (_send.IsEnabled) await SubmitPromptAsync(); }
+        }, RoutingStrategies.Tunnel);
         DesktopWindowChrome.Attach(this, header);
         RebuildContextChips();
+        ShowHistory([], null);
     }
-
     public string PromptText
     {
         get => _prompt.Text ?? "";
@@ -211,6 +133,9 @@ public sealed partial class WorkAssistantCompactWindow : Window
     }
 
     public event Func<string, string, Task>? SubmitRequested;
+    public event Action<string>? DraftChanged;
+    public IReadOnlyList<H2AgentThread> Threads { get; set; } = [];
+    public event Action<Guid>? ConversationSelected;
 
     public H2ActiveWorkContext? CapturedContext => _capturedContext;
     public WorkAssistantContextScope AvailableContextScope => _availableContextScope;
@@ -218,13 +143,12 @@ public sealed partial class WorkAssistantCompactWindow : Window
 
     public H2AgentPermissionMode SelectedPermissionMode
     {
-        get => _permission.SelectedItem is WorkAssistantPermissionOption option
-            ? option.Mode
-            : H2AgentPermissionMode.ObserveOnly;
+        get => _permissionMode;
         set
         {
-            var index = Array.FindIndex(PermissionOptions, option => option.Mode == value);
-            _permission.SelectedIndex = index >= 0 ? index : 0;
+            if (_taskBusy) return;
+            _permissionMode = Enum.IsDefined(value) ? value : H2AgentPermissionMode.ObserveOnly;
+            RefreshPermissionButton();
         }
     }
 
@@ -280,7 +204,9 @@ public sealed partial class WorkAssistantCompactWindow : Window
 
     private async Task SubmitPromptAsync()
     {
+        if (_preparingAttachments) { CancelTaskRequested?.Invoke(); return; }
         var prompt = PromptText.Trim();
+        if(prompt.Length==0 && DraftAttachments.Count>0)prompt="Phân tích các tệp đính kèm và tóm tắt nội dung chính.";
         if (prompt.Length == 0)
         {
             SetStatus("Nhập yêu cầu trước khi gửi.", isError: true);
@@ -314,16 +240,23 @@ public sealed partial class WorkAssistantCompactWindow : Window
     {
         _contextChips.Children.Clear();
 
+        if (SelectedWorkspaceRoot is not null)
+        {
+            _contextHint.Text = "Ngữ cảnh: thư mục đã chọn.";
+            _contextReset.IsVisible = false;
+            return;
+        }
+
         if (_capturedContext is null || _availableContextScope == WorkAssistantContextScope.None)
         {
-            _contextHint.Text = "Không có ngữ cảnh ứng dụng.";
+            _contextHint.Text = SelectedWorkspaceRoot is null ? "Chưa chọn tài liệu hoặc thư mục." : "Ngữ cảnh: thư mục đã chọn.";
             _contextReset.IsVisible = false;
             return;
         }
 
         _contextHint.Text = _selectedContextScope == WorkAssistantContextScope.None
-            ? "Đã bỏ toàn bộ context khỏi lượt gửi kế tiếp."
-            : "Context cho lượt gửi kế tiếp · bấm × để bỏ bớt scope.";
+            ? "Đã bỏ ngữ cảnh ứng dụng khỏi lượt gửi kế tiếp."
+            : "Ngữ cảnh gửi kèm · bấm × để bỏ.";
 
         AddChip(
             WorkAssistantContextScope.Application,
@@ -441,7 +374,8 @@ public sealed partial class WorkAssistantCompactWindow : Window
     [
         new(H2AgentPermissionMode.ObserveOnly, "Chỉ quan sát"),
         new(H2AgentPermissionMode.AskBeforeChanges, "Hỏi trước khi thay đổi"),
-        new(H2AgentPermissionMode.AllowScopedChanges, "Cho phép thay đổi tài liệu/session hiện tại"),
+        new(H2AgentPermissionMode.AllowScopedChanges, "Cho phép thay đổi phạm vi đã chọn"),
+        new(H2AgentPermissionMode.FullAccess, "Toàn quyền tiếp cận"),
         new(H2AgentPermissionMode.UseProjectPolicy, "Dùng chính sách dự án")
     ];
 

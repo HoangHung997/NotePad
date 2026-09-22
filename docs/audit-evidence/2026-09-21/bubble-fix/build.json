@@ -1,0 +1,11 @@
+{
+  "buildDirectory": ".artifacts/repair-2026-09-21/bubble-final",
+  "assemblySha256": "405f10a15a62e211e92c5ead0b4366c3a7b05059b21ecece7eb58880d8a74068",
+  "nativeClick": true,
+  "nativeDrag": true,
+  "targetedTests": [
+    "Work Assistant 27/27",
+    "Window 15/15"
+  ],
+  "runningWithUserConfiguration": true
+}

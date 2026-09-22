@@ -14,9 +14,20 @@
     <PackageReference Include="Markdig" Version="0.37.0" />
     <ProjectReference Include="../H2Notes.Core/H2Notes.Core.csproj" />
     <ProjectReference Include="../../experiments/H2AgentLab/H2AgentLab.csproj" />
+    <ProjectReference Include="../../experiments/H2AgentLab.DesktopHost/H2AgentLab.DesktopHost.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../experiments/H2AgentLab.OfficeHost/H2AgentLab.OfficeHost.csproj" ReferenceOutputAssembly="false" />
+    <!-- Explicit content propagates to referencing tests and publish. Copying only the
+         helper apphost EXE leaves it unable to load its managed entry assembly. -->
+    <Content Include="../../experiments/H2AgentLab.DesktopHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.DesktopHost.dll;../../experiments/H2AgentLab.DesktopHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.DesktopHost.deps.json;../../experiments/H2AgentLab.DesktopHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.DesktopHost.runtimeconfig.json">
+      <Link>%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../../experiments/H2AgentLab.OfficeHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.OfficeHost.dll;../../experiments/H2AgentLab.OfficeHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.OfficeHost.deps.json;../../experiments/H2AgentLab.OfficeHost/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/H2AgentLab.OfficeHost.runtimeconfig.json">
+      <Link>%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <None Update="PORTABLE-README.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tools/ocr/got_attention.py" Link="tools/ocr/got_attention.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/install.py" Link="tools/ocr/install.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/smoke.py" Link="tools/ocr/smoke.py" CopyToOutputDirectory="PreserveNewest" />

@@ -1,0 +1,5 @@
+PASS MB-41 large tool output becomes bounded durable evidence
+PASS MB-41 important small tool result keeps inline observation plus evidence handle
+PASS MB-41 canonical tool metadata declares verification evidence capability
+PASS MB-41 verifier receives evidence IDs from real mutation tool results
+RESULT: 4 passed, 0 failed.

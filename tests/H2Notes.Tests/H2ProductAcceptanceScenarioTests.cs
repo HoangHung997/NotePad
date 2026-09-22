@@ -108,11 +108,17 @@ internal static class H2ProductAcceptanceScenarioTests
                 var app = new App();
                 app.State.Notes.Add(board);
                 SetStorage(app, new ProjectWorkspaceStore(root, writerId: "h2m111"));
+                // The production UI deliberately uses its isolated Agent workspace, not
+                // the shared project data folder. Seed the file where the tool will read it.
+                var projectWorkspace = Path.Combine(app.AgentWorkspaceRoot!, "projects", project.Id.ToString("N"));
+                Directory.CreateDirectory(projectWorkspace);
+                File.Copy(Path.Combine(root, "dossier.txt"), Path.Combine(projectWorkspace, "dossier.txt"), true);
                 var transport = new ScriptedToolTransportFactory(
                     [new("read_file", "{\"path\":\"dossier.txt\",\"offset\":\"0\"}")],
                     "Đã kiểm tra toàn bộ hồ sơ và hoàn thành mọi việc có thể.");
                 using var adapter = ProductionAdapter(root, transport);
                 app.AgentAdapter = adapter;
+                H2UiTestNavigation.ConfigureAgentProfile(app);
 
                 var before = JsonSerializer.Serialize(project.ChecklistItems);
                 var panel = new AiChatPanel(app);
@@ -203,8 +209,8 @@ internal static class H2ProductAcceptanceScenarioTests
                     ClickSend(compact);
 
                     WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
-                    Check(!app.IsWorkAssistantCompactVisible && app.IsWorkAssistantBubbleVisible,
-                        "Work Assistant did not collapse to bubble while task runs.");
+                    Check(app.IsWorkAssistantCompactVisible && app.IsWorkAssistantBubbleVisible,
+                        "Work Assistant must keep conversation and pending approvals visible while task runs.");
                     Check(!app.OpenWindows.OfType<MainWindow>().Any(),
                         "Excel quick task required opening H2 main window.");
 
@@ -349,7 +355,8 @@ internal static class H2ProductAcceptanceScenarioTests
                         "autocad.read_attributes",
                         "autocad.update_attribute",
                         "autocad.verify_entity"
-                    }), "AutoCAD scenario did not use structured query/read/mutate/verify flow.");
+                    }), "AutoCAD scenario did not use structured query/read/mutate/verify flow. Calls="
+                        + string.Join(",", recorder.Calls) + "; status=" + summary.Status + "; error=" + summary.Error);
                     Check(recorder.Arguments
                         .Where(pair => pair.Name == "autocad.update_attribute")
                         .All(pair => pair.Json.Contains("\"ABCD\"", StringComparison.Ordinal)

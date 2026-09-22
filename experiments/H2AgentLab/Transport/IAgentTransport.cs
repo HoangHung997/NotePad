@@ -56,7 +56,8 @@ public sealed record AgentTransportContinuationRequest(
     Guid TaskId,
     Guid TurnId,
     IReadOnlyList<AgentToolResult> ToolResults,
-    IReadOnlyList<AgentToolDefinition>? NewlyLoadedTools = null);
+    IReadOnlyList<AgentToolDefinition>? NewlyLoadedTools = null,
+    IReadOnlyList<string>? SupplementalUserMessages = null);
 
 public sealed record AgentTransportToolCall(
     string Id,

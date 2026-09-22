@@ -83,6 +83,8 @@ public sealed class AgentOrchestrator
         try
         {
             var result = await runtime.RunAsync(request, cancellationToken).ConfigureAwait(false);
+            if (result.EffectiveContract is { } effective)
+                UpdateContract(current, effective);
             Verify(current, "AgentRuntime returned; host completion state evaluated.");
 
             if (result.VerificationHistory.Count > 0)

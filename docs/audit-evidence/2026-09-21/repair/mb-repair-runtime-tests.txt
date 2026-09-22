@@ -1,0 +1,4 @@
+PASS MB-43 failed-only repair context preserves prior passed criteria without transcript replay
+PASS MB-43 canonical duplicate mutation is blocked before a second executor call
+PASS MB-43 repair retry budget is host-bounded
+RESULT: 3 passed, 0 failed.

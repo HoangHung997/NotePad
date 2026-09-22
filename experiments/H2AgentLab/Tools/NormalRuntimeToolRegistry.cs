@@ -29,6 +29,10 @@ public static class NormalRuntimeToolRegistry
 
     private static readonly Card[] Cards =
     [
+        new("read_tool_output", "evidence",
+            "Read a saved tool result referenced by [artifact:h2a1_...] or [evidence:h2a1_...]. Use this for truncated web/Office/other tool output, not read_run. Read chunks until nextOffset reaches totalCharacters.",
+            AgentToolRisk.Low, AgentToolAccess.ReadOnly, true,
+            Args(("artifact_id", "Exact h2a1_ handle from tool output"), ("offset", "Character offset as string; start with 0"))),
         new(
             SkillRuntimeToolExecutor.SearchToolName,
             "skills",
@@ -51,21 +55,22 @@ public static class NormalRuntimeToolRegistry
             "core",
             "Record a concise task plan/progress with evidence for multi-step work. Not a private reasoning transcript.",
             AgentToolRisk.Low,
-            AgentToolAccess.Mutating,
+            // Internal task journal only; no user/project resource is changed.
+            AgentToolAccess.ReadOnly,
             false,
             Args(("plan", "Steps, status and observed results"))),
 
         new(
             "run_python",
             "python",
-            "Execute task-specific Python in Windows AppContainer on COPIES. Inputs are staged under input/ and outputs must be under output/. No network/child process/host files.",
+            "Execute Python in Windows AppContainer on COPIES. Installed: python-docx (import docx), openpyxl, pypdf, reportlab, pypdfium2, Pillow. pandas and PyPDF2 are NOT installed. Input files under input/, outputs under output/. No network/child process/host files. When repairing a failed run, use its exact runId as previous_run and keep the SAME inputs so recovery can be tracked.",
             AgentToolRisk.Medium,
             AgentToolAccess.Mutating,
             false,
             Args(
                 ("code", "Complete Python source"),
                 ("inputs", "Newline-separated workspace-relative files to copy to input/, or empty"),
-                ("previous_run", "Prior runId whose outputs are copied to input/previous/, or empty")),
+                ("previous_run", "Exact returned runId; output files are copied to input/previous/. Required when repairing that failed attempt. Empty only for an independent run.")),
             Preference: EscapeHatch()),
         new(
             "inspect_artifact",
@@ -79,7 +84,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "read_run",
             "python",
-            "Recover generated code, stdout, stderr and artifact metadata from a previous run in this workspace.",
+            "Read generated code, stdout, stderr and artifacts from an actual run_python runId in this workspace. A web fetch_id or arbitrary ID is NOT a Python run. Do not call this for web data.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
             true,
@@ -154,7 +159,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "open_file",
             "files",
-            "Ask the user before opening a supported document in its associated desktop application.",
+            "Open a document in its desktop application only when the user explicitly asks to open/show it. Never use to read, inspect, verify or edit a disk file: use read_file/run_python instead. Opening may lock the file.",
             AgentToolRisk.Medium,
             AgentToolAccess.Mutating,
             false,
@@ -220,6 +225,7 @@ public static class NormalRuntimeToolRegistry
         {
             ["skills"] = new SkillExecutor(host),
             ["core"] = new PlanExecutor(host),
+            ["evidence"] = new EvidenceExecutor(host),
             ["python"] = new PythonExecutor(host),
             ["files"] = new FileExecutor(host),
             ["office"] = new WordExecutor(host),
@@ -624,6 +630,32 @@ public static class NormalRuntimeToolRegistry
         }
     }
 
+    private sealed class EvidenceExecutor(global::H2AgentLab.AgentTools host) : ExecutorBase(host)
+    {
+        public override string ExecutorId => "normal.evidence";
+        protected override IReadOnlySet<string> Names { get; } = new HashSet<string>(StringComparer.Ordinal) { "read_tool_output" };
+        protected override ValueTask<object?> ExecuteCoreAsync(global::H2AgentLab.ToolCall call, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var store = new H2AgentLab.Session.ArtifactStore(Host.StateRoot);
+            var id = Arg(call, "artifact_id");
+            var handle = store.LoadHandle(id); var value = store.ReadText(id);
+            if (!int.TryParse(Arg(call, "offset"), out var offset) || offset < 0 || offset > value.Length)
+                throw new ArgumentException("Offset must be between 0 and totalCharacters.");
+            // Worst-case JSON escaping is six characters per input character. Keep even
+            // escaped chunks below the evidence projector's inline limit to avoid recursion.
+            var length = Math.Min(4000, value.Length - offset);
+            while (true)
+            {
+                var content = value.Substring(offset, length);
+                var result = new { artifact_id = id, handle.Sha256, totalCharacters = value.Length,
+                    offset, nextOffset = offset + content.Length, content, truncated = offset + content.Length < value.Length };
+                if (JsonSerializer.Serialize(result).Length <= 7000 || length == 0) return ValueTask.FromResult<object?>(result);
+                length /= 2;
+            }
+        }
+    }
+
     private sealed class PythonExecutor : ExecutorBase
     {
         private static readonly IReadOnlySet<string> Supported =
@@ -663,6 +695,11 @@ public static class NormalRuntimeToolRegistry
                     var path = Arg(call, "path");
                     var data = Host.RuntimeScripts.Read(Arg(call, "run_id"), path);
                     var ext = Path.GetExtension(path).ToLowerInvariant();
+                    if (ext is ".pdf" or ".png" or ".jpg" or ".jpeg" or ".webp")
+                        return new { path, hash = global::H2AgentLab.SafeWorkspace.Hash(data), bytes = data.Length,
+                            contentAvailable = false,
+                            next = ext == ".pdf" ? "Use run_python with pypdf to extract embedded text or render with pypdfium2. For scans attach the file through the configured OCR workflow. This hash can be used as expected_hash when publishing a verified edited PDF."
+                                : "Use view_artifact or the configured attachment OCR workflow to inspect the image; metadata is not image content." };
                     var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
                         ? Decode(data)
                         : ext is ".docx" or ".xlsx" or ".pdf"
@@ -827,6 +864,11 @@ public static class NormalRuntimeToolRegistry
                     var path = Arg(call, "path");
                     var bytes = Host.Workspace.Read(path);
                     var ext = Path.GetExtension(path).ToLowerInvariant();
+                    if (ext is ".pdf" or ".png" or ".jpg" or ".jpeg" or ".webp" or ".dwg" or ".dxf")
+                        return new { path, hash = global::H2AgentLab.SafeWorkspace.Hash(bytes), bytes = bytes.Length,
+                            contentAvailable = false,
+                            next = ext == ".pdf" ? "Use run_python with pypdf to read text or pypdfium2 to render. For scans use the configured attachment OCR workflow. This current hash supports guarded publication of edits."
+                                : "Binary metadata only. Use the relevant image/OCR/CAD tools to read content." };
                     var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
                         ? Decode(bytes)
                         : ext is ".docx" or ".xlsx"

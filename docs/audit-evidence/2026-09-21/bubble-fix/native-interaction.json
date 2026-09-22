@@ -1,0 +1,17 @@
+{
+  "dpiScale": 1.25,
+  "bubbleSizeDip": 74,
+  "drag": {
+    "before": {
+      "x": 300,
+      "y": 200
+    },
+    "after": {
+      "x": 341,
+      "y": 229
+    }
+  },
+  "dragDidNotOpenPanel": true,
+  "clickAfterDragOpenedPanel": true,
+  "windowTitle": "Work Assistant"
+}

@@ -92,7 +92,7 @@ public sealed class ChatCompletionsTransport : IAgentTransport
         if (!_started) throw new InvalidOperationException("Chat Completions transport turn chưa bắt đầu.");
         if (request.TaskId != _taskId || request.TurnId != _turnId)
             throw new InvalidOperationException("Continuation không thuộc task/turn đang chạy.");
-        if (_pendingCalls.Count == 0)
+        if (_pendingCalls.Count == 0 && request.SupplementalUserMessages is not { Count: > 0 })
             throw new InvalidOperationException("Không có tool call đang chờ kết quả.");
 
         var byId = request.ToolResults
@@ -122,6 +122,8 @@ public sealed class ChatCompletionsTransport : IAgentTransport
                 ["content"] = result.Content
             });
         }
+        foreach (var input in request.SupplementalUserMessages ?? [])
+            _messages.Add(new JsonObject { ["role"] = "user", ["content"] = input });
         _pendingCalls = [];
 
         await foreach (var item in StreamOnce(cancellationToken).WithCancellation(cancellationToken))

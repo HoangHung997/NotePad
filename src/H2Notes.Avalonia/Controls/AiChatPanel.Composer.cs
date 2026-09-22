@@ -45,17 +45,17 @@ public sealed partial class AiChatPanel
         _composer.Background = Brushes.Transparent;
         _composer.BorderThickness = new Thickness(0);
         _composer.Padding = new Thickness(5, 5, 5, 8);
-        _composer.MinHeight = 76;
+        _composer.MinHeight = 50;
         _composer.MaxHeight = 180;
         _composer.FontSize = 14;
-        ToolTip.SetTip(_composer, "Ctrl+V để dán ảnh hoặc văn bản; thả tệp/file:// trên máy. Gõ @ để chọn ngữ cảnh hoặc gợi ý. Ctrl+Enter để gửi.");
+        ToolTip.SetTip(_composer, "Ctrl+V để dán ảnh hoặc văn bản; thả tệp/file:// trên máy. Gõ @ để chọn ngữ cảnh hoặc gợi ý. Enter để gửi; Shift+Enter để xuống dòng.");
         var options = BuildComposerOptions();
         var body = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto"), Children = { _composer, options } };
         Grid.SetRow(options, 1);
         var surface = new Border
         {
-            Name = "ChatComposerSurface", CornerRadius = new CornerRadius(22), Padding = new Thickness(10, 9, 10, 8),
-            Background = RichEditor.Brush("#FFFCF8"), BorderBrush = RichEditor.Brush("#E4DBD2"), BorderThickness = new Thickness(1),
+            Name = "ChatComposerSurface", CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 9, 10, 8),
+            Background = RichEditor.Brush("#FFFFFF"), BorderBrush = RichEditor.Brush("#E4DBD2"), BorderThickness = new Thickness(1),
             BoxShadow = new BoxShadows(new BoxShadow { OffsetY = 2, Blur = 8, Color = Color.Parse("#0A5C4634") }), Child = body
         };
         _composerRow = new Grid { Name = "ChatComposerRow", Children = { surface, _mentionPopup } };
@@ -70,7 +70,7 @@ public sealed partial class AiChatPanel
         });
         _mentionPopup.Child = new Border
         {
-            Background = RichEditor.Brush("#FFFCF8"), BorderBrush = RichEditor.Brush("#D9CFC5"), BorderThickness = new Thickness(1),
+            Background = RichEditor.Brush("#FFFFFF"), BorderBrush = RichEditor.Brush("#D9CFC5"), BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8), Padding = new Thickness(5), Child = new StackPanel
             {
                 Spacing = 4, Children =

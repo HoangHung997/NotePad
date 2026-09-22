@@ -47,9 +47,14 @@ public partial class MainWindow
 
             CommandCenterAttentionList.SelectedItem = null;
             if (item.Board is not null && item.Project is not null)
+            {
                 OpenProjectWorkspace(item.Board, item.Project);
+                if (item.AgentTaskId is { } taskId) new AgentTaskWindow(_app.AgentAdapter, taskId).Show(this);
+            }
             else if (item.Kind == "workspace")
                 _app.ShowSettings(this);
+            else if (item.AgentTaskId is { } quickTaskId)
+                new AgentTaskWindow(_app.AgentAdapter, quickTaskId).Show(this);
         };
 
         _commandCenterRefreshTimer.Tick += (_, _) =>
@@ -102,6 +107,8 @@ public partial class MainWindow
             ? allItems
             : allItems.Where(item => item.Group == selectedGroup.Value).ToArray();
 
+        items = items.Where(item => _overviewSearch.Length == 0 || (item.Name + item.Project.NotesText
+            + string.Join(" ", item.Project.ChecklistItems.Select(t => t.DisplayText))).Contains(_overviewSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
         var attentionItems = _commandCenterQuery.GetNeedsAttention(
                 pairs.Select(pair => pair.Project),
                 health)
@@ -280,16 +287,16 @@ public partial class MainWindow
             ? 0d
             : 100d * Projection.CompletedTasks / Projection.TotalTasks;
         public string NextText => string.IsNullOrWhiteSpace(Projection.NextTask)
-            ? "Tiếp theo: Đã hoàn thành"
+            ? "Chưa có việc tiếp theo"
             : "Tiếp theo: " + Projection.NextTask;
         public string AgentText => Projection.AgentStatus is null
-            ? "Agent: chưa có hoạt động"
+            ? "Agent: Sẵn sàng"
             : "Agent: " + AgentStatusText(Projection.AgentStatus.Value);
         public string AttentionText => Projection.AttentionCount == 0
             ? "Không cần xử lý"
             : $"{Projection.AttentionCount} cần xem";
         public string ActivityText => Projection.LatestVerifiedActivityUtc is { } at
-            ? "Hoạt động mới nhất: " + ToLocal(at).ToString("dd/MM HH:mm")
+            ? "Đã xác minh " + ToLocal(at).ToString("dd/MM HH:mm") + " · " + Projection.LatestVerifiedActivitySummary
             : "Chưa có hoạt động xác minh";
         public string SyncText => SyncTextFor(Projection.SyncState);
         public string BoardText => string.IsNullOrWhiteSpace(Board.Title) ? "" : Board.Title;

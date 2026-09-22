@@ -1,0 +1,1 @@
+Native Avalonia windows; synthetic public activities. PNGs rendered at actual monitor DPI. Manual mouse interaction remains separately recorded.

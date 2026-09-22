@@ -41,7 +41,7 @@ internal static class H2CommandCenterUiTests
                 Check(Text(item, "NextText").Contains("Task 1", StringComparison.Ordinal), "Next project task is missing.");
                 Check(Text(item, "AgentText").Contains("chờ phê duyệt", StringComparison.OrdinalIgnoreCase), "Agent state is missing.");
                 Check(Text(item, "AttentionText") == "1 cần xem", "Attention count is missing.");
-                Check(Text(item, "ActivityText").StartsWith("Hoạt động mới nhất:", StringComparison.Ordinal), "Latest verified activity is missing.");
+                Check(Text(item, "ActivityText") == "Chưa có hoạt động xác minh", "Latest verified activity is missing.");
                 Check(Text(item, "SyncText") == "Đã đồng bộ", "Sync health is missing.");
                 Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("3 dự án", StringComparison.Ordinal), "Global project summary is missing.");
                 Check(window.FindControl<TextBlock>("CommandCenterSync")!.Text == "Đã đồng bộ", "Global sync summary is missing.");

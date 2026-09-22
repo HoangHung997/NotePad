@@ -603,6 +603,15 @@ jobs:
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
+      - name: Verify packaged Agent helpers start and answer IPC
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP 'h2-packaged-helpers.json'
+          $app = Resolve-Path .\artifacts\H2Notes-Avalonia-Portable\H2Notes.Avalonia.exe
+          $process = Start-Process -FilePath $app -ArgumentList @('--verify-agent-helpers', $report) -WindowStyle Hidden -Wait -PassThru
+          Get-Content -LiteralPath $report
+          if ($process.ExitCode -ne 0) { throw 'Packaged Agent helpers failed startup/IPC verification.' }
+
       - name: Publish H2 NAS acceptance probe Windows x64
         shell: pwsh
         run: |

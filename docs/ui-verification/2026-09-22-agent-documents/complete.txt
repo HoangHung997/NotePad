@@ -1,0 +1,1 @@
+Running Avalonia app; isolated synthetic data; no AI request or storage transfer executed. RenderTargetBitmap captures; native mouse checks recorded separately.

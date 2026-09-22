@@ -8,6 +8,20 @@ namespace H2Notes.Core;
 
 public static class AiPdfProcessor
 {
+    public static async Task<IReadOnlyList<AiAttachment>> PrepareAttachmentsAsync(
+        IReadOnlyList<AiAttachment> attachments, AiProfile profile, AiPdfSettings settings,
+        string bridgePath, IProgress<string>? progress = null, CancellationToken token = default)
+    {
+        settings = Snapshot(settings);
+        var prepared = new List<AiAttachment>();
+        foreach (var attachment in attachments)
+            prepared.Add(await PrepareAttachmentAsync(attachment, settings, bridgePath, progress, token).ConfigureAwait(false));
+        token.ThrowIfCancellationRequested();
+        AiPdf.ValidateRequest(profile, [new AiTurn("user", AiDocuments.Describe(prepared),
+            AiDocuments.NativeImages(prepared), AiDocuments.NativeFiles(prepared))]);
+        return prepared;
+    }
+
     private const int MaxLogCharacters = 64 * 1024;
     private const int MaxMarkdownBytes = AiDocuments.MaxTextCharacters * 4;
 

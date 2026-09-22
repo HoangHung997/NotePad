@@ -18,7 +18,7 @@ public static class DesktopHostLocator
         if (!string.IsNullOrWhiteSpace(configured))
         {
             var explicitPath = Path.GetFullPath(configured);
-            if (File.Exists(explicitPath))
+            if (CompleteHelper(explicitPath))
                 return explicitPath;
             throw new FileNotFoundException(
                 "Configured DesktopHost executable was not found.",
@@ -48,7 +48,7 @@ public static class DesktopHostLocator
                 fileName))
         };
 
-        var found = candidates.FirstOrDefault(File.Exists);
+        var found = candidates.FirstOrDefault(CompleteHelper);
         if (found is not null)
             return found;
 
@@ -61,6 +61,10 @@ public static class DesktopHostLocator
 
     public static DesktopHostClient CreateClient()
         => new(ResolveExecutable());
+
+    private static bool CompleteHelper(string path)
+        => File.Exists(path) && File.Exists(Path.ChangeExtension(path, ".dll"))
+            && File.Exists(Path.ChangeExtension(path, ".runtimeconfig.json"));
 }
 
 /// <summary>

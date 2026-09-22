@@ -35,6 +35,13 @@ public static class MbPermissionRuntimeTests
             if (!value) throw new InvalidOperationException(message);
         }
 
+        static async Task ExpectBlocked(Task<AgentRuntimeResult> task, string code)
+        {
+            try { await task; }
+            catch (AgentVerificationRequiredException ex) when (ex.Message.Contains(code, StringComparison.Ordinal)) { return; }
+            throw new InvalidOperationException("Denied operation was incorrectly reported as completed.");
+        }
+
         await Test("MB-40 read-only task blocks mutation before executor", async () =>
         {
             var executions = 0;
@@ -54,14 +61,13 @@ public static class MbPermissionRuntimeTests
                 new AgentContextManager(),
                 registry);
 
-            var result = await runtime.RunAsync(
+            await ExpectBlocked(runtime.RunAsync(
                 Request(
                     "Try protected mutation.",
                     AgentTaskRiskClass.ReadOnly,
                     mutating: false),
-                CancellationToken.None);
+                CancellationToken.None), "permission_required");
 
-            Check(result.FinalText == "permission-blocked", "Read-only denial did not reach final.");
             Check(executions == 0, "Read-only mutation reached executor.");
         });
 
@@ -104,11 +110,10 @@ public static class MbPermissionRuntimeTests
                 registry,
                 permissionPolicy: policy);
 
-            var result = await runtime.RunAsync(
+            await ExpectBlocked(runtime.RunAsync(
                 Request("Write shared fixture.", AgentTaskRiskClass.Medium, mutating: true),
-                CancellationToken.None);
+                CancellationToken.None), "denied");
 
-            Check(result.FinalText == "decline-memory-ok", "Declined-scope fixture did not reach final.");
             Check(firstExecutions == 1, "Primary tool did not execute exactly once.");
             Check(secondExecutions == 0, "Alternate tool executed after same scope was declined.");
             Check(policy.IsDeclined("fixture.shared"), "Runtime did not remember declined resource scope.");
@@ -135,11 +140,10 @@ public static class MbPermissionRuntimeTests
                 registry,
                 permissionPolicy: policy);
 
-            var result = await runtime.RunAsync(
+            await ExpectBlocked(runtime.RunAsync(
                 Request("Use guidance but obey host policy.", AgentTaskRiskClass.Medium, mutating: true),
-                CancellationToken.None);
+                CancellationToken.None), "denied");
 
-            Check(result.FinalText == "host-policy-wins", "Skill-claim fixture did not reach final.");
             Check(executions == 0, "Untrusted model/skill text granted mutation permission.");
         });
 

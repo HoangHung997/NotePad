@@ -6,6 +6,7 @@ using H2AgentLab.Tasking;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
 using H2AgentLab.Verification;
+using H2Notes.Core;
 
 namespace H2AgentLab.Runtime;
 
@@ -18,7 +19,15 @@ public sealed record AgentRuntimeRequest(
     int MaxToolRounds = 24,
     int MaxRepairRounds = 4,
     AgentPromptCacheScope? PromptCacheScope = null,
-    IReadOnlyList<AgentStableSkillHash>? StableSkillHashes = null);
+    IReadOnlyList<AgentStableSkillHash>? StableSkillHashes = null,
+    IReadOnlyList<AiImage>? Images = null,
+    IReadOnlyList<AiFile>? Files = null,
+    Action<AgentToolResult>? ToolResultObserver = null,
+    Func<bool, IReadOnlyList<string>>? TakeSupplementalInput = null,
+    Action<string>? PublicTextObserver = null,
+    Action<string>? CommentaryObserver = null,
+    Action<IReadOnlyList<AgentEvidenceReference>>? EvidenceObserver = null,
+    Action<VerificationReport, int>? VerificationObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -40,6 +49,7 @@ public sealed record AgentRuntimeResult(
 {
     public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
         = Array.Empty<AgentEvidenceReference>();
+    public AgentTaskContract? EffectiveContract { get; init; }
 }
 
 public sealed record AgentRuntimeVerificationContext(
@@ -53,6 +63,7 @@ public sealed record AgentRuntimeVerificationContext(
 
     public IReadOnlyDictionary<string, string> RawToolOutputs { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
+    public IReadOnlyList<string> MutationCallIds { get; init; } = [];
 }
 
 public interface IAgentRuntimeVerifier
@@ -145,6 +156,10 @@ public sealed class AgentRuntime : IAsyncDisposable
             stable,
             contextSnapshot.RuntimeContext,
             request.UserInput);
+        var messages = layout.Messages.ToArray();
+        var userIndex = Array.FindLastIndex(messages, message => message.Role == AgentTransportMessageRole.User);
+        if (userIndex >= 0)
+            messages[userIndex] = messages[userIndex] with { Images = request.Images, Files = request.Files };
 
         AgentPromptCacheIdentity? promptCacheIdentity = null;
         if (request.PromptCacheScope is not null)
@@ -171,6 +186,11 @@ public sealed class AgentRuntime : IAsyncDisposable
         var toolCalls = 0;
         var repairRounds = 0;
         var failedMutationSignatures = new HashSet<string>(StringComparer.Ordinal);
+        var effectiveContract = request.Contract;
+        var mutationAwaitingVerification = false;
+        var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId)>();
+        var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
+        var completionRepairRequested = false;
 
         try
         {
@@ -179,13 +199,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                     new AgentTransportStartRequest(
                         taskId,
                         turnId,
-                        layout.Messages,
+                        messages,
                         initialTools,
                         promptCacheKey,
                         _transport.Capabilities.ParallelToolCalls),
                     cancellationToken),
                 usage,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
 
             while (true)
             {
@@ -193,7 +213,34 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 if (round.ToolCalls.Count == 0)
                 {
-                    EnsureFinalCompletionAllowed(request.Contract, latestVerification);
+                    var supplements = request.TakeSupplementalInput?.Invoke(true) ?? [];
+                    if (supplements.Count > 0)
+                    {
+                        if (++toolRounds > request.MaxToolRounds)
+                            throw new InvalidOperationException("Đã tới giới hạn số lượt bổ sung; nội dung bổ sung được giữ trong lịch sử.");
+                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
+                            SupplementalUserMessages: supplements), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        continue;
+                    }
+                    if (unresolvedCalls.Any(f => f.FailureId is not null) && !completionRepairRequested
+                        && toolRounds < request.MaxToolRounds && repairRounds < request.MaxRepairRounds)
+                    {
+                        completionRepairRequested = true; toolRounds++; repairRounds++;
+                        var feedback = "The host still has unresolved failed attempts: " + string.Join("; ",
+                            unresolvedCalls.Select(f => f.Name + " (failureId=" + f.FailureId + ")"))
+                            + ". Follow the failed tool's recovery instructions and verify the requested output. Do not repeat an unrelated successful call or claim completion.";
+                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
+                            SupplementalUserMessages: [feedback]), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        continue;
+                    }
+                    if (unresolvedCalls.Count > 0)
+                        throw new AgentVerificationRequiredException(
+                            "Chưa hoàn thành: công cụ vẫn còn lỗi — " + string.Join("; ",
+                                unresolvedCalls.Take(8).Select(f => f.Name + " (" + f.Code + ")"))
+                            + ". Kiểm tra phạm vi/thư mục hoặc thử lại.");
+                    if (mutationAwaitingVerification)
+                        throw new AgentVerificationRequiredException("The latest mutation has no verifier report.");
+                    EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
                     return new AgentRuntimeResult(
                         round.Text,
                         toolRounds,
@@ -205,7 +252,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                         _discovery.LoadedSchemaNames,
                         promptCacheIdentity)
                     {
-                        Evidence = evidenceHistory.ToArray()
+                        Evidence = evidenceHistory.ToArray(),
+                        EffectiveContract = effectiveContract
                     };
                 }
 
@@ -214,8 +262,10 @@ public sealed class AgentRuntime : IAsyncDisposable
                         $"AgentRuntime exceeded the {request.MaxToolRounds}-round tool budget.");
 
                 toolCalls += round.ToolCalls.Count;
+                if (!string.IsNullOrWhiteSpace(round.Text)) request.CommentaryObserver?.Invoke(round.Text);
+                request.PublicTextObserver?.Invoke("");
                 var execution = await ExecuteCallsAsync(
-                    request.Contract,
+                    effectiveContract,
                     turnId,
                     toolRounds,
                     round.ToolCalls,
@@ -223,28 +273,106 @@ public sealed class AgentRuntime : IAsyncDisposable
                     cancellationToken).ConfigureAwait(false);
 
                 evidenceHistory.AddRange(execution.Evidence);
+                request.EvidenceObserver?.Invoke(execution.Evidence);
+                for (var resultIndex = 0; resultIndex < execution.Results.Count; resultIndex++)
+                {
+                    var result = execution.Results[resultIndex];
+                    var executedCall = execution.Calls[resultIndex];
+                    var executedName = executedCall.Name;
+                    // Evidence projection is human/model-facing and may truncate or wrap JSON.
+                    // Recovery bookkeeping must use the executor's complete structured output.
+                    var recoveryOutput = execution.RawToolOutputs.TryGetValue(executedCall.Id, out var rawRecovery)
+                        ? rawRecovery : result.Content;
+                    request.ToolResultObserver?.Invoke(result);
+                    if (result.IsError)
+                    {
+                        var code = "tool_error";
+                        string[] recovery = [executedName];
+                        string? failureId = null;
+                        try
+                        {
+                            using var failure = JsonDocument.Parse(recoveryOutput);
+                            if (failure.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String)
+                                code = error.GetString() ?? code;
+                            if (failure.RootElement.TryGetProperty("recovery", out var detail)
+                                && detail.ValueKind == JsonValueKind.Object && detail.TryGetProperty("code", out var typedCode)
+                                && typedCode.ValueKind == JsonValueKind.String) code = typedCode.GetString() ?? code;
+                            if (failure.RootElement.TryGetProperty("recoveryTools", out var choices))
+                                recovery = choices.EnumerateArray().Select(c => c.GetString()!).ToArray();
+                            if (failure.RootElement.TryGetProperty("failureId", out var id) && id.ValueKind == JsonValueKind.String)
+                                failureId = id.GetString();
+                        }
+                        catch (JsonException) { }
+                        // A prevented duplicate has no additional side effect. Its original
+                        // failed verification remains authoritative until a verified correction.
+                        if (code != "repeated_failed_mutation")
+                            unresolvedCalls.Add((executedName, code, recovery, executedCall.Arguments.Clone(), failureId));
+                        var failedSignature = MutationSignature(executedCall) + ":" + code;
+                        repeatedFailures.TryGetValue(failedSignature, out var repeated);
+                        repeatedFailures[failedSignature] = repeated + 1;
+                        if (repeated >= 2)
+                            throw new AgentVerificationRequiredException("Công cụ " + executedName + " đã lỗi 3 lần với cùng đầu vào: "
+                                + code + ". Cần xử lý nguyên nhân trước khi thử lại.");
+                    }
+                    else if (executedName != DeferredToolDiscovery.SearchToolName
+                        && _registry.TryGet(executedName, out var successful) && successful.Namespace.Name != "core")
+                    {
+                        // Recovery must match a discovered candidate and the original supplied
+                        // arguments. A successful unrelated operation cannot clear earlier errors.
+                        unresolvedCalls.RemoveAll(f => f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
+                            && (CompatibleRetryArguments(f.Arguments, executedCall.Arguments,
+                                f.Code is "unknown_tool" or "tool_not_loaded")
+                                || f.Code == "stale_state" && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments)));
+                        // Recovery references come from the executor after checking its recorded
+                        // failed attempt and resource identity, not from the model's final text.
+                        try
+                        {
+                            using var succeeded = JsonDocument.Parse(recoveryOutput);
+                            if (succeeded.RootElement.ValueKind == JsonValueKind.Object
+                                && succeeded.RootElement.TryGetProperty("resolvedFailureIds", out var resolved)
+                                && resolved.ValueKind == JsonValueKind.Array)
+                            {
+                                var ids = resolved.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).ToHashSet();
+                                unresolvedCalls.RemoveAll(f => f.Name == executedName && f.FailureId is not null && ids.Contains(f.FailureId));
+                            }
+                        }
+                        catch (JsonException) { }
+                    }
+                }
+                if (execution.ExecutedMutationSignatures.Count > 0)
+                {
+                    effectiveContract = effectiveContract.WithExecutedMutation();
+                    // An earlier successful mutation cannot verify a later, different write.
+                    mutationAwaitingVerification = true;
+                }
                 var results = execution.Results.ToArray();
                 if (_verifier is not null)
                 {
                     var report = await _verifier.VerifyAsync(
                         new AgentRuntimeVerificationContext(
-                            request.Contract,
+                            effectiveContract,
                             toolRounds,
                             execution.Calls,
                             results)
                         {
                             Evidence = execution.Evidence,
-                            RawToolOutputs = execution.RawToolOutputs
+                            RawToolOutputs = execution.RawToolOutputs,
+                            MutationCallIds = execution.Calls.Where(call =>
+                                execution.RawToolOutputs.ContainsKey(call.Id)
+                                && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
+                                .Select(call => call.Id).ToArray()
                         },
                         cancellationToken).ConfigureAwait(false);
 
                     if (report is not null)
                     {
+                        mutationAwaitingVerification = false;
                         var effectiveReport = MergeVerificationReports(
                             latestVerification,
                             report);
                         latestVerification = effectiveReport;
                         verificationHistory.Add(effectiveReport);
+                        request.VerificationObserver?.Invoke(effectiveReport, verificationHistory.Count - 1);
                         if (!effectiveReport.Passed)
                         {
                             if (effectiveReport.Failures.Count == 0)
@@ -258,7 +386,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                                 failedMutationSignatures.Add(signature);
 
                             var repair = _repairController.Build(
-                                request.Contract,
+                                effectiveContract,
                                 effectiveReport);
                             if (results.Length == 0)
                                 throw new InvalidOperationException(
@@ -290,10 +418,11 @@ public sealed class AgentRuntime : IAsyncDisposable
                             results,
                             execution.NewlyLoadedTools.Count == 0
                                 ? null
-                                : execution.NewlyLoadedTools),
+                                : execution.NewlyLoadedTools,
+                            request.TakeSupplementalInput?.Invoke(false)),
                         cancellationToken),
                     usage,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -335,12 +464,12 @@ public sealed class AgentRuntime : IAsyncDisposable
             var arguments = ParseArguments(transportCall.ArgumentsJson);
             var call = new global::H2AgentLab.ToolCall(
                 transportCall.Id,
-                transportCall.Name,
+                ResolveCallableName(transportCall.Name),
                 arguments);
             calls[i] = call;
 
             if (string.Equals(
-                    transportCall.Name,
+                    call.Name,
                     DeferredToolDiscovery.SearchToolName,
                     StringComparison.Ordinal))
             {
@@ -360,8 +489,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
-            if (!_registry.TryGet(transportCall.Name, out var descriptor))
+            if (!_registry.TryGet(call.Name, out var descriptor))
             {
+                var query = new string(transportCall.Name.Take(128)
+                    .Select(c => char.IsAsciiLetterOrDigit(c) ? c : ' ').ToArray()).Trim();
+                var recovery = query.Length == 0 ? null : _discovery.SearchAndLoad(query, 4);
+                if (recovery is not null)
+                    newlyLoadedSchemas.AddRange(recovery.CallableSchemas.Select(ToTransportTool));
                 results[i] = new AgentToolResult(
                     transportCall.Id,
                     transportCall.Name,
@@ -369,7 +503,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                     {
                         ok = false,
                         error = "unknown_tool",
-                        message = "Tool is not registered or its schema was not loaded for this task."
+                        message = "No operation was executed. Use tool_search and then call the exact returned function name and argument schema. Do not add a namespace prefix or invent tool names. Candidate schemas are available on this continuation.",
+                        recoveryTools = recovery?.Trace.SelectedNames.Take(1).ToArray() ?? []
                     }),
                     IsError: true);
                 continue;
@@ -379,6 +514,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                     descriptor.Name,
                     StringComparer.Ordinal))
             {
+                var recovery = _discovery.SearchAndLoad(descriptor.Name, 1);
+                newlyLoadedSchemas.AddRange(recovery.CallableSchemas.Select(ToTransportTool));
                 results[i] = new AgentToolResult(
                     transportCall.Id,
                     transportCall.Name,
@@ -386,7 +523,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     {
                         ok = false,
                         error = "tool_not_loaded",
-                        message = "Tool schema was not selected through deferred discovery."
+                        message = "No operation was executed. The schema has now been loaded; retry using its exact arguments."
                     }),
                     IsError: true);
                 continue;
@@ -470,14 +607,15 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var original = scheduled[i].OriginalIndex;
                 var scheduledResult = scheduledResults[i];
                 var rawOutput = scheduledResult.Output ?? "";
-                rawToolOutputs[calls[original].Id] = rawOutput;
-                if (scheduled[i].MutationSignature is { } mutationSignature)
+                var deniedBeforeExecution = IsPermissionDenial(rawOutput);
+                if (!deniedBeforeExecution) rawToolOutputs[calls[original].Id] = rawOutput;
+                if (!deniedBeforeExecution && scheduled[i].MutationSignature is { } mutationSignature)
                     executedMutationSignatures.Add(mutationSignature);
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
                     rawOutput);
 
-                var projection = _evidenceProjector?.Project(
+                var projection = deniedBeforeExecution ? null : _evidenceProjector?.Project(
                     scheduled[i].Request.Descriptor,
                     $"tool-result:{turnId:N}:{toolRound}:{original}",
                     ((long)toolRound * 1_000L) + original,
@@ -487,9 +625,9 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 results[original] = new AgentToolResult(
                     calls[original].Id,
-                    scheduledResult.ToolName,
+                    transportCalls[original].Name,
                     BoundToolOutput(projection?.ModelContent ?? rawOutput),
-                    IsError: false);
+                    IsError: deniedBeforeExecution || IsToolFailure(rawOutput));
             }
         }
 
@@ -511,6 +649,73 @@ public sealed class AgentRuntime : IAsyncDisposable
 
     private static string? ResourceKey(ToolDescriptor descriptor)
         => descriptor.ResourceScope?.ScopeId;
+
+    private string ResolveCallableName(string supplied)
+    {
+        if (_registry.TryGet(supplied, out var exact)) return exact.Name;
+        // Some models qualify the exact callable name with its declared namespace. Accept
+        // only a registered namespace + exact name, never guessed verbs or fuzzy aliases.
+        var separator = supplied.IndexOf(':');
+        if (separator > 0 && _registry.TryGet(supplied[(separator + 1)..], out var descriptor)
+            && supplied[..separator] == descriptor.Namespace.Name)
+            return descriptor.Name;
+        return supplied;
+    }
+
+    private static bool CompatibleRetryArguments(JsonElement failed, JsonElement retry, bool discoveryFailure)
+    {
+        if (JsonElement.DeepEquals(failed, retry)) return true;
+        if (!discoveryFailure || failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
+        var sharedValue = false;
+        foreach (var property in failed.EnumerateObject())
+        {
+            if (!retry.TryGetProperty(property.Name, out var actual)) continue;
+            if (!JsonElement.DeepEquals(property.Value, actual)) return false;
+            if (actual.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(actual.GetString())) sharedValue = true;
+        }
+        return sharedValue;
+    }
+
+    private static bool SameMutationWithFreshToken(JsonElement failed, JsonElement retry)
+    {
+        if (failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
+        static bool Token(string name) => name is "expectedHash" or "expected_hash" or "state_token";
+        var before = failed.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
+        var after = retry.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
+        return before.Count > 0 && before.Count == after.Count && before.All(p => after.TryGetValue(p.Key, out var value) && JsonElement.DeepEquals(p.Value, value));
+    }
+
+    private static bool IsToolFailure(string output)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(output);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && ((root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False)
+                    || (root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False));
+        }
+        catch (JsonException) { return false; }
+    }
+
+    private static bool IsPermissionDenial(string output)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(output);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return false;
+            var failed = (root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False)
+                || (root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False);
+            if (!failed) return false;
+            foreach (var name in new[] { "code", "error" })
+                if (root.TryGetProperty(name, out var code) && code.ValueKind == JsonValueKind.String
+                    && code.GetString() is "denied" or "permission_denied" or "permission_required" or "outside_resource_scope" or "expired_permission")
+                    return true;
+        }
+        catch (JsonException) { }
+        return false;
+    }
 
     private static VerificationReport MergeVerificationReports(
         VerificationReport? previous,
@@ -637,12 +842,14 @@ public sealed class AgentRuntime : IAsyncDisposable
     private static async Task<RuntimeRound> ReadRoundAsync(
         IAsyncEnumerable<AgentTransportEvent> events,
         MutableUsage usage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? publicTextObserver = null)
     {
         var text = new StringBuilder();
         var calls = new List<AgentTransportToolCall>();
         var completed = false;
         string? finishReason = null;
+        var lastFlush = Environment.TickCount64;
 
         await foreach (var item in events.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
@@ -650,6 +857,8 @@ public sealed class AgentRuntime : IAsyncDisposable
             {
                 case AgentTransportEventKind.TextDelta:
                     text.Append(item.Text);
+                    if (Environment.TickCount64 - lastFlush >= 100)
+                    { publicTextObserver?.Invoke(text.ToString()); lastFlush = Environment.TickCount64; }
                     break;
 
                 case AgentTransportEventKind.ToolCall:
@@ -681,6 +890,7 @@ public sealed class AgentRuntime : IAsyncDisposable
             throw new IOException(
                 "Transport stopped for length while proposing tools; proposed tools were not executed.");
 
+        publicTextObserver?.Invoke(text.ToString());
         return new RuntimeRound(
             text.ToString(),
             calls.ToArray(),

@@ -86,6 +86,7 @@ internal static class H2LegacyConversationHistoryTests
 
             var adapter = new CompletionAgentAdapter(project.Id);
             var app = new App { AgentAdapter = adapter };
+            H2UiTestNavigation.ConfigureAgentProfile(app);
             var panel = new AiChatPanel(app);
             panel.SetProject(project);
 
@@ -114,7 +115,7 @@ internal static class H2LegacyConversationHistoryTests
 
                 var user = conversation.Messages[^2];
                 var answer = conversation.Messages[^1];
-                Check(user.Provider == "H2 Agent" && answer.Provider == "H2 Agent"
+                Check(user.Provider == "Test model" && answer.Provider == "Test model"
                     && user.AiRunId == adapter.TaskId && answer.AiRunId == adapter.TaskId,
                     "New Agent presentation is not clearly separated from legacy metadata.");
                 Check(answer.Content == "Agent continuation result.",

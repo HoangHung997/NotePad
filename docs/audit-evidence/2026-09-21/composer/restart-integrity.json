@@ -1,0 +1,18 @@
+{
+  "checkedUtc": "2026-09-21T10:34:20.5975862Z",
+  "processCount": 1,
+  "processes": [
+    {
+      "ProcessId": 36208,
+      "ExecutablePath": "D:\\VSstudio\\H2Notes\\.artifacts\\repair-2026-09-21\\composer-release\\H2Notes.Avalonia.exe",
+      "CommandLine": "\"D:\\VSstudio\\H2Notes\\.artifacts\\repair-2026-09-21\\composer-release\\H2Notes.Avalonia.exe\" --show-assistant"
+    }
+  ],
+  "assemblySha256": "86EDBE618506FAEE7BEA3764E5188024FDDDC6FA65F02C64D273CAF481D33A27",
+  "projectJsonBefore": 33,
+  "projectJsonAfter": 33,
+  "changedProjectJson": 0,
+  "aiSettingsUnchanged": true,
+  "draftsUnchanged": true,
+  "agentHistoryUnchanged": true
+}

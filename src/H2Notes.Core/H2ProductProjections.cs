@@ -32,7 +32,8 @@ public sealed record ProjectOverviewProjection(
     H2AgentTaskStatus? AgentStatus,
     int AttentionCount,
     DateTime? LatestVerifiedActivityUtc,
-    H2WorkspaceSyncState SyncState);
+    H2WorkspaceSyncState SyncState,
+    string? LatestVerifiedActivitySummary = null);
 
 public sealed record NeedsAttentionProjection(
     Guid? ProjectId,
@@ -150,7 +151,8 @@ public sealed class H2ProductProjectionService
             latestAgent?.Status,
             attention,
             latestVerified,
-            health.State);
+            health.State,
+            recent.FirstOrDefault(H2AgentVerification.IsVerified)?.Goal);
     }
 
     public IReadOnlyList<NeedsAttentionProjection> BuildNeedsAttention(
@@ -249,7 +251,7 @@ public sealed class H2ProductProjectionService
 
             foreach (var evidence in run.Evidence)
             {
-                var verifiedMutation = IsVerifiedMutationEvidence(evidence.Kind);
+                var verifiedMutation = evidence.VerificationPassed == true;
                 activity.Add(new(
                     project.Id,
                     run.UpdatedUtc,
@@ -341,32 +343,12 @@ public sealed class H2ProductProjectionService
         ProjectRecord project,
         IReadOnlyList<H2AgentTaskSummary> recent)
     {
-        var candidates = new List<DateTime>();
-        if (project.UpdatedAtUtc is { } projectUpdated) candidates.Add(projectUpdated);
-        candidates.AddRange(project.ChecklistItems
-            .SelectMany(task => new[] { task.UpdatedAtUtc, task.CompletedAtUtc })
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value));
-
-        candidates.AddRange(recent
-            .Where(task => task.Status == H2AgentTaskStatus.Completed || task.Evidence.Count > 0)
-            .Select(task => task.UpdatedUtc));
-
-        return candidates.Count == 0 ? null : candidates.Max();
+        return recent.Where(H2AgentVerification.IsVerified)
+            .Select(task => (DateTime?)task.UpdatedUtc).Max();
     }
 
     private static string ProjectName(ProjectRecord project)
         => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
-
-    private static bool IsVerifiedMutationEvidence(string kind)
-    {
-        kind = (kind ?? "").Trim().ToLowerInvariant();
-        return kind.Contains("mutation", StringComparison.Ordinal)
-            || kind.Contains("verification", StringComparison.Ordinal)
-            || kind.Contains("verified", StringComparison.Ordinal)
-            || kind.Contains("patch", StringComparison.Ordinal)
-            || kind.Contains("write", StringComparison.Ordinal);
-    }
 
     private static string EvidenceActivitySummary(H2AgentEvidence evidence, bool verifiedMutation)
     {

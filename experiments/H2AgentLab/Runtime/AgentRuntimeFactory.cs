@@ -45,20 +45,23 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         ArgumentNullException.ThrowIfNull(telemetry);
 
         var registry = NormalRuntimeToolRegistry.Create(tools);
-        var transport = _transportFactory.Create(profile, apiKey, telemetry);
-        var verifier = new AgentRuntimeDomainVerifierRouter(
-        [
+        var domainVerifiers = new List<IAgentRuntimeDomainVerifier>
+        {
             new FileRuntimeDomainVerifier(tools.Workspace),
             new PythonRuntimeDomainVerifier(tools.Workspace, tools.StateRoot),
             new StructuredOfficeRuntimeDomainVerifier()
-        ]);
+        };
+        if (tools.ProductionSession is { } session)
+            registry = session.Configure(tools, registry, domainVerifiers);
+        var transport = _transportFactory.Create(profile, apiKey, telemetry);
+        var verifier = new AgentRuntimeDomainVerifierRouter(domainVerifiers);
 
         return new AgentRuntime(
             transport,
             contextManager,
             registry,
             verifier: verifier,
-            permissionPolicy: new ScopedAgentRuntimePermissionPolicy(
+            permissionPolicy: tools.ProductionSession ?? (IAgentRuntimePermissionPolicy)new ScopedAgentRuntimePermissionPolicy(
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
                 new ArtifactStore(tools.StateRoot)));

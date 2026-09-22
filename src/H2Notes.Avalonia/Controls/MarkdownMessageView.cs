@@ -4,6 +4,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Layout;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Markdig;
 using Markdig.Extensions.Tables;
@@ -22,8 +24,10 @@ public sealed class MarkdownMessageView : StackPanel
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
     private string _source = "";
+    private readonly List<(string Signature, Control[] Controls)> _blocks = [];
 
     public string Markdown { get; private set; } = "";
+    public Action<string>? OpenResource { get; set; }
 
     public MarkdownMessageView()
     {
@@ -36,11 +40,40 @@ public sealed class MarkdownMessageView : StackPanel
         markdown = NormalizeDisplayText(markdown ?? "");
         if (Markdown == markdown) return;
         Markdown = markdown;
-        _source = markdown;
-        Children.Clear();
-        if (markdown.Length == 0) return;
-        var document = Markdig.Markdown.Parse(markdown, Pipeline);
-        foreach (var block in document) RenderBlock(block, Children, 0);
+        _source = SeparateParagraphTables(markdown);
+        var document = Markdig.Markdown.Parse(_source, Pipeline);
+        var signatures = document.Select(b => b.GetType().Name + ":" + SourceText(b)).ToArray();
+        var unchanged = 0;
+        while (unchanged < _blocks.Count && unchanged < signatures.Length && _blocks[unchanged].Signature == signatures[unchanged]) unchanged++;
+        for (var i = _blocks.Count - 1; i >= unchanged; i--)
+        { foreach (var control in _blocks[i].Controls) Children.Remove(control); _blocks.RemoveAt(i); }
+        for (var i = unchanged; i < document.Count; i++)
+        {
+            var before = Children.Count; RenderBlock(document[i], Children, 0);
+            _blocks.Add((signatures[i], Children.Skip(before).ToArray()));
+        }
+    }
+
+    private static string SeparateParagraphTables(string markdown)
+    {
+        // Providers often omit the blank line before a pipe table. Only repair parsed prose;
+        // fenced/indented code and raw HTML are left byte-for-byte unchanged.
+        var original = Markdig.Markdown.Parse(markdown, Pipeline);
+        var positions = new List<int>();
+        foreach (var paragraph in original.OfType<ParagraphBlock>())
+        {
+            var source = markdown.Substring(paragraph.Span.Start, paragraph.Span.Length);
+            var lines = source.Split('\n'); var offset = paragraph.Span.Start;
+            for (var i = 0; i + 1 < lines.Length; i++)
+            {
+                if (i > 0 && lines[i].TrimStart().StartsWith('|')
+                    && System.Text.RegularExpressions.Regex.IsMatch(lines[i + 1], @"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$"))
+                    positions.Add(offset);
+                offset += lines[i].Length + 1;
+            }
+        }
+        foreach (var position in positions.OrderDescending()) markdown = markdown.Insert(position, "\n");
+        return markdown;
     }
 
     private void RenderBlock(Block block, global::Avalonia.Controls.Controls controls, int depth)
@@ -56,7 +89,7 @@ public sealed class MarkdownMessageView : StackPanel
                 break;
             }
             case ParagraphBlock paragraph:
-                controls.Add(InlineBlock(paragraph.Inline, 13, FontWeight.Normal, "MarkdownParagraph"));
+                controls.Add(InlineBlock(paragraph.Inline, 14, FontWeight.Normal, "MarkdownParagraph"));
                 break;
             case ThematicBreakBlock:
                 controls.Add(new Border { Name = "MarkdownRule", Height = 1, Background = RichEditor.Brush("#DDD4CB"), Margin = new Thickness(0, 5) });
@@ -81,9 +114,7 @@ public sealed class MarkdownMessageView : StackPanel
             case FencedCodeBlock fenced:
             {
                 var code = fenced.Lines.ToString() ?? "";
-                var nested = Markdig.Markdown.Parse(code, Pipeline);
-                if (nested.Count == 1 && nested[0] is Table nestedTable) controls.Add(RenderTable(nestedTable));
-                else controls.Add(CodeBlock(code, fenced.Info?.ToString() ?? ""));
+                controls.Add(CodeBlock(code, fenced.Info?.ToString() ?? ""));
                 break;
             }
             case CodeBlock code:
@@ -100,7 +131,7 @@ public sealed class MarkdownMessageView : StackPanel
                 foreach (var child in container) RenderBlock(child, controls, depth + 1);
                 break;
             case LeafBlock leaf when leaf.Inline is not null:
-                controls.Add(InlineBlock(leaf.Inline, 13, FontWeight.Normal, "MarkdownParagraph"));
+                controls.Add(InlineBlock(leaf.Inline, 14, FontWeight.Normal, "MarkdownParagraph"));
                 break;
             default:
             {
@@ -128,7 +159,7 @@ public sealed class MarkdownMessageView : StackPanel
             foreach (var child in item)
             {
                 if (child is ParagraphBlock paragraph && paragraph.Inline is not null)
-                    body.Children.Add(InlineBlock(paragraph.Inline, 13, FontWeight.Normal, "MarkdownListText"));
+                    body.Children.Add(InlineBlock(paragraph.Inline, 14, FontWeight.Normal, "MarkdownListText"));
                 else RenderBlock(child, body.Children, depth + 1);
             }
             Grid.SetColumn(body, 1); row.Children.Add(body); controls.Add(row);
@@ -140,35 +171,62 @@ public sealed class MarkdownMessageView : StackPanel
         var rows = table.OfType<TableRow>().ToArray();
         var columns = rows.Select(r => r.OfType<TableCell>().Count()).DefaultIfEmpty(0).Max();
         if (columns == 0) return PlainBlock(SourceText(table), 12.5, FontWeight.Normal, "MarkdownFallback");
-        var grid = new Grid { Name = "MarkdownTable", Margin = new Thickness(0, 3), HorizontalAlignment = HorizontalAlignment.Stretch, ClipToBounds = true };
-        var weights = EstimateColumnWeights(rows, columns);
-        for (var c = 0; c < columns; c++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(weights[c], GridUnitType.Star), MinWidth = 0 });
-        for (var r = 0; r < rows.Length; r++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        for (var r = 0; r < rows.Length; r++)
+        var values = rows.Select(r => r.OfType<TableCell>().Select(CellPlainText).ToArray()).ToArray();
+        string RowText(int r) => string.Join("\t", values[r]);
+        var root = new StackPanel { Spacing = 5 };
+        var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var copy = CopyButton("Sao chép bảng", () => string.Join("\n", Enumerable.Range(0, rows.Length).Select(RowText)));
+        var previous = new Button { Content = "‹", FontSize = 11 };
+        var next = new Button { Content = "›", FontSize = 11 };
+        var count = new TextBlock { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+        toolbar.Children.Add(copy); toolbar.Children.Add(previous); toolbar.Children.Add(count); toolbar.Children.Add(next);
+        var scroll = new ScrollViewer { HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        root.Children.Add(toolbar); root.Children.Add(scroll);
+        var page = 0; const int pageSize = 30;
+        void ShowPage()
         {
-            var cells = rows[r].OfType<TableCell>().ToArray();
-            for (var c = 0; c < columns; c++)
+            var indices = new[] { 0 }.Concat(Enumerable.Range(1, Math.Max(0, rows.Length - 1)).Skip(page * pageSize).Take(pageSize)).ToArray();
+            var grid = new Grid { Name = "MarkdownTable", HorizontalAlignment = HorizontalAlignment.Stretch };
+            var weights = EstimateColumnWeights(rows.Take(32).ToArray(), columns);
+            for (var c = 0; c < columns; c++) grid.ColumnDefinitions.Add(new ColumnDefinition {
+                Width = new GridLength(weights[c], GridUnitType.Star), MinWidth = Math.Clamp(weights[c] * 30, 90, 220) });
+            foreach (var _ in indices) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            for (var r = 0; r < indices.Length; r++)
             {
-                var panel = new StackPanel { Spacing = 2, HorizontalAlignment = HorizontalAlignment.Stretch };
-                if (c < cells.Length)
-                    foreach (var child in cells[c])
-                    {
-                        if (child is ParagraphBlock paragraph)
-                            panel.Children.Add(InlineBlock(paragraph.Inline, 12, r == 0 ? FontWeight.SemiBold : FontWeight.Normal, "MarkdownTableCell"));
-                        else RenderBlock(child, panel.Children, 0);
-                    }
-                if (panel.Children.Count == 0) panel.Children.Add(PlainBlock("", 12, FontWeight.Normal, "MarkdownTableCell"));
-                var cell = new Border
+                var rowIndex = indices[r];
+                for (var c = 0; c < columns; c++)
                 {
-                    BorderBrush = RichEditor.Brush("#DED6CE"), BorderThickness = new Thickness(1),
-                    Background = r == 0 ? RichEditor.Brush("#F6F0EA") : Brushes.Transparent,
-                    Padding = new Thickness(6, 5), Child = panel, HorizontalAlignment = HorizontalAlignment.Stretch
-                };
-                Grid.SetRow(cell, r); Grid.SetColumn(cell, c); grid.Children.Add(cell);
+                    var columnIndex = c;
+                    var text = c < values[rowIndex].Length ? values[rowIndex][c] : "";
+                    var cellText = PlainBlock(text, 12, rowIndex == 0 ? FontWeight.SemiBold : FontWeight.Normal, "MarkdownTableCell");
+                    if (c < table.ColumnDefinitions.Count)
+                        cellText.TextAlignment = table.ColumnDefinitions[c].Alignment switch {
+                            TableColumnAlign.Right => TextAlignment.Right, TableColumnAlign.Center => TextAlignment.Center, _ => TextAlignment.Left };
+                    var copyCell = new MenuItem { Header = "Sao chép ô" };
+                    copyCell.Click += async (_, _) => { if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text); };
+                    var copyRow = new MenuItem { Header = "Sao chép hàng" };
+                    copyRow.Click += async (_, _) => { if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(RowText(rowIndex)); };
+                    cellText.ContextMenu = new ContextMenu { ItemsSource = new[] { copyCell, copyRow } };
+                    var cell = new Border { BorderBrush = RichEditor.Brush("#DED6CE"), BorderThickness = new Thickness(0, 0, 0, 1),
+                        Background = rowIndex == 0 ? RichEditor.Brush("#F6F0EA") : Brushes.Transparent, Padding = new Thickness(9, 7), Child = cellText };
+                    Grid.SetRow(cell, r); Grid.SetColumn(cell, c); grid.Children.Add(cell);
+                }
             }
+            scroll.Content = grid;
+            previous.IsVisible = next.IsVisible = rows.Length > pageSize + 1;
+            previous.IsEnabled = page > 0; next.IsEnabled = (page + 1) * pageSize < rows.Length - 1;
+            count.Text = rows.Length <= pageSize + 1 ? $"{Math.Max(0, rows.Length - 1)} hàng" : $"{page * pageSize + 1}–{Math.Min((page + 1) * pageSize, rows.Length - 1)} / {rows.Length - 1} hàng";
         }
-        return grid;
+        previous.Click += (_, _) => { page--; ShowPage(); }; next.Click += (_, _) => { page++; ShowPage(); };
+        ShowPage(); return root;
+    }
+
+    private static Button CopyButton(string label, Func<string> text)
+    {
+        var button = new Button { Content = label, FontSize = 11, Padding = new Thickness(6, 3) };
+        button.Click += async (_, _) => { if (TopLevel.GetTopLevel(button)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text()); };
+        return button;
     }
 
     private static double[] EstimateColumnWeights(IReadOnlyList<TableRow> rows, int columns)
@@ -214,7 +272,7 @@ public sealed class MarkdownMessageView : StackPanel
         }
     }
 
-    private static SelectableTextBlock InlineBlock(ContainerInline? inline, double fontSize, FontWeight weight, string name, Thickness? margin = null)
+    private SelectableTextBlock InlineBlock(ContainerInline? inline, double fontSize, FontWeight weight, string name, Thickness? margin = null)
     {
         var block = new SelectableTextBlock
         {
@@ -228,7 +286,7 @@ public sealed class MarkdownMessageView : StackPanel
     private static SelectableTextBlock PlainBlock(string text, double fontSize, FontWeight weight, string name)
         => new() { Name = name, Text = text, FontSize = fontSize, FontWeight = weight, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Stretch };
 
-    private static void AddInlines(InlineCollection output, ContainerInline? container, InlineStyle style)
+    private void AddInlines(InlineCollection output, ContainerInline? container, InlineStyle style)
     {
         if (container is null) return;
         for (var inline = container.FirstChild; inline is not null; inline = inline.NextSibling)
@@ -258,6 +316,15 @@ public sealed class MarkdownMessageView : StackPanel
                     {
                         var alt = new StringBuilder(); AppendPlain(link, alt);
                         AddRun(output, alt.Length == 0 ? "[Ảnh]" : "[Ảnh: " + alt + "]", style with { Italic = true });
+                    }
+                    else if (OpenResource is not null && !string.IsNullOrWhiteSpace(link.Url))
+                    {
+                        var label = new StringBuilder(); AppendPlain(link, label);
+                        var button = new Button { Content = label.ToString(), FontSize = 13, Padding = new Thickness(1, 0),
+                            Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = RichEditor.Brush("#A4573D") };
+                        ToolTip.SetTip(button, link.Url);
+                        button.Click += (_, _) => OpenResource?.Invoke(link.Url!);
+                        output.Add(new InlineUIContainer(button));
                     }
                     else AddInlines(output, link, style with { Link = true });
                     break;
@@ -305,8 +372,10 @@ public sealed class MarkdownMessageView : StackPanel
     private static Control CodeBlock(string code, string language)
     {
         var panel = new StackPanel { Spacing = 4 };
+        panel.Children.Add(CopyButton("Sao chép mã", () => code));
         if (!string.IsNullOrWhiteSpace(language)) panel.Children.Add(new TextBlock { Text = language, FontSize = 10, Foreground = RichEditor.Brush("#796C62") });
-        panel.Children.Add(new SelectableTextBlock { Name = "MarkdownCodeText", Text = code, FontFamily = new FontFamily("Consolas"), FontSize = 12, TextWrapping = TextWrapping.WrapWithOverflow });
+        panel.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            Content = new SelectableTextBlock { Name = "MarkdownCodeText", Text = code, FontFamily = new FontFamily("Consolas"), FontSize = 12, TextWrapping = TextWrapping.NoWrap } });
         return new Border
         {
             Name = "MarkdownCode", Background = RichEditor.Brush("#F3F0EC"), BorderBrush = RichEditor.Brush("#DED6CE"),

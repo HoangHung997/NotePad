@@ -11,7 +11,7 @@ internal static class H2ProductProjectionTests
             var project = Project(now);
             var agent = new ProjectionAgentFake();
             agent.Add(Task(project.Id, H2AgentTaskStatus.Completed, now.AddMinutes(4),
-                evidence: [new H2AgentEvidence("ev-ok", "verification", new string('a', 64), "verified output")]));
+                evidence: [new H2AgentEvidence("ev-ok", "verification", new string('a', 64), "verified output", VerificationPassed: true)]));
             agent.Add(Task(project.Id, H2AgentTaskStatus.WaitingForApproval, now.AddMinutes(5),
                 approval: new H2AgentApproval(Guid.NewGuid(), "Approve change", "fixture", now.AddMinutes(5))));
 

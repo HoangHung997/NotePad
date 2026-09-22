@@ -12,7 +12,7 @@ namespace H2Notes.Avalonia;
 public sealed class SettingsWindow : Window
 {
     private bool _importInProgress;
-    public SettingsWindow(App app)
+    public SettingsWindow(App app, string initialSection = "Dữ liệu và đồng bộ")
     {
         Title = "Cài đặt · H2 Notes"; Icon = app.Icon; Width = 540; SizeToContent = SizeToContent.Height;
         CanResize = false; MaxHeight = 780; WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -139,13 +139,7 @@ public sealed class SettingsWindow : Window
                 var network = string.IsNullOrWhiteSpace(location.ResolvedNetworkPath) ? "" : $"\nNetwork target: {location.ResolvedNetworkPath}";
                 var identity = destination.WorkspaceId == Guid.Empty ? "chưa tạo" : destination.WorkspaceId.ToString();
                 var summary = $"Đang dùng: {app.DataFolder}\nĐích: {target}\nLoại: {location.Kind}{network}\nWorkspaceId: {identity}\n\nHiện tại: {transfer.SourceProjects} dự án, {transfer.SourceNotes} note.\nỞ đích: {transfer.DestinationProjects} dự án, {transfer.DestinationNotes} note.\nXung đột cần chọn: {transfer.Conflicts.Count}.\n\nBản sao lưu: {Path.Combine(target, "backups")}\nThư mục cũ luôn được giữ nguyên.";
-                var choice = hasData ? await ChoiceDialog.Show(this, "Thư mục đã có dữ liệu", summary,
-                    ("merge", "Đồng bộ", "Hợp nhất hai kho. Chọn cách xử lý từng xung đột."),
-                    ("overwrite", "Ghi đè", "Thay dữ liệu H2 Notes ở đích bằng dữ liệu hiện tại; có sao lưu và xác nhận riêng."),
-                    ("existing", "Không làm gì", "Dùng dữ liệu đã có ở đích. Không sao chép hoặc ghi đè."))
-                    : await ChoiceDialog.Show(this, "Đồng bộ sang thư mục mới?", summary,
-                    ("merge", "Đồng bộ sang", "Sao chép dữ liệu hiện tại sang thư mục này."),
-                    ("existing", "Không đồng bộ", "Dùng kho mới trống. Dữ liệu cũ vẫn ở thư mục cũ."));
+                var choice = await WorkspaceTransferDialog.Show(this, app.DataFolder, target, transfer);
                 if (choice is null) return;
                 var mode = choice == "overwrite" ? WorkspaceTransferMode.Overwrite : choice == "existing" ? WorkspaceTransferMode.UseExisting : WorkspaceTransferMode.Merge;
                 if (mode == WorkspaceTransferMode.Overwrite && !await Dialogs.Confirm(this, "Xác nhận ghi đè kho", "Sao lưu và thay toàn bộ dữ liệu H2 Notes ở:\n" + target + "\n\nCác tệp không thuộc H2 Notes không bị thay đổi.", "Sao lưu và ghi đè")) return;
@@ -267,30 +261,33 @@ public sealed class SettingsWindow : Window
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
             { await Dialogs.Message(this, "Chưa lưu được cài đặt", ex.Message); }
         };
-        Content = new ScrollViewer { Content = new StackPanel { Margin = new Thickness(24), Spacing = 12, Children =
+        var host=new ContentControl();
+        StackPanel Page(string title,params Control[] children)
         {
-            new TextBlock { Text = "Cài đặt", FontSize = 24, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
-            new TextBlock { Text = "Dữ liệu và lưu trữ", FontSize = 18, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
-            new TextBlock { Text = app.DataFolder, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            new TextBlock { Text = currentWorkspaceText, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            changeFolder, defaultFolder, openFolder,
-            recoverWorkspace, recoveryStatus,
-            aiSettings,
-            new Separator(),
-            new TextBlock { Text = "Work Assistant", FontSize = 18, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
-            workAssistantEnabled,
-            new TextBlock { Text = "Global hotkey", FontSize = 12, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
-            workAssistantHotkey,
-            workAssistantHotkeyStatus,
-            import, importStatus, new Separator(),
-            startup, restore, snap, new Separator(), label, opacity,
-            new TextBlock { Text = "Cửa sổ đang active luôn rõ 100%. Click ra ngoài không ẩn cửa sổ.", TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            new Separator(), new TextBlock { Text = "Tự giãn chiều cao hàng theo cột", FontSize = 17, FontWeight = global::Avalonia.Media.FontWeight.SemiBold },
-            autoTitle, autoProgress, autoComment,
-            new TextBlock { Text = "Bật: hiện đủ chữ, hàng tự cao lên. Tắt: giữ chiều cao do các cột còn lại quyết định, chữ dư hiện dấu … Hover vào ô để đọc đầy đủ. STT / ô tích luôn gọn, không cần tự giãn.", TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            new Separator(), new TextBlock { Text = "Dữ liệu bản thử (độc lập với WPF):\n" + app.DataPath, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            new TextBlock { Text = app.LastSaveError ?? "Giữ nguyên bản sao nguồn và một bản sao lưu lần lưu trước.", TextWrapping = global::Avalonia.Media.TextWrapping.Wrap, FontSize = 12 },
-            new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, save } }
-        } } };
+            var panel=new StackPanel { Margin=new Thickness(28),Spacing=14 };
+            panel.Children.Add(new TextBlock { Text=title,FontSize=25,FontWeight=global::Avalonia.Media.FontWeight.SemiBold });
+            foreach(var child in children) panel.Children.Add(child);return panel;
+        }
+        var data=Page("Dữ liệu và đồng bộ",
+            new TextBlock { Text=app.DataFolder,TextWrapping=global::Avalonia.Media.TextWrapping.Wrap },
+            new TextBlock { Text=app.CurrentWorkspaceHealth.Message ?? "Trạng thái lưu trữ",TextWrapping=global::Avalonia.Media.TextWrapping.Wrap },
+            changeFolder,defaultFolder,openFolder,new Separator(),recoverWorkspace,recoveryStatus,
+            new Expander { Header="Thông tin kho dữ liệu",Content=new TextBlock { Text=currentWorkspaceText,TextWrapping=global::Avalonia.Media.TextWrapping.Wrap } });
+        var appearance=Page("Giao diện",startup,restore,snap,label,opacity,
+            new TextBlock { Text="Tự giãn chiều cao hàng",FontSize=17 },autoTitle,autoProgress,autoComment);
+        foreach(var conflict in app.GetNoteConflictReviews())
+            data.Children.Insert(2,new NoteConflictPanel(conflict,choice=>app.ResolveNoteConflict(conflict,choice)));
+        var assistant=Page("Trợ lý desktop",workAssistantEnabled,
+            new TextBlock { Text="Phím tắt mở trợ lý" },workAssistantHotkey,workAssistantHotkeyStatus);
+        var utilities=Page("Tiện ích",import,importStatus);
+        var actions=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,Spacing=8,Margin=new Thickness(24,12),Children={cancel,save} };
+        save.Classes.Add("accent");
+        var main=new Grid { RowDefinitions=new RowDefinitions("*,Auto") };main.Children.Add(host);Grid.SetRow(actions,1);main.Children.Add(actions);
+        void ShowPage(string label)
+        {
+            if(label=="Kết nối AI") { aiSettings.RaiseEvent(new global::Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));return; }
+            host.Content=new ScrollViewer { Content=label switch { "Giao diện"=>appearance,"Trợ lý desktop"=>assistant,"Tiện ích"=>utilities,_=>data } };
+        }
+        Content=SettingsFrame.Build(this,main,initialSection,ShowPage);ShowPage(initialSection);
     }
 }

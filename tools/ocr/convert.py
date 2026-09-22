@@ -45,7 +45,9 @@ def offline_policy(models):
         if event in {"socket.connect", "socket.connect_ex", "socket.getaddrinfo",
                      "socket.gethostbyname", "socket.sendto", "socket.bind",
                      "subprocess.Popen", "_winapi.CreateProcess", "os.system", "os.posix_spawn", "os.exec"}:
-            raise BridgeError("Offline policy blocked network or child-process access", 5)
+            import traceback
+            location = " > ".join(f"{Path(f.filename).name}:{f.name}" for f in traceback.extract_stack(limit=5)[:-1])
+            raise BridgeError(f"Offline policy blocked {event} ({location})", 5)
     sys.addaudithook(audit)
 
 
@@ -173,6 +175,7 @@ def docling_convert(source, models, pages, max_chars):
     from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
     from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions, TableFormerMode
     from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
     torch.set_num_threads(2)
     options = PdfPipelineOptions(
         artifacts_path=models, enable_remote_services=False, allow_external_plugins=False,
@@ -185,8 +188,10 @@ def docling_convert(source, models, pages, max_chars):
                                   download_enabled=False),
     )
     options.table_structure_options.mode = TableFormerMode.ACCURATE
+    # The pinned Windows docling-parse backend crashes in native image rendering.
+    # Use Docling's PDFium backend with the same offline OCR/layout/table models.
     converter = DocumentConverter(allowed_formats=[InputFormat.PDF], format_options={
-        InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
+        InputFormat.PDF: PdfFormatOption(pipeline_options=options, backend=PyPdfiumDocumentBackend)})
     result = converter.convert(source, max_num_pages=pages, max_file_size=8 * 1024 ** 2,
                                raises_on_error=True)
     if result.status != ConversionStatus.SUCCESS or result.errors or len(result.pages) != pages:
@@ -198,10 +203,14 @@ def got_convert(source, models, pages, max_chars):
     import pypdfium2 as pdfium
     import torch
     from transformers import GotOcr2ForConditionalGeneration, GotOcr2Processor
+    # Bound attention allocations below; retain a small CPU worker budget.
     torch.set_num_threads(2)
+    torch.set_num_interop_threads(1)
     model = GotOcr2ForConditionalGeneration.from_pretrained(
         str(models), local_files_only=True, trust_remote_code=False,
         use_safetensors=True, torch_dtype=torch.float32, attn_implementation="eager").to("cpu").eval()
+    import runpy
+    runpy.run_path(str(Path(__file__).with_name("got_attention.py")))["install"](model)
     processor = GotOcr2Processor.from_pretrained(str(models), local_files_only=True, trust_remote_code=False)
     output = []
     characters = 0
@@ -212,7 +221,8 @@ def got_convert(source, models, pages, max_chars):
                 bitmap = page.render(scale=2)
                 try:
                     with bitmap.to_pil().convert("RGB") as image:
-                        inputs = processor(image, return_tensors="pt", format=True)
+                        inputs = {key: value.clone().contiguous() for key, value in
+                                  processor(image, return_tensors="pt", format=True).items()}
                 finally:
                     bitmap.close()
             ids = model.generate(**inputs, do_sample=False, max_new_tokens=4096,
@@ -259,18 +269,40 @@ def got_markdown(text):
     return text
 
 
-def mineru_convert(source, models, pages, max_chars, layout=False):
-    import torch
-    from importlib.metadata import version
-    if version("mineru") != "3.4.5":
-        raise BridgeError("MinerU adapter requires pinned version 3.4.5", 3)
+@contextlib.contextmanager
+def mineru_configuration(models):
+    """Use verified local weights after moving the bundle; leave its receipt unchanged."""
     config = models / "mineru.json"
     if not config.is_file():
         raise BridgeError("MinerU local configuration is missing", 3)
     settings = json.loads(config.read_text(encoding="utf-8"))
-    if Path(settings.get("models-dir", {}).get("pipeline", "")).resolve() != models:
-        raise BridgeError("MinerU model root changed; rerun explicit installer after relocating", 3)
-    os.environ["MINERU_TOOLS_CONFIG_JSON"] = str(config)
+    if settings.get("config_version") != "1.3.2":
+        raise BridgeError("MinerU local configuration version is unsupported", 3)
+    previous = os.environ.get("MINERU_TOOLS_CONFIG_JSON")
+    with tempfile.TemporaryDirectory(prefix="h2-mineru-config-") as scratch:
+        relocated = Path(scratch) / "mineru.json"
+        relocated.write_text(json.dumps({"config_version": "1.3.2", "model-source": "local",
+                                        "models-dir": {"pipeline": str(models.resolve())}}), encoding="utf-8")
+        os.environ["MINERU_TOOLS_CONFIG_JSON"] = str(relocated)
+        try:
+            yield
+        finally:
+            if previous is None:
+                os.environ.pop("MINERU_TOOLS_CONFIG_JSON", None)
+            else:
+                os.environ["MINERU_TOOLS_CONFIG_JSON"] = previous
+
+
+def mineru_convert(source, models, pages, max_chars, layout=False):
+    with mineru_configuration(models):
+        return _mineru_convert(source, models, pages, max_chars, layout)
+
+
+def _mineru_convert(source, models, pages, max_chars, layout=False):
+    import torch
+    from importlib.metadata import version
+    if version("mineru") != "3.4.5":
+        raise BridgeError("MinerU adapter requires pinned version 3.4.5", 3)
     torch.set_num_threads(2)
     # Direct in-process API: never launch MinerU's service-oriented CLI.
     from mineru.backend.pipeline.pipeline_analyze import doc_analyze_streaming
@@ -334,6 +366,67 @@ def validate_text(text, maximum):
     return text + "\n"
 
 
+def refine_vietnamese_lines(source, markdown, models):
+    """Ground close OCR line repairs in local vi/en pixels, never in an LLM guess.
+
+    Layout/table parsing remains with the selected engine. A separately installed vi/en
+    recognizer improves prose accents/word order only where the two readings closely match.
+    """
+    vi_root = models if models.name == "docling" else models.parent / "docling"
+    if not (vi_root / "models.json").is_file() or not (vi_root / "easyocr").is_dir():
+        return markdown
+    import easyocr
+    import numpy as np
+    import pypdfium2 as pdfium
+    verified_models(vi_root, "docling")
+    reader = easyocr.Reader(["vi", "en"], gpu=False, model_storage_directory=str(vi_root / "easyocr"),
+                            download_enabled=False, verbose=False)
+    lines = []
+    with pdfium.PdfDocument(source) as pdf:
+        for page in pdf:
+            with contextlib.closing(page), contextlib.closing(page.render(scale=2)) as bitmap:
+                readings = reader.readtext(np.asarray(bitmap.to_pil().convert("RGB")), detail=1, paragraph=False)
+            rows = []
+            for box, text, confidence in sorted(readings, key=lambda r: (min(p[1] for p in r[0]), min(p[0] for p in r[0]))):
+                if confidence < .3 or not text.strip(): continue
+                y0, y1 = min(p[1] for p in box), max(p[1] for p in box)
+                center, height = (y0+y1)/2, y1-y0
+                row = next((r for r in rows if abs(r[0]-center) < min(r[1], height)*.45), None)
+                if row is None: row = [center, height, []]; rows.append(row)
+                row[2].append((min(p[0] for p in box), text.strip()))
+            lines.extend(" ".join(t for _, t in sorted(row[2])) for row in rows)
+    return repair_prose_lines(markdown, lines)
+
+
+def repair_prose_lines(markdown, lines):
+    """Use close pixel-grounded prose matches, preserving numbers, code and table cells."""
+    import difflib
+    import unicodedata
+    def normalized(text):
+        return re.sub(r"[^a-z0-9]", "", "".join(c for c in unicodedata.normalize("NFD", text.lower().replace("đ", "d")) if not unicodedata.combining(c)))
+    fixed = []
+    corrections = 0
+    fenced = False
+    for line in markdown.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            fixed.append(line); continue
+        if fenced or line.lstrip().startswith(("|", "<", "![")) or "|" in line or len(line.strip()) < 10:
+            fixed.append(line); continue
+        prefix = re.match(r"^(\s*#{1,6}\s+)?", line).group(0)
+        body = line[len(prefix):].strip()
+        # Similar prose can refer to different dates/amounts. Never substitute those.
+        numbers = re.findall(r"\d+(?:[.,:/-]\d+)*", body)
+        candidates = [(difflib.SequenceMatcher(None, normalized(body), normalized(text)).ratio(), text)
+                      for text in lines if re.findall(r"\d+(?:[.,:/-]\d+)*", text) == numbers]
+        score, text = max(candidates, default=(0, body))
+        if score >= .68 and len(text) <= len(body)*1.5 and text != body:
+            fixed.append(prefix + text); corrections += 1
+        else: fixed.append(line)
+    print(f"Local vi/en line readback: {corrections} grounded prose corrections; tables kept from selected engine", file=sys.stderr)
+    return "\n".join(fixed)
+
+
 def atomic_output(destination, text):
     fd, name = tempfile.mkstemp(prefix=".h2-ocr-", suffix=".tmp", dir=destination.parent)
     temp = Path(name)
@@ -386,7 +479,8 @@ def main(argv=None):
                     if len(text.encode("utf-8")) > 32 * 1024 ** 2:
                         raise BridgeError("Layout output exceeds 32 MiB", 2)
                 else:
-                    text = validate_text(convert(pdf_source, models, pages, args.max_chars), args.max_chars)
+                    text = convert(pdf_source, models, pages, args.max_chars)
+                    text = validate_text(refine_vietnamese_lines(pdf_source, text, models), args.max_chars)
                 atomic_output(output, text)
         print(json.dumps({"ok": True, "engine": args.engine, "pages": pages,
                           "characters": len(text), "seconds": round(time.monotonic() - start, 3),

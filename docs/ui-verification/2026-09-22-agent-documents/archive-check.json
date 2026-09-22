@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "archive": "C:\\Users\\hoang\\Downloads\\H2Notes-Agent-Documents-Full-2026-09-22-win-x64.zip",
+  "checkedFiles": 36300,
+  "checkedBytes": 7895714309,
+  "archiveBytes": 4309057789,
+  "method": "Stream every ZIP member; SHA256 and CRC; exact manifest membership. No second extraction.",
+  "elapsedSeconds": 51.8
+}

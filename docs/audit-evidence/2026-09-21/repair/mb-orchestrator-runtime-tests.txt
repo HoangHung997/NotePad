@@ -1,0 +1,4 @@
+PASS MB-11 normal AgentOrchestratedRun executes through the AgentRuntime-only production path
+PASS MB-11 mutating normal runtime remains blocked without deterministic verifier evidence
+PASS MB-11 source guard prevents normal UI facade from returning to AgentRunner
+RESULT: 3 passed, 0 failed.

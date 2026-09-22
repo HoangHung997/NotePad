@@ -214,7 +214,7 @@ public sealed partial class AiChatPanel
         var selected = SelectedReasoningEffort;
         var configured = profile?.ReasoningEffort?.Trim().ToLowerInvariant();
         var inherited = configured == "max" ? options.LastOrDefault() : options.FirstOrDefault(value => value == configured);
-        var effortLabel = options.Count == 0 ? "Tối đa" : selected is not null ? EffortLabel(selected)
+        var effortLabel = options.Count == 0 ? "Theo model" : selected is not null ? EffortLabel(selected)
             : inherited is not null ? "Mặc định · " + EffortLabel(inherited) : "Mặc định";
         _modelPickerLabel.Text = ModelLabel(profile) + " · " + effortLabel;
         var description = (profile is null ? "Mở Thiết lập AI để lưu kết nối và model." : ProfileDescription(profile))

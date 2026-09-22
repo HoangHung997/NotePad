@@ -1,0 +1,28 @@
+PASS Work Assistant settings round-trip only through local configuration
+PASS Work Assistant settings never enter shared workspace models
+PASS Work Assistant bubble opens once on click and does not activate on drag or cancelled press
+PASS Work Assistant placement restores preferred monitor in DIPs and clamps to work area
+PASS Work Assistant bubble exposes idle working attention and completed states
+PASS Work Assistant bubble can live without MainWindow and disabled setting keeps it hidden
+PASS Work Assistant shell is wired to startup tray drag and local-only lifecycle
+PASS Work Assistant hotkey parser normalizes configurable chords and rejects invalid input
+PASS Work Assistant hotkey conflict fails gracefully and binding stays configurable
+PASS Work Assistant hotkey callback only opens compact assistant and does not start or mutate work
+PASS Work Assistant hotkey stays machine-local and is not shared project truth
+PASS Work Assistant context chips show current interpretation and support remove reset scope
+PASS Quick Work Assistant request starts normal unscoped Agent task and survives panel collapse
+PASS Quick Work Assistant fails closed when selected active context is stale
+PASS Work Assistant allow-document preset maps to expiring workbook session scope, not full PC
+PASS Work Assistant ask-before-changes maps to scoped mutation plus approval
+PASS Compact Work Assistant resets mutation preset whenever foreground context is recaptured
+PASS Quick Work Assistant forwards workbook-scoped grant through existing Agent adapter
+PASS Quick Work Assistant project-policy preset fails closed until task is project-scoped
+PASS Work Assistant permission mapping is a scope mapper, not a second execution engine
+PASS Work Assistant projects running attention and verified completion from one Agent task
+PASS Work Assistant cancel and retry are explicit and retry never auto-repeats mutation
+PASS Work Assistant can link completed task to project and open full Project Workspace
+PASS Work Assistant completion UX keeps one Agent runtime and has no generic Undo promise
+PASS H2M-112 Excel Work Assistant uses structured tools verifies and runs without MainWindow
+PASS H2M-113 Word legal Work Assistant uses unsaved structured Word and authoritative Web evidence
+PASS H2M-114 AutoCAD Work Assistant performs bounded selected-block mutation and reread verification
+RESULT: 27 passed, 0 failed. Temporary test evidence: C:\Users\hoang\AppData\Local\Temp\H2Notes-tests-72c34b24e1844da2906f4bb5c0e5008b

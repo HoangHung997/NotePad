@@ -1,0 +1,25 @@
+PASS Disabling session restore starts quietly with Windows, manually opens only the board
+PASS Application exit retains visible windows and captures draft and geometry before closing
+PASS Main window constructs its named controls and loads notes
+PASS Work Assistant bubble can live without MainWindow and disabled setting keeps it hidden
+PASS ActiveWorkContext revalidation rejects stale window process or provider session
+PASS H2M-091 NAS snapshot strips DesktopSession and note window coordinates
+PASS H2M-092 short narrow window switches between task and note detail instead of crushing both
+PASS H2M-112 Excel Work Assistant uses structured tools verifies and runs without MainWindow
+PASS H2M-123 ProjectAiWindow is a detached view of the same Agent workspace
+H2M-132 METRIC startup_proxy_ui_ms=138,83
+H2M-132 METRIC command_center_refresh_20_total_ms=22,57
+H2M-132 METRIC project_switch_25_total_ms=742,33
+H2M-132 METRIC agent_progress_refresh_100_total_ms=1,45
+H2M-132 METRIC background_bubble_idle_250_pumps_ms=0,09
+H2M-132 METRIC background_bubble_managed_delta_bytes=238512
+H2M-132 METRIC workspace_save_250_projects_1250_tasks_ms=1564,88
+H2M-132 METRIC large_1000_projects_10000_tasks_layout_ms=1720,60
+H2M-132 METRIC large_1000_projects_10000_tasks_visual_count=27
+PASS H2M-132 measures final product performance/resource proxies on Windows CI
+PASS Window resize hit testing and cursor axes match all eight sides
+PASS Window edge hover temporarily overrides child I-beam and restores it
+PASS Desktop AI-only session restores selected project and window on restart/startup
+PASS Composer local file safety walk accepts ordinary ancestors and a Windows drive root
+PASS Dictation is an honest Windows launcher and is never started by load resize or settings refresh
+RESULT: 15 passed, 0 failed. Temporary test evidence: C:\Users\hoang\AppData\Local\Temp\H2Notes-tests-8ac84babc9824278bcf013cd7c20a7f1

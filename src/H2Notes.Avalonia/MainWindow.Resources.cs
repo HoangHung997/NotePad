@@ -31,6 +31,7 @@ public partial class MainWindow
         }
 
         var items = _projectResourceProjection.Build(_notesProject)
+            .Where(resource => string.IsNullOrWhiteSpace(ResourceSearchBox.Text) || (resource.Label + " " + resource.Target).Contains(ResourceSearchBox.Text.Trim(), StringComparison.OrdinalIgnoreCase))
             .Select(resource => new ProjectResourceItem(resource))
             .ToArray();
 
@@ -132,14 +133,14 @@ public partial class MainWindow
         {
             H2ProjectResourceSource.ProjectLink => Projection.Kind == H2ProjectResourceKind.WebLink
                 ? "Liên kết dự án"
-                : "Tài nguyên dự án",
+                : "Dự án",
             H2ProjectResourceSource.SavedFile => "Tệp đã lưu",
-            H2ProjectResourceSource.AgentEvidence => "Agent evidence",
+            H2ProjectResourceSource.AgentEvidence => "Bằng chứng Agent",
             _ => "Tài nguyên"
         };
 
         public string TargetText => Projection.Source == H2ProjectResourceSource.AgentEvidence
-            ? "Evidence ID: " + Projection.EvidenceId
+            ? "Nguồn: Agent"
             : string.IsNullOrWhiteSpace(Projection.Target)
                 ? "Không có target mở trực tiếp"
                 : Projection.Target!;
@@ -154,10 +155,7 @@ public partial class MainWindow
                     var local = observed.Kind == DateTimeKind.Utc ? observed.ToLocalTime() : observed;
                     parts.Add(local.ToString("dd/MM/yyyy HH:mm"));
                 }
-                if (!string.IsNullOrWhiteSpace(Projection.Sha256))
-                    parts.Add("SHA256 " + Projection.Sha256);
-                if (Projection.AgentTaskId is { } taskId)
-                    parts.Add("Agent " + taskId.ToString("N")[..8]);
+                if (Target is { } path && Path.IsPathFullyQualified(path) && !File.Exists(path) && !Directory.Exists(path)) parts.Add("Không tìm thấy · liên kết lại");
                 return string.Join(" · ", parts);
             }
         }

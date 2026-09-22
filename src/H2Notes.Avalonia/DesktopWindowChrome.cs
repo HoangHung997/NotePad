@@ -32,6 +32,12 @@ internal static class DesktopWindowChrome
     };
 
     public static void Attach(Window window, Control titleBar)
+        => AttachCore(window, titleBar, null);
+
+    public static void AttachClickable(Window window, Control surface, Action activate)
+        => AttachCore(window, surface, activate);
+
+    private static void AttachCore(Window window, Control titleBar, Action? activate)
     {
         window.ShowInTaskbar = false;
         window.CanMinimize = window.CanMaximize = false;
@@ -56,13 +62,70 @@ internal static class DesktopWindowChrome
         window.PointerCaptureLost += (_, _) => ClearCursor();
         window.Closed += (_, _) => ClearCursor();
         window.PropertyChanged += (_, e) => { if (e.Property == Window.WindowStateProperty || e.Property == Window.CanResizeProperty) ClearCursor(); };
+        PointerPressedEventArgs? pendingPress = null;
+        Point pressPoint = default;
+        PixelPoint pressScreen = default;
+        PixelPoint windowOrigin = default;
+        bool dragged = false;
+        const double dragThreshold = 4;
+        void CancelPress()
+        {
+            var pointer = pendingPress?.Pointer;
+            pendingPress = null;
+            if (pointer?.Captured == titleBar) pointer.Capture(null);
+        }
         titleBar.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(window).Properties.IsLeftButtonPressed) return;
             for (var element = e.Source as StyledElement; element is not null; element = element.Parent)
                 if (element is Button or TextBox) return;
-            window.BeginMoveDrag(e);
+            if (activate is null) { window.BeginMoveDrag(e); return; }
+            // Native move loops consume the release/tap even when the user never moves.
+            // Keep a normal press until movement establishes an actual drag.
+            pendingPress = e;
+            pressPoint = e.GetPosition(titleBar);
+            pressScreen = titleBar.PointToScreen(pressPoint);
+            windowOrigin = window.Position;
+            dragged = false;
+            e.Pointer.Capture(titleBar);
+            e.Handled = true;
         };
+        titleBar.PointerMoved += (_, e) =>
+        {
+            if (pendingPress is not { } press || press.Pointer != e.Pointer) return;
+            if (!e.GetCurrentPoint(titleBar).Properties.IsLeftButtonPressed) { CancelPress(); return; }
+            var screen = titleBar.PointToScreen(e.GetPosition(titleBar));
+            var dx = screen.X - pressScreen.X;
+            var dy = screen.Y - pressScreen.Y;
+            var threshold = dragThreshold * window.RenderScaling;
+            if (!dragged && Math.Abs(dx) < threshold && Math.Abs(dy) < threshold) return;
+            dragged = true;
+            // This small clickable surface keeps capture while moving. Entering a native
+            // move loop here would lose a fast drag's already-dispatched mouse movement.
+            window.Position = new PixelPoint(windowOrigin.X + dx, windowOrigin.Y + dy);
+            e.Handled = true;
+        };
+        titleBar.PointerReleased += (_, e) =>
+        {
+            if (pendingPress is not { } press || press.Pointer != e.Pointer) return;
+            var point = e.GetPosition(titleBar);
+            var delta = point - pressPoint;
+            var clicked = !dragged && e.InitialPressMouseButton == MouseButton.Left
+                && new Rect(titleBar.Bounds.Size).Contains(point)
+                && Math.Abs(delta.X) < dragThreshold && Math.Abs(delta.Y) < dragThreshold;
+            CancelPress();
+            e.Handled = true;
+            if (clicked) activate?.Invoke();
+        };
+        titleBar.PointerCaptureLost += (_, _) => CancelPress();
+        window.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Escape || pendingPress is null) return;
+            if (dragged) window.Position = windowOrigin;
+            CancelPress();
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        window.Closed += (_, _) => CancelPress();
         window.AddHandler(InputElement.PointerPressedEvent, (_, e) =>
         {
             if (!window.CanResize || !e.GetCurrentPoint(window).Properties.IsLeftButtonPressed || window.WindowState != WindowState.Normal) return;

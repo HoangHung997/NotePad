@@ -1,0 +1,52 @@
+[
+  {
+    "file": "01-hep-cong-viec-va-ghi-chu.png",
+    "sha256": "b80ff3e0d62957c95e31e40ca39b38e3bfd2f35e3483558d60f33f1398427a97",
+    "matchesOriginal": true
+  },
+  {
+    "file": "02-hep-doi-du-an.png",
+    "sha256": "2d352b392a885e4ce27a9632acb0a5d5b6f4e0bc27785d1eb14ee058a97cf069",
+    "matchesOriginal": true
+  },
+  {
+    "file": "03-hep-soan-ghi-chu.png",
+    "sha256": "c565baec56cb94828296dce7c60be45c652df8e44a101dca778c64b84795ad7b",
+    "matchesOriginal": true
+  },
+  {
+    "file": "04-hep-mo-ai.png",
+    "sha256": "7b62226e5fbcd4c754e3fb3fe83e104cd15199c6dda924bc4c2c555baf816d29",
+    "matchesOriginal": true
+  },
+  {
+    "file": "05-vua-danh-sach-chi-tiet.png",
+    "sha256": "5d7d1d61a9dd2bb72a6ed55ed6fed7cec4f3254c11cda62be79c4c3e93e663ce",
+    "matchesOriginal": true
+  },
+  {
+    "file": "06-vua-ai-noi.png",
+    "sha256": "353116b78b73f8c913bebaf4d9bab004146c9127a642d3db6a0a0c4b76f427d6",
+    "matchesOriginal": true
+  },
+  {
+    "file": "07-toan-man-hinh-ai-ben-phai.png",
+    "sha256": "87a5f15db3c1123dc61f68aabadb65eba36ec4b69edb9bf67965295a681bc949",
+    "matchesOriginal": true
+  },
+  {
+    "file": "08-keo-ghim-ai-xuong-duoi.png",
+    "sha256": "a0c63085985dcf4bb5c890077ec55fe72e7b28615cce2e25265992a5b5675595",
+    "matchesOriginal": true
+  },
+  {
+    "file": "09-note-thuong-nho-gon.png",
+    "sha256": "fca5a5ebfd91ac4452ab91c0cca82adb1a0a1c94c38962e1c2d6c30f4d1705ec",
+    "matchesOriginal": true
+  },
+  {
+    "file": "10-kich-thuoc-toi-thieu.png",
+    "sha256": "bb1918321f46915ae94dac7ba6e9f692ea2802133ecda001c486dd8dd33d56bf",
+    "matchesOriginal": true
+  }
+]

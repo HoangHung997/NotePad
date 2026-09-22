@@ -1,0 +1,4 @@
+PASS MB-44 model done cannot complete a mutating host task
+PASS MB-44 required verifier failure keeps task non-complete
+PASS MB-44 non-mechanical completion requires explicit host classification evidence
+RESULT: 3 passed, 0 failed.

@@ -58,8 +58,7 @@ public sealed class ScopedAgentRuntimePermissionPolicy : IAgentRuntimePermission
         if (!request.Descriptor.IsMutating)
             return ValueTask.FromResult(AgentRuntimePermissionDecision.Allow(request.ResourceKey));
 
-        if (!request.Contract.IsMutating
-            || request.Contract.RiskClass == AgentTaskRiskClass.ReadOnly)
+        if (!request.Contract.MutationAllowed)
         {
             return ValueTask.FromResult(
                 AgentRuntimePermissionDecision.Deny(

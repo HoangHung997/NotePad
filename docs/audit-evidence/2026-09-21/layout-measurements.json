@@ -1,0 +1,587 @@
+[
+  {
+    "Name": "command-center-1040",
+    "Width": 1040,
+    "Height": 760,
+    "Controls": [
+      {
+        "Name": "CommandCenter",
+        "IsVisible": true,
+        "X": 327,
+        "Y": 63,
+        "Width": 692,
+        "Height": 670,
+        "CenterHitInside": true,
+        "HitType": "Border"
+      },
+      {
+        "Name": "WorkContent",
+        "IsVisible": false,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ProjectTitle",
+        "IsVisible": true,
+        "X": 0,
+        "Y": 0,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Panel"
+      },
+      {
+        "Name": "CompactTabs",
+        "IsVisible": false,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "AgentTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "TasksTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "NotesTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ResourcesTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "HistoryTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "EvidenceTabButton",
+        "IsVisible": true,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "AiHostBorder",
+        "IsVisible": false,
+        "X": 307,
+        "Y": 45,
+        "Width": 0,
+        "Height": 0,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      }
+    ]
+  },
+  {
+    "Name": "project-agent-1440",
+    "Width": 1440,
+    "Height": 860,
+    "Controls": [
+      {
+        "Name": "CommandCenter",
+        "IsVisible": false,
+        "X": 77,
+        "Y": 63,
+        "Width": 692,
+        "Height": 670,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "WorkContent",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 57,
+        "Width": 278,
+        "Height": 776,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ProjectTitle",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 74,
+        "Width": 73,
+        "Height": 84,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "CompactTabs",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 258,
+        "Width": 278,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "AgentTabButton",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 258,
+        "Width": 89,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "TasksTabButton",
+        "IsVisible": true,
+        "X": 170,
+        "Y": 258,
+        "Width": 81,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "NotesTabButton",
+        "IsVisible": true,
+        "X": 259,
+        "Y": 258,
+        "Width": 68,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ResourcesTabButton",
+        "IsVisible": true,
+        "X": 335,
+        "Y": 258,
+        "Width": 87,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "HistoryTabButton",
+        "IsVisible": true,
+        "X": 430,
+        "Y": 258,
+        "Width": 63,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "EvidenceTabButton",
+        "IsVisible": true,
+        "X": 501,
+        "Y": 258,
+        "Width": 75,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "AiHostBorder",
+        "IsVisible": true,
+        "X": 379,
+        "Y": 45,
+        "Width": 1060,
+        "Height": 788,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      }
+    ]
+  },
+  {
+    "Name": "project-agent-1040",
+    "Width": 1040,
+    "Height": 760,
+    "Controls": [
+      {
+        "Name": "CommandCenter",
+        "IsVisible": false,
+        "X": 77,
+        "Y": 63,
+        "Width": 692,
+        "Height": 670,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "WorkContent",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 57,
+        "Width": 278,
+        "Height": 676,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ProjectTitle",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 74,
+        "Width": 73,
+        "Height": 84,
+        "CenterHitInside": true,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "CompactTabs",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 258,
+        "Width": 278,
+        "Height": 35,
+        "CenterHitInside": true,
+        "HitType": "AccessText"
+      },
+      {
+        "Name": "AgentTabButton",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 258,
+        "Width": 89,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "TasksTabButton",
+        "IsVisible": true,
+        "X": 170,
+        "Y": 258,
+        "Width": 81,
+        "Height": 34,
+        "CenterHitInside": true,
+        "HitType": "AccessText"
+      },
+      {
+        "Name": "NotesTabButton",
+        "IsVisible": true,
+        "X": 259,
+        "Y": 258,
+        "Width": 68,
+        "Height": 34,
+        "CenterHitInside": true,
+        "HitType": "AccessText"
+      },
+      {
+        "Name": "ResourcesTabButton",
+        "IsVisible": true,
+        "X": 335,
+        "Y": 258,
+        "Width": 87,
+        "Height": 34,
+        "CenterHitInside": true,
+        "HitType": "AccessText"
+      },
+      {
+        "Name": "HistoryTabButton",
+        "IsVisible": true,
+        "X": 430,
+        "Y": 258,
+        "Width": 63,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "EvidenceTabButton",
+        "IsVisible": true,
+        "X": 501,
+        "Y": 258,
+        "Width": 75,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "AiHostBorder",
+        "IsVisible": true,
+        "X": 379,
+        "Y": 45,
+        "Width": 660,
+        "Height": 688,
+        "CenterHitInside": true,
+        "HitType": "ScrollContentPresenter"
+      }
+    ]
+  },
+  {
+    "Name": "project-agent-560",
+    "Width": 560,
+    "Height": 820,
+    "Controls": [
+      {
+        "Name": "CommandCenter",
+        "IsVisible": false,
+        "X": 77,
+        "Y": 63,
+        "Width": 692,
+        "Height": 670,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "WorkContent",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 57,
+        "Width": 470,
+        "Height": 736,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ProjectTitle",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 119,
+        "Width": 239,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "CompactTabs",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 226,
+        "Width": 470,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "AgentTabButton",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 226,
+        "Width": 89,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "TasksTabButton",
+        "IsVisible": true,
+        "X": 170,
+        "Y": 226,
+        "Width": 81,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "NotesTabButton",
+        "IsVisible": true,
+        "X": 259,
+        "Y": 226,
+        "Width": 68,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "ResourcesTabButton",
+        "IsVisible": true,
+        "X": 335,
+        "Y": 226,
+        "Width": 87,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      },
+      {
+        "Name": "HistoryTabButton",
+        "IsVisible": true,
+        "X": 430,
+        "Y": 226,
+        "Width": 63,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "EvidenceTabButton",
+        "IsVisible": true,
+        "X": 501,
+        "Y": 226,
+        "Width": 75,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "AiHostBorder",
+        "IsVisible": true,
+        "X": 57,
+        "Y": 200,
+        "Width": 502,
+        "Height": 593,
+        "CenterHitInside": false,
+        "HitType": "Border"
+      }
+    ]
+  },
+  {
+    "Name": "project-agent-long-title-560",
+    "Width": 560,
+    "Height": 600,
+    "Controls": [
+      {
+        "Name": "CommandCenter",
+        "IsVisible": false,
+        "X": 77,
+        "Y": 63,
+        "Width": 692,
+        "Height": 670,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "WorkContent",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 57,
+        "Width": 470,
+        "Height": 516,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "ProjectTitle",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 119,
+        "Width": 253,
+        "Height": 203,
+        "CenterHitInside": false,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "CompactTabs",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 394,
+        "Width": 470,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "AgentTabButton",
+        "IsVisible": true,
+        "X": 73,
+        "Y": 394,
+        "Width": 89,
+        "Height": 35,
+        "CenterHitInside": false,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "TasksTabButton",
+        "IsVisible": true,
+        "X": 170,
+        "Y": 394,
+        "Width": 81,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "NotesTabButton",
+        "IsVisible": true,
+        "X": 259,
+        "Y": 394,
+        "Width": 68,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "TextBlock"
+      },
+      {
+        "Name": "ResourcesTabButton",
+        "IsVisible": true,
+        "X": 335,
+        "Y": 394,
+        "Width": 87,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "HistoryTabButton",
+        "IsVisible": true,
+        "X": 430,
+        "Y": 394,
+        "Width": 63,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "EvidenceTabButton",
+        "IsVisible": true,
+        "X": 501,
+        "Y": 394,
+        "Width": 75,
+        "Height": 34,
+        "CenterHitInside": false,
+        "HitType": "ScrollContentPresenter"
+      },
+      {
+        "Name": "AiHostBorder",
+        "IsVisible": true,
+        "X": 57,
+        "Y": 200,
+        "Width": 502,
+        "Height": 373,
+        "CenterHitInside": true,
+        "HitType": "ScrollContentPresenter"
+      }
+    ]
+  }
+]

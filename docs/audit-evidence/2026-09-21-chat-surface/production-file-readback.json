@@ -1,0 +1,18 @@
+{
+  "bang-mau.csv": {
+    "bytes": 115,
+    "hashMatches": true
+  },
+  "gioi-thieu.docx": {
+    "bytes": 36822,
+    "hashMatches": true
+  },
+  "gioi-thieu.pdf": {
+    "bytes": 1371,
+    "hashMatches": true
+  },
+  "docxParagraphs": 2,
+  "csvRows": 6,
+  "pdfRendered": true,
+  "supplementReceived": true
+}

@@ -9,6 +9,7 @@ public sealed partial class AiChatPanel
 {
     private Guid? _activeAgentTaskId;
     private long _activeAgentProgressSequence = -1;
+    private readonly AgentApprovalPanel _agentApproval = new();
 
     private void CancelActiveAgentTask()
     {
@@ -37,30 +38,47 @@ public sealed partial class AiChatPanel
             prompt = "Phân tích các tệp đính kèm và tóm tắt nội dung chính.";
 
         PrepareProjectContext?.Invoke();
-
-        var context = BuildAgentTaskContext(project, draftAttachments);
-        var readOnly = CurrentPermission == AiPermissionMode.ReadOnly;
-        var cts = new CancellationTokenSource();
-        _request = cts;
-        _activeAgentProgressSequence = -1;
+        if (_profiles.SelectedItem is not AiProfile selectedProfile || string.IsNullOrWhiteSpace(selectedProfile.Model))
+        { _status.Text = "Mở Thiết lập AI để chọn model và lưu kết nối trước."; return; }
+        var profile = CreateRequestProfile(selectedProfile);
 
         var user = new AiMessage
         {
             Role = "user",
             Content = prompt,
-            Provider = "H2 Agent",
-            Model = "Agent",
+            Provider = profile.Name,
+            Model = profile.Model,
             CreatedAt = DateTime.UtcNow,
             DeviceId = _app.DeviceId,
             Attachments = draftAttachments
         };
 
+        IReadOnlyList<AiTurn> preparedTurns = [new AiTurn("user", prompt,
+            AiDocuments.NativeImages(draftAttachments), AiDocuments.NativeFiles(draftAttachments))];
+        if (AiPdfProcessor.NeedsPreparation(preparedTurns, _app.LocalSettings.Ai.Pdf))
+        {
+            var prepared = await PreparePdfRequest(scope, conversation, user, profile, "");
+            if (prepared is null) return;
+            preparedTurns = prepared;
+        }
+        var context = BuildAgentTaskContext(project, user.Attachments) with
+        {
+            Images = preparedTurns[^1].Images,
+            Files = preparedTurns[^1].Files
+        };
+        var readOnly = CurrentPermission == AiPermissionMode.ReadOnly;
+        _projectActiveContext = context; _projectActiveReadOnly = readOnly; _projectQueueTail = null;
+        var cts = new CancellationTokenSource();
+        _request = cts;
+        _activeAgentProgressSequence = -1;
+        user.Context = context.Summary ?? "";
+
         var answer = new AiMessage
         {
             Role = "assistant",
             ParentId = user.Id,
-            Provider = "H2 Agent",
-            Model = "Agent",
+            Provider = profile.Name,
+            Model = profile.Model,
             Status = "streaming",
             CreatedAt = DateTime.UtcNow,
             DeviceId = _app.DeviceId
@@ -130,10 +148,12 @@ public sealed partial class AiChatPanel
                 if (_conversation == conversation
                     && _bubbles.TryGetValue(answer.Id, out var bubble))
                 {
-                    bubble.SetThinking(_streamingReasoning);
+                    bubble.PresentAgent(_app.AgentAdapter, observation);
+                    _chatSurface.NotifyActivity();
                 }
 
                 var summary = observation.Summary;
+
                 if (summary.PendingApproval is { } approval)
                 {
                     _status.Text = "Agent cần phê duyệt: " + approval.Title;
@@ -160,6 +180,8 @@ public sealed partial class AiChatPanel
                     if (summary.Status == H2AgentTaskStatus.Failed
                         && string.IsNullOrWhiteSpace(answer.ErrorText))
                         answer.ErrorText = "Agent không hoàn tất tác vụ.";
+                    if (summary.Status == H2AgentTaskStatus.Cancelled && string.IsNullOrWhiteSpace(answer.ErrorText))
+                        answer.ErrorText = "Đã dừng Agent theo yêu cầu. Các thay đổi đã thực hiện không tự hoàn tác.";
 
                     break;
                 }
@@ -190,15 +212,16 @@ public sealed partial class AiChatPanel
         finally
         {
             _streamingReasoning = "";
-            _activeAgentTaskId = null;
+            _activeAgentTaskId = _queuedAgentTurns.Keys.Cast<Guid?>().FirstOrDefault();
+            _agentApproval.Present(_app.AgentAdapter, taskId, null);
             _activeAgentProgressSequence = -1;
             _flushStreaming = null;
             _activeAnswer = null;
             _request = null;
             cts.Dispose();
 
-            _send.IsVisible = true;
-            _stop.IsVisible = false;
+            _send.IsVisible = !_activeAgentTaskId.HasValue;
+            _stop.IsVisible = _activeAgentTaskId.HasValue;
             RefreshComposerOptions();
 
             if (_conversation == conversation)
@@ -221,7 +244,8 @@ public sealed partial class AiChatPanel
         ProjectRecord project,
         IReadOnlyList<AiAttachment> attachments)
     {
-        var selectedContext = ReadContext?.Invoke() ?? "";
+        var includeProject = _includeProject.IsChecked == true;
+        var selectedContext = includeProject ? ReadContext?.Invoke() ?? "" : "";
         var progress = ProjectProgressCalculator.Calculate(project);
         var next = ProjectProgressCalculator.NextTask(project);
 
@@ -230,8 +254,8 @@ public sealed partial class AiChatPanel
         summary.AppendLine("ProjectId: " + project.Id);
         var projectName = project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
         summary.AppendLine("Project: " + BoundAgentContext(projectName, 500));
-        summary.AppendLine($"Progress: {progress.Completed}/{progress.Total}");
-        if (next is not null)
+        if (includeProject) summary.AppendLine($"Progress: {progress.Completed}/{progress.Total}");
+        if (includeProject && next is not null)
             summary.AppendLine("Next task: " + BoundAgentContext(
                 ProjectProgressCalculator.TaskText(next),
                 1_000));
@@ -250,7 +274,7 @@ public sealed partial class AiChatPanel
                 ProjectProgressCalculator.TaskText(task),
                 300))
             .ToArray();
-        if (openTasks.Length > 0)
+        if (includeProject && openTasks.Length > 0)
         {
             summary.AppendLine();
             summary.AppendLine("Open project tasks:");
@@ -264,7 +288,7 @@ public sealed partial class AiChatPanel
             summary.AppendLine("Composer attachments (presentation metadata; Agent tools remain authoritative for file access):");
             foreach (var item in attachments.Take(12))
             {
-                summary.Append("- ")
+                summary.Append("- attachmentId=").Append(item.Id).Append(" | ")
                     .Append(BoundAgentContext(item.Name, 180))
                     .Append(" | sha256=")
                     .Append(BoundAgentContext(item.Sha256, 128));
@@ -275,11 +299,46 @@ public sealed partial class AiChatPanel
             }
         }
 
+        var conversation = EnsureConversation();
+        var history = new List<H2AgentChatTurn>();
+        if (_includeHistory.IsChecked == true)
+            foreach (var other in project.Conversations.Where(item => item.Id != conversation.Id).TakeLast(4))
+                history.AddRange(ChatTurns(other).TakeLast(2));
+        history.AddRange(ChatTurns(conversation).TakeLast(AiHistory.RecentMessageLimit));
+        var now = DateTime.UtcNow;
+        var permission = CurrentPermission;
+        var permissionScope = new H2AgentPermissionScope(
+            permission == AiPermissionMode.ReadOnly ? H2AgentPermissionMode.ObserveOnly
+                : permission == AiPermissionMode.ProjectAccess ? H2AgentPermissionMode.AllowScopedChanges
+                : H2AgentPermissionMode.AskBeforeChanges,
+            H2AgentResourceScopeKind.Project, "h2-project:" + project.Id.ToString("N"),
+            permission != AiPermissionMode.ReadOnly, permission != AiPermissionMode.ProjectAccess,
+            now, now.AddMinutes(15));
+        if (permission == AiPermissionMode.FullAccess)
+            permissionScope = new(H2AgentPermissionMode.FullAccess, H2AgentResourceScopeKind.Machine,
+                H2AgentPermissionScope.CurrentMachineResourceKey, true, false, now,
+                _fullAccessExpiresUtc < now.AddHours(1) ? _fullAccessExpiresUtc : now.AddHours(1));
+        var targets = new List<H2AgentTargetPath>();
+        if (includeProject) foreach (var link in project.Links) H2AgentTargetScope.Add(targets, link.Target, "project-link");
+        var projectWorkspace = Path.Combine(_app.AgentWorkspaceRoot, "projects", project.Id.ToString("N"));
+        Directory.CreateDirectory(projectWorkspace);
         return new H2AgentTaskContext(
-            _app.AgentWorkspaceRoot,
+            projectWorkspace,
             BoundAgentContext(summary.ToString(), 15_000),
-            project.UpdatedAtUtc?.Ticks ?? 0);
+            project.UpdatedAtUtc?.Ticks ?? 0,
+            permissionScope,
+            (_profiles.SelectedItem as AiProfile)?.Id,
+            SelectedReasoningEffort,
+            history,
+            AiDocuments.NativeImages(attachments), AiDocuments.NativeFiles(attachments),
+            attachments.ToArray(), includeProject, conversation.Id, Guid.NewGuid(), TargetPaths: targets);
     }
+
+    private static IEnumerable<H2AgentChatTurn> ChatTurns(AiConversation conversation)
+        => conversation.Messages.Where(message => !message.IsTimelineMarker && message.Status == "complete"
+            && message.Role is "user" or "assistant")
+            .Select(message => new H2AgentChatTurn(message.Id.ToString("N"), message.Role,
+                AiHistory.TimeMetadata(message) + message.Content + AiDocuments.Describe(message.Attachments)));
 
     private static void AppendBoundedProgress(StringBuilder builder, string? text)
     {

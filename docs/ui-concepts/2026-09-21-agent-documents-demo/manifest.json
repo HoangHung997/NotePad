@@ -1,0 +1,229 @@
+{
+  "status": "PROPOSED_NOT_ACCEPTED",
+  "created": "2026-09-21",
+  "method": "built-in imagegen; reference-guided image edits",
+  "anchor": "D:/VSstudio/H2Notes/docs/ui-concepts/2026-09-21-ui-rebuild-demos/02-agent-workspace.png",
+  "notes": "DIP dimensions are design targets, not verified bitmap sizes or native app acceptance. All content is illustrative.",
+  "images": [
+    {
+      "id": "01-agent-wide",
+      "category": "Kích thước",
+      "title": "Agent và tài liệu · rộng",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "01-agent-wide.png",
+      "description": "Ba vùng: dự án/hội thoại, Agent, tài liệu; duyệt thay đổi ngay trong hội thoại."
+    },
+    {
+      "id": "02-agent-medium",
+      "category": "Kích thước",
+      "title": "Agent và tài liệu · vừa",
+      "dip": {
+        "width": 1040,
+        "height": 760
+      },
+      "file": "02-agent-medium.png",
+      "description": "Thu danh sách dự án thành bộ chọn để giữ chỗ cho Agent và tài liệu."
+    },
+    {
+      "id": "03-agent-narrow",
+      "category": "Kích thước",
+      "title": "Agent · cửa sổ hẹp",
+      "dip": {
+        "width": 560,
+        "height": 820
+      },
+      "file": "03-agent-narrow.png",
+      "description": "Một cột hội thoại, tài liệu mở bằng nút riêng; composer luôn ở đáy."
+    },
+    {
+      "id": "04-agent-minimum",
+      "category": "Kích thước",
+      "title": "Agent · kích thước tối thiểu",
+      "dip": {
+        "width": 560,
+        "height": 600
+      },
+      "file": "04-agent-minimum.png",
+      "description": "Header gọn, kết quả cuộn riêng, một vùng nội dung tại một thời điểm."
+    },
+    {
+      "id": "05-project-picker",
+      "category": "Kích thước",
+      "title": "Đổi dự án trên cửa sổ hẹp",
+      "dip": {
+        "width": 560,
+        "height": 820
+      },
+      "file": "05-project-picker.png",
+      "description": "Drawer tìm/chọn dự án và hội thoại, có nút đóng rõ ràng."
+    },
+    {
+      "id": "06-document-narrow",
+      "category": "Kích thước",
+      "title": "Xem tài liệu trên cửa sổ hẹp",
+      "dip": {
+        "width": 560,
+        "height": 820
+      },
+      "file": "06-document-narrow.png",
+      "description": "Tài liệu thành trang riêng; quay lại hội thoại bằng một nút."
+    },
+    {
+      "id": "07-command-center",
+      "category": "Chức năng",
+      "title": "Tổng quan dự án",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "07-command-center.png",
+      "description": "Việc cần xử lý, tiến độ theo checklist, trạng thái Agent và đồng bộ."
+    },
+    {
+      "id": "08-project-tasks",
+      "category": "Chức năng",
+      "title": "Công việc dự án",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "08-project-tasks.png",
+      "description": "Sửa công việc, tích hoàn thành, ghi chú và việc tiếp theo."
+    },
+    {
+      "id": "09-project-notes",
+      "category": "Chức năng",
+      "title": "Ghi chú dự án",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "09-project-notes.png",
+      "description": "Soạn ghi chú có định dạng, chọn đoạn để trao đổi với Agent."
+    },
+    {
+      "id": "10-project-files",
+      "category": "Chức năng",
+      "title": "Tệp và bản xem trước",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "10-project-files.png",
+      "description": "Liên kết Word/Excel/PDF, xem trước tài liệu và báo tệp mất liên kết."
+    },
+    {
+      "id": "11-history-evidence",
+      "category": "Chức năng",
+      "title": "Lịch sử, bằng chứng và xác minh",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "11-history-evidence.png",
+      "description": "Theo dõi thay đổi và mở nguồn xác minh; giữ dấu lần kiểm tra chưa đạt."
+    },
+    {
+      "id": "12-ai-settings",
+      "category": "Chức năng",
+      "title": "Kết nối AI và model",
+      "dip": {
+        "width": 1040,
+        "height": 760
+      },
+      "file": "12-ai-settings.png",
+      "description": "Ollama local/LAN/Docker, khu vực API riêng, chọn model và thử kết nối."
+    },
+    {
+      "id": "13-storage-conflict",
+      "category": "Chức năng",
+      "title": "Đồng bộ và xử lý xung đột",
+      "dip": {
+        "width": 1040,
+        "height": 760
+      },
+      "file": "13-storage-conflict.png",
+      "description": "Phân biệt lưu máy, đồng bộ, hàng đợi AI và xung đột cần chọn."
+    },
+    {
+      "id": "14-assistant-bubble",
+      "category": "AI Assistant",
+      "title": "Bong bóng AI Assistant",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "14-assistant-bubble.png",
+      "description": "Bốn trạng thái: sẵn sàng, đang làm, cần bạn xem, hoàn tất."
+    },
+    {
+      "id": "15-assistant-640",
+      "category": "AI Assistant",
+      "title": "Assistant nổi · 640 × 610",
+      "dip": {
+        "width": 640,
+        "height": 610
+      },
+      "file": "15-assistant-640.png",
+      "description": "Lịch sử ở trên, composer dưới; nhận ngữ cảnh tài liệu đang mở."
+    },
+    {
+      "id": "16-assistant-380",
+      "category": "AI Assistant",
+      "title": "Assistant nổi · tối thiểu 380 × 610",
+      "dip": {
+        "width": 380,
+        "height": 610
+      },
+      "file": "16-assistant-380.png",
+      "description": "Thu nhãn điều khiển, giữ chữ dễ đọc và nút Dừng."
+    },
+    {
+      "id": "17-assistant-full",
+      "category": "AI Assistant",
+      "title": "Assistant · cửa sổ đầy đủ",
+      "dip": {
+        "width": 1040,
+        "height": 760
+      },
+      "file": "17-assistant-full.png",
+      "description": "Mở trao đổi đầy đủ và tài liệu; có thể gắn tác vụ vào dự án."
+    },
+    {
+      "id": "18-composer-menus",
+      "category": "Thao tác",
+      "title": "Ô soạn, ngữ cảnh, quyền và model",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "18-composer-menus.png",
+      "description": "Bốn cận cảnh thao tác dùng chung cho Agent dự án và AI Assistant."
+    },
+    {
+      "id": "19-storage-transfer",
+      "category": "Chức năng",
+      "title": "Chuyển kho và nhập dữ liệu",
+      "dip": {
+        "width": 1040,
+        "height": 760
+      },
+      "file": "19-storage-transfer.png",
+      "description": "Xem nguồn/đích và chọn hợp nhất, ghi đè hoặc dùng dữ liệu hiện có."
+    },
+    {
+      "id": "20-pdf-evidence",
+      "category": "Chức năng",
+      "title": "PDF và nguồn đối chiếu",
+      "dip": {
+        "width": 1440,
+        "height": 860
+      },
+      "file": "20-pdf-evidence.png",
+      "description": "Xem trang PDF, phần được dẫn nguồn và liên kết về kết quả Agent."
+    }
+  ]
+}

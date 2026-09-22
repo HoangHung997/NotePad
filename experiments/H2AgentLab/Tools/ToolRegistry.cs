@@ -229,7 +229,14 @@ public sealed class ToolRegistry
     }
 
     public bool TryGet(string name, out ToolDescriptor descriptor)
-        => _tools.TryGetValue(ToolNamespace.NormalizeId(name, nameof(name)), out descriptor!);
+    {
+        // Model-supplied lookup names are untrusted; malformed names are a miss, not a crash.
+        descriptor = null!;
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var normalized = name.Trim().ToLowerInvariant();
+        if (normalized.Length > 64 || normalized.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.'))) return false;
+        return _tools.TryGetValue(normalized, out descriptor!);
+    }
 
     public IReadOnlyList<ToolDescriptor> GetNamespace(string name)
     {

@@ -1,0 +1,26 @@
+[
+  {
+    "File": "H2Notes.Avalonia.dll",
+    "SHA256": "3962E35154562D7A6595DD4A176C3D16080F290814B55D509D88DCC5E662FB50",
+    "InstalledMatches": true,
+    "CopiedMatches": true
+  },
+  {
+    "File": "H2Notes.Core.dll",
+    "SHA256": "1E46D68D4418BF91006DE4A1E8EBD4BC3B4FF2588ADA6A0AB555245F9BD019A4",
+    "InstalledMatches": true,
+    "CopiedMatches": true
+  },
+  {
+    "File": "H2AgentLab.dll",
+    "SHA256": "0A891730374F26F39095CF2CBA36642EC53B01CFF04CF7D024D4EB423CB63BE7",
+    "InstalledMatches": true,
+    "CopiedMatches": true
+  },
+  {
+    "File": "H2Notes.Avalonia.exe",
+    "SHA256": "2DB8177CB9274CB3F4F086C3BA3ADD48C11E276EAFC920A874BDA3E04B322C55",
+    "InstalledMatches": true,
+    "CopiedMatches": true
+  }
+]

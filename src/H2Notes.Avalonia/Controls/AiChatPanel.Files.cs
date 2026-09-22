@@ -17,6 +17,18 @@ public sealed partial class AiChatPanel
         var scope = _scope; var conversation = _conversation;
         try
         {
+            if (scope.Project is { } project)
+            {
+                PrepareProjectContext?.Invoke();
+                var request = BuildAgentTaskContext(project, conversation?.DraftAttachments ?? []);
+                var preview = "Model: " + (_profiles.SelectedItem as AiProfile)?.Model + "\n\n"
+                    + request.Summary + "\n\nLịch sử liên quan (Agent áp dụng giới hạn ngữ cảnh):\n"
+                    + string.Join("\n\n", (request.RecentTurns ?? []).Select(turn => turn.Role + ": " + turn.Content))
+                    + "\n\nTin nhắn mới:\n" + (_composer.Text ?? "")
+                    + "\n\nTệp gốc được gửi theo lựa chọn PDF/ảnh; nội dung trích đầy đủ có thể đọc qua công cụ tệp đính kèm.";
+                await TextPreview(owner, "Dữ liệu sẽ gửi cho Agent", preview, false);
+                return;
+            }
             var context = BuildProjectContext();
             if (scope != _scope || conversation != _conversation) return;
             var turns = AiLegacyRequestContext.Prepare(conversation ?? new AiConversation(),

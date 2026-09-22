@@ -164,6 +164,7 @@ internal static class AiDocumentTests
             var project = new ProjectRecord { Name = "Requested project", Notes = "stale" };
             var agent = new SnapshotAgentAdapter(project.Id);
             app.AgentAdapter = agent;
+            H2UiTestNavigation.ConfigureAgentProfile(app);
             var clientCalls = 0;
             var panel = new AiChatPanel(app, () => { clientCalls++; return new AiClient(); }); panel.SetProject(project);
             panel.PrepareProjectContext = () => project.NotesRich = RichDocument.Plain("Unsaved editor text");

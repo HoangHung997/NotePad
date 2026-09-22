@@ -18,7 +18,7 @@ public sealed partial class AiChatPanel
     private readonly ComboBox _reasoningEffort = new() { Name = "ChatReasoningEffort" };
     private readonly TextBlock _unknownReasoning = new()
     {
-        Name = "ChatReasoningUnavailable", Text = "Tối đa", FontSize = 11,
+        Name = "ChatReasoningUnavailable", Text = "Theo model", FontSize = 11,
         Foreground = RichEditor.Brush("#796C62"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0)
     };
     private readonly Button _dictationButton = AppIcon.Button(IconKind.Microphone, "Mở nhập giọng nói Windows · Win+H");
@@ -28,10 +28,14 @@ public sealed partial class AiChatPanel
     private ContextMenu? _permissionMenu;
     private bool _refreshingComposerOptions;
     private bool _permissionPromptOpen;
+    private Guid? _fullAccessConversationId;
+    private DateTime _fullAccessExpiresUtc;
 
     public AiPermissionMode SelectedPermissionMode => _conversation?.PermissionMode switch
     {
         AiPermissionMode.ReadOnly => AiPermissionMode.ReadOnly,
+        AiPermissionMode.FullAccess when _scope?.Project is not null && _conversation.Id == _fullAccessConversationId
+            && DateTime.UtcNow < _fullAccessExpiresUtc => AiPermissionMode.FullAccess,
         AiPermissionMode.ProjectAccess when _scope?.Project is not null && _conversation is not null
             && _app.LocalSettings.Ai.ProjectAccessConversationIds?.Contains(_conversation.Id) == true => AiPermissionMode.ProjectAccess,
         _ => AiPermissionMode.ConfirmChanges
@@ -62,7 +66,7 @@ public sealed partial class AiChatPanel
     public Action<LocalConfiguration> PersistComposerPermissions { get; set; } = settings => settings.Save();
     public event Action? ComposerOptionsChanged;
 
-    private bool ComposerOptionsBusy => _preparing || _request is not null || _permissionPromptOpen;
+    private bool ComposerOptionsBusy => _preparing || _request is not null || _queuedAgentTurns.Count > 0 || _permissionPromptOpen;
     private bool IsComposerCompact => Bounds.Height is > 0 and < 500;
 
     private Control BuildComposerOptions()
@@ -175,6 +179,7 @@ public sealed partial class AiChatPanel
         _refreshingComposerOptions = true;
         try
         {
+            _busySendMode.IsVisible = _activeAgentTaskId.HasValue || _request is not null;
             var enabled = _scope is not null && !ComposerOptionsBusy;
             _permissionButton.IsEnabled = _profiles.IsEnabled = _modelPickerButton.IsEnabled = enabled;
             _dictationButton.IsEnabled = _scope is not null && !_composer.IsReadOnly && !_permissionPromptOpen && DictationService.IsSupported;
@@ -198,7 +203,7 @@ public sealed partial class AiChatPanel
             ToolTip.SetTip(_reasoningEffort, options.Count == 0
                 ? "Tối đa: dùng khả năng mặc định của model. Chưa biết API chỉnh mức suy luận; không gửi tham số suy luận tự đặt."
                 : "Chỉ hiện các mức API của model hỗ trợ. Mặc định dùng cấu hình hồ sơ; lựa chọn khác chỉ lưu cho cuộc trao đổi này.");
-            ToolTip.SetTip(_unknownReasoning, "Tối đa: dùng khả năng mặc định của model. Chưa biết API chỉnh mức suy luận; không gửi tham số suy luận tự đặt.");
+            ToolTip.SetTip(_unknownReasoning, "Dùng khả năng mặc định của model. Kết nối này chưa công bố các mức suy luận có thể điều chỉnh.");
             RefreshModelPicker(profile, options, enabled);
         }
         finally { _refreshingComposerOptions = false; }
@@ -211,12 +216,12 @@ public sealed partial class AiChatPanel
         _mentionPopup.IsOpen = false;
         _permissionMenu?.Close();
         _permissionMenu = new ContextMenu();
-        foreach (var mode in new[] { AiPermissionMode.ReadOnly, AiPermissionMode.ConfirmChanges, AiPermissionMode.ProjectAccess })
+        foreach (var mode in new[] { AiPermissionMode.ReadOnly, AiPermissionMode.ConfirmChanges, AiPermissionMode.ProjectAccess, AiPermissionMode.FullAccess })
         {
             var item = new MenuItem
             {
                 Header = PermissionLabel(mode), ToggleType = MenuItemToggleType.Radio, IsChecked = SelectedPermissionMode == mode,
-                IsEnabled = mode != AiPermissionMode.ProjectAccess || _scope.Project is not null
+                IsEnabled = mode is not (AiPermissionMode.ProjectAccess or AiPermissionMode.FullAccess) || _scope.Project is not null
             };
             ToolTip.SetTip(item, PermissionDescription(mode));
             item.Click += async (_, _) => await SelectPermissionMode(mode);
@@ -263,6 +268,8 @@ public sealed partial class AiChatPanel
             }
         }
         selected.PermissionMode = mode;
+        _fullAccessConversationId = mode == AiPermissionMode.FullAccess ? selected.Id : null;
+        _fullAccessExpiresUtc = mode == AiPermissionMode.FullAccess ? DateTime.UtcNow.AddHours(1) : DateTime.MinValue;
         _mentionPopup.IsOpen = false; _composerMenu?.Close();
         Touch(scope); Render(); RefreshComposerOptions(); ComposerOptionsChanged?.Invoke();
     }
@@ -283,16 +290,17 @@ public sealed partial class AiChatPanel
     private static string ProfileDescription(AiProfile profile) => profile.Name + " · " + profile.Model + "\n" + profile.ProcessingLocation;
     private static string PermissionLabel(AiPermissionMode mode) => mode switch
     {
-        AiPermissionMode.ReadOnly => "Chỉ đọc",
-        AiPermissionMode.ProjectAccess => "Toàn quyền dự án",
-        _ => "Xác nhận thay đổi"
+        AiPermissionMode.ReadOnly => "Chỉ quan sát",
+        AiPermissionMode.ProjectAccess => "Trong phạm vi đã chọn",
+        AiPermissionMode.FullAccess => "Toàn quyền tiếp cận",
+        _ => "Hỏi trước khi thay đổi"
     };
     private static string PermissionDescription(AiPermissionMode mode) => mode switch
     {
-        AiPermissionMode.ReadOnly => "Chỉ trả lời; không áp dụng thay đổi dữ liệu dự án và không lưu tệp từ AI.",
-        AiPermissionMode.ProjectAccess => "Chỉ trong dự án H2 Notes đang chọn: AI được tự thêm, sửa hoặc xóa công việc; thêm, sửa hoặc xóa đúng đoạn ghi chú; và định dạng phần nội dung AI thêm/sửa. "
-            + "Các thao tác hợp lệ tự áp dụng sau khi AI trả lời, không hỏi lại từng lần. Đây không phải quyền hệ điều hành của Codex: AI không chạy lệnh/shell, không truy cập toàn máy. Không tự xóa hoặc ghi đè tệp ngoài dự án. Lưu tệp ngoài dự án vẫn do bạn chọn.",
-        _ => "AI có thể đề xuất thêm, sửa hoặc xóa dữ liệu trong dự án. Khi có thay đổi, H2 Notes hiện ngay nội dung cụ thể cần thay đổi; bạn bấm Đồng ý một lần để áp dụng. Không có quyền hệ điều hành/shell và không tự ghi tệp ngoài dự án."
+        AiPermissionMode.ReadOnly => "Đọc ngữ cảnh và tệp đã chọn để trả lời; không cho Agent thay đổi dữ liệu hoặc chạy lệnh tự do.",
+        AiPermissionMode.FullAccess => "Cho Agent đọc/ghi tệp và chạy lệnh bằng tài khoản Windows này. Chỉ cấp trên máy này trong tối đa một giờ; không tự nâng quyền quản trị. Hội thoại vẫn lấy dự án làm ngữ cảnh mặc định.",
+        AiPermissionMode.ProjectAccess => "Cho phép các thao tác hợp lệ trong dự án đang chọn. Quyền giới hạn theo công cụ và phạm vi tài nguyên; không chạy lệnh/shell tự do và không cấp quyền quản trị. Không tự xóa hoặc ghi đè tệp ngoài phạm vi đã cấp.",
+        _ => "Agent đọc ngữ cảnh đã chọn và hỏi trước các thao tác thay đổi cần cấp quyền. Xem nội dung yêu cầu rồi chọn Cho phép một lần hoặc Từ chối. Quyền toàn máy phải được chọn riêng."
     };
     private static string EffortLabel(string value) => value switch
     {

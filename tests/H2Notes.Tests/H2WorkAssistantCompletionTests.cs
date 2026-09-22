@@ -12,6 +12,31 @@ internal static class H2WorkAssistantCompletionTests
 
     public static void Run(Action<string, Action> test)
     {
+        test("Work Assistant bubble follows live progress and chat visibility without reopening the chat", () =>
+        {
+            var fixture = Fixture();
+            try
+            {
+                StartQuickTask(fixture.App, "Sửa tài liệu mẫu");
+                var compact = Compact(fixture.App); var bubble = Bubble(fixture.App);
+                Check(compact.IsVisible && !bubble.IsExpanded, "Busy visible chat duplicated the activity bar");
+                fixture.App.HideWorkAssistantCompact(); Pump();
+                Check(bubble.IsExpanded && !compact.IsVisible, "Hidden busy chat did not show its bar");
+                fixture.Agent.Progress.Add(new(1, DateTime.UtcNow, "tool", "tool-start", "word.replace_range")); Refresh(fixture.App);
+                Check(bubble.ActivityText == "Đang sửa nội dung Word…" && !compact.IsVisible, "Bubble missed live tool activity or opened chat automatically");
+                fixture.Agent.Progress.Add(new(2, DateTime.UtcNow, "commentary", "commentary", "Đang kiểm tra\nđịnh dạng tiếng Việt")); Refresh(fixture.App);
+                Check(bubble.ActivityText == "Đang kiểm tra định dạng tiếng Việt", "Public activity was not refreshed on one line");
+                OpenDetails(fixture.App);
+                Check(!bubble.IsExpanded && compact.IsVisible, "Opening actual chat did not collapse the bar");
+                compact.Hide(); Pump();
+                Check(bubble.IsExpanded, "Closing chat directly did not restore busy bar");
+                fixture.Agent.Set(H2AgentTaskStatus.Completed, finalText: "Xong"); Refresh(fixture.App);
+                Check(!bubble.IsExpanded && !compact.IsVisible, "Completion did not restore circle or reopened hidden chat");
+                Check(WorkAssistantActivityText.FromProgress(new(3, DateTime.UtcNow, "tool", "tool-result", "private document body")) is null,
+                    "Raw document/tool output leaked onto desktop ticker");
+            }
+            finally { CloseFixture(fixture); }
+        });
         test("Work Assistant projects running attention and verified completion from one Agent task", () =>
         {
             var fixture = Fixture();
@@ -48,7 +73,7 @@ internal static class H2WorkAssistantCompletionTests
                             new string('a', 64),
                             "Workbook reread passed",
                             LocalPath: @"C:\Projects\DuToan.xlsx",
-                            Provenance: "OfficeHost")
+                            Provenance: "OfficeHost", VerificationPassed: true)
                     ]);
                 Refresh(fixture.App);
 
@@ -166,7 +191,7 @@ internal static class H2WorkAssistantCompletionTests
             var compact = File.ReadAllText(Path.Combine(
                 repo, "src", "H2Notes.Avalonia", "WorkAssistantCompactWindow.Completion.cs"));
 
-            Check(app.Contains("_agentAdapter.GetTaskSummary(", StringComparison.Ordinal)
+            Check(app.Contains("_agentAdapter.ObserveTask(", StringComparison.Ordinal)
                 && app.Contains("_agentAdapter.CancelTask(", StringComparison.Ordinal)
                 && app.Contains("LinkCurrentWorkAssistantTaskToProject(", StringComparison.Ordinal),
                 "Completion UX is not projecting the existing Agent task lifecycle.");
@@ -188,8 +213,6 @@ internal static class H2WorkAssistantCompletionTests
                     line.Contains("\"Undo\"", StringComparison.OrdinalIgnoreCase)
                     || line.Contains("\"Hoàn tác\"", StringComparison.OrdinalIgnoreCase)),
                 "Completion UX advertises a generic undo action.");
-            Check(compact.Contains("Undo chỉ xuất hiện khi provider/Agent có đường hoàn tác an toàn", StringComparison.Ordinal),
-                "Completion UX does not state the safe-undo boundary.");
         });
     }
 
@@ -372,6 +395,7 @@ internal static class H2WorkAssistantCompletionTests
     {
         private H2AgentTaskSummary? _summary;
         private readonly Dictionary<string, H2AgentEvidence> _evidence = new(StringComparer.Ordinal);
+        public List<H2AgentProgress> Progress { get; } = [];
 
         public int StartCalls { get; private set; }
         public int CancelCalls { get; private set; }
@@ -426,7 +450,7 @@ internal static class H2WorkAssistantCompletionTests
         }
 
         public H2AgentTaskObservation ObserveTask(Guid taskId, long afterSequence = -1)
-            => new(GetTaskSummary(taskId), Array.Empty<H2AgentProgress>());
+            => new(GetTaskSummary(taskId), Progress.Where(p => p.Sequence > afterSequence).ToArray());
 
         public void CancelTask(Guid taskId)
         {

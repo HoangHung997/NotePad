@@ -26,6 +26,7 @@ internal static class H2AgentPresentationTests
             };
             var adapter = new PresentationAgentFake(project.Id, holdUntilCancel: false);
             var app = new App { AgentAdapter = adapter };
+            H2UiTestNavigation.ConfigureAgentProfile(app);
             var clientCalls = 0;
             var panel = new AiChatPanel(app, () =>
             {
@@ -66,7 +67,7 @@ internal static class H2AgentPresentationTests
                 var user = conversation.Messages[0];
                 var answer = conversation.Messages[1];
                 Check(user.Role == "user" && answer.Role == "assistant", "Agent presentation message roles are wrong.");
-                Check(user.Provider == "H2 Agent" && answer.Provider == "H2 Agent",
+                Check(user.Provider == "Test model" && answer.Provider == "Test model",
                     "Agent presentation was mislabeled as a legacy provider.");
                 Check(user.AiRunId == adapter.TaskId && answer.AiRunId == adapter.TaskId,
                     "Agent task identity was not preserved in presentation messages.");
@@ -85,6 +86,7 @@ internal static class H2AgentPresentationTests
             var project = new ProjectRecord { Name = "Cancelable Agent project", UpdatedAtUtc = DateTime.UtcNow };
             var adapter = new PresentationAgentFake(project.Id, holdUntilCancel: true);
             var app = new App { AgentAdapter = adapter };
+            H2UiTestNavigation.ConfigureAgentProfile(app);
             var clientCalls = 0;
             var panel = new AiChatPanel(app, () =>
             {

@@ -16,6 +16,7 @@ public sealed partial class AiChatPanel
         if (_scope?.Project is null
             || message.Role != "assistant"
             || message.Status != "complete"
+            || message.AiRunId.HasValue
             || string.Equals(message.Provider, "H2 Agent", StringComparison.Ordinal))
             return;
 

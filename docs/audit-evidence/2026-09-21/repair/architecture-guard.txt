@@ -1,0 +1,36 @@
+PASS Agent Lab keeps direct H2Notes.Core capability types
+PASS Shared AI snapshot and endpoint capability checks stay in H2 Core
+PASS V2 prompt keeps stable prefix ahead of all runtime context
+PASS V2 policy safety and toolset versions are validated out-of-band metadata
+PASS Prompt cache identity ignores runtime context and non-cache request controls
+PASS Prompt cache identity changes for every stable policy model toolset safety input
+PASS AgentContextManager enforces explicit budgets and deterministic provenance
+PASS AgentContextManager automatically triggers compaction under long-thread pressure
+PASS AgentTaskContract snapshots host-owned task requirements
+PASS Acceptance criteria preserve identity and use typed durable evidence
+PASS AgentTaskStateMachine enforces deterministic lifecycle and repair loop
+PASS Mutating task cannot complete without verification
+PASS Fast path router classifies direct retrieval action and complex tasks without heavy direct schemas
+PASS AgentOrchestrator preserves host boundaries without a legacy compatibility seam
+PASS Tool registry descriptors preserve risk access parallel schema and executor metadata
+PASS Canonical normal runtime registry preserves callable metadata
+PASS ToolSearchIndex ranks lexically and caches by registry version
+PASS Deferred tool discovery initially exposes only tool_search plus stable core
+PASS Deferred schema loading is traceable and coalesces duplicates
+PASS Tool execution scheduler parallelizes safe reads and serializes overlapping mutations
+PASS Canonical skill catalog preserves progressive loading and hash identity
+PASS VerificationReport is machine-readable per criterion with typed failures and evidence IDs
+PASS FileScopeVerifier detects exact changes hashes and unintended outputs
+PASS Artifact verifier contract stays domain-neutral and criterion-scoped
+PASS AgentRepairController emits concise failed-criterion context and preserves passed criteria
+PASS Runtime RecoverySupervisor stays below semantic verification repair
+PASS Lab document inspection delegates safety hash and extraction to H2 Core AiDocuments
+PASS Lab PDF OCR adapter delegates direct PDF handling to H2 Core
+PASS Closed XLSX snapshot captures deterministic formula style merge and hidden state
+PASS Closed DOCX snapshot captures deterministic paragraph run table section header footer state
+PASS ExcelVerifier validates target cells and rejects unrelated formula/style/structure regressions
+PASS WordVerifier validates target paragraph state and rejects unrelated header/table regressions
+PASS Generic tool preference uses provider metadata instead of application switches
+PASS Preserved v1 deterministic suites remain callable
+PASS Existing execution and safety primitives remain present
+RESULT: 35 passed, 0 failed. This is a migration guard only; run the full v1 suites separately.

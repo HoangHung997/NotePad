@@ -12,6 +12,34 @@ internal static class H2WorkAssistantQuickTaskTests
 
     public static void Run(Action<string, Action> test)
     {
+        test("Work Assistant selected folder bypasses unrelated foreground validation and forwards model and follow-up history", () =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), "h2-quick-folder-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            var app = new App(); app.LocalSettings.WorkAssistant.Enabled = true;
+            var model = new AiProfile { Name = "Selected model", Model = "test-model" };
+            app.LocalSettings.Ai.Profiles = [model]; app.LocalSettings.Ai.SelectedId = model.Id;
+            var capture = new ContextCapture(Context()) { RevalidateResult = false };
+            app.WorkAssistantContextCapture = capture;
+            var agent = new QuickAgentFake(); app.AgentAdapter = agent;
+            app.ShowWorkAssistantCompact(); var compact = Compact(app);
+            try
+            {
+                compact.SetWorkspaceRoot(root); compact.PromptText = "First question"; Send(compact); Pump();
+                Check(agent.StartContext?.WorkspaceRoot == root && agent.StartContext.PermissionScope?.ScopeKind == H2AgentResourceScopeKind.Workspace,
+                    "Selected folder did not reach production context");
+                Check(agent.StartContext?.ModelProfileId == model.Id && agent.StartContext.Summary is null && capture.RevalidateCalls == 0,
+                    "Unrelated app context or global model replaced selected folder/model");
+                agent.Complete("First answer");
+                typeof(App).GetMethod("RefreshWorkAssistantTaskState", Private)!.Invoke(app, null); Pump();
+                compact.PromptText = "Follow-up"; Send(compact); Pump();
+                Check(agent.StartContext?.RecentTurns?.Select(t => t.Content).SequenceEqual(new[] { "First question", "First answer" }) == true,
+                    "Follow-up was sent without the visible conversation");
+                Check(app.IsWorkAssistantCompactVisible, "Sending hid the chat");
+            }
+            finally { compact.Close(); Bubble(app).Close(); Directory.Delete(root, true); }
+        });
+
         test("Quick Work Assistant request starts normal unscoped Agent task and survives panel collapse", () =>
         {
             var app = new App();
@@ -60,8 +88,8 @@ internal static class H2WorkAssistantQuickTaskTests
             Check(taskId == agent.TaskId
                 && agent.GetTaskSummary(taskId).Status == H2AgentTaskStatus.Running,
                 "Quick task stopped/disappeared when compact panel collapsed.");
-            Check(!app.IsWorkAssistantCompactVisible,
-                "Compact assistant did not collapse after successful quick-task start.");
+            Check(app.IsWorkAssistantCompactVisible,
+                "Conversation should remain open after sending, with history above the composer.");
             Check(app.IsWorkAssistantBubbleVisible
                 && Bubble(app).State == WorkAssistantBubbleState.Working,
                 "Work Assistant bubble did not show running state after panel collapse.");
@@ -271,6 +299,9 @@ internal static class H2WorkAssistantQuickTaskTests
 
         public H2AgentTaskObservation ObserveTask(Guid taskId, long afterSequence = -1)
             => new(GetTaskSummary(taskId), Array.Empty<H2AgentProgress>());
+
+        public void Complete(string answer)
+            => _task = _task! with { Status = H2AgentTaskStatus.Completed, FinalText = answer, UpdatedUtc = DateTime.UtcNow };
 
         public void CancelTask(Guid taskId)
             => throw new NotSupportedException();

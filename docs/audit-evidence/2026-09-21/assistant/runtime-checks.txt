@@ -1,0 +1,38 @@
+runtime-tests.log
+PASS MB-10 real runtime performs tool_search then loaded tool then final in one task
+PASS MB-10 verifier failure becomes bounded repair continuation and can pass on a later tool round
+PASS MB-10 cancellation reaches provider-neutral transport and executes no latent tool
+PASS MB-10 AgentRuntime source has no AgentRunner compatibility dependency
+RESULT: 4 passed, 0 failed.
+mb-deferred-tool-loading-test.log
+PASS MB-32 tool_search loads schema and selected tool executes in the same task without a new user turn
+PASS MB-32 duplicate schema loads coalesce within one discovery session
+PASS MB-32 registry version change invalidates lexical search corpus and discovers newly registered tool
+RESULT: 3 passed, 0 failed.
+mb-permission-runtime-test-final.log
+PASS MB-40 read-only task blocks mutation before executor
+PASS MB-40 declined resource scope blocks alternate tool before second executor
+PASS MB-40 model or skill text cannot grant mutation authority
+PASS MB-40 canonical registry scopes every mutation and shares workspace write scope
+RESULT: 4 passed, 0 failed.
+mb-verification-runtime-test.log
+PASS MB-42 tool success alone cannot complete a mutation
+PASS MB-42 file mutation re-reads workspace and passes FileScopeVerifier in real runtime
+PASS MB-42 Python durable run uses PythonResultVerifier rather than exit code alone
+PASS MB-42 structured Word mutation uses LiveWordVerifier and preserves unrelated state
+RESULT: 4 passed, 0 failed.
+mb-completion-gate-test.log
+PASS MB-44 model done cannot complete a mutating host task
+PASS MB-44 required verifier failure keeps task non-complete
+PASS MB-44 non-mechanical completion requires explicit host classification evidence
+RESULT: 3 passed, 0 failed.
+mb-orchestrator-runtime-test.log
+PASS MB-11 normal AgentOrchestratedRun executes through the AgentRuntime-only production path
+PASS MB-11 mutating normal runtime remains blocked without deterministic verifier evidence
+PASS MB-11 source guard prevents normal UI facade from returning to AgentRunner
+RESULT: 3 passed, 0 failed.
+mb-tool-registry-execution-test-final.log
+PASS MB-31 selected tool executes only through ToolRegistry descriptor executor
+PASS MB-31 unknown model tool fails closed and never executes any fallback switch
+PASS MB-31 normal runtime source resolves descriptors and never calls AgentTools.Execute directly
+RESULT: 3 passed, 0 failed.

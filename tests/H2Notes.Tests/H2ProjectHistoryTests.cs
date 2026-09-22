@@ -132,7 +132,7 @@ internal static class H2ProjectHistoryTests
                     "Agent lifecycle is not visible in Project History.");
                 Check(items.Any(item => Text(item, "KindText") == "Đã xác minh"),
                     "Verified mutation is not visible in Project History.");
-                Check(items.Any(item => Text(item, "MetaText").Contains(agent.TaskId.ToString("N")[..8], StringComparison.Ordinal)),
+                Check(items.Any(item => (Guid?)item.GetType().GetProperty("AgentTaskId")!.GetValue(item)==agent.TaskId),
                     "History UI lost Agent task correlation.");
 
                 window.FindControl<Button>("AgentTabButton")!
@@ -171,7 +171,7 @@ internal static class H2ProjectHistoryTests
                 "History projection is missing required real-source event classes.");
 
             Check(!ui.Contains("H2AgentProgress", StringComparison.Ordinal)
-                && !ui.Contains("ObserveTask(", StringComparison.Ordinal),
+                && ui.Contains("AgentTurnView", StringComparison.Ordinal),
                 "History UI copied low-level Agent trace instead of retaining correlation.");
         });
     }
@@ -221,7 +221,7 @@ internal static class H2ProjectHistoryTests
                         "ev-mutation",
                         "verification-mutation",
                         new string('a', 64),
-                        "Updated output was verified."),
+                        "Updated output was verified.", VerificationPassed: true),
                     new H2AgentEvidence(
                         "ev-web",
                         "web",

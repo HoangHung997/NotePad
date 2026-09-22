@@ -144,7 +144,7 @@ public sealed class ProjectGrid : Control
             var title = MakeCell(doc, _widths[1] - (TasksOnly ? 20 : row.IsProject ? 50 : 59), row.IsProject);
             var commentDoc = row.Task?.ReadComment() ?? row.Project.ReadNotes();
             var comment = MakeCell(commentDoc, (Compact ? _widths[1] : _widths[3]) - 24);
-            var progressText = row.IsProject ? row.Project.Progress : "";
+            var progressText = row.IsProject ? row.Project.Progress : row.Task?.IsCompleted==true ? "Hoàn thành" : "Chưa làm";
             if (row.IsProject && !row.Project.IsExpanded && row.Project.Next is { } next)
                 progressText += "\nNext: " + next.DisplayText;
             var progressDoc = new RichDocument { Runs = [new(progressText, new TextStyle(Size: 12))] };
@@ -206,7 +206,7 @@ public sealed class ProjectGrid : Control
         {
             _layoutWidth = width;
             if (Compact) _widths = [40, width - 40, 0, 0];
-            else if (TasksOnly) _widths = [40, (width - 40) * .58, 0, (width - 40) * .42];
+            else if (TasksOnly) _widths = [72, (width - 182) * .52, 110, (width - 182) * .48];
             else if (!_manualWidths) _widths = [64, (width - 209) * .61, 145, (width - 209) * .39];
             else
             {
@@ -231,7 +231,7 @@ public sealed class ProjectGrid : Control
             if (row is not null)
             {
                 var indent = _editingColumn == 1 ? (TasksOnly ? 0 : _editingRow.IsProject ? 32 : 40) : 0;
-                _editorBounds = new Rect(_edges[_editingColumn] + indent, HeaderHeight + row.Y - _scroll.Snapshot.OffsetY,
+                _editorBounds = new Rect(CellLeft(_editingColumn) + indent, HeaderHeight + row.Y - _scroll.Snapshot.OffsetY,
                     Math.Max(30, _widths[_editingColumn] - indent), Math.Max(42, row.Height));
                 if (Compact) _editorBounds = new Rect(40, row.Y - _scroll.Snapshot.OffsetY + (_editingColumn == 3 ? row.Title.Height + 12 : 0), _widths[1], Math.Max(42, row.Height - (_editingColumn == 3 ? row.Title.Height + 12 : 0)));
                 _editor.Arrange(_editorBounds);
@@ -244,6 +244,8 @@ public sealed class ProjectGrid : Control
         _edges = new double[_columns.Length + 1];
         for (var i = 0; i < _columns.Length; i++) _edges[i + 1] = _edges[i] + _widths[i];
     }
+    private double CellLeft(int column)=>TasksOnly && !Compact
+        ? column switch { 2=>_edges[2]+_widths[3],3=>_edges[2],_=>_edges[column] } : _edges[column];
 
     public override void Render(DrawingContext context)
     {
@@ -261,7 +263,7 @@ public sealed class ProjectGrid : Control
                 if (y > Bounds.Height) break;
                 var row = layout.Row;
                 var selected = _selection?.Id == row.Id;
-                var background = selected ? "#F9EAE2" : row.IsProject ? "#FBF8F3" : "#FFFDFC";
+                var background = selected || TasksOnly && row.Project.Next?.Id==row.Task?.Id ? "#F9EAE2" : row.IsProject ? "#FBF8F3" : "#FFFDFC";
                 context.FillRectangle(RichEditor.Brush(background), new Rect(0, y, width, layout.Height));
                 if (selected) context.DrawRectangle(Accent, null, new Rect(1, y + 2, 6, layout.Height - 4), 2, 2);
                 if (row.IsProject)
@@ -271,7 +273,8 @@ public sealed class ProjectGrid : Control
                 }
                 else
                 {
-                    var box = new Rect((_widths[0] - 19) / 2, y + 10, 19, 19);
+                    if(TasksOnly && !Compact)context.DrawText(MakeText((row.Project.ChecklistItems.IndexOf(row.Task!)+1).ToString(),30,13),new Point(12,y+11));
+                    var box = new Rect(TasksOnly && !Compact ? 44 : (_widths[0] - 19) / 2, y + 10, 19, 19);
                     context.DrawRectangle(row.Task!.IsCompleted ? Accent : Brushes.White, new Pen(row.Task.IsCompleted ? Accent : Ink, 1), box, 3, 3);
                     if (row.Task.IsCompleted)
                     {
@@ -286,16 +289,19 @@ public sealed class ProjectGrid : Control
                     using var clip = context.PushClip(new Rect(_edges[1], y, _widths[1], layout.Height));
                     layout.Title.Draw(context, new Point(_edges[1] + (TasksOnly ? 8 : row.IsProject ? 38 : 47), y + 8));
                 }
-                using (context.PushClip(new Rect(_edges[2], y, _widths[2], layout.Height)))
-                    layout.Progress.Draw(context, new Point(_edges[2] + 10, y + 8));
+                using (context.PushClip(new Rect(CellLeft(2), y, _widths[2], layout.Height)))
+                {
+                    if(TasksOnly && !Compact)context.DrawRectangle(RichEditor.Brush(row.Task?.IsCompleted==true ? "#E4F4E9" : "#ECEEF1"),null,new Rect(CellLeft(2)+6,y+5,98,28),14,14);
+                    layout.Progress.Draw(context, new Point(CellLeft(2) + 10, y + 8));
+                }
                 if (!_editor.IsVisible || _editingRow?.Id != row.Id || _editingColumn != 3)
                 {
-                    using var clip = context.PushClip(new Rect(Compact ? _edges[1] : _edges[3], y, Compact ? _widths[1] : _widths[3], layout.Height));
-                    layout.Comment.Draw(context, new Point((Compact ? _edges[1] + 8 : _edges[3] + 12), y + (Compact ? layout.Title.Height + 12 : 8)));
+                    using var clip = context.PushClip(new Rect(Compact ? _edges[1] : CellLeft(3), y, Compact ? _widths[1] : _widths[3], layout.Height));
+                    layout.Comment.Draw(context, new Point((Compact ? _edges[1] + 8 : CellLeft(3) + 12), y + (Compact ? layout.Title.Height + 12 : 8)));
                 }
                 context.DrawLine(Line, new Point(0, y + layout.Height), new Point(width, y + layout.Height));
             }
-            if (!Compact) for (var i = TasksOnly ? 3 : 1; i < _columns.Length; i++) context.DrawLine(Line, new Point(_edges[i], HeaderHeight), new Point(_edges[i], Bounds.Height));
+            if (!Compact) for (var i = 1; i < _columns.Length; i++) context.DrawLine(Line, new Point(CellLeft(i), HeaderHeight), new Point(CellLeft(i), Bounds.Height));
             if (_layout.Count == 0)
                 context.DrawText(MakeText(TasksOnly ? "Chưa có công việc. Nhấn + để thêm." : _filter.Length > 0 ? "Không tìm thấy dự án hoặc công việc." : "Chưa có dự án. Nhấn + Dự án để bắt đầu.", width - 60, 16), new Point(30, 72));
             if (_dragging && _dropTarget is not null)
@@ -313,9 +319,10 @@ public sealed class ProjectGrid : Control
         context.FillRectangle(RichEditor.Brush("#FAF7F2"), new Rect(0, 0, Bounds.Width, HeaderHeight));
         for (var i = 0; i < _columns.Length; i++)
         {
-            if (Compact || TasksOnly && i is 0 or 2) continue;
-            context.DrawText(MakeText(TasksOnly && i == 1 ? "Công việc" : _columns[i].Header, _widths[i] - 16, 14), new Point(_edges[i] + (i == 0 ? 20 : 10), 9));
-            context.DrawLine(Line, new Point(_edges[i], 0), new Point(_edges[i], HeaderHeight));
+            if (Compact) continue;
+            var caption=TasksOnly ? i switch { 0=>"#",1=>"Công việc",2=>"Trạng thái",_=>"Ghi chú" } : _columns[i].Header;
+            context.DrawText(MakeText(caption, _widths[i] - 16, 14), new Point(CellLeft(i) + (i == 0 ? 20 : 10), 9));
+            context.DrawLine(Line, new Point(CellLeft(i), 0), new Point(CellLeft(i), HeaderHeight));
         }
         context.DrawLine(Line, new Point(0, HeaderHeight), new Point(Bounds.Width, HeaderHeight));
         if (_dragging && _pressedRow is not null)
@@ -415,6 +422,7 @@ public sealed class ProjectGrid : Control
             var row = Hit(point); var layout = _layout.FirstOrDefault(r => r.Row.Id == row?.Id);
             return layout is not null && point.Y + _scroll.Snapshot.OffsetY > layout.Y + layout.Title.Height + 10 ? 3 : 1;
         }
+        if(TasksOnly && !Compact)return point.X<_edges[1] ? 0 : point.X<_edges[2] ? 1 : point.X<CellLeft(2) ? 3 : 2;
         for (var i = 0; i < _columns.Length; i++) if (point.X >= _edges[i] && point.X < _edges[i + 1]) return i; return -1;
     }
     private int ResizeColumnAt(Point point)

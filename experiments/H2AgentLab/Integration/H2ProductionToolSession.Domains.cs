@@ -1,0 +1,34 @@
+using H2AgentLab.Providers;
+using H2AgentLab.Runtime;
+using H2AgentLab.Tools;
+using H2AgentLab.Web;
+
+namespace H2AgentLab.Integration;
+
+internal sealed partial class H2ProductionToolSession
+{
+    private partial void ConfigureDomains(AgentTools tools, ToolRegistry registry, List<IAgentRuntimeDomainVerifier> verifiers)
+    {
+        var office = new H2OfficeRuntimeTools(() => IsExecutingAuthorizedCall, tools.Workspace.Root, _scope,
+            _projectId.HasValue ? (_context?.TargetPaths ?? []).Append(new H2Notes.Core.H2AgentTargetPath(tools.Workspace.Root, true, "project-workspace")).ToArray() : null);
+        _owned.Add(office);
+        if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace) office.Register(registry);
+        verifiers.RemoveAll(item => item is StructuredOfficeRuntimeDomainVerifier);
+        verifiers.Add(office);
+        if (tools.Desktop is not null) verifiers.Add(new H2DesktopRuntimeVerifier());
+        if (_scope?.Mode == H2Notes.Core.H2AgentPermissionMode.FullAccess && H2AutoCadFileTools.FindExecutable() is { } cadExecutable)
+        {
+            var cad = new H2AutoCadFileTools(cadExecutable, tools.Workspace, tools.StateRoot); cad.Register(registry); verifiers.Add(cad);
+        }
+
+        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
+        _owned.Add(http);
+        var digest = new H2NewsDigestTools(tools.Workspace, tools.StateRoot); digest.Register(registry); verifiers.Add(digest);
+        var web = new WebResearchHost(new HttpWebResearchBackend(http)) { FeedObserved = digest.Observe };
+        web.ConnectAsync(CancellationToken.None).GetAwaiter().GetResult();
+        // Fetch/extract are available without a search subscription. Do not advertise an
+        // unconfigured search backend or a browser action that merely echoes a URL.
+        new CapabilityProviderToolRegistryAdapter(registry).LoadSelectedAsync(web,
+            ["web.fetch", "web.download", "web.extract", "web.get_metadata", "web.read_feed"], CancellationToken.None).GetAwaiter().GetResult();
+    }
+}

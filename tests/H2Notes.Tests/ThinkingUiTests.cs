@@ -73,9 +73,9 @@ internal static class ThinkingUiTests
                 Check(heading.FontSize is > 13 and <= 18, "Chat heading is still oversized");
                 Check(headingText.Contains("📝") && !rendered.Markdown.Contains("\\uD83D", StringComparison.Ordinal), "Literal Unicode escape was not normalized for display");
                 Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownListItem") == 2, "Markdown checklist/list not rendered");
-                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownTable") == 2, "Markdown or fenced table not rendered as a real table");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownTable") == 1, "Markdown table not rendered as a real table");
                 Check(rendered.GetVisualDescendants().Any(c => c.Name == "MarkdownQuote"), "Markdown quote not rendered");
-                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownCode") == 1, "A fenced table stayed as code or ordinary code was lost");
+                Check(rendered.GetVisualDescendants().Count(c => c.Name == "MarkdownCode") == 2, "Fenced literal content was incorrectly interpreted as a table");
                 Check(AiLegacyRequestContext.Instructions.Contains("bảng Markdown", StringComparison.Ordinal)
                     && AiLegacyRequestContext.Instructions.Contains("không bọc bảng trong code fence", StringComparison.Ordinal),
                     "Vision transcription guidance no longer preserves table structure");

@@ -43,6 +43,7 @@ internal static class PdfComposerTests
             var window = new H2Notes.Avalonia.AiSettingsWindow(app); window.Show(); Dispatcher.UIThread.RunJobs();
             try
             {
+                window.GetVisualDescendants().OfType<Button>().Single(b=>b.Content is TextBlock { Text:"Tiện ích" }).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)); Dispatcher.UIThread.RunJobs();
                 var selector = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "AiPdfEngine");
                 Check(selector.ItemsSource!.Cast<object>().Count() == 4, "PDF engine choice missing");
                 selector.SelectedIndex = 3; Dispatcher.UIThread.RunJobs();

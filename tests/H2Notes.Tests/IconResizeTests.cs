@@ -80,30 +80,17 @@ internal static class IconResizeTests
             var window = new H2Notes.Avalonia.MainWindow(new H2Notes.Avalonia.App(), board);
             window.Show(); Pump();
             H2UiTestNavigation.OpenProjectWorkspace(window, project.Id); Pump();
-            foreach (var name in new[] { "PinButton", "CloseButton", "MenuButton", "ProjectsNavButton", "NotesNavButton", "AiNavButton", "SettingsNavButton", "AskAiButton", "PriorityButton", "AgentTabButton" })
+            foreach (var name in new[] { "PinButton", "CloseButton", "MenuButton", "ProjectsNavButton", "NotesNavButton", "AiNavButton", "SettingsNavButton", "DocumentButton", "AgentTabButton" })
                 Check(window.FindControl<Button>(name)!.GetVisualDescendants().OfType<AppIcon>().Any(), "Missing vector: " + name);
 
-            // The default project surface is Agent-first. Enter the Tasks detail before
-            // validating the mature task/note detail splitter.
             window.FindControl<Button>("TasksTabButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
-            var splitter = window.FindControl<ResizeSplitter>("NotesSplitter")!;
-            Check(splitter.Bounds.Height >= ResizeSplitter.HitSize && splitter.Cursor is not null, "Splitter not discoverable");
-            var point = splitter.TranslatePoint(new Point(splitter.Bounds.Width / 2, 1), window)!.Value;
-            var pane = window.FindControl<Border>("TasksPane")!; var before = pane.Bounds.Height;
-            window.MouseMove(point); window.MouseDown(point, MouseButton.Left);
-            window.MouseMove(point + new Vector(0, 30), RawInputModifiers.LeftMouseButton);
-            window.MouseUp(point + new Vector(0, 30), MouseButton.Left); Pump();
-            Check(Math.Abs(pane.Bounds.Height - before) > 10, "Outer splitter hit area does not drag");
+            Check(window.FindControl<Border>("TasksPane")!.IsVisible && !window.FindControl<Border>("NotesPane")!.IsVisible,"Tasks must occupy their own page");
             window.FindControl<Button>("PriorityButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
-            Check(board.Projects[0] == project, "Star does not prioritize current project");
-            foreach (var mode in new[] { "right", "bottom" })
-            {
-                project.Layout.AiDock = mode;
-                window.Width += 1; Pump();
-                var aiSplit = window.FindControl<ResizeSplitter>(mode == "right" ? "AiVerticalSplitter" : "AiHorizontalSplitter")!;
-                Check(aiSplit.IsVisible && aiSplit.Cursor is not null, "Missing AI resize cursor");
-                Check((mode == "right" ? aiSplit.Bounds.Width : aiSplit.Bounds.Height) >= ResizeSplitter.HitSize, "AI splitter hit area too small");
-            }
+            Check(board.Projects[0] == project,"Prioritize still orders the project");
+            window.Width=1440;window.Height=860;window.DockProjectAi("right");Pump();
+            Check(window.FindControl<Border>("AiHostBorder")!.IsVisible,"Wide task page lost docked Agent");
+            window.DockProjectAi("hidden");Pump();
+            Check(!window.FindControl<Border>("AiHostBorder")!.IsVisible,"Hide dock action did not work");
             window.Hide();
         });
         test("List toolbar actions preserve formatting and undo as one edit", () =>

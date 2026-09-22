@@ -1,0 +1,142 @@
+[
+  {
+    "sha256": "0ba7f2d47190a465a89975b5ff468c21671a668ff66c8d99f034b27384e78f93",
+    "file": "01-agent-wide.png"
+  },
+  {
+    "sha256": "f24f1f623a8c9e8e00a453380ec858dad7c0156f9aadb88e12bfb3bfc30e4195",
+    "file": "02-agent-medium.png"
+  },
+  {
+    "sha256": "0d9956ebf8f737abdf23658d689aa7b4c0b28027bb766ddcb66c8570de4c25cb",
+    "file": "03-agent-narrow.png"
+  },
+  {
+    "sha256": "e59369cc11edc8cb280101ee60b48811fc0833fdbe72c0f210232f93775f175d",
+    "file": "04-agent-minimum.png"
+  },
+  {
+    "sha256": "8252e69d03e20f58799ddb1978dcf7911ec9ea8022bafff6506e32aebb6a658f",
+    "file": "05-project-picker.png"
+  },
+  {
+    "sha256": "ae398d94fe35eee4b3f37d37eccf6c539e3b4bae2a6c2e46dfaf527396251dcd",
+    "file": "06-document-narrow.png"
+  },
+  {
+    "sha256": "b48245cc286786a0515442d5e05902c517e266980624acbd2c5997ac96ef7d37",
+    "file": "07-command-center.png"
+  },
+  {
+    "sha256": "b752d2b83d1cb2e2127b28a2df1132744b6dc1386be61131d7e1484a7ee8dd11",
+    "file": "08-project-tasks.png"
+  },
+  {
+    "sha256": "6fa7e928db0225df372700f9fcfaf755a21990f770b86aecdc5625de8969e938",
+    "file": "09-project-notes.png"
+  },
+  {
+    "sha256": "1e3500022297bdfeca54f911e3b4c2917fe7667203f0c1934afaeebfffa455fb",
+    "file": "10-project-files.png"
+  },
+  {
+    "sha256": "f216904b03e781b9d0aa4cba84677248637930ee5494782a4114e2102da12ded",
+    "file": "10-word-preview.png"
+  },
+  {
+    "sha256": "ef216afa1b37cf52461819834e70ba4f5c1f8c6c5b0146a3cd5b59642bfd7ebb",
+    "file": "11-history-evidence.png"
+  },
+  {
+    "sha256": "06af3d23ae50d756d8ca4b6e660cbc99c498aceb93321f4ca8f222f7796cea1e",
+    "file": "12-ai-settings.png"
+  },
+  {
+    "sha256": "62f35fdae5380a842766e3e5479ad4550ca3a0c8e4ab51710be13539633a237f",
+    "file": "13-storage-conflict.png"
+  },
+  {
+    "sha256": "876c6da38664bf46015a23e861b2b83722d6cbcbfdf15656f560f57e4284a06c",
+    "file": "14-bubble-attention.png"
+  },
+  {
+    "sha256": "61c9c5c3038fa57fb3f71ace9b6d18ddf87f74b4c54fa40d860f662462bfc3b0",
+    "file": "14-bubble-completed.png"
+  },
+  {
+    "sha256": "3873d1a4525b6c314113158011e63d2447287bee440bdb7182b0c5c860fe0049",
+    "file": "14-bubble-idle.png"
+  },
+  {
+    "sha256": "dd85f93e8f97599fafd666c88af02438deb7bea7997fba5a75f76a5ac9bc2341",
+    "file": "14-bubble-working.png"
+  },
+  {
+    "sha256": "744cf30922d60c83d8aa7ceb250b646a047deb00ae9aff57759859c5e21ea400",
+    "file": "15-assistant-640.png"
+  },
+  {
+    "sha256": "4497bba0544f154ec0213c3dd770c68fadb66ce490d25ec26966f42625c573f2",
+    "file": "16-assistant-380.png"
+  },
+  {
+    "sha256": "365be621599dd80cc5497702f0e3f33cd9fb98fb9d59be2c677beb8c1c88f59c",
+    "file": "17-assistant-full.png"
+  },
+  {
+    "sha256": "1868bb25db163aec67b2ae388084ab746a086ae484e2c3f5ff743c6a88dc135f",
+    "file": "18-attach-menu.png"
+  },
+  {
+    "sha256": "cbc65b0c31023805fa0f9d5530562015b3aee474db1def7c176f4855471086b4",
+    "file": "18-composer.png"
+  },
+  {
+    "sha256": "5e484f89163601fa8b7da84b8bab6138129d3f619c4956ad7aa8b309f5c76da1",
+    "file": "18-context-menu.png"
+  },
+  {
+    "sha256": "2714373596049f0193b78dd2e94b28bb5d61f68064ece5368e57c8e4f03684a9",
+    "file": "18-model-menu.png"
+  },
+  {
+    "sha256": "36fae481149f769a8ad89f83ba6f0f94ae99b8b94a3516752df5090811863dca",
+    "file": "18-permission-menu.png"
+  },
+  {
+    "sha256": "ff3fb8b8281f2e4aa389e2e9911c8761a7fea5c490b4f3b7df43fa3253194998",
+    "file": "19-storage-transfer.png"
+  },
+  {
+    "sha256": "5958e2b765e8315adf03450bb7667ac62270eb822a9ea66bb8bc51355d1e3c2a",
+    "file": "20-pdf-evidence.png"
+  },
+  {
+    "sha256": "27af24a62371ba80d4d9904a02358d569eb6dc3b8c8531027979f641bbd3f94e",
+    "file": "native-assistant.jpg"
+  },
+  {
+    "sha256": "5b15a91dacc53042d76aa1fede08e33d90716d3feb282b8f613f44e05e76c88c",
+    "file": "native-document-page.jpg"
+  },
+  {
+    "sha256": "e639a66258b0e86d35ff27bb6aed1a12ba0afe26a1b6780f0b2798ba410e9ffd",
+    "file": "native-minimum-draft.jpg"
+  },
+  {
+    "sha256": "6111a0bfd7cad390e29c04146405f5016263f67dbef8015cf0cc035911219fda",
+    "file": "native-note-selection-to-agent.jpg"
+  },
+  {
+    "sha256": "dac1189cd886ed4d572a082d3e7f926a43f92182bf351a57fd1819ab30b8e1ff",
+    "file": "native-notes-wide.jpg"
+  },
+  {
+    "sha256": "d7aa5bde85dd841159006d8434276031bd99fbcf0e688b342833240926a4c0c6",
+    "file": "native-tasks-interaction.jpg"
+  },
+  {
+    "sha256": "e8d183db7703ffcb92c65997a31bc65ec9b1534220ec424807d82d7bdde5927a",
+    "file": "native-word-zoom.jpg"
+  }
+]

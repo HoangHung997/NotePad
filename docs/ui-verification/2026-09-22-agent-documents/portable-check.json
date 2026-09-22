@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "application": "C:\\Users\\hoang\\Downloads\\H2Notes-Full-2026-09-21-win-x64\\",
+  "bundledPython": "C:\\Users\\hoang\\Downloads\\H2Notes-Full-2026-09-21-win-x64\\python",
+  "helpersPassed": true,
+  "documentsPythonPassed": true,
+  "ocr": {
+    "Root": "C:\\Users\\hoang\\Downloads\\H2Notes-Full-2026-09-21-win-x64\\ocr-runtime",
+    "Ready": true,
+    "PythonBundled": true,
+    "Bytes": 7810338625,
+    "Engines": {
+      "got-ocr": true,
+      "docling": true,
+      "mineru": true
+    },
+    "Message": "\u0110\u1EE7 Python portable \u002B GOT-OCR 2.0 \u002B Docling \u002B MinerU. C\u00F3 th\u1EC3 \u0111\u00F3ng g\u00F3i c\u00F9ng \u1EE9ng d\u1EE5ng."
+  },
+  "limits": "OCR models are inventoried, not inferred by this command. No LLM, live Office document, personal data or second-machine check."
+}

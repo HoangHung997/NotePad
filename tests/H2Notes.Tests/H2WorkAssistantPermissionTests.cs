@@ -119,10 +119,14 @@ internal static class H2WorkAssistantPermissionTests
             Check(compact.SelectedPermissionMode == H2AgentPermissionMode.ObserveOnly,
                 "New context silently inherited a previous mutation grant preset.");
 
-            var combo = PrivateField<ComboBox>(compact, "_permission");
-            Check(combo.Name == "WorkAssistantPermissionPreset"
-                && combo.ItemsSource!.Cast<object>().Count() == 4,
-                "Work Assistant does not expose the four product permission presets.");
+            var button = PrivateField<Button>(compact, "_permission");
+            Check(button.Name == "WorkAssistantPermissionPreset", "Permission menu is missing.");
+            compact.SelectedPermissionMode = H2AgentPermissionMode.FullAccess;
+            Check(compact.SelectedPermissionMode == H2AgentPermissionMode.FullAccess,
+                "Full access cannot be selected.");
+            compact.SetActiveContext(null);
+            Check(compact.SelectedPermissionMode == H2AgentPermissionMode.ObserveOnly,
+                "Full access leaked into a newly captured target.");
             compact.Close();
         });
 

@@ -4,6 +4,13 @@ Status: **CANONICAL AFTER THE CURRENT IN-FLIGHT AGENT LAB TASK FINISHES**
 Date: 2026-09-18  
 Architecture source of truth: `docs/H2_AGENT_MASTER_SPEC.md`
 
+Production integration correction (2026-09-21): see [repair evidence](H2_REPAIR_2026-09-21.md).
+Historical MB fixture completion does not imply that the H2 product composed
+those providers. H2 now wires typed project/attachment tools, OfficeHost and HTTP
+retrieval, with exact resource authorization and visible approval. AutoCAD native
+bridge and structured web search production connections remain open; native Office
+mutation and two-PC acceptance are not certified by the regression suite.
+
 > Do not start this tracker by interrupting an Agent Lab task already in progress.
 >
 > Finish the task that was already active when this master tracker was introduced, get its CI/evidence stable, then stop using the old Phase-11/Phase-12 sequence as the execution source of truth and begin at `MB-00`.
@@ -1332,3 +1339,14 @@ build more marketplace abstractions
 before
 the real AgentRuntime is using the transports/context/tools already written
 ```
+
+### Chat surface checkpoint — 21/09/2026
+
+User-approved direction implemented and published locally: shared turn renderer,
+durable conversations/replay, public streaming, task input/queue, scoped targets,
+artifact preview and bottom composer. Evidence and explicit remaining gates:
+[chat implementation report](H2_AGENT_CHAT_SURFACE_IMPLEMENTATION_2026-09-21.md).
+566/566 app regression; 10/10 new chat cases; four additional steering wire cases
+passed (Ollama, Chat Completions, Responses stateless/stored). Real Gemma 4 Cloud
+created DOCX/CSV/PDF and consumed supplemental user input inside one task.
+This checkpoint does not close all 109 chat-spec items or NAS two-PC acceptance.

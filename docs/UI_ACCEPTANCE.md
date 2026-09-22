@@ -118,3 +118,39 @@ Kiểm ngưỡng quanh 900 và 1360 DIP, đủ/thấp chiều cao, DPI 100/125/1
 - Chưa kiểm được và lý do:
 - Đã mở đúng app sau build:
 - Kết luận Đạt / Chưa đạt / Chưa kiểm trực tiếp:
+
+### Bổ sung 21/09/2026: Work Assistant theo phản hồi người dùng
+
+- [Biên bản và bằng chứng](H2_WORK_ASSISTANT_REPAIR_2026-09-21.md): panel đi theo bubble, lịch sử phía trên/composer phía dưới, lựa chọn model và Desktop/thư mục, Enter/Shift+Enter, phục hồi tool và trạng thái hoàn thành đúng.
+- Đã thao tác Windows thật ở 125%, panel 460×610 DIP. Kéo bubble và panel cùng delta (31,19) pixel; gửi bằng Enter giữ panel mở; lịch sử dài cuộn riêng; câu tiếp nối dùng đúng trả lời trước; lịch sử nạp lại sau khởi động app review.
+- Mẫu dữ liệu review độc lập với kho người dùng. Đã thử model Ollama thật tạo/đọc lại TXT trên Desktop. Kiểm tra Release 548/548, Work Assistant 36/36, guard kiến trúc 35/35.
+- Mười PNG baseline và BASELINE.json không đổi. Thay đổi Work Assistant tuân theo hai ảnh/yêu cầu mới ngày 21/09; không dùng kết quả này để xác nhận toàn bộ ma trận cũ hoặc parity với mọi chức năng Codex.
+
+### Bổ sung 21/09/2026: ô soạn Assistant và quyền theo ảnh mới
+
+- [Biên bản](H2_ASSISTANT_COMPOSER_2026-09-21.md): ô soạn trắng bo tròn, một hàng +/quyền/model/micro/nút tròn; menu quyền có thực thi backend, bổ sung toàn quyền tệp và lệnh theo tài khoản Windows.
+- Release 554/554, Work Assistant 42/42, guard kiến trúc 35/35. Windows thật 125%, 640×610 và 380×610 DIP; đã thử mở/chọn quyền, model picker, nhập/gửi và resize. Ollama thật tạo/đọc lại tệp ngoài workspace trong chế độ toàn quyền.
+- Giữ 10 PNG/BASELINE.json. Không tuyên bố mọi chức năng hoặc sandbox Codex đã được triển khai; micro hiện mở nhập giọng nói Windows, chưa có hội thoại âm thanh hai chiều.
+
+### Bổ sung 21/09/2026: bề mặt chat Agent theo hướng mới
+
+- [Triển khai và bằng chứng](H2_AGENT_CHAT_SURFACE_IMPLEMENTATION_2026-09-21.md): chung renderer, thread/turn bền vững, hoạt động thu gọn, bổ sung/queue, scope và preview tệp.
+- 566/566 kiểm tra ứng dụng; 10/10 kiểm tra chat; guard 35/35. Gemma 4 Cloud thật tạo Word/CSV/PDF và nhận bổ sung giữa lượt; PDFium render thành công.
+- Native Release đã quan sát ở 640×610; giữ 10 PNG chuẩn. Chuột/resize/DPI chưa kiểm đủ do công cụ báo input người dùng, không xác nhận parity toàn bộ hoặc 109 mục đã hoàn thành.
+
+### Bổ sung 22/09/2026: đại tu Agent và tài liệu theo yêu cầu mới
+
+- Người dùng yêu cầu triển khai toàn bộ `2026-09-21-agent-documents-demo`; đây là chỉ đạo mới, thay trạng thái đề xuất lịch sử để triển khai. Không sửa PNG/manifest hoặc BASELINE.json.
+- Bổ sung 22/09: kiểm thử chức năng Agent bằng `gemma4:cloud`, 584/584 kiểm tra ứng dụng; sửa đường OCR/attachment/evidence và công cụ tài liệu. Xem [biên bản chức năng](H2_AGENT_CAPABILITY_ACCEPTANCE_2026-09-22.md). Trạng thái chuẩn bị OCR và hủy giữ bản nháp đã kiểm tự động; tương tác chuột/phím native trong lượt bổ sung chưa xác nhận vì Windows trả access denied. Không dùng kết quả này làm chứng nhận khớp ảnh 100%.
+- [Biên bản triển khai](H2_AGENT_DOCUMENTS_IMPLEMENTATION.md), [đối chiếu ảnh thiết kế và app](ui-verification/2026-09-22-agent-documents/index.html). Bao phủ bố cục Agent, drawer/trang tài liệu, tổng quan, công việc, ghi chú, tệp, lịch sử, AI, xung đột, Assistant, composer và chuyển kho.
+- Release self-contained build đạt; 574/574 kiểm tra. Native Windows 125%, ảnh bề mặt theo kích thước ghi trong sizes.txt. Kiểm chuột chuyển tab, checkbox/tiến độ, model menu, bấm bong bóng và kéo panel đi cùng (-50,-25) pixel.
+- Bổ sung chuột thật: chọn ghi chú→bản nháp Agent, resize 1440×860→560×600, mở tài liệu thành trang riêng và quay lại giữ bản nháp; zoom Word. Ảnh native bổ sung nằm cùng thư mục kiểm chứng.
+- Đã bổ sung xem tài liệu thật, liên kết lại, chọn đoạn ghi chú, bản nháp đính kèm riêng từng hội thoại, lựa chọn chuyển kho/xung đột rõ ràng. Quyền và dữ liệu ngữ cảnh độc lập; không gán thành công hoặc bằng chứng giả.
+- Kết luận: các luồng chính đã triển khai và chụp trên ứng dụng thật; chưa xác nhận parity từng pixel, DPI 100%/150% và máy thứ hai. Không dùng kiểm tra tự động để thay nghiệm thu hình ảnh.
+
+### Bổ sung 22/09/2026: bong bóng tròn và hoạt động một dòng
+
+- [Biên bản, 11 ảnh và kích thước](H2_BUBBLE_COMPACT_2026-09-22.md). Yêu cầu mới của người dùng thay hình dạng rảnh/hoàn thành trong mẫu 14 bằng hình tròn 54×54 DIP; đang làm và ẩn chat mới mở ngang 320×54 DIP, hoạt động dài cuộn một dòng.
+- App Release thật, dữ liệu demo riêng, DPI native 125%. Đã xem ảnh rảnh/đang làm/chat mở/chat ẩn/hoàn thành và sát mép phải, đối chiếu màu/bố cục thanh với mẫu 14. Giữ nguyên PNG và BASELINE.json, không tuyên bố pixel parity với mẫu cũ.
+- Chuột thật: bắt đầu tác vụ mẫu, bấm H2 mở chat và thu tròn, kéo bong bóng +41/+41 pixel và chat bám theo trong giới hạn màn hình, ẩn chat hiện lại thanh, hoàn thành thu tròn. Mép phải kiểm bằng cửa sổ native với vị trí đặt trong chế độ demo; không coi đây là kiểm kéo chuột qua nhiều màn hình.
+- 590/590 kiểm tra ứng dụng đạt; Release self-contained publish đạt. Chưa kiểm trực tiếp DPI 100%/150% hoặc máy thứ hai. Gói full và bản đang chạy được cập nhật theo [biên bản portable](H2_PORTABLE_BUILD_2026-09-22.md).

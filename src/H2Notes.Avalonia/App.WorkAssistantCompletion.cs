@@ -12,6 +12,10 @@ public partial class App
     private bool _workAssistantTaskMonitorInitialized;
     private H2AgentTaskSummary? _workAssistantTaskSnapshot;
     private string? _workAssistantLastGoal;
+    private Guid? _bubbleProgressTaskId;
+    private long _bubbleProgressSequence = -1;
+    private string? _bubbleProgressText;
+    private string? _bubbleStreamingText;
 
     private void EnsureWorkAssistantTaskMonitor()
     {
@@ -45,7 +49,21 @@ public partial class App
         H2AgentTaskSummary summary;
         try
         {
-            summary = _agentAdapter.GetTaskSummary(taskId);
+            if (_bubbleProgressTaskId != taskId)
+            { _bubbleProgressTaskId = taskId; _bubbleProgressSequence = -1; _bubbleProgressText = null; _bubbleStreamingText = null; }
+            var observation = _agentAdapter.ObserveTask(taskId, _bubbleProgressSequence);
+            summary = observation.Summary;
+            foreach (var progress in observation.Progress.OrderBy(p => p.Sequence))
+            {
+                _bubbleProgressSequence = Math.Max(_bubbleProgressSequence, progress.Sequence);
+                var text = WorkAssistantActivityText.FromProgress(progress);
+                if (text is not null) _bubbleProgressText = text;
+            }
+            if (!string.IsNullOrWhiteSpace(observation.StreamingText) && observation.StreamingText != _bubbleStreamingText)
+            {
+                _bubbleStreamingText = observation.StreamingText;
+                if (observation.Progress.Count == 0) _bubbleProgressText = "Đang viết câu trả lời…";
+            }
         }
         catch (Exception ex)
         {
@@ -62,13 +80,21 @@ public partial class App
         var presentation = BuildWorkAssistantPresentation(summary);
         UpdateWorkAssistantBubble(presentation);
 
-        if (_workAssistantCompact?.IsTaskResultVisible == true)
+        if (_workAssistantCompact is not null)
+        {
+            RefreshWorkAssistantHistory();
             _workAssistantCompact.ShowTaskPresentation(
                 presentation,
                 WorkAssistantProjectChoices());
+        }
 
         if (IsTerminal(summary.Status))
-            _workAssistantTaskTimer.Stop();
+        {
+            var next = _workAssistantThreadId is { } id ? _agentAdapter.GetThread(id)?.TaskIds?
+                .Select(_agentAdapter.GetTaskSummary).FirstOrDefault(t => !IsTerminal(t.Status)) : null;
+            if (next is not null) { _workAssistantQuickTaskId = next.TaskId; _workAssistantTaskSnapshot = next; }
+            else _workAssistantTaskTimer.Stop();
+        }
     }
 
     private WorkAssistantTaskPresentation BuildWorkAssistantPresentation(
@@ -82,7 +108,7 @@ public partial class App
             })
             .ToArray();
 
-        var verified = evidence.Any(IsVerifiedEvidence);
+        var verified = H2AgentVerification.IsVerified(summary);
         var attention = summary.Status is
             H2AgentTaskStatus.WaitingForApproval
             or H2AgentTaskStatus.Blocked
@@ -143,7 +169,7 @@ public partial class App
             summary.TaskId,
             summary.Status,
             stateText,
-            BoundWorkAssistantText(resultText, 1_200),
+            resultText.Length <= 16_000 ? resultText : resultText[..16_000] + "…",
             verified,
             attention,
             evidenceLines,
@@ -155,7 +181,8 @@ public partial class App
             CanRetry: summary.Status is
                 H2AgentTaskStatus.Blocked
                 or H2AgentTaskStatus.Cancelled
-                or H2AgentTaskStatus.Failed);
+                or H2AgentTaskStatus.Failed,
+            PendingApproval: summary.PendingApproval);
     }
 
     private void UpdateWorkAssistantBubble(
@@ -164,7 +191,7 @@ public partial class App
         var (state, detail) = presentation.Status switch
         {
             H2AgentTaskStatus.Queued or H2AgentTaskStatus.Running =>
-                (WorkAssistantBubbleState.Working, "Đang làm"),
+                (WorkAssistantBubbleState.Working, _bubbleProgressText ?? "Đang suy nghĩ…"),
             H2AgentTaskStatus.WaitingForApproval =>
                 (WorkAssistantBubbleState.Attention, "Cần xác nhận"),
             H2AgentTaskStatus.Blocked =>
@@ -179,7 +206,7 @@ public partial class App
                 (WorkAssistantBubbleState.Completed, "Đã xong"),
             _ => (WorkAssistantBubbleState.Idle, "Sẵn sàng")
         };
-        SetWorkAssistantBubbleState(state, detail);
+        SetWorkAssistantBubbleState(state, detail, !IsTerminal(presentation.Status));
     }
 
     private void ShowCurrentWorkAssistantTaskDetails()
@@ -195,6 +222,8 @@ public partial class App
             return;
 
         var compact = EnsureWorkAssistantCompact();
+        RefreshWorkAssistantHistory();
+        PositionWorkAssistantCompact();
         compact.ShowTaskPresentation(
             BuildWorkAssistantPresentation(_workAssistantTaskSnapshot),
             WorkAssistantProjectChoices(),
@@ -203,6 +232,7 @@ public partial class App
 
     private void CancelCurrentWorkAssistantTask()
     {
+        if (_workAssistantPreparation is { } preparing) { preparing.Cancel(); return; }
         if (_workAssistantQuickTaskId is not { } taskId)
             return;
 
@@ -274,14 +304,6 @@ public partial class App
     private static string ProjectDisplayName(ProjectRecord project)
         => project.NameRich?.Text
            ?? RichDocument.FromLegacy(project.Name ?? "").Text;
-
-    private static bool IsVerifiedEvidence(H2AgentEvidence evidence)
-    {
-        var kind = (evidence.Kind ?? "").ToLowerInvariant();
-        return kind.Contains("verified", StringComparison.Ordinal)
-               || kind.Contains("verification", StringComparison.Ordinal)
-               || kind.Contains("mutation", StringComparison.Ordinal);
-    }
 
     private static bool IsTerminal(H2AgentTaskStatus status)
         => status is H2AgentTaskStatus.Completed

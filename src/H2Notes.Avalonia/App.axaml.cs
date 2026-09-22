@@ -24,20 +24,15 @@ public partial class App : Application
     public string DeviceId => _local.DeviceId;
     public bool IsChangingStore { get; private set; }
     public bool UsesProjectFiles => _storage is ProjectWorkspaceStore;
-    public string? AgentWorkspaceRoot => _storage switch
-    {
-        ProjectWorkspaceStore project => project.Root,
-        null => null,
-        _ => string.IsNullOrWhiteSpace(_storage.FilePath)
-            ? null
-            : Path.GetDirectoryName(_storage.FilePath)
-    };
+    // Generic file/Python tools work in a local output area. Project data is available only
+    // through versioned typed project tools, never unrestricted edits to the shared JSON store.
+    public string? AgentWorkspaceRoot => Path.Combine(LocalConfiguration.SettingsDirectory, "agent-workspace");
     public string DataFolder => _storage is ProjectWorkspaceStore project ? project.Root : Path.GetDirectoryName(DataPath)!;
     private IH2AgentAdapter _agentAdapter = H2UnavailableAgentAdapter.Instance;
     private IH2ProjectToolHost? _projectToolHost;
-    public IH2ProjectToolHost ProjectToolHost => _projectToolHost ??= new H2ProjectToolHost(
+    public IH2ProjectToolHost ProjectToolHost => _projectToolHost ??= new UiProjectToolHost(new H2ProjectToolHost(
         ResolveProjectForAgentTools,
-        ProjectChangedByAgentTool);
+        ProjectChangedByAgentTool));
     public IH2AgentAdapter AgentAdapter
     {
         get => _agentAdapter;
@@ -120,7 +115,8 @@ public partial class App : Application
 
     public Task StopAiAsync() => Task.WhenAll(_aiWindows.Values.Select(w => w.StopAiAsync()).Append(_main?.StopAiAsync() ?? Task.CompletedTask));
     private void CancelAi() { _main?.CancelAi(); foreach (var window in _aiWindows.Values) window.CancelAi(); }
-    public void RefreshAiConnections() { _main?.RefreshAiConnections(); foreach (var window in _aiWindows.Values) window.RefreshAiConnections(); }
+    public void RefreshAiConnections() { _main?.RefreshAiConnections(); foreach (var window in _aiWindows.Values) window.RefreshAiConnections();
+        _workAssistantCompact?.ConfigureModels(LocalSettings.Ai.Profiles, LocalSettings.Ai.SelectedId); }
     private DateTime _lastTrayClick;
     public string DataPath => _storage.FilePath;
     public IEnumerable<Window> OpenWindows => _notes.Values.Cast<Window>().Concat(_aiWindows.Values).Concat(_main is null ? [] : new Window[] { _main })
@@ -223,8 +219,29 @@ public partial class App : Application
                 foreach (var window in _aiWindows.Values) window.SetSaveStatus(text);
             }
             if (UsesProjectFiles) _syncTimer.Start();
+            if (_demo && dataIndex >= 0 && args.Contains("--review-ui"))
+            {
+                // Native UI acceptance is opt-in and restricted to explicitly selected demo data.
+                _main.ShowInTaskbar = true;
+                _main.Title = "H2 Notes · Bản sửa Agent và giao diện";
+                _main.Width = 1200; _main.Height = 820;
+                var reviewWidth=Array.IndexOf(args,"--review-width");var reviewHeight=Array.IndexOf(args,"--review-height");
+                if(reviewWidth>=0 && reviewWidth+1<args.Length && int.TryParse(args[reviewWidth+1],out var rw))_main.Width=Math.Clamp(rw,560,1920);
+                if(reviewHeight>=0 && reviewHeight+1<args.Length && int.TryParse(args[reviewHeight+1],out var rh))_main.Height=Math.Clamp(rh,600,1080);
+                if (plan.Board.Projects.FirstOrDefault() is { } project) _main.OpenProjectWorkspace(project.Id);
+                ShowMain();
+                if (args.Contains("--review-bubble"))
+                {
+                    // Expose the real floating surfaces to native acceptance tools, only
+                    // with explicitly isolated demo data and the review UI opt-in.
+                    EnsureWorkAssistantCompact().ShowInTaskbar = true;
+                    EnsureWorkAssistantBubble().ShowInTaskbar = true;
+                    ShowWorkAssistantBubble();
+                }
+            }
             if (args.Contains("--show")) ShowMain();
             if (args.Contains("--show-ai")) ShowProjectAiWindow();
+            if (args.Contains("--show-assistant")) ShowWorkAssistantCompact();
             ScheduleSave();
             var evidenceIndex = Array.IndexOf(args, "--ui-evidence");
             if (_demo && dataIndex >= 0 && evidenceIndex >= 0 && evidenceIndex + 1 < args.Length)
@@ -271,6 +288,22 @@ public partial class App : Application
                 _instanceLock?.Dispose();
             };
             var documentsEvidenceIndex = Array.IndexOf(args, "--documents-evidence");
+            var bubbleEvidenceIndex = Array.IndexOf(args, "--bubble-evidence");
+            if (_demo && dataIndex >= 0 && bubbleEvidenceIndex >= 0 && bubbleEvidenceIndex + 1 < args.Length)
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var directory = Path.GetFullPath(args[bubbleEvidenceIndex + 1]);
+                    try { await CaptureWorkAssistantBubbleEvidence(directory); }
+                    catch (Exception ex) { Directory.CreateDirectory(directory); File.WriteAllText(Path.Combine(directory, "error.txt"), ex.ToString()); }
+                });
+            var agentDocumentsIndex=Array.IndexOf(args,"--agent-documents-evidence");
+            if(_demo && dataIndex>=0 && agentDocumentsIndex>=0 && agentDocumentsIndex+1<args.Length)
+                Dispatcher.UIThread.Post(async ()=>
+                {
+                    var directory=Path.GetFullPath(args[agentDocumentsIndex+1]);
+                    try { ShowMain();await _main.CaptureAgentDocumentsEvidence(directory); }
+                    catch(Exception ex) { Directory.CreateDirectory(directory);File.WriteAllText(Path.Combine(directory,"error.txt"),ex.ToString()); }
+                });
             if (_demo && dataIndex >= 0 && documentsEvidenceIndex >= 0 && documentsEvidenceIndex + 1 < args.Length)
                 Dispatcher.UIThread.Post(async () =>
                 {
@@ -304,22 +337,29 @@ public partial class App : Application
     {
         AgentAdapter = new H2ProductionAgentAdapter(
             Path.Combine(LocalConfiguration.SettingsDirectory, "agent-runtime"),
-            () =>
-            {
-                var profile = _local.Ai.Profiles
-                    .FirstOrDefault(item => item.Id == _local.Ai.SelectedId)
-                    ?? _local.Ai.Profiles.FirstOrDefault()
-                    ?? throw new InvalidOperationException(
-                        "Chưa có cấu hình model cho H2 Agent.");
+            () => ResolveAgentModel(null, null),
+            requestModelResolver: ResolveAgentModel);
+    }
 
-                if (string.IsNullOrWhiteSpace(profile.Model))
-                    throw new InvalidOperationException(
-                        "Chọn model trong Thiết lập AI trước khi chạy H2 Agent.");
+    private H2ProductionAgentModel ResolveAgentModel(Guid? profileId, string? reasoningEffort)
+    {
+        var profile = _local.Ai.Profiles
+            .FirstOrDefault(item => item.Id == (profileId ?? _local.Ai.SelectedId))
+            ?? (profileId is null ? _local.Ai.Profiles.FirstOrDefault() : null)
+            ?? throw new InvalidOperationException(
+                "Chưa có cấu hình model cho H2 Agent.");
 
-                return new H2ProductionAgentModel(
-                    profile,
-                    SecretVault.Read(profile.Id));
-            });
+        if (string.IsNullOrWhiteSpace(profile.Model))
+            throw new InvalidOperationException(
+                "Chọn model trong Thiết lập AI trước khi chạy H2 Agent.");
+
+        var options = AiModelCapabilities.GetReasoningOptions(profile);
+        var snapshot = AiModelCapabilities.WithReasoning(profile,
+            reasoningEffort is not null && options.Contains(reasoningEffort) ? reasoningEffort : null);
+        if (options.Count == 0) snapshot.ReasoningEffort = "";
+        return new H2ProductionAgentModel(
+            snapshot,
+            SecretVault.Read(profile.Id));
     }
 
     private void ShowStartupError(IClassicDesktopStyleApplicationLifetime desktop, string text)
@@ -385,6 +425,10 @@ public partial class App : Application
                 _local.Save();
             },
             ShowCurrentWorkAssistantTaskDetails);
+        _workAssistantBubble.PositionChanged += (_, _) => PositionWorkAssistantCompact();
+        _workAssistantBubble.Resized += (_, _) => PositionWorkAssistantCompact();
+        _foregroundMemoryTimer.Tick += (_, _) => { if (_local.WorkAssistant.Enabled && !IsExiting) WorkAssistantContextCapture.RememberForeground(); };
+        _foregroundMemoryTimer.Start();
         return _workAssistantBubble;
     }
 
@@ -443,13 +487,15 @@ public partial class App : Application
 
     public void SetWorkAssistantBubbleState(
         WorkAssistantBubbleState state,
-        string? detail = null)
+        string? detail = null,
+        bool? taskActive = null)
     {
         if (!_local.WorkAssistant.Enabled)
             return;
 
         var bubble = EnsureWorkAssistantBubble();
-        bubble.SetState(state, detail);
+        bubble.SetChatVisible(IsWorkAssistantCompactVisible && _workAssistantCompact?.WindowState != WindowState.Minimized);
+        bubble.SetState(state, detail, taskActive);
     }
 
     public string? WorkAssistantHotkeyError
@@ -517,11 +563,28 @@ public partial class App : Application
             return _workAssistantCompact;
 
         _workAssistantCompact = new WorkAssistantCompactWindow(_local.WorkAssistant);
+        if (_demo) _workAssistantCompact.Title = "Work Assistant · Kiểm thử";
         _workAssistantCompact.SubmitRequested += StartWorkAssistantQuickTaskAsync;
         _workAssistantCompact.CancelTaskRequested += CancelCurrentWorkAssistantTask;
         _workAssistantCompact.RetryTaskRequested += PrepareRetryCurrentWorkAssistantTask;
         _workAssistantCompact.LinkProjectRequested += LinkCurrentWorkAssistantTaskFromUi;
         _workAssistantCompact.OpenWorkspaceRequested += OpenCurrentWorkAssistantWorkspace;
+        _workAssistantCompact.ApprovalAdapter = _agentAdapter;
+        _workAssistantCompact.ConfigureModels(_local.Ai.Profiles, _local.Ai.SelectedId);
+        _workAssistantCompact.Opened += (_, _) => PositionWorkAssistantCompact();
+        _workAssistantCompact.Resized += (_, _) => PositionWorkAssistantCompact();
+        _workAssistantCompact.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Window.IsVisibleProperty || e.Property == Window.WindowStateProperty)
+            {
+                _workAssistantBubble?.SetChatVisible(IsWorkAssistantCompactVisible && _workAssistantCompact.WindowState != WindowState.Minimized);
+                PositionWorkAssistantCompact();
+            }
+        };
+        _workAssistantCompact.NewConversationRequested += StartNewWorkAssistantConversation;
+        _workAssistantCompact.ConversationSelected += SelectWorkAssistantThread;
+        _workAssistantCompact.DraftChanged += _ => { if (!_loadingWorkAssistantThread) { _workAssistantDraftTimer.Stop(); _workAssistantDraftTimer.Start(); } };
+        _workAssistantDraftTimer.Tick += (_, _) => SaveWorkAssistantDraft();
         return _workAssistantCompact;
     }
 
@@ -534,7 +597,18 @@ public partial class App : Application
         CurrentWorkAssistantContext = WorkAssistantContextCapture.Capture();
         var compact = EnsureWorkAssistantCompact();
         compact.SetActiveContext(CurrentWorkAssistantContext);
+        RefreshWorkAssistantHistory();
+        ShowWorkAssistantBubble();
+        PositionWorkAssistantCompact();
         compact.OpenFromHotkey();
+    }
+
+    public void ShowWorkAssistantFull()
+    {
+        if (!_local.WorkAssistant.Enabled) { _local.WorkAssistant.Enabled = true; _local.Save(); }
+        var compact = EnsureWorkAssistantCompact();
+        compact.SetFullMode(true);
+        ShowWorkAssistantCompact();
     }
 
     public void HideWorkAssistantCompact()
@@ -549,6 +623,7 @@ public partial class App : Application
     {
         var compact = EnsureWorkAssistantCompact();
         prompt = (prompt ?? "").Trim();
+        if (_workAssistantPreparation is not null) return;
         if (prompt.Length == 0)
         {
             compact.SetStatus("Nhập yêu cầu trước khi gửi.", isError: true);
@@ -556,32 +631,50 @@ public partial class App : Application
         }
 
         var permissionMode = compact.SelectedPermissionMode;
+        if (_workAssistantTaskSnapshot is { } running && !IsTerminal(running.Status))
+        {
+            if (compact.QueueNextTurn) { await QueueWorkAssistantTurn(prompt, running); return; }
+            if (_agentAdapter.SupplementTask(running.TaskId, Guid.NewGuid(), prompt))
+            { compact.ClearPrompt(); compact.SetStatus("Đã nhận bổ sung cho tác vụ hiện tại. Phạm vi và quyền đang chạy giữ nguyên."); }
+            else compact.SetStatus("Tác vụ vừa kết thúc hoặc chưa nhận được bổ sung. Nội dung vẫn ở ô soạn để gửi lượt tiếp.");
+            return;
+        }
+        var workspaceRoot = compact.SelectedWorkspaceRoot;
+        if(workspaceRoot is null && compact.DraftAttachments.Count>0 && string.IsNullOrWhiteSpace(selectedContextSummary))workspaceRoot=AgentWorkspaceRoot;
+        if (workspaceRoot is null && H2AgentTargetScope.FromUserRequest(prompt).Count > 0) workspaceRoot = AgentWorkspaceRoot;
+        if (workspaceRoot is not null) selectedContextSummary = "";
         H2ActiveWorkContext? validatedContext = null;
 
         // Grounding and any mutating scope both use the original captured target identity.
         // Removing chips narrows what is sent; it never bypasses stale-target validation.
-        var needsTargetValidation =
+        var needsTargetValidation = workspaceRoot is null && (
             !string.IsNullOrWhiteSpace(selectedContextSummary)
             || permissionMode is H2AgentPermissionMode.AskBeforeChanges
-                or H2AgentPermissionMode.AllowScopedChanges;
+                or H2AgentPermissionMode.AllowScopedChanges);
 
         if (needsTargetValidation
             && !TryGetValidatedWorkAssistantContext(out validatedContext))
         {
             compact.SetActiveContext(null);
             compact.SetStatus(
-                "Context đã thay đổi hoặc không còn hợp lệ. Mở lại trợ lý để capture lại, hoặc gửi ở chế độ Chỉ quan sát không kèm context.",
+                "Ứng dụng hoặc tài liệu đã thay đổi. Mở lại trợ lý để chọn lại ngữ cảnh, hoặc chọn thư mục làm việc.",
                 isError: true);
             return;
         }
 
-        if (!WorkAssistantPermissionScopeMapper.TryMap(
+        WorkAssistantPermissionMapping? permission;
+        if (workspaceRoot is not null)
+        {
+            try { permission = WorkAssistantPermissionScopeMapper.ForWorkspace(permissionMode, workspaceRoot, DateTime.UtcNow); }
+            catch (ArgumentException ex) { compact.SetStatus(ex.Message, true); return; }
+        }
+        else if (!WorkAssistantPermissionScopeMapper.TryMap(
                 permissionMode,
                 validatedContext ?? CurrentWorkAssistantContext,
                 compact.SelectedContextScope,
                 projectId: null,
                 DateTime.UtcNow,
-                out var permission,
+                out permission,
                 out var permissionError)
             || permission is null)
         {
@@ -591,16 +684,48 @@ public partial class App : Application
             return;
         }
 
+        EnsureWorkAssistantThread();
+        IReadOnlyList<AiAttachment> attachments;
+        if (compact.DraftAttachments.Count == 0) attachments = [];
+        else using (var preparation = new CancellationTokenSource())
+        {
+            _workAssistantPreparation = preparation;
+            compact.SetAttachmentPreparation(true);
+            SetWorkAssistantBubbleState(WorkAssistantBubbleState.Working, "Đang đọc tài liệu đính kèm…");
+            try
+            {
+                var model = ResolveAgentModel(compact.SelectedModelProfileId, compact.SelectedReasoningEffort);
+                attachments = await AiPdfProcessor.PrepareAttachmentsAsync(compact.DraftAttachments, model.Profile,
+                    _local.Ai.Pdf, AiSettingsWindow.PdfBridgePath,
+                    new Progress<string>(text => { compact.SetStatus(text); SetWorkAssistantBubbleState(WorkAssistantBubbleState.Working, text); }), preparation.Token);
+            }
+            catch (OperationCanceledException)
+            { compact.SetStatus("Đã dừng đọc tài liệu. Nội dung và tệp nháp vẫn được giữ, chưa gửi AI."); return; }
+            catch (Exception ex)
+            { compact.SetStatus("Chưa gửi tài liệu: " + BoundUiError(ex.Message), true); return; }
+            finally { _workAssistantPreparation = null; compact.SetAttachmentPreparation(false); SetWorkAssistantBubbleState(WorkAssistantBubbleState.Idle); }
+        }
         var taskContext = new H2AgentTaskContext(
-            AgentWorkspaceRoot,
+            workspaceRoot ?? AgentWorkspaceRoot,
             string.IsNullOrWhiteSpace(selectedContextSummary)
                 ? null
                 : selectedContextSummary,
             Version: 0,
-            PermissionScope: permission.PermissionScope);
+            PermissionScope: permission.PermissionScope,
+            ModelProfileId: compact.SelectedModelProfileId,
+            ReasoningEffort: compact.SelectedReasoningEffort,
+            RecentTurns: compact.ConversationTurns,
+            Images: AiDocuments.NativeImages(attachments),
+            Files: AiDocuments.NativeFiles(attachments),
+            Attachments: attachments,
+            ThreadId: _workAssistantThreadId,
+            TurnId: Guid.NewGuid());
 
         try
         {
+            _workAssistantLastContext = taskContext;
+            _workAssistantLastReadOnly = permission.ReadOnly;
+            _workAssistantQueueTail = null;
             var taskId = await _agentAdapter.StartTaskAsync(
                 projectId: null,
                 goal: prompt,
@@ -609,10 +734,11 @@ public partial class App : Application
                 cancellationToken: CancellationToken.None);
 
             compact.ClearPrompt();
+            compact.ClearAttachments();
             compact.SetStatus("Tác vụ đã gửi cho Agent.");
-            HideWorkAssistantCompact();
             ShowWorkAssistantBubble();
             BeginWorkAssistantTaskMonitor(taskId, prompt);
+            RefreshWorkAssistantHistory();
         }
         catch (Exception ex)
         {
@@ -1028,9 +1154,11 @@ public partial class App : Application
 
     public void ExitApp()
     {
+        SaveWorkAssistantDraft();
         CancelAi();
         SaveNow();
         if (LastSaveError is not null) return;
+        _workAssistantDraftTimer.Stop(); _foregroundMemoryTimer.Stop();
         IsExiting = true;
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) desktop.Shutdown();
     }

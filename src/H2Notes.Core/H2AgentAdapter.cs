@@ -19,7 +19,8 @@ public enum H2AgentPermissionMode
     ObserveOnly = 0,
     AskBeforeChanges = 1,
     AllowScopedChanges = 2,
-    UseProjectPolicy = 3
+    UseProjectPolicy = 3,
+    FullAccess = 4
 }
 
 public enum H2AgentResourceScopeKind
@@ -28,7 +29,9 @@ public enum H2AgentResourceScopeKind
     Window = 1,
     Document = 2,
     Session = 3,
-    Project = 4
+    Project = 4,
+    Workspace = 5,
+    Machine = 6
 }
 
 /// <summary>
@@ -37,6 +40,7 @@ public enum H2AgentResourceScopeKind
 /// </summary>
 public sealed record H2AgentPermissionScope
 {
+    public static string CurrentMachineResourceKey => "machine:" + Environment.MachineName + ":" + Environment.UserName;
     public H2AgentPermissionScope(
         H2AgentPermissionMode mode,
         H2AgentResourceScopeKind scopeKind,
@@ -65,6 +69,11 @@ public sealed record H2AgentPermissionScope
             throw new ArgumentException("Ask-before-changes requires mutation capability plus approval.", nameof(approvalRequired));
         if (mode == H2AgentPermissionMode.AllowScopedChanges && (!mutationAllowed || approvalRequired))
             throw new ArgumentException("Allow-scoped-changes must allow mutation without per-change approval.", nameof(approvalRequired));
+        if (mode == H2AgentPermissionMode.FullAccess && (!mutationAllowed || approvalRequired
+            || scopeKind != H2AgentResourceScopeKind.Machine || resourceKey != CurrentMachineResourceKey))
+            throw new ArgumentException("Full access requires an explicit grant for the current Windows account and machine.");
+        if (scopeKind == H2AgentResourceScopeKind.Machine && mode != H2AgentPermissionMode.FullAccess)
+            throw new ArgumentException("Only full access can grant machine scope.");
         if (mutationAllowed && scopeKind == H2AgentResourceScopeKind.None)
             throw new ArgumentException("Mutating scope requires a concrete host-owned resource identity.", nameof(scopeKind));
 
@@ -100,6 +109,10 @@ public sealed record H2AgentPermissionScope
         => utcNow.Kind == DateTimeKind.Utc
            && utcNow >= IssuedUtc
            && utcNow < ExpiresUtc;
+
+    public bool HasFullAccessAt(DateTime utcNow) => Mode == H2AgentPermissionMode.FullAccess
+        && ScopeKind == H2AgentResourceScopeKind.Machine && ResourceKey == CurrentMachineResourceKey
+        && MutationAllowed && !ApprovalRequired && IsActiveAt(utcNow);
 
     public bool MatchesActiveContext(H2ActiveWorkContext context, DateTime utcNow)
     {
@@ -149,7 +162,20 @@ public sealed record H2AgentTaskContext(
     string? WorkspaceRoot,
     string? Summary,
     long Version = 0,
-    H2AgentPermissionScope? PermissionScope = null);
+    H2AgentPermissionScope? PermissionScope = null,
+    Guid? ModelProfileId = null,
+    string? ReasoningEffort = null,
+    IReadOnlyList<H2AgentChatTurn>? RecentTurns = null,
+    IReadOnlyList<AiImage>? Images = null,
+    IReadOnlyList<AiFile>? Files = null,
+    IReadOnlyList<AiAttachment>? Attachments = null,
+    bool IncludeProjectContent = true,
+    Guid? ThreadId = null,
+    Guid? TurnId = null,
+    Guid? AfterTaskId = null,
+    IReadOnlyList<H2AgentTargetPath>? TargetPaths = null);
+
+public sealed record H2AgentChatTurn(string SourceId, string Role, string Content);
 
 public sealed record H2AgentProgress(
     long Sequence,
@@ -171,7 +197,8 @@ public sealed record H2AgentEvidence(
     string? Summary,
     string? SourceUri = null,
     string? LocalPath = null,
-    string? Provenance = null);
+    string? Provenance = null,
+    bool? VerificationPassed = null);
 
 public sealed record H2AgentTaskSummary(
     Guid TaskId,
@@ -183,11 +210,23 @@ public sealed record H2AgentTaskSummary(
     string? FinalText,
     string? Error,
     DateTime CreatedUtc,
-    DateTime UpdatedUtc);
+    DateTime UpdatedUtc,
+    Guid? ThreadId = null,
+    Guid? TurnId = null);
 
 public sealed record H2AgentTaskObservation(
     H2AgentTaskSummary Summary,
-    IReadOnlyList<H2AgentProgress> Progress);
+    IReadOnlyList<H2AgentProgress> Progress,
+    string? StreamingText = null);
+
+public sealed record H2AgentPagePreview(byte[] Png, int PageCount, string Text, string SourceSha256);
+
+public static class H2AgentVerification
+{
+    public static bool IsVerified(H2AgentTaskSummary task)
+        => task.Status == H2AgentTaskStatus.Completed
+            && task.Evidence.LastOrDefault(item => item.VerificationPassed.HasValue)?.VerificationPassed == true;
+}
 
 /// <summary>
 /// The only Agent-shaped service surface H2 product code should consume.
@@ -196,6 +235,16 @@ public sealed record H2AgentTaskObservation(
 /// </summary>
 public interface IH2AgentAdapter
 {
+    IReadOnlyList<H2AgentThread> GetThreads(Guid? projectId = null) => [];
+    H2AgentThread? GetThread(Guid threadId) => null;
+    void SaveThread(H2AgentThread thread) { }
+    bool SupplementTask(Guid taskId, Guid inputId, string text) => false;
+    Task<H2AgentPagePreview> PreviewPdfAsync(string evidenceId, int page, CancellationToken cancellationToken = default)
+        => Task.FromException<H2AgentPagePreview>(new NotSupportedException("Bộ xem PDF chưa khả dụng."));
+
+    Task<H2AgentPagePreview> PreviewDocumentPdfAsync(H2AgentEvidence evidence, int page, CancellationToken cancellationToken = default)
+        => PreviewPdfAsync(evidence.EvidenceId, page, cancellationToken);
+
     Task<Guid> StartTaskAsync(
         Guid? projectId,
         string goal,

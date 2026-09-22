@@ -297,6 +297,7 @@ public sealed partial class H2CoordinatorSqliteStore
                     connection, tx, workspaceId, resolutionEvent.ProjectId, resolutionEvent.DeviceId, resolutionEvent.DeviceSequence) is not null)
                 throw new InvalidOperationException("Resolution DeviceSequence was already used by another event.");
 
+            ValidateAiEventCorrelation(connection, tx, resolutionEvent, ServerNow());
             var payload = Deserialize<H2ConflictResolutionPayload>(resolutionEvent.PayloadJson);
             var arbitration = ArbitrateResolution(connection, tx, conflict, resolutionEvent, payload);
 
@@ -776,9 +777,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 {
                     var existingRequestId = Guid.Parse(reader.GetString(0));
                     var existing = Deserialize<H2ProjectAiRequest>(reader.GetString(2));
-                    if (existingRequestId != request.RequestId
-                        || existing.ProjectId != request.ProjectId
-                        || existing.OwnerDeviceId != request.OwnerDeviceId)
+                    if (existingRequestId != request.RequestId || existing != request)
                         throw new InvalidOperationException("ClientRequestId was reused for incompatible AI request content.");
 
                     var queued = new H2QueuedProjectAiRequest(
@@ -799,7 +798,7 @@ public sealed partial class H2CoordinatorSqliteStore
                 """,
                 ("$workspace", Id(request.WorkspaceId)),
                 ("$project", Id(request.ProjectId)));
-            var acceptedUtc = DateTimeOffset.UtcNow;
+            var acceptedUtc = ServerNow();
 
             Execute(connection, tx,
                 """
@@ -891,11 +890,12 @@ public sealed partial class H2CoordinatorSqliteStore
                 blocking.Transaction = tx;
                 blocking.CommandText =
                     """
-                    SELECT 1
+                    SELECT state, lease_json
                     FROM ai_queue
                     WHERE workspace_id = $workspace
                       AND project_id = $project
                       AND state IN ($waitingSync, $running, $repair, $review)
+                    ORDER BY queue_sequence
                     LIMIT 1;
                     """;
                 blocking.Parameters.AddWithValue("$workspace", Id(workspaceId));
@@ -904,10 +904,19 @@ public sealed partial class H2CoordinatorSqliteStore
                 blocking.Parameters.AddWithValue("$running", (int)H2ProjectAiQueueState.Running);
                 blocking.Parameters.AddWithValue("$repair", (int)H2ProjectAiQueueState.WaitingForRepair);
                 blocking.Parameters.AddWithValue("$review", (int)H2ProjectAiQueueState.NeedsUserReview);
-                if (blocking.ExecuteScalar() is not null)
+                using var reader = blocking.ExecuteReader();
+                if (reader.Read())
                 {
+                    H2ProjectAiLease? existingLease = null;
+                    if ((H2ProjectAiQueueState)reader.GetInt32(0) == H2ProjectAiQueueState.WaitingForSync
+                        && !reader.IsDBNull(1))
+                    {
+                        var pending = Deserialize<H2ProjectAiLease>(reader.GetString(1));
+                        if (pending.OwnerDeviceId == deviceId && pending.ExpiresUtc > now)
+                            existingLease = pending;
+                    }
                     tx.Commit();
-                    return null;
+                    return existingLease;
                 }
             }
 
@@ -1005,12 +1014,20 @@ public sealed partial class H2CoordinatorSqliteStore
                 connection, tx, row.WorkspaceId, row.ProjectId, now);
             row = FindAiQueueByLease(connection, tx, leaseId);
             if (row is null
-                || row.State != H2ProjectAiQueueState.WaitingForSync
+                || (row.State != H2ProjectAiQueueState.WaitingForSync
+                    && row.State != H2ProjectAiQueueState.Running)
                 || row.Lease.OwnerDeviceId != deviceId
-                || observedProjectSequence < row.Lease.Barrier.RequiredProjectSequence)
+                || observedProjectSequence < row.Lease.Barrier.RequiredProjectSequence
+                || observedProjectSequence > ReadProjectSequence(connection, tx, row.WorkspaceId, row.ProjectId))
             {
                 tx.Commit();
                 return false;
+            }
+
+            if (row.State == H2ProjectAiQueueState.Running)
+            {
+                tx.Commit();
+                return true;
             }
 
             var refreshed = RefreshLease(row.Lease, now);
@@ -1250,38 +1267,6 @@ public sealed partial class H2CoordinatorSqliteStore
         }
     }
 
-    public void SaveProjectAiLease(H2ProjectAiLease lease)
-    {
-        ArgumentNullException.ThrowIfNull(lease);
-
-        lock (_gate)
-        {
-            using var connection = Open();
-            using var tx = connection.BeginTransaction();
-
-            var changed = Execute(connection, tx,
-                """
-                UPDATE ai_queue
-                SET state = $running, lease_json = $lease
-                WHERE request_id = $request
-                  AND project_id = $project
-                  AND owner_device_id = $device
-                  AND queue_sequence = $queue;
-                """,
-                ("$running", (int)H2ProjectAiQueueState.Running),
-                ("$lease", JsonSerializer.Serialize(lease, Json)),
-                ("$request", Id(lease.RequestId)),
-                ("$project", Id(lease.ProjectId)),
-                ("$device", Id(lease.OwnerDeviceId)),
-                ("$queue", lease.QueueSequence));
-
-            if (changed != 1)
-                throw new InvalidOperationException("AI lease does not match a durable queued request.");
-
-            tx.Commit();
-        }
-    }
-
     public H2ProjectAiLease? GetRunningProjectAiLease(Guid workspaceId, Guid projectId)
     {
         lock (_gate)
@@ -1304,47 +1289,6 @@ public sealed partial class H2CoordinatorSqliteStore
             command.Parameters.AddWithValue("$running", (int)H2ProjectAiQueueState.Running);
             var json = command.ExecuteScalar() as string;
             return json is null ? null : Deserialize<H2ProjectAiLease>(json);
-        }
-    }
-
-    public void CompleteProjectAiUncheckedLegacy(H2ProjectAiCompletion completion)
-    {
-        ArgumentNullException.ThrowIfNull(completion);
-
-        lock (_gate)
-        {
-            using var connection = Open();
-            using var tx = connection.BeginTransaction();
-
-            using var select = connection.CreateCommand();
-            select.Transaction = tx;
-            select.CommandText =
-                """
-                SELECT lease_json
-                FROM ai_queue
-                WHERE request_id = $request AND project_id = $project;
-                """;
-            select.Parameters.AddWithValue("$request", Id(completion.RequestId));
-            select.Parameters.AddWithValue("$project", Id(completion.ProjectId));
-            var leaseJson = select.ExecuteScalar() as string
-                ?? throw new InvalidOperationException("AI completion has no active durable lease.");
-            var lease = Deserialize<H2ProjectAiLease>(leaseJson);
-            if (lease.LeaseId != completion.LeaseId)
-                throw new InvalidOperationException("AI completion lease identity does not match durable lease.");
-
-            var changed = Execute(connection, tx,
-                """
-                UPDATE ai_queue
-                SET state = $state, lease_json = NULL, completion_json = $completion
-                WHERE request_id = $request AND project_id = $project;
-                """,
-                ("$state", (int)completion.TerminalState),
-                ("$completion", JsonSerializer.Serialize(completion, Json)),
-                ("$request", Id(completion.RequestId)),
-                ("$project", Id(completion.ProjectId)));
-            if (changed != 1) throw new InvalidOperationException("AI completion target was not updated.");
-
-            tx.Commit();
         }
     }
 

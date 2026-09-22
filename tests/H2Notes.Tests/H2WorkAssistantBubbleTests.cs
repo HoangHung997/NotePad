@@ -2,13 +2,77 @@ using System.Collections;
 using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Avalonia.Media;
 using H2Notes.Avalonia;
 
 internal static class H2WorkAssistantBubbleTests
 {
     public static void Run(Action<string, Action> test)
     {
+        test("Work Assistant bubble is circular when idle or chat visible and stays one line while working", () =>
+        {
+            var bubble = new WorkAssistantBubbleWindow(new(), () => { }); bubble.Show(); Pump();
+            try
+            {
+                var anchor = bubble.Position;
+                Check(bubble.Width == 54 && bubble.Height == 54 && !bubble.IsExpanded, "Idle bubble is not a small circle");
+                bubble.SetState(WorkAssistantBubbleState.Working, "Đang sửa Word\r\nKiểm tra dòng tiếp theo"); Pump();
+                Check(bubble.IsExpanded && bubble.Width == 320 && bubble.Height == 54, "Working bubble grew vertically or did not expand");
+                var label = bubble.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WorkAssistantBubbleActivity");
+                Check(label.Text == "Đang sửa Word Kiểm tra dòng tiếp theo" && label.MaxLines == 1 && label.TextWrapping == TextWrapping.NoWrap, "Activity is not a single readable line");
+                bubble.SetChatVisible(true); Pump();
+                Check(!bubble.IsExpanded && bubble.Width == 54 && bubble.Position == anchor, "Chat-open bubble did not return to its circle anchor");
+                bubble.SetState(WorkAssistantBubbleState.Working, new string('x', 2000)); Pump();
+                Check(!bubble.IsExpanded && bubble.Height == 54, "Progress reopened the bar over a visible chat");
+                bubble.SetChatVisible(false); Pump();
+                Check(bubble.IsExpanded && bubble.Height == 54, "Hiding a busy chat did not restore the single-line ticker");
+                bubble.SetState(WorkAssistantBubbleState.Attention, "Cần xác nhận", taskActive: true); Pump();
+                Check(bubble.IsExpanded, "Pending approval has no visible cue while chat hidden");
+                foreach (var state in new[] { WorkAssistantBubbleState.Completed, WorkAssistantBubbleState.Attention, WorkAssistantBubbleState.Idle })
+                { bubble.SetState(state); Pump(); Check(!bubble.IsExpanded && bubble.Width == 54, "Finished task left the bar expanded"); }
+            }
+            finally { bubble.Close(); }
+        });
+        test("Work Assistant bubble opens once on click and does not activate on drag or cancelled press", () =>
+        {
+            var opened = 0;
+            var bubble = new WorkAssistantBubbleWindow(new() { Enabled = true }, () => { }, () => opened++);
+            bubble.Show(); Pump(); AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            try
+            {
+                var center = new Point(37, 37);
+                bubble.MouseDown(center, MouseButton.Left); Pump();
+                Check(opened == 0, "Bubble activated on press before click/drag was known.");
+                bubble.MouseMove(center + new Vector(1, 1), RawInputModifiers.LeftMouseButton);
+                bubble.MouseUp(center + new Vector(1, 1), MouseButton.Left); Pump();
+                Check(opened == 1, "A click with small hand movement did not open exactly once.");
+
+                var originalPosition = bubble.Position;
+                bubble.MouseDown(center, MouseButton.Left);
+                bubble.MouseMove(center + new Vector(14, 0), RawInputModifiers.LeftMouseButton);
+                bubble.MouseUp(center + new Vector(14, 0), MouseButton.Left); Pump();
+                Check(opened == 1, "Dragging also opened the assistant.");
+                Check(bubble.Position != originalPosition, "Drag did not move the bubble.");
+
+                bubble.MouseDown(center, MouseButton.Left);
+                bubble.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                bubble.MouseUp(center, MouseButton.Left); Pump();
+                Check(opened == 1, "Cancelled press opened the assistant.");
+                bubble.MouseDown(center, MouseButton.Right); bubble.MouseUp(center, MouseButton.Right); Pump();
+                Check(opened == 1, "Right click opened the assistant.");
+                // The compact circle now exposes its controls through a right-click menu.
+                // Dismiss that menu before testing the next independent left click.
+                bubble.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WorkAssistantBubbleShell").ContextMenu?.Close(); Pump();
+
+                bubble.MouseDown(center, MouseButton.Left); bubble.MouseUp(center, MouseButton.Left); Pump();
+                Check(opened == 2, "Click stopped working after a drag/cancellation.");
+            }
+            finally { bubble.Close(); }
+        });
         test("Work Assistant placement restores preferred monitor in DIPs and clamps to work area", () =>
         {
             var assembly = typeof(WorkAssistantBubbleWindow).Assembly;
@@ -150,8 +214,8 @@ internal static class H2WorkAssistantBubbleTests
             Check(!appSource.Contains("TrackWindow(_workAssistantBubble", StringComparison.Ordinal),
                 "Bubble leaked into shared/desktop-session tracked windows.");
 
-            Check(bubbleSource.Contains("DesktopWindowChrome.Attach(this, _shell);", StringComparison.Ordinal),
-                "Bubble shell is not draggable through native window chrome.");
+            Check(bubbleSource.Contains("DesktopWindowChrome.AttachClickable(this, _shell, _activate);", StringComparison.Ordinal),
+                "Bubble shell does not distinguish click activation from dragging.");
             Check(bubbleSource.Contains("WorkAssistantPlacement.Clamp", StringComparison.Ordinal)
                 && bubbleSource.Contains("Screens.All", StringComparison.Ordinal)
                 && bubbleSource.Contains("screen.Scaling", StringComparison.Ordinal),

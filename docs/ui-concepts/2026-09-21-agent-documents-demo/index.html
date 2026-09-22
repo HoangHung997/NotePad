@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>H2 Notes — Agent & Tài liệu</title>
+  <style>
+    :root { --paper: #f7f4ee; --surface: #fffdf9; --ink: #332f2b; --muted: #746e65; --line: #e4ddd2; --accent: #a9553c; --accent-light: #f0ded3; --sage: #677665; --shadow: 0 10px 35px #46372c08; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.6 "Segoe UI", system-ui, sans-serif; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; cursor: pointer; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #bf7652; outline-offset: 4px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .page { width: min(1520px, 100%); margin: auto; padding: 32px 48px 40px; }
+    .brand-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 46px; }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; background: var(--accent); border-radius: 12px; color: #fff9f3; font-size: 14px; font-weight: 700; }
+    .brand-name { font-size: 17px; font-weight: 650; letter-spacing: -.4px; }
+    .brand-detail { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 28px; margin-bottom: 32px; }
+    .eyebrow { margin: 0 0 9px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; }
+    h1 { margin: 0 0 12px; font-size: clamp(30px, 4vw, 49px); font-weight: 550; line-height: 1.15; letter-spacing: -1.8px; }
+    .intro { max-width: 760px; margin: 0; color: var(--muted); font-size: 16px; }
+    .edition { border-left: 1px solid var(--line); padding-left: 32px; white-space: nowrap; }
+    .edition-number { display: block; color: var(--accent); font-size: 38px; line-height: 1.15; font-weight: 400; letter-spacing: -1px; }
+    .edition-text { font-size: 12px; color: var(--muted); }
+    .notice { padding: 15px 19px; margin: 0 0 29px; background: #efeae0; border: 1px solid #e5dccb; border-radius: 12px; font-size: 13px; color: #6b604e; }
+    .notice strong { display: block; margin-bottom: 2px; font-weight: 650; color: #594a39; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin: 0 0 22px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 7px; }
+    .filter { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 8px 16px; color: #655d54; font-size: 13px; transition: background .15s, border-color .15s; }
+    .filter:hover { background: #ede5dc; }
+    .filter[aria-pressed="true"] { color: #fffaf4; background: var(--accent); border-color: var(--accent); }
+    .counter { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+    .card { display: flex; flex-direction: column; padding: 0; border: 1px solid var(--line); border-radius: 17px; overflow: hidden; background: var(--surface); color: var(--ink); text-align: left; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px #58452d10; }
+    .thumbnail { height: 255px; padding: 18px; background: #eee9e1; display: grid; place-items: center; border-bottom: 1px solid var(--line); position: relative; }
+    .thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; filter: drop-shadow(0 4px 5px #52432f13); }
+    .card-number { position: absolute; left: 11px; top: 10px; background: #fffaf1ed; border: 1px solid #e4dacb; color: #7c6f5e; border-radius: 7px; min-width: 28px; padding: 1px 5px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .missing { color: var(--muted); font-size: 13px; padding: 40px 18px; text-align: center; }
+    .card-body { display: flex; flex: 1; flex-direction: column; padding: 19px 21px 18px; }
+    .card-category { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; margin-bottom: 5px; }
+    .card-title { font-weight: 600; font-size: 16px; line-height: 1.4; margin: 0 0 8px; letter-spacing: -.3px; }
+    .card-description { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0 0 20px; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 13px; border-top: 1px solid #ede6dc; font-size: 11px; color: var(--muted); }
+    .view-label { color: var(--accent); white-space: nowrap; }
+    .footer { display: flex; justify-content: space-between; gap: 24px; margin-top: 42px; padding-top: 21px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .footer p { margin: 0; max-width: 750px; }
+    .footer-links { display: flex; gap: 18px; flex-shrink: 0; }
+    dialog { width: min(1500px, calc(100vw - 44px)); max-width: none; height: min(980px, calc(100dvh - 44px)); max-height: none; padding: 0; border: 1px solid #d4c9ba; border-radius: 17px; color: var(--ink); background: var(--surface); box-shadow: 0 30px 100px #21191055; overflow: hidden; }
+    dialog::backdrop { background: #2e2821b8; backdrop-filter: blur(5px); }
+    .lightbox-layout { height: 100%; display: flex; flex-direction: column; }
+    .lightbox-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 23px; border-bottom: 1px solid var(--line); }
+    .lightbox-title { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; }
+    .lightbox-subtitle { color: var(--muted); font-size: 11px; margin: 4px 0 0; }
+    .icon-button { border: 1px solid var(--line); border-radius: 9px; min-width: 39px; min-height: 39px; padding: 4px 10px; background: var(--surface); color: var(--ink); font-size: 20px; line-height: 1; }
+    .icon-button:hover { background: #f0e9df; }
+    .icon-button:disabled { opacity: .35; cursor: default; }
+    .image-stage { min-height: 0; flex: 1; padding: 22px; background: #e8e2d9; display: flex; justify-content: center; align-items: center; overflow: auto; }
+    .image-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; filter: drop-shadow(0 6px 14px #3d332721); }
+    .lightbox-footer { padding: 15px 23px; display: flex; gap: 22px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); }
+    .lightbox-caption { font-size: 13px; color: #655d54; margin: 0; }
+    .lightbox-note { font-size: 10px; color: var(--muted); margin: 4px 0 0; }
+    .lightbox-controls { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+    .lightbox-position { min-width: 48px; text-align: center; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .original-link { font-size: 11px; margin-right: 5px; }
+    body.modal-open { overflow: hidden; }
+    @media (max-width: 1150px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page { padding: 26px 30px 32px; } .thumbnail { height: 270px; } }
+    @media (max-width: 680px) { .page { padding: 22px 18px 28px; } .brand-bar { margin-bottom: 33px; } .brand-detail { font-size: 10px; max-width: 140px; text-align: right; } .hero { grid-template-columns: 1fr; gap: 18px; } .edition { display: none; } h1 { letter-spacing: -1px; } .intro { font-size: 14px; } .notice { font-size: 12px; padding: 13px 15px; } .gallery { grid-template-columns: 1fr; gap: 20px; } .thumbnail { height: 270px; } .filter { padding: 7px 12px; font-size: 12px; } .toolbar { gap: 12px; } .footer { flex-direction: column; gap: 12px; } dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); border-radius: 12px; } .lightbox-header { padding: 13px 14px; gap: 10px; } .lightbox-title { font-size: 14px; } .lightbox-subtitle { font-size: 10px; } .image-stage { padding: 8px; } .lightbox-footer { flex-direction: column; gap: 12px; align-items: stretch; padding: 12px 14px; } .lightbox-controls { justify-content: center; } .lightbox-caption { font-size: 12px; } }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="brand-bar"><span class="brand-mark" aria-hidden="true">H2</span><span class="brand-name">H2 Notes</span><span class="brand-detail">Bộ đề xuất giao diện · 21.09.2026</span></div>
+    <header class="hero">
+      <div><p class="eyebrow">Không gian làm việc cùng Agent</p><h1>Agent &amp; Tài liệu</h1><p class="intro">Xem cách H2 thích ứng với từng kích thước cửa sổ, từng công việc và AI Assistant. Chọn một ảnh để mở lớn, dùng phím ← → để xem tiếp.</p></div>
+      <div class="edition"><span class="edition-number">20</span><span class="edition-text">góc nhìn · 4 nhóm trải nghiệm</span></div>
+    </header>
+    <aside class="notice"><strong>Đề xuất giao diện · Dữ liệu minh họa</strong>Kích thước DIP là mục tiêu bố cục, không phải kích thước bitmap đã đo hoặc kết quả nghiệm thu ứng dụng thật. Bộ ảnh này chưa thay thế baseline đã duyệt.</aside>
+    <nav class="toolbar" aria-label="Lọc bộ ảnh">
+      <div class="filters" id="filters"></div>
+      <output class="counter" id="counter" aria-live="polite"></output>
+    </nav>
+    <section class="gallery" id="gallery" aria-label="Ảnh demo H2 Notes"></section>
+    <noscript><p>Hãy bật JavaScript để dùng bộ lọc và trình xem ảnh. Danh mục ảnh vẫn có trong <a href="README.md">README.md</a>.</p></noscript>
+    <footer class="footer"><p>Ngôn ngữ hình ảnh ivory / terracotta. Các màn hình minh họa là tài liệu thảo luận thiết kế; tương tác trong trang này chỉ phục vụ xem ảnh.</p><div class="footer-links"><a href="README.md">Danh mục ảnh</a><a href="PROMPTS.md">Prompt tạo ảnh</a></div></footer>
+  </main>
+  <dialog id="lightbox" aria-labelledby="lightbox-title" aria-describedby="lightbox-caption">
+    <div class="lightbox-layout">
+      <header class="lightbox-header"><div><h2 class="lightbox-title" id="lightbox-title"></h2><p class="lightbox-subtitle" id="lightbox-subtitle"></p></div><button class="icon-button" id="close" type="button" aria-label="Đóng ảnh (Esc)">×</button></header>
+      <div class="image-stage" id="image-stage"><img id="full-image" alt=""></div>
+      <footer class="lightbox-footer"><div><p class="lightbox-caption" id="lightbox-caption"></p><p class="lightbox-note">Đề xuất giao diện · Dữ liệu minh họa · DIP là mục tiêu bố cục.</p></div><div class="lightbox-controls"><a class="original-link" id="original" target="_blank" rel="noopener">Mở ảnh gốc ↗</a><button class="icon-button" id="previous" type="button" aria-label="Ảnh trước (←)">←</button><span class="lightbox-position" id="position" aria-live="polite"></span><button class="icon-button" id="next" type="button" aria-label="Ảnh tiếp (→)">→</button></div></footer>
+    </div>
+  </dialog>
+  <script id="demo-data" type="application/json">
+  [
+    {"id":"01-agent-wide","category":"Kích thước","title":"Agent và tài liệu · rộng","dip":{"width":1440,"height":860},"file":"01-agent-wide.png","description":"Ba vùng: dự án/hội thoại, Agent, tài liệu; duyệt thay đổi ngay trong hội thoại."},
+    {"id":"02-agent-medium","category":"Kích thước","title":"Agent và tài liệu · vừa","dip":{"width":1040,"height":760},"file":"02-agent-medium.png","description":"Thu danh sách dự án thành bộ chọn để giữ chỗ cho Agent và tài liệu."},
+    {"id":"03-agent-narrow","category":"Kích thước","title":"Agent · cửa sổ hẹp","dip":{"width":560,"height":820},"file":"03-agent-narrow.png","description":"Một cột hội thoại, tài liệu mở bằng nút riêng; composer luôn ở đáy."},
+    {"id":"04-agent-minimum","category":"Kích thước","title":"Agent · kích thước tối thiểu","dip":{"width":560,"height":600},"file":"04-agent-minimum.png","description":"Header gọn, kết quả cuộn riêng, một vùng nội dung tại một thời điểm."},
+    {"id":"05-project-picker","category":"Kích thước","title":"Đổi dự án trên cửa sổ hẹp","dip":{"width":560,"height":820},"file":"05-project-picker.png","description":"Drawer tìm/chọn dự án và hội thoại, có nút đóng rõ ràng."},
+    {"id":"06-document-narrow","category":"Kích thước","title":"Xem tài liệu trên cửa sổ hẹp","dip":{"width":560,"height":820},"file":"06-document-narrow.png","description":"Tài liệu thành trang riêng; quay lại hội thoại bằng một nút."},
+    {"id":"07-command-center","category":"Chức năng","title":"Tổng quan dự án","dip":{"width":1440,"height":860},"file":"07-command-center.png","description":"Việc cần xử lý, tiến độ theo checklist, trạng thái Agent và đồng bộ."},
+    {"id":"08-project-tasks","category":"Chức năng","title":"Công việc dự án","dip":{"width":1440,"height":860},"file":"08-project-tasks.png","description":"Sửa công việc, tích hoàn thành, ghi chú và việc tiếp theo."},
+    {"id":"09-project-notes","category":"Chức năng","title":"Ghi chú dự án","dip":{"width":1440,"height":860},"file":"09-project-notes.png","description":"Soạn ghi chú có định dạng, chọn đoạn để trao đổi với Agent."},
+    {"id":"10-project-files","category":"Chức năng","title":"Tệp và bản xem trước","dip":{"width":1440,"height":860},"file":"10-project-files.png","description":"Liên kết Word/Excel/PDF, xem trước tài liệu và báo tệp mất liên kết."},
+    {"id":"11-history-evidence","category":"Chức năng","title":"Lịch sử, bằng chứng và xác minh","dip":{"width":1440,"height":860},"file":"11-history-evidence.png","description":"Theo dõi thay đổi và mở nguồn xác minh; giữ dấu lần kiểm tra chưa đạt."},
+    {"id":"12-ai-settings","category":"Chức năng","title":"Kết nối AI và model","dip":{"width":1040,"height":760},"file":"12-ai-settings.png","description":"Ollama local/LAN/Docker, khu vực API riêng, chọn model và thử kết nối."},
+    {"id":"13-storage-conflict","category":"Chức năng","title":"Đồng bộ và xử lý xung đột","dip":{"width":1040,"height":760},"file":"13-storage-conflict.png","description":"Phân biệt lưu máy, đồng bộ, hàng đợi AI và xung đột cần chọn."},
+    {"id":"14-assistant-bubble","category":"AI Assistant","title":"Bong bóng AI Assistant","dip":{"width":1440,"height":860},"file":"14-assistant-bubble.png","description":"Bốn trạng thái: sẵn sàng, đang làm, cần bạn xem, hoàn tất."},
+    {"id":"15-assistant-640","category":"AI Assistant","title":"Assistant nổi · 640 × 610","dip":{"width":640,"height":610},"file":"15-assistant-640.png","description":"Lịch sử ở trên, composer dưới; nhận ngữ cảnh tài liệu đang mở."},
+    {"id":"16-assistant-380","category":"AI Assistant","title":"Assistant nổi · tối thiểu 380 × 610","dip":{"width":380,"height":610},"file":"16-assistant-380.png","description":"Thu nhãn điều khiển, giữ chữ dễ đọc và nút Dừng."},
+    {"id":"17-assistant-full","category":"AI Assistant","title":"Assistant · cửa sổ đầy đủ","dip":{"width":1040,"height":760},"file":"17-assistant-full.png","description":"Mở trao đổi đầy đủ và tài liệu; có thể gắn tác vụ vào dự án."},
+    {"id":"18-composer-menus","category":"Thao tác","title":"Ô soạn, ngữ cảnh, quyền và model","dip":{"width":1440,"height":860},"file":"18-composer-menus.png","description":"Bốn cận cảnh thao tác dùng chung cho Agent dự án và AI Assistant."},
+    {"id":"19-storage-transfer","category":"Chức năng","title":"Chuyển kho và nhập dữ liệu","dip":{"width":1040,"height":760},"file":"19-storage-transfer.png","description":"Xem nguồn/đích và chọn hợp nhất, ghi đè hoặc dùng dữ liệu hiện có."},
+    {"id":"20-pdf-evidence","category":"Chức năng","title":"PDF và nguồn đối chiếu","dip":{"width":1440,"height":860},"file":"20-pdf-evidence.png","description":"Xem trang PDF, phần được dẫn nguồn và liên kết về kết quả Agent."}
+  ]
+  </script>
+  <script>
+    "use strict";
+    const entries = JSON.parse(document.getElementById("demo-data").textContent);
+    const categories = ["Tất cả", "Kích thước", "Chức năng", "AI Assistant", "Thao tác"];
+    const gallery = document.getElementById("gallery");
+    const lightbox = document.getElementById("lightbox");
+    const fullImage = document.getElementById("full-image");
+    const previous = document.getElementById("previous");
+    const next = document.getElementById("next");
+    let filtered = entries.slice();
+    let selectedIndex = 0;
+    let currentCategory = "Tất cả";
+
+    function element(tag, className, text) {
+      const result = document.createElement(tag);
+      if (className) result.className = className;
+      if (text !== undefined) result.textContent = text;
+      return result;
+    }
+    function dimensions(entry) { return `${entry.dip.width} × ${entry.dip.height} DIP`; }
+    function renderGallery(category) {
+      currentCategory = category;
+      filtered = entries.filter(entry => category === "Tất cả" || entry.category === category);
+      document.querySelectorAll(".filter").forEach(button => button.setAttribute("aria-pressed", String(button.textContent === category)));
+      document.getElementById("counter").textContent = `${filtered.length} / ${entries.length} ảnh · ${category}`;
+      gallery.replaceChildren();
+      filtered.forEach((entry, index) => {
+        const card = element("button", "card");
+        card.type = "button";
+        card.setAttribute("aria-label", `Mở ảnh ${entry.title}, mục tiêu ${dimensions(entry)}`);
+        const thumbnail = element("span", "thumbnail");
+        const img = element("img");
+        img.src = entry.file;
+        img.alt = entry.title;
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.addEventListener("error", () => {
+          img.remove();
+          thumbnail.append(element("span", "missing", "Ảnh đang được chuẩn bị. Tải lại trang khi bộ ảnh hoàn tất."));
+        }, {once: true});
+        thumbnail.append(img, element("span", "card-number", entry.id.slice(0, 2)));
+        const body = element("span", "card-body");
+        body.append(element("span", "card-category", entry.category), element("span", "card-title", entry.title), element("span", "card-description", entry.description));
+        const footer = element("span", "card-footer");
+        footer.append(element("span", "", `Mục tiêu ${dimensions(entry)}`), element("span", "view-label", "Xem ảnh ↗"));
+        body.append(footer);
+        card.append(thumbnail, body);
+        card.addEventListener("click", () => openImage(index));
+        gallery.append(card);
+      });
+    }
+    function updateImage(index) {
+      selectedIndex = Math.max(0, Math.min(index, filtered.length - 1));
+      const entry = filtered[selectedIndex];
+      fullImage.src = entry.file;
+      fullImage.alt = `${entry.title}. ${entry.description}`;
+      document.getElementById("lightbox-title").textContent = entry.title;
+      document.getElementById("lightbox-subtitle").textContent = `${entry.category} · Kích thước mục tiêu ${dimensions(entry)}`;
+      document.getElementById("lightbox-caption").textContent = entry.description;
+      document.getElementById("position").textContent = `${selectedIndex + 1} / ${filtered.length}`;
+      document.getElementById("original").href = entry.file;
+      previous.disabled = selectedIndex === 0;
+      next.disabled = selectedIndex === filtered.length - 1;
+    }
+    function openImage(index) {
+      updateImage(index);
+      lightbox.showModal();
+      document.body.classList.add("modal-open");
+      document.getElementById("close").focus();
+    }
+    categories.forEach(category => {
+      const button = element("button", "filter", category);
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(category === currentCategory));
+      button.addEventListener("click", () => renderGallery(category));
+      document.getElementById("filters").append(button);
+    });
+    previous.addEventListener("click", () => updateImage(selectedIndex - 1));
+    next.addEventListener("click", () => updateImage(selectedIndex + 1));
+    document.getElementById("close").addEventListener("click", () => lightbox.close());
+    lightbox.addEventListener("close", () => document.body.classList.remove("modal-open"));
+    lightbox.addEventListener("click", event => {
+      if (event.target !== lightbox) return;
+      const bounds = lightbox.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) lightbox.close();
+    });
+    lightbox.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        updateImage(selectedIndex + (event.key === "ArrowLeft" ? -1 : 1));
+      }
+    });
+    renderGallery("Tất cả");
+  </script>
+</body>
+</html>

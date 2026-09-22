@@ -170,13 +170,13 @@ internal static class H2ProjectResourcesTests
                 Check(window.FindControl<Button>("ProjectResourceRevealButton")!.IsEnabled == OperatingSystem.IsWindows(),
                     "Reveal button did not follow safe platform policy.");
 
-                var evidenceItem = items.Single(item => Text(item, "SourceText") == "Agent evidence");
+                var evidenceItem = items.Single(item => Text(item, "SourceText") == "Bằng chứng Agent");
                 list.SelectedItem = evidenceItem;
                 Pump();
                 Check(!window.FindControl<Button>("ProjectResourceOpenButton")!.IsEnabled
                     && !window.FindControl<Button>("ProjectResourceRevealButton")!.IsEnabled,
                     "Agent evidence without explicit target became directly openable.");
-                Check(Text(evidenceItem, "TargetText").Contains("ev-ui", StringComparison.Ordinal),
+                Check(Text(evidenceItem, "TargetText").Contains("Agent", StringComparison.Ordinal),
                     "Agent evidence identity is not visible to the user.");
 
                 window.FindControl<Button>("AgentTabButton")!

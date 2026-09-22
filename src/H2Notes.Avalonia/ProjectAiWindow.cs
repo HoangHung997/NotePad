@@ -30,7 +30,7 @@ public sealed class ProjectAiWindow : Window
         dock.Click += (_, _) =>
         {
             var menu = new ContextMenu();
-            foreach (var (mode, label) in new[] { ("floating", "Nổi trong bảng dự án"), ("right", "Ghim bên phải bảng dự án"), ("bottom", "Ghim phía dưới bảng dự án") })
+            foreach (var (mode, label) in new[] { ("right", "Ghép bên phải công việc / ghi chú"), ("hidden", "Thu về dự án") })
             { var item = new MenuItem { Header = label }; item.Click += (_, _) => { main.DockProjectAi(mode); app.ShowMain(); }; menu.Items.Add(item); }
             menu.Open(dock);
         }; Add(dock, 3);

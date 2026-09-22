@@ -1,0 +1,5 @@
+PASS MB-42 tool success alone cannot complete a mutation
+PASS MB-42 file mutation re-reads workspace and passes FileScopeVerifier in real runtime
+PASS MB-42 Python durable run uses PythonResultVerifier rather than exit code alone
+PASS MB-42 structured Word mutation uses LiveWordVerifier and preserves unrelated state
+RESULT: 4 passed, 0 failed.

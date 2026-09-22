@@ -188,6 +188,7 @@ internal static class H2TypedProjectToolTests
             };
             var adapter = new PseudoTextAgentAdapter(project.Id);
             var app = new App { AgentAdapter = adapter };
+            H2UiTestNavigation.ConfigureAgentProfile(app);
             var panel = new AiChatPanel(app);
             panel.SetProject(project);
 
@@ -208,7 +209,7 @@ internal static class H2TypedProjectToolTests
                     && project.Conversations[0].Messages[^1].Status == "complete");
 
                 var answer = project.Conversations[0].Messages[^1];
-                Check(answer.Provider == "H2 Agent"
+                Check(answer.Provider == "Test model"
                     && answer.Content.Contains("h2-actions", StringComparison.Ordinal),
                     "Fixture did not deliver pseudo-action text through H2 Agent.");
                 Check(project.ChecklistItems.Count == 0,

@@ -7,6 +7,7 @@ namespace H2Notes.Avalonia;
 
 public interface IWorkAssistantActiveContextCapture
 {
+    void RememberForeground() { }
     H2ActiveWorkContext? Capture();
     bool Revalidate(H2ActiveWorkContext context);
 }
@@ -28,6 +29,16 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
 {
     private readonly IWorkAssistantWindowContextBackend _backend;
     private readonly Func<IH2ActiveWorkContextProvider?> _provider;
+    private WorkAssistantWindowSnapshot? _lastExternalWindow;
+
+    public void RememberForeground()
+    {
+        var window = _backend.CaptureForeground();
+        if (window is not null && !IsOwnWindow(window)) _lastExternalWindow = window;
+    }
+
+    private static bool IsOwnWindow(WorkAssistantWindowSnapshot window)
+        => window.ProcessId == Environment.ProcessId || window.ProcessName.StartsWith("H2Notes", StringComparison.OrdinalIgnoreCase);
 
     public WorkAssistantActiveContextCapture(
         IWorkAssistantWindowContextBackend backend,
@@ -46,6 +57,8 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
     public H2ActiveWorkContext? Capture()
     {
         var snapshot = _backend.CaptureForeground();
+        if (snapshot is not null && IsOwnWindow(snapshot)) snapshot = _lastExternalWindow;
+        else if (snapshot is not null) _lastExternalWindow = snapshot;
         if (snapshot is null || snapshot.ProcessId <= 0 || snapshot.NativeWindowHandle == 0)
             return null;
 

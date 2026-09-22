@@ -1,0 +1,23 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  H2AgentLab.OfficeProtocol -> D:\VSstudio\H2Notes\experiments\H2AgentLab.OfficeProtocol\bin\Release\net10.0\H2AgentLab.OfficeProtocol.dll
+  H2Notes.Core -> D:\VSstudio\H2Notes\src\H2Notes.Core\bin\Release\net10.0\H2Notes.Core.dll
+  H2AgentLab.DesktopProtocol -> D:\VSstudio\H2Notes\experiments\H2AgentLab.DesktopProtocol\bin\Release\net10.0\H2AgentLab.DesktopProtocol.dll
+  H2AgentLab.DesktopHost -> D:\VSstudio\H2Notes\experiments\H2AgentLab.DesktopHost\bin\Release\net10.0-windows\win-x64\H2AgentLab.DesktopHost.dll
+  H2AgentLab -> D:\VSstudio\H2Notes\experiments\H2AgentLab\bin\Release\net10.0-windows\win-x64\H2AgentLab.dll
+  H2AgentLab.OfficeHost -> D:\VSstudio\H2Notes\experiments\H2AgentLab.OfficeHost\bin\Release\net10.0-windows\win-x64\H2AgentLab.OfficeHost.dll
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(225,17): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(247,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(248,66): warning CS8604: Possible null reference argument for parameter 'owner' in 'Task Dialogs.Message(Window owner, string title, string text)'. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(254,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(255,66): warning CS8604: Possible null reference argument for parameter 'owner' in 'Task Dialogs.Message(Window owner, string title, string text)'. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(270,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(271,66): warning CS8604: Possible null reference argument for parameter 'owner' in 'Task Dialogs.Message(Window owner, string title, string text)'. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(291,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(292,66): warning CS8604: Possible null reference argument for parameter 'owner' in 'Task Dialogs.Message(Window owner, string title, string text)'. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(298,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\App.axaml.cs(310,45): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\SettingsWindow.cs(34,13): warning CS0618: 'TextBox.Watermark' is obsolete: 'Use PlaceholderText instead.' [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+D:\VSstudio\H2Notes\src\H2Notes.Avalonia\WorkAssistantCompactWindow.cs(73,47): warning CS0618: 'TextBox.Watermark' is obsolete: 'Use PlaceholderText instead.' [D:\VSstudio\H2Notes\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj]
+  H2Notes.Avalonia -> D:\VSstudio\H2Notes\src\H2Notes.Avalonia\bin\Release\net10.0-windows\win-x64\H2Notes.Avalonia.dll
+  H2Notes.Avalonia -> C:\Users\hoang\Downloads\H2Notes-Full-2026-09-21-win-x64\

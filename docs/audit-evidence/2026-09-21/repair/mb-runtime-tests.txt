@@ -1,0 +1,5 @@
+PASS MB-10 real runtime performs tool_search then loaded tool then final in one task
+PASS MB-10 verifier failure becomes bounded repair continuation and can pass on a later tool round
+PASS MB-10 cancellation reaches provider-neutral transport and executes no latent tool
+PASS MB-10 AgentRuntime source has no AgentRunner compatibility dependency
+RESULT: 4 passed, 0 failed.

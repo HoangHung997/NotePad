@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +17,33 @@ spec.loader.exec_module(bridge)
 
 
 class BridgeTests(unittest.TestCase):
+    def test_grounded_prose_correction_preserves_numbers_tables_and_code(self):
+        original = "## Bao cao tien do du an\nNgay 15 thang 9 hoan thanh\n| Bao cao tien do | 42 |\n```\nBao cao tien do du an\n```"
+        result = bridge.repair_prose_lines(original, ["Báo cáo tiến độ dự án", "Ngày 16 tháng 9 hoàn thành", "Báo cáo tiến độ 45"])
+        self.assertIn("## Báo cáo tiến độ dự án", result)
+        self.assertIn("Ngay 15 thang 9 hoan thanh", result)
+        self.assertIn("| Bao cao tien do | 42 |", result)
+        self.assertIn("```\nBao cao tien do du an\n```", result)
+
+    def test_mineru_relocation_uses_new_root_without_rewriting_original(self):
+        with tempfile.TemporaryDirectory(prefix="H2 moved bundle ") as directory:
+            root = Path(directory)
+            config = root / "mineru.json"
+            original = json.dumps({"config_version": "1.3.2", "models-dir": {"pipeline": "Z:/old-machine/models"}})
+            config.write_text(original, encoding="utf-8")
+            previous = os.environ.get("MINERU_TOOLS_CONFIG_JSON")
+            with self.assertRaisesRegex(RuntimeError, "test failure"):
+                with bridge.mineru_configuration(root):
+                    temporary = Path(os.environ["MINERU_TOOLS_CONFIG_JSON"])
+                    effective = json.loads(temporary.read_text(encoding="utf-8"))
+                    self.assertEqual(str(root.resolve()), effective["models-dir"]["pipeline"])
+                    self.assertEqual("local", effective["model-source"])
+                    self.assertEqual(original, config.read_text(encoding="utf-8"))
+                    raise RuntimeError("test failure")
+            self.assertEqual(previous, os.environ.get("MINERU_TOOLS_CONFIG_JSON"))
+            self.assertFalse(temporary.exists())
+            self.assertEqual(original, config.read_text(encoding="utf-8"))
+
     def test_document_image_is_lossless_pdf_and_source_is_preserved(self):
         from PIL import Image
         import pypdfium2 as pdfium

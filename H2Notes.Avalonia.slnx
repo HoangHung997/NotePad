@@ -1,4 +1,9 @@
 <Solution>
+  <Project Path="experiments/H2AgentLab/H2AgentLab.csproj" />
+  <Project Path="experiments/H2AgentLab.DesktopProtocol/H2AgentLab.DesktopProtocol.csproj" />
+  <Project Path="experiments/H2AgentLab.DesktopHost/H2AgentLab.DesktopHost.csproj" />
+  <Project Path="experiments/H2AgentLab.OfficeProtocol/H2AgentLab.OfficeProtocol.csproj" />
+  <Project Path="experiments/H2AgentLab.OfficeHost/H2AgentLab.OfficeHost.csproj" />
   <Project Path="src/H2Notes.Core/H2Notes.Core.csproj" />
   <Project Path="src/H2Notes.Coordinator/H2Notes.Coordinator.csproj" />
   <Project Path="src/H2Notes.Avalonia/H2Notes.Avalonia.csproj" />

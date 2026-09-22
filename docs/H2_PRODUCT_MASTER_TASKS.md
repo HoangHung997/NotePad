@@ -4,6 +4,29 @@ Status: **CANONICAL FUTURE H2 NOTES TRACKER**
 Date: 2026-09-18  
 Architecture source of truth: `docs/H2_PRODUCT_MASTER_SPEC.md`
 
+## Current implementation audit — 2026-09-21
+
+**Repair update:** [implementation and evidence](H2_REPAIR_2026-09-21.md)
+records 538/538 H2 regression checks, production-path approval/project/context
+tests, live Ollama greeting, packaged helper IPC and native Windows workspace
+checks. A01–A04/A06–A11 have corrective changes; A05 remains partial (native
+AutoCAD/search connections), and full Office/DPI/two-PC gates remain open.
+Test settings now use an isolated directory rather than the user's configuration.
+
+**Production Agent/UI acceptance is not established by the historical checked
+stages below.** The [current audit](H2_AUDIT_2026-09-21.md) reproduces a default
+greeting blocked by a mutation-verification contract, rejected multiline input,
+and overlapping Project Workspace controls in the pre-repair version. It also traced missing
+approval UI, unregistered project/domain tools, ignored chat model/history,
+resource-scope enforcement gaps and incomplete helper packaging.
+
+Historical test/CI evidence remains recorded at its original commit. H2M-073,
+074, 086, 092 and 110–115 require corrective work and renewed acceptance against
+the real production composition; their old fixture passes must not be treated
+as proof that the current app satisfies those user flows. Native visual/live
+provider/Office acceptance is still required. H2M-133F remains in progress, and
+the prior real two-PC NAS failures remain open architecture evidence.
+
 > This tracker is for H2 Notes/product work.
 >
 > It does not replace the Agent tracker.
@@ -1430,6 +1453,16 @@ PC2 -> RUNNING
 
 No NAS lock file participates.
 
+Local continuation (2026-09-21, imported head `9660a0f3000ea9c24d5e071160d22196baf4836a`):
+the Coordinator queue now supports retrying lost grant/confirmation/completion
+responses, fences AI conflict-resolution writes with the active lease, rejects
+incompatible enqueue retries, and removes unchecked legacy lease/completion
+entry points. Release build PASS and local H2 Notes regression **527/527**;
+legacy NAS harness local self-test PASS. See `docs/H2_SYNC_AI_QUEUE_ACCEPTANCE.md` for local verification
+and the remaining CI/production-wiring boundary. H2M-133F stays in progress;
+protocol tests do not establish that the desktop Agent path has switched to
+Coordinator execution. H2M-133H and physical H2M-133K remain mandatory.
+
 ### [ ] H2M-133G — Coordinator authentication and deployment boundary
 
 Required:
@@ -1658,3 +1691,14 @@ Command Center
 Project Workspace
 Work Assistant
 ```
+
+### Chat surface checkpoint — 21/09/2026
+
+User-approved direction implemented and published locally: shared turn renderer,
+durable conversations/replay, public streaming, task input/queue, scoped targets,
+artifact preview and bottom composer. Evidence and explicit remaining gates:
+[chat implementation report](H2_AGENT_CHAT_SURFACE_IMPLEMENTATION_2026-09-21.md).
+566/566 app regression; 10/10 new chat cases; four additional steering wire cases
+passed (Ollama, Chat Completions, Responses stateless/stored). Real Gemma 4 Cloud
+created DOCX/CSV/PDF and consumed supplemental user input inside one task.
+This checkpoint does not close all 109 chat-spec items or NAS two-PC acceptance.

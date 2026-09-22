@@ -1,0 +1,44 @@
+D:\VSstudio\H2Notes\tests\H2Notes.Tests\H2ProjectNotesDetailTests.cs(70,23): warning CS8602: Dereference of a possibly null reference. [D:\VSstudio\H2Notes\tests\H2Notes.Tests\H2Notes.Tests.csproj]
+PASS Work Assistant settings round-trip only through local configuration
+PASS Work Assistant settings never enter shared workspace models
+PASS Work Assistant bubble opens once on click and does not activate on drag or cancelled press
+PASS Work Assistant placement restores preferred monitor in DIPs and clamps to work area
+PASS Work Assistant bubble exposes idle working attention and completed states
+PASS Work Assistant bubble can live without MainWindow and disabled setting keeps it hidden
+PASS Work Assistant shell is wired to startup tray drag and local-only lifecycle
+PASS Work Assistant hotkey parser normalizes configurable chords and rejects invalid input
+PASS Work Assistant hotkey conflict fails gracefully and binding stays configurable
+PASS Work Assistant hotkey callback only opens compact assistant and does not start or mutate work
+PASS Work Assistant hotkey stays machine-local and is not shared project truth
+PASS Work Assistant context chips show current interpretation and support remove reset scope
+PASS Work Assistant selected folder bypasses unrelated foreground validation and forwards model and follow-up history
+PASS Quick Work Assistant request starts normal unscoped Agent task and survives panel collapse
+PASS Quick Work Assistant fails closed when selected active context is stale
+PASS Work Assistant allow-document preset maps to expiring workbook session scope, not full PC
+PASS Work Assistant ask-before-changes maps to scoped mutation plus approval
+PASS Compact Work Assistant resets mutation preset whenever foreground context is recaptured
+PASS Quick Work Assistant forwards workbook-scoped grant through existing Agent adapter
+PASS Quick Work Assistant project-policy preset fails closed until task is project-scoped
+PASS Work Assistant permission mapping is a scope mapper, not a second execution engine
+PASS Work Assistant projects running attention and verified completion from one Agent task
+PASS Work Assistant cancel and retry are explicit and retry never auto-repeats mutation
+PASS Work Assistant can link completed task to project and open full Project Workspace
+PASS Work Assistant completion UX keeps one Agent runtime and has no generic Undo promise
+PASS Work Assistant composer uses one bottom toolbar and switches voice to send without overlap
+PASS Work Assistant full access writes and verifies an absolute path outside workspace without approval
+PASS Work Assistant full access runs local commands while scoped mode cannot discover or execute them
+PASS Work Assistant full access expires and never survives read-only override
+PASS Work Assistant local command nonzero exit and timeout block completion
+PASS Work Assistant cancelling a local command kills the running process
+PASS Work Assistant Enter submits once and Shift Enter keeps a multiline draft
+PASS Work Assistant conversation pins composer below long scrollable multiline history
+PASS Work Assistant panel follows bubble and stays inside negative-origin and high-DPI monitors
+PASS Work Assistant unknown tool blocks false completion: files:write
+PASS Work Assistant unknown tool blocks false completion: made_up_tool
+PASS Work Assistant recovers qualified callable with selected-folder permission and verified write
+PASS Work Assistant cannot clear failed operation by writing another path
+PASS Work Assistant folder scope rejects escaping paths and mismatched folder grants
+PASS H2M-112 Excel Work Assistant uses structured tools verifies and runs without MainWindow
+PASS H2M-113 Word legal Work Assistant uses unsaved structured Word and authoritative Web evidence
+PASS H2M-114 AutoCAD Work Assistant performs bounded selected-block mutation and reread verification
+RESULT: 42 passed, 0 failed. Temporary test evidence: C:\Users\hoang\AppData\Local\Temp\H2Notes-tests-a7d5a3b1e4be4f95bd4679d2bbb02fc1

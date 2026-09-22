@@ -63,7 +63,8 @@ public sealed record AgentTaskContract
         IEnumerable<string>? outputRequirements,
         IEnumerable<AgentAcceptanceCriterion>? acceptanceCriteria,
         AgentTaskRiskClass riskClass,
-        AgentVerificationPolicy verificationPolicy)
+        AgentVerificationPolicy verificationPolicy,
+        bool mutationAllowed = false)
     {
         if (taskId == Guid.Empty)
             throw new ArgumentException("Task ID cannot be empty.", nameof(taskId));
@@ -78,6 +79,7 @@ public sealed record AgentTaskContract
         AcceptanceCriteria = NormalizeCriteria(acceptanceCriteria);
         RiskClass = riskClass;
         VerificationPolicy = verificationPolicy ?? throw new ArgumentNullException(nameof(verificationPolicy));
+        MutationAllowed = mutationAllowed || IsMutating;
 
         if (!Enum.IsDefined(riskClass))
             throw new ArgumentOutOfRangeException(nameof(riskClass), "Unknown task risk class.");
@@ -93,8 +95,22 @@ public sealed record AgentTaskContract
     public IReadOnlyList<AgentAcceptanceCriterion> AcceptanceCriteria { get; }
     public AgentTaskRiskClass RiskClass { get; }
     public AgentVerificationPolicy VerificationPolicy { get; }
+    public bool MutationAllowed { get; }
 
     public bool IsMutating => RequiredChanges.Count > 0 || RiskClass != AgentTaskRiskClass.ReadOnly;
+
+    // Permission is a capability, not evidence that the user's request requires a mutation.
+    // The runtime promotes a conversational contract only after an authorized tool executes.
+    public AgentTaskContract WithExecutedMutation()
+        => IsMutating ? this : new(
+            TaskId, UserGoal, Scope, Inputs, ["verify executed changes"], PreserveConstraints,
+            OutputRequirements,
+            AcceptanceCriteria.Concat([new AgentAcceptanceCriterion(
+                Runtime.AgentRuntimeDomainVerifierRouter.MutationCriterionId,
+                "Executed changes are re-observed and deterministically verified.")]),
+            AgentTaskRiskClass.Medium,
+            new AgentVerificationPolicy(requiredVerifierIds: [Runtime.AgentRuntimeDomainVerifierRouter.VerifierId]),
+            MutationAllowed);
 
     /// <summary>
     /// Adds new acceptance requirements without permitting an existing criterion to disappear or
@@ -152,7 +168,8 @@ public sealed record AgentTaskContract
             OutputRequirements,
             criteria,
             RiskClass,
-            VerificationPolicy);
+            VerificationPolicy,
+            MutationAllowed);
 
     private static string NormalizeRequired(string? value, string parameterName, int maxLength)
     {

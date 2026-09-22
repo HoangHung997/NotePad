@@ -844,6 +844,8 @@ Host owns:
 
 A skill or plugin cannot grant itself more authority by instruction text.
 
+Host integration addition, 2026-09-21, explicitly requested by the user: Work Assistant exposes a task-local FullAccess preset bound to the current account/machine. It permits absolute filesystem paths and local PowerShell/network execution without per-action approval, expires within one hour, and does not elevate Windows privileges. Restricted presets retain their existing resource checks and do not expose unsandboxed command execution. This is not a new Agent permission engine or a claim of complete Codex feature parity. See `H2_ASSISTANT_COMPOSER_2026-09-21.md` for exact behavior, UI evidence and tests.
+
 ---
 
 ## 26. State / artifacts / evidence

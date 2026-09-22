@@ -119,6 +119,8 @@ internal static class ProjectChatTests
                 var panel = (AiChatPanel)main.FindControl<ContentControl>("AiHost")!.Content!;
                 var gate = new GateAgentAdapter(project.Id);
                 app.AgentAdapter = gate;
+                H2UiTestNavigation.ConfigureAgentProfile(app);
+                panel.RefreshConnections();
 
                 main.DockProjectAi("floating"); Pump(); Named<TextBox>(panel, "ChatComposer").Text = "Question A"; Pump();
                 var send = (Task)typeof(AiChatPanel).GetMethod("SendOrSave", Private)!.Invoke(panel, null)!;

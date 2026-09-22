@@ -65,6 +65,12 @@ public interface IH2ProjectToolHost
     H2ProjectMutationReceipt ReplaceNote(H2ReplaceProjectNoteRequest request);
 }
 
+/// <summary>Unabridged host readback used only by deterministic verification, never model context.</summary>
+public interface IH2ProjectToolVerifier
+{
+    H2ProjectSummary ReadProjectForVerification(Guid projectId);
+}
+
 /// <summary>
 /// Optional adapter capability. A production Agent bridge can bind H2 typed project tools
 /// without H2 Notes depending on provider/runtime implementation details.
@@ -74,7 +80,7 @@ public interface IH2ProjectToolHostConsumer
     void BindProjectToolHost(IH2ProjectToolHost host);
 }
 
-public sealed class H2ProjectToolHost : IH2ProjectToolHost
+public sealed class H2ProjectToolHost : IH2ProjectToolHost, IH2ProjectToolVerifier
 {
     private readonly object _gate = new();
     private readonly Func<Guid, ProjectRecord?> _resolve;
@@ -89,6 +95,12 @@ public sealed class H2ProjectToolHost : IH2ProjectToolHost
     }
 
     public H2ProjectSummary ReadProject(Guid projectId)
+        => ReadProject(projectId, bounded: true);
+
+    public H2ProjectSummary ReadProjectForVerification(Guid projectId)
+        => ReadProject(projectId, bounded: false);
+
+    private H2ProjectSummary ReadProject(Guid projectId, bool bounded)
     {
         if (projectId == Guid.Empty)
             throw new ArgumentException("ProjectId must not be empty.", nameof(projectId));
@@ -99,10 +111,10 @@ public sealed class H2ProjectToolHost : IH2ProjectToolHost
             var progress = ProjectProgressCalculator.Calculate(project);
             var next = ProjectProgressCalculator.NextTask(project);
             var tasks = project.ChecklistItems
-                .Take(200)
+                .Take(bounded ? 200 : int.MaxValue)
                 .Select(task => new H2ProjectTaskSummary(
                     task.Id,
-                    Bound(ProjectProgressCalculator.TaskText(task), 4_000),
+                    bounded ? Bound(ProjectProgressCalculator.TaskText(task), 4_000) : ProjectProgressCalculator.TaskText(task),
                     Bound(task.CommentText, 8_000),
                     task.IsCompleted,
                     task.CreatedAtUtc,
@@ -114,7 +126,7 @@ public sealed class H2ProjectToolHost : IH2ProjectToolHost
                 project.Id,
                 Version(project),
                 Bound(ProjectName(project), 500),
-                Bound(ProjectNotes(project), 20_000),
+                bounded ? ProjectNotes(project)[..Math.Min(ProjectNotes(project).Length, 20_000)] : ProjectNotes(project),
                 progress.Completed,
                 progress.Total,
                 next?.Id,

@@ -85,7 +85,10 @@ public sealed class LocalConfiguration
     public WorkAssistantSettings WorkAssistant { get; set; } = new();
     public Dictionary<Guid, LocalProjectLayout> ProjectLayouts { get; set; } = [];
 
-    public static string SettingsDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes");
+    public const string SettingsDirectoryEnvironmentVariable = "H2_NOTES_SETTINGS_DIRECTORY";
+    public static string SettingsDirectory => Environment.GetEnvironmentVariable(SettingsDirectoryEnvironmentVariable) is { Length: > 0 } configured
+        ? Path.GetFullPath(configured)
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "H2Notes");
     public static string DefaultDataFolder => Path.Combine(SettingsDirectory, "workspace-v2");
     public static string ConfigPath => Path.Combine(SettingsDirectory, "local-config-v2.json");
 

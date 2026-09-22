@@ -1,0 +1,145 @@
+[
+  {
+    "name": "01-idle-circle",
+    "Width": 53.6,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": false,
+    "ActivityText": "S\u1EB5n s\u00E0ng",
+    "chatVisible": false
+  },
+  {
+    "name": "02-working-hidden-chat",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang suy ngh\u0129\u2026",
+    "chatVisible": false
+  },
+  {
+    "name": "03-long-activity",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang ki\u1EC3m tra n\u1ED9i dung v\u00E0 \u0111\u1ECBnh d\u1EA1ng ti\u1EBFng Vi\u1EC7t trong t\u00E0i li\u1EC7u Word, r\u1ED3i l\u01B0u b\u1EA3n k\u1EBFt qu\u1EA3 \u0111\u1EC3 b\u1EA1n xem l\u1EA1i.",
+    "chatVisible": false
+  },
+  {
+    "name": "04-long-activity-scrolled",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang ki\u1EC3m tra n\u1ED9i dung v\u00E0 \u0111\u1ECBnh d\u1EA1ng ti\u1EBFng Vi\u1EC7t trong t\u00E0i li\u1EC7u Word, r\u1ED3i l\u01B0u b\u1EA3n k\u1EBFt qu\u1EA3 \u0111\u1EC3 b\u1EA1n xem l\u1EA1i.",
+    "chatVisible": false
+  },
+  {
+    "name": "05-working-open-chat",
+    "Width": 53.6,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": false,
+    "ActivityText": "\u0110ang ki\u1EC3m tra n\u1ED9i dung v\u00E0 \u0111\u1ECBnh d\u1EA1ng ti\u1EBFng Vi\u1EC7t trong t\u00E0i li\u1EC7u Word, r\u1ED3i l\u01B0u b\u1EA3n k\u1EBFt qu\u1EA3 \u0111\u1EC3 b\u1EA1n xem l\u1EA1i.",
+    "chatVisible": true
+  },
+  {
+    "name": "06-working-chat-hidden-again",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang ki\u1EC3m tra n\u1ED9i dung v\u00E0 \u0111\u1ECBnh d\u1EA1ng ti\u1EBFng Vi\u1EC7t trong t\u00E0i li\u1EC7u Word, r\u1ED3i l\u01B0u b\u1EA3n k\u1EBFt qu\u1EA3 \u0111\u1EC3 b\u1EA1n xem l\u1EA1i.",
+    "chatVisible": false
+  },
+  {
+    "name": "07-completed-circle",
+    "Width": 53.6,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 700,
+      "Y": 650
+    },
+    "IsExpanded": false,
+    "ActivityText": "\u0110\u00E3 xong",
+    "chatVisible": false
+  },
+  {
+    "name": "08-working-right-edge",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 1512,
+      "Y": 944
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang ki\u1EC3m tra k\u1EBFt qu\u1EA3\u2026",
+    "chatVisible": false
+  },
+  {
+    "name": "09-right-edge-chat-open",
+    "Width": 53.6,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 1844,
+      "Y": 944
+    },
+    "IsExpanded": false,
+    "ActivityText": "\u0110ang ki\u1EC3m tra k\u1EBFt qu\u1EA3\u2026",
+    "chatVisible": true
+  },
+  {
+    "name": "10-right-edge-chat-hidden",
+    "Width": 320,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 1512,
+      "Y": 944
+    },
+    "IsExpanded": true,
+    "ActivityText": "\u0110ang ki\u1EC3m tra k\u1EBFt qu\u1EA3\u2026",
+    "chatVisible": false
+  },
+  {
+    "name": "11-right-edge-completed",
+    "Width": 53.6,
+    "Height": 53.6,
+    "scale": 1.25,
+    "Position": {
+      "X": 1844,
+      "Y": 944
+    },
+    "IsExpanded": false,
+    "ActivityText": "\u0110\u00E3 xong",
+    "chatVisible": false
+  }
+]

@@ -60,9 +60,19 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
             if (!context.RawToolOutputs.TryGetValue(call.Id, out var raw))
                 continue;
 
+            if (context.Results.Any(r => r.ToolCallId == call.Id && r.IsError))
+            {
+                if (context.MutationCallIds.Contains(call.Id))
+                    outcomes.Add(new("tool-execution", false, [], call.Name + " failed; correct the original error before verifying its output."));
+                continue;
+            }
+
             var selected = _verifiers
                 .Where(x => x.CanVerify(call, raw))
                 .ToArray();
+            if (selected.Length == 0 && context.MutationCallIds.Contains(call.Id))
+                outcomes.Add(new("unverified-tool", false, [],
+                    "No deterministic verifier is registered for " + call.Name + "."));
             foreach (var verifier in selected)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -229,6 +239,10 @@ public sealed class PythonRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
 
         using var json = JsonDocument.Parse(rawToolOutput);
         var root = json.RootElement;
+        if ((root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False)
+            || (root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False))
+            return Task.FromResult(new AgentRuntimeDomainVerification(DomainId, false, [],
+                "Python did not complete. Inspect the original tool error; no successful run was verified."));
         var runId = RequiredString(root, "runId");
         var run = _scripts.Evidence(runId);
         foreach (var artifact in run.Artifacts)

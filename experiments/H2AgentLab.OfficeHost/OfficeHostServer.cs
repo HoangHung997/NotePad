@@ -134,6 +134,10 @@ public sealed class OfficeHostServer
         {
             throw;
         }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult is unchecked((int)0x80010001) or unchecked((int)0x8001010A))
+        {
+            response = Error(request.Id, "application_busy", "Word/Excel đang mở hộp thoại hoặc đang bận. Hãy đóng thông báo trong ứng dụng rồi thử lại; không lặp lại thao tác ghi khi ứng dụng chưa sẵn sàng.");
+        }
         catch (Exception ex)
         {
             response = Error(request.Id, "host_error", Sanitize(ex.Message));

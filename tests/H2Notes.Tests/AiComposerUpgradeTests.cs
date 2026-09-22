@@ -137,10 +137,10 @@ internal static class AiComposerUpgradeTests
             var context = menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Ngữ cảnh"));
             context.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Xem dữ liệu gửi")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); Pump();
             var preview = f.Window.OwnedWindows.Single();
-            Check(preview.Title == "Dữ liệu sẽ gửi cho AI" && f.Conversation.Messages.Count == 0, "Preview sent or failed to open");
+            Check(preview.Title == "Dữ liệu sẽ gửi cho Agent" && f.Conversation.Messages.Count == 0, "Preview sent or failed to open");
             preview.Close(); Pump(); f.Type("@preview"); f.Key(Key.Tab);
             preview = f.Window.OwnedWindows.Single();
-            Check(preview.Title == "Dữ liệu sẽ gửi cho AI" && f.Conversation.Messages.Count == 0, "Mention preview sent or failed to open");
+            Check(preview.Title == "Dữ liệu sẽ gửi cho Agent" && f.Conversation.Messages.Count == 0, "Mention preview sent or failed to open");
             preview.Close(); Pump();
         });
         test("Composer clipboard Ctrl+V/context menu uses exactly one plain-text edit with undo", () =>

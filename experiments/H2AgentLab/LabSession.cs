@@ -80,12 +80,16 @@ public sealed class LabSession
 public sealed class SafeWorkspace
 {
     public string Root { get; }
+    private readonly Func<bool>? _fullAccessAuthorized;
+    private readonly Func<string, bool>? _additionalTarget;
     public static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     { ".txt", ".md", ".csv", ".json", ".cs", ".csproj", ".slnx", ".xaml", ".axaml", ".py", ".js", ".ts", ".tsx", ".html", ".css", ".xml", ".yml", ".yaml" };
     private static readonly HashSet<string> Excluded = new(StringComparer.OrdinalIgnoreCase)
     { ".git", ".ssh", ".codex", ".aws", ".azure", "node_modules", "bin", "obj", ".vs", ".env", "credentials", "secrets.json", "appsettings.production.json" };
-    public SafeWorkspace(string root)
+    public SafeWorkspace(string root, Func<bool>? fullAccessAuthorized = null, Func<string, bool>? additionalTarget = null)
     {
+        _fullAccessAuthorized = fullAccessAuthorized;
+        _additionalTarget = additionalTarget;
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         if (!Directory.Exists(Root) || Root == Path.GetPathRoot(Root)) throw new IOException("Chọn một thư mục dự án cụ thể, không chọn cả ổ đĩa.");
         CheckLinks(Root);
@@ -98,6 +102,28 @@ public sealed class SafeWorkspace
     }
     public string Resolve(string relative, bool directory = false)
     {
+        if (_fullAccessAuthorized is null && _additionalTarget is not null && relative.IndexOfAny(['\0', '*', '?']) < 0)
+        {
+            var candidate = Path.GetFullPath(relative, Root);
+            if (_additionalTarget(candidate))
+            {
+                var components = candidate.Replace('\\', '/').Split('/');
+                if (components.Skip(1).Any(p => p.Contains(':') || p.EndsWith(' ') || p.EndsWith('.')
+                    || System.Text.RegularExpressions.Regex.IsMatch(p, @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])($|\.)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
+                    throw new AgentFaultException("boundary", "Đường dẫn tệp không hợp lệ.", false);
+                CheckLinks(candidate); return candidate;
+            }
+        }
+        if (_fullAccessAuthorized is not null)
+        {
+            if (!_fullAccessAuthorized()) throw new AgentFaultException("expired_permission", "Quyền toàn máy đã hết hạn hoặc bị thu hồi.", false);
+            // Full access intentionally has no workspace or junction boundary. Windows ACLs
+            // still apply. Reject device/stream syntax; these tools operate on ordinary files.
+            if (relative.IndexOfAny(['\0', '*', '?']) >= 0 || relative.StartsWith(@"\\.\", StringComparison.Ordinal)
+                || relative.Replace('\\', '/').Split('/').Any(p => p.Contains(':') && !(p.Length == 2 && char.IsLetter(p[0]))))
+                throw new AgentFaultException("boundary", "Đường dẫn tệp không hợp lệ.", false);
+            return Path.GetFullPath(relative, Root);
+        }
         if (Path.IsPathRooted(relative) || relative.Contains(':') || relative.IndexOfAny(['\0', '*', '?']) >= 0)
             throw new AgentFaultException("boundary", "Chỉ dùng đường dẫn tương đối trong thư mục được chọn.", false);
         var parts = relative.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);

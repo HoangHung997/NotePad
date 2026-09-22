@@ -25,6 +25,7 @@ public sealed class ChatMessageView : Border
     private bool _thinkingScrollQueued;
     private readonly TextBlock _error = new() { Name = "MessageError", FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = RichEditor.Brush("#9C422B") };
     private readonly bool _user;
+    private readonly AgentTurnView _agentTurn = new() { IsVisible = false };
     private Control? _widthHost;
 
     public ChatMessageView(AiMessage message)
@@ -33,12 +34,12 @@ public sealed class ChatMessageView : Border
         _user = message.Role == "user";
         HorizontalAlignment = _user ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         Margin = _user ? new Thickness(72, 0, 0, 0) : new Thickness(0, 0, 18, 0);
-        Padding = new Thickness(12, 9);
+        Padding = _user ? new Thickness(12, 9) : new Thickness(0, 9);
         if (_user) MaxWidth = 520;
         CornerRadius = _user ? new CornerRadius(12, 12, 3, 12) : new CornerRadius(12, 12, 12, 3);
-        Background = RichEditor.Brush(_user ? "#F4E7DC" : "#FFFFFF");
-        BorderBrush = RichEditor.Brush(_user ? "#E7CCBA" : "#E5DCD3"); BorderThickness = new Thickness(1);
-        Body = new SelectableTextBlock { Name = "MessageBody", Text = message.Content, TextWrapping = TextWrapping.Wrap, FontSize = 13 };
+        Background = _user ? RichEditor.Brush("#F4E7DC") : Brushes.Transparent;
+        BorderBrush = RichEditor.Brush(_user ? "#E7CCBA" : "#E5DCD3"); BorderThickness = new Thickness(_user ? 1 : 0);
+        Body = new SelectableTextBlock { Name = "MessageBody", Text = message.Content, TextWrapping = TextWrapping.Wrap, FontSize = 14 };
         Body.PropertyChanged += (_, e) =>
         {
             if (e.Property == TextBlock.TextProperty) RefreshRenderedBody();
@@ -56,7 +57,15 @@ public sealed class ChatMessageView : Border
             if (e.ExtentDelta.Y != 0 || e.ViewportDelta.Y != 0) FollowThinking();
         };
         ToolTip.SetTip(_thinking, "Thu gọn: xem một dòng tiến trình mới nhất. Mở rộng: xem toàn bộ tiến trình model cung cấp. Không lưu vào lịch sử.");
-        Child = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch, Children = { title, _thinking, _markdownBody, Body, _error, Actions, _time } };
+        var content=new StackPanel { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Stretch,
+            Children = { _user ? title : new TextBlock { Text="H2 Agent",FontSize=14,FontWeight=FontWeight.SemiBold }, _agentTurn, _thinking, _markdownBody, Body, _error, Actions, _time } };
+        if(_user)Child=content;
+        else
+        {
+            var row=new Grid { ColumnDefinitions=new ColumnDefinitions("36,*"),ColumnSpacing=12 };
+            var avatar=AgentBrand.Avatar();avatar.VerticalAlignment=VerticalAlignment.Top;row.Children.Add(avatar);
+            Grid.SetColumn(content,1);row.Children.Add(content);Child=row;
+        }
 
         // Keep the familiar left-aligned assistant bubble, but size it from its live chat host.
         // Responsive Markdown tables therefore reflow whenever the dock/floating window is resized.
@@ -92,7 +101,7 @@ public sealed class ChatMessageView : Border
 
     public void SetThinking(string text)
     {
-        var visible = Message.Role == "assistant" && Message.Status == "streaming" && Message.Content.Length == 0;
+        var visible = !_agentTurn.IsVisible && Message.Role == "assistant" && Message.Status == "streaming" && Message.Content.Length == 0;
         _thinking.IsVisible = visible;
         var next = !visible ? "" : text.Length > 0 ? text
             : "Đang chờ model. Nội dung suy nghĩ hoặc bản tóm tắt sẽ hiện ở đây nếu máy chủ cung cấp.";
@@ -114,8 +123,16 @@ public sealed class ChatMessageView : Border
         return "Đang suy nghĩ · " + latest;
     }
 
+    public void PresentAgent(IH2AgentAdapter adapter, H2AgentTaskObservation observation)
+    {
+        _agentTurn.IsVisible = true;
+        _agentTurn.Present(adapter, observation);
+        _thinking.IsVisible = _markdownBody.IsVisible = Body.IsVisible = _error.IsVisible = false;
+    }
+
     private void RefreshRenderedBody()
     {
+        if (_agentTurn.IsVisible) return;
         var text = Body.Text ?? "";
         var renderMarkdown = Message.Role == "assistant" && !Message.IsTimelineMarker;
         _markdownBody.IsVisible = renderMarkdown && text.Length > 0;
@@ -143,7 +160,7 @@ public sealed class ChatMessageView : Border
         RefreshRenderedBody();
         if (Message.Status != "streaming" || Message.Content.Length > 0) SetThinking("");
         _error.Text = Message.ErrorText;
-        _error.IsVisible = Message.ErrorText.Length > 0;
+        _error.IsVisible = !_agentTurn.IsVisible && Message.ErrorText.Length > 0;
         var time = AiHistory.LocalTime(Message);
         var status = Message.IsTimelineMarker ? "Mốc ghi nhớ" : Message.Status switch
         {

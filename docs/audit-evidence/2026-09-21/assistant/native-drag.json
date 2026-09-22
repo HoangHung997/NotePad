@@ -1,0 +1,47 @@
+{
+  "scale": 1.25,
+  "before": {
+    "chat": [
+      {
+        "height": 610,
+        "id": "screenshot-0",
+        "originX": 1195,
+        "originY": 197,
+        "width": 460,
+        "zIndex": 0
+      }
+    ],
+    "bubble": [
+      {
+        "height": 74,
+        "id": "screenshot-0",
+        "originX": 1090,
+        "originY": 867,
+        "width": 74,
+        "zIndex": 0
+      }
+    ]
+  },
+  "after": {
+    "chat": [
+      {
+        "height": 610,
+        "id": "screenshot-0",
+        "originX": 1226,
+        "originY": 216,
+        "width": 460,
+        "zIndex": 0
+      }
+    ],
+    "bubble": [
+      {
+        "height": 74,
+        "id": "screenshot-0",
+        "originX": 1121,
+        "originY": 886,
+        "width": 74,
+        "zIndex": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "test": "real-production-greeting-multiline-default-permission",
+  "Model": "gemma4:latest",
+  "status": "Completed",
+  "FinalText": "T\u00F4i \u0111\u00E3 s\u1EB5n s\u00E0ng.",
+  "Error": null,
+  "privateDataSent": false,
+  "mutationRequested": false
+}

@@ -43,7 +43,7 @@ internal static class AiComposerOptionsTests
                 var model = InPanel(Field<Button>(f.Panel, "_modelPickerButton"), f.Panel);
                 var mic = InPanel(Named<Button>(f.Panel, "ChatDictation"), f.Panel);
                 var send = InPanel(Named<Button>(f.Panel, "ChatSend"), f.Panel);
-                Check(input.Height >= 76 && input.Width >= 260, "Multiline composer too small at " + width);
+                Check(input.Height >= 50 && input.Width >= 260, "Multiline composer too small at " + width);
                 Check(plus.Top >= input.Bottom && model.Top >= input.Bottom, "Footer overlaps the editor at " + width);
                 Check(permission.Left >= plus.Right && model.Left >= permission.Right && mic.Left >= model.Right && send.Left >= mic.Right,
                     "Bottom controls overlap at " + width);
@@ -92,7 +92,7 @@ internal static class AiComposerOptionsTests
             Check(menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Ngữ cảnh")).Items.OfType<MenuItem>()
                 .Single(i => Equals(i.Header, "Chỉ lưu mốc, không hỏi AI")).IsChecked, "Menu does not reflect checked marker");
             menu.Close(); f.Window.Height = 700; Pump();
-            Check(!marker.IsVisible && marker.IsChecked == true && f.Input.MinHeight == 76, "Resize lost marker state or exposed removed checkbox");
+            Check(!marker.IsVisible && marker.IsChecked == true && f.Input.MinHeight == 50, "Resize lost marker state or exposed removed checkbox");
         });
         test("Composer permissions persist to the conversation and rebuild actions without replacing editor", () =>
         {

@@ -17,26 +17,43 @@ public sealed partial class H2CoordinatorSqliteStore
 
             Guid workspaceId;
             H2ProjectAiQueueState state;
-            H2ProjectAiLease lease;
+            H2ProjectAiLease? lease;
+            H2ProjectAiCompletion? recordedCompletion;
             using (var select = connection.CreateCommand())
             {
                 select.Transaction = tx;
                 select.CommandText =
                     """
-                    SELECT workspace_id, state, lease_json
+                    SELECT workspace_id, state, lease_json, completion_json
                     FROM ai_queue
                     WHERE request_id = $request AND project_id = $project;
                     """;
                 select.Parameters.AddWithValue("$request", Id(completion.RequestId));
                 select.Parameters.AddWithValue("$project", Id(completion.ProjectId));
                 using var reader = select.ExecuteReader();
-                if (!reader.Read() || reader.IsDBNull(2))
+                if (!reader.Read())
                     throw new InvalidOperationException("AI completion has no active durable lease.");
                 workspaceId = Guid.Parse(reader.GetString(0));
                 state = (H2ProjectAiQueueState)reader.GetInt32(1);
-                lease = Deserialize<H2ProjectAiLease>(reader.GetString(2));
+                lease = reader.IsDBNull(2) ? null : Deserialize<H2ProjectAiLease>(reader.GetString(2));
+                recordedCompletion = reader.IsDBNull(3)
+                    ? null
+                    : Deserialize<H2ProjectAiCompletion>(reader.GetString(3));
             }
 
+            // A lost response must not turn a committed result into a failed run. The
+            // immutable receipt also survives lease release, restart and later turns.
+            if (recordedCompletion is not null)
+            {
+                if (recordedCompletion != completion)
+                    throw new InvalidOperationException(
+                        "AI completion retry does not match the durable completion receipt.");
+                tx.Commit();
+                return;
+            }
+
+            if (lease is null)
+                throw new InvalidOperationException("AI completion has no active durable lease.");
             if (state != H2ProjectAiQueueState.Running)
                 throw new InvalidOperationException(
                     "AI completion requires a RUNNING lease after sync barrier confirmation.");

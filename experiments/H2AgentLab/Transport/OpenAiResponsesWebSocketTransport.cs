@@ -214,7 +214,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             yield break;
         }
 
-        if (_pendingCalls.Count == 0)
+        if (_pendingCalls.Count == 0 && request.SupplementalUserMessages is not { Count: > 0 })
             throw new InvalidOperationException("Không có Responses function call đang chờ kết quả.");
         if (string.IsNullOrWhiteSpace(_previousResponseId))
             throw new InvalidOperationException("Responses WebSocket continuation thiếu previous_response_id.");
@@ -246,6 +246,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
                 ["output"] = result.Content
             });
         }
+        foreach (var message in request.SupplementalUserMessages ?? [])
+            input.Add(new JsonObject { ["role"] = "user", ["content"] = message });
         _pendingCalls = [];
 
         var payload = BuildPayload(input, _previousResponseId);

@@ -1,0 +1,38 @@
+{
+  "baseCommit": "9660a0f3000ea9c24d5e071160d22196baf4836a",
+  "configuration": "Release",
+  "runtime": "win-x64",
+  "selfContained": true,
+  "builtFromWorkingTree": true,
+  "builtAtUtc": "2026-09-21T08:57:09.5446900Z",
+  "helperCheck": "final-helpers.json",
+  "checks": {
+    "H2NotesDebug": "538/538",
+    "H2NotesRelease": "538/538",
+    "AgentRuntime": "25/25",
+    "Architecture": "35/35",
+    "BaselineImages": "10/10 unchanged"
+  },
+  "binaries": [
+    {
+      "file": "H2Notes.Avalonia.exe",
+      "sha256": "2db8177cb9274cb3f4f086c3ba3add48c11e276eafc920a874bda3e04b322c55"
+    },
+    {
+      "file": "H2Notes.Avalonia.dll",
+      "sha256": "08634c8508a3864cd5a0a3e16c44fdfe0b0751b185b01f54cefd966ea20b0a08"
+    },
+    {
+      "file": "H2AgentLab.dll",
+      "sha256": "52831ea6f992290e37a5d1955ec30f6aee78b0a1bf6e48932b6b55ff3f70790c"
+    },
+    {
+      "file": "H2AgentLab.OfficeHost.dll",
+      "sha256": "df80d8038c00583b8e8e4ea7e4f5138b0d0e43c25f43021e3445d036329e358a"
+    },
+    {
+      "file": "H2AgentLab.DesktopHost.dll",
+      "sha256": "5b7492e54de8457b470c9c17387045c3a6a245ff42a4ac3440bc746a913b8020"
+    }
+  ]
+}

@@ -21,6 +21,16 @@ if (args.Length >= 2 && args[0] == "--desktop-session-probe")
     return DesktopSessionProbe.Run(args[1], args.Contains("--startup"));
 if (args.Length >= 2 && args[0] == "--live-ai-probe" && args.Contains("--allow-live-ai"))
     return await LiveAiProbe.Run(args);
+if (args.Length == 3 && args[0] == "--agent-chat-live-probe" && args[2] == "--allow-live-ai")
+    return await H2AgentChatLiveProbe.Run(args[1]);
+if (args.Length == 4 && args[0] == "--agent-capability-live-probe" && args[3] == "--allow-live-ai")
+    return await H2AgentCapabilityLiveProbe.Run(args[1], args[2]);
+if (args.Length == 2 && args[0] == "--office-fixture-manifest")
+    return await H2AgentCapabilityLiveProbe.OfficeManifest(args[1]);
+if (args.Length == 3 && args[0] == "--word-cv-live-probe" && args[2] == "--allow-live-office")
+    return await H2WordCvLiveProbe.Run(args[1]);
+if (args.Length == 3 && args[0] == "--word-cv-close-fixtures" && args[2] == "--allow-live-office")
+    return H2WordCvLiveProbe.CloseFixtures(args[1]);
 if (args.Length >= 3 && args[0] == "--ollama-stream-probe" && args.Contains("--allow-live-ai"))
 {
     // Explicit diagnostic: synthetic text only, no profiles, credentials or project files.
@@ -40,8 +50,15 @@ if (args.Length >= 3 && args[0] == "--ollama-stream-probe" && args.Contains("--a
 
 var passed = 0;
 var failed = 0;
+// UI fixtures call LocalSettings.Save just like the app. Never let them write user settings,
+// drafts or Agent state. Child restart probes inherit this process-local override.
+var isolatedSettings = Path.Combine(Path.GetTempPath(), "H2Notes-test-settings-" + Guid.NewGuid().ToString("N"));
+Environment.SetEnvironmentVariable(H2Notes.Avalonia.LocalConfiguration.SettingsDirectoryEnvironmentVariable, isolatedSettings);
+var filterIndex = Array.IndexOf(args, "--filter");
+var testFilter = filterIndex >= 0 && filterIndex + 1 < args.Length ? args[filterIndex + 1] : null;
 void Test(string name, Action action)
 {
+    if (testFilter is not null && !name.Contains(testFilter, StringComparison.OrdinalIgnoreCase)) return;
     try { action(); passed++; Console.WriteLine("PASS " + name); }
     catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + ": " + ex); }
 }
@@ -369,8 +386,9 @@ Test("Settings exposes manual import without changing state on open or close", (
 {
     var app = new H2Notes.Avalonia.App(); typeof(H2Notes.Avalonia.App).GetField("_storage", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(app, new SheetStorage(Path.Combine(folder, "settings-data.json")));
     var before = JsonSerializer.Serialize(app.State); var window = new H2Notes.Avalonia.SettingsWindow(app); window.Show(); Dispatcher.UIThread.RunJobs();
-    True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ImportLegacyButton" && b.IsEnabled));
     True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "RecoverWorkspaceButton" && !b.IsEnabled));
+    window.GetVisualDescendants().OfType<Button>().Single(b => b.Content is TextBlock { Text: "Tiện ích" }).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
+    True(window.GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ImportLegacyButton" && b.IsEnabled));
     window.Close(); Equal(before, JsonSerializer.Serialize(app.State));
 });
 void Pump() => Dispatcher.UIThread.RunJobs();
@@ -635,6 +653,7 @@ H2CoordinatorSqliteStoreTests.Run(Test);
 H2CoordinatorClientSyncTests.Run(Test);
 H2CoordinatorConflictSnapshotTests.Run(Test);
 H2ProjectAiQueueTests.Run(Test);
+H2ProjectAiLeaseFencingTests.Run(Test);
 H2AgentTaskCorrelationTests.Run(Test);
 H2ProductProjectionTests.Run(Test);
 H2ProjectDataBoundaryTests.Run(Test);
@@ -658,11 +677,18 @@ H2WorkAssistantContextChipTests.Run(Test);
 H2WorkAssistantQuickTaskTests.Run(Test);
 H2WorkAssistantPermissionTests.Run(Test);
 H2WorkAssistantCompletionTests.Run(Test);
+H2WorkAssistantRepairTests.Run(Test);
 H2ProjectLayoutStorageTests.Run(Test);
 H2DesktopSessionStorageTests.Run(Test);
 H2ResponsiveProductTests.Run(Test);
 H2ProductArchitectureGuardTests.Run(Test);
 H2ProductionAgentBridgeTests.Run(Test);
+H2AgentChatSurfaceTests.Run(Test);
+H2DocumentsDesignTests.Run(Test);
+H2AgentSteeringWireTests.Run(Test);
+H2ProductionRepairTests.Run(Test);
+H2WordCvRepairTests.Run(Test);
+H2AgentCapabilityRepairTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);
@@ -679,7 +705,7 @@ Test("Responsive shell keeps rich draft, selection and undo across narrow and wi
     window.FindControl<Button>("NotesTabButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
     True(window.FindControl<Border>("NotesPane")!.IsVisible); True(!window.FindControl<Border>("TasksPane")!.IsVisible);
     Equal(draft, editor.Editor.Text); Equal(4, editor.Editor.SelectionLength);
-    window.Width = 1040; window.Height = 760; Pump(); True(window.FindControl<Border>("Sidebar")!.IsVisible);
+    window.Width = 1440; window.Height = 860; Pump(); True(window.FindControl<Border>("Sidebar")!.IsVisible);
     Equal(draft, editor.Editor.Text); True(editor.Editor.CanUndo); window.Flush(); Equal(draft, p.NotesText); window.Hide();
 });
 Test("Project drawer switches selected project and AI draft remains with its owner", () =>
@@ -696,7 +722,7 @@ Test("Project drawer switches selected project and AI draft remains with its own
     True(window.FindControl<Border>("AiHostBorder")!.IsVisible);
     True(window.FindControl<Grid>("WorkContent")!.IsVisible);
     True(!window.FindControl<Grid>("EditorSplit")!.IsVisible);
-    True(!window.FindControl<Button>("AgentTabButton")!.IsEnabled);
+    True(window.FindControl<Button>("AgentTabButton")!.Classes.Contains("selected"));
     window.Hide();
 });
 Test("Compact task drag only commits Next on release and edits comment separately", () =>

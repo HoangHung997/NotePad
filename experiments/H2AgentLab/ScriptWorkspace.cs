@@ -12,6 +12,7 @@ public sealed record ScriptRun(string Id, string Workspace, int ExitCode, Dictio
 {
     public string EvidenceId { get; init; } = "";
     public DateTime CompletedUtc { get; init; }
+    public string? PreviousRunId { get; init; }
 }
 
 public sealed record ScriptRunEvidence(
@@ -80,7 +81,8 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
         var run = new ScriptRun(id, workspace.Root, exit, originals.ToDictionary(x => x.Key, x => SafeWorkspace.Hash(x.Value)), artifacts)
         {
             EvidenceId = RunEvidenceId(id),
-            CompletedUtc = completedUtc
+            CompletedUtc = completedUtc,
+            PreviousRunId = prior?.Id
         };
         File.WriteAllText(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(run));
         string Log(string name)
@@ -90,9 +92,21 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
             using var reader = new StreamReader(file); var buffer = new char[24000]; var count = reader.ReadBlock(buffer, 0, buffer.Length);
             return new string(buffer, 0, count) + (reader.EndOfStream ? "" : "\n[truncated]");
         }
-        return new { runId = id, evidenceId = run.EvidenceId, exitCode = exit, stdout = Log("stdout.log"), stderr = Log("stderr.log"), artifacts,
+        var recovered = new List<string>();
+        var ancestor = prior;
+        while (exit == 0 && ancestor is not null && recovered.Count < 64
+            && ancestor.Inputs.Count == run.Inputs.Count && ancestor.Inputs.All(p => run.Inputs.TryGetValue(p.Key, out var hash) && hash == p.Value))
+        {
+            if (ancestor.ExitCode != 0) recovered.Add(ancestor.Id);
+            ancestor = ancestor.PreviousRunId is { Length: > 0 } parent ? Load(parent) : null;
+        }
+        return new { runId = id, evidenceId = run.EvidenceId, failureId = exit == 0 ? null : id,
+            resolvedFailureIds = recovered.ToArray(),
+            exitCode = exit, stdout = Log("stdout.log"), stderr = Log("stderr.log"), artifacts,
             stagedInputs = originals.Keys.Select(p => "input/" + p.Replace('\\', '/')).ToArray(), outputFolder = "output/",
-            originalFilesChanged = false, execution = "Windows AppContainer; no network capability; staged copies only", next = "Inspect results. On error revise code using previous_run if useful. Publish only verified outputs via publish_artifact." };
+            originalFilesChanged = false, execution = "Windows AppContainer; no network capability; staged copies only",
+            next = exit == 0 ? "Inspect results. Publish only verified outputs via publish_artifact."
+                : "Repair the script and rerun with the SAME inputs and previous_run='" + id + "' so the host can track recovery of this failed attempt. Check requested content and preservation before publishing." };
     }
     public ScriptRun Load(string id)
     {

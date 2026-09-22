@@ -1,0 +1,50 @@
+{
+  "probe": "production-agent-offline-greeting",
+  "defaultConversationPermission": "ConfirmChanges",
+  "cases": [
+    {
+      "readOnly": false,
+      "status": "Blocked",
+      "FinalText": null,
+      "Error": "Task requires verification, but no verifier report exists before final completion.",
+      "modelStartCalls": 1,
+      "syntheticAnswer": "Xin ch\u00E0o!",
+      "networkCalls": 0
+    },
+    {
+      "readOnly": true,
+      "status": "Completed",
+      "FinalText": "Xin ch\u00E0o!",
+      "Error": null,
+      "modelStartCalls": 1,
+      "syntheticAnswer": "Xin ch\u00E0o!",
+      "networkCalls": 0
+    },
+    {
+      "multilineAccepted": false,
+      "error": "Value is empty, too long or contains control characters. (Parameter \u0027goal\u0027)"
+    }
+  ],
+  "productionToolNames": [
+    "check_word",
+    "click_control",
+    "find_files",
+    "inspect_artifact",
+    "inspect_window",
+    "list_files",
+    "list_skills",
+    "open_file",
+    "publish_artifact",
+    "read_file",
+    "read_run",
+    "read_skill",
+    "run_python",
+    "search_files",
+    "type_control",
+    "update_plan",
+    "view_artifact",
+    "word_paragraphs",
+    "write_text"
+  ],
+  "desktopControllerConfigured": false
+}

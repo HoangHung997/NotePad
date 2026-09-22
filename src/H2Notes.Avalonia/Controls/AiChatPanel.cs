@@ -13,7 +13,8 @@ public sealed partial class AiChatPanel : UserControl
 {
     private readonly App _app;
     private readonly Func<AiClient> _createClient;
-    private readonly StackPanel _messages = new() { Name = "ChatMessages", Spacing = 10, Margin = new Thickness(12) };
+    private readonly AgentChatSurface _chatSurface = new();
+    private StackPanel _messages => _chatSurface.Timeline;
     private readonly Dictionary<Guid, ChatMessageView> _bubbles = [];
     private readonly ScrollViewer _scroll;
     private readonly TextBox _composer = new() { Name = "ChatComposer", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, PlaceholderText = "Hỏi AI…", MinHeight = 48, MaxHeight = 140 };
@@ -30,6 +31,7 @@ public sealed partial class AiChatPanel : UserControl
     private readonly Grid _title = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeAll) };
     private readonly Grid _header;
     private readonly StackPanel _optionsPanel;
+    private readonly StackPanel _composerFooter;
     private AiChatScope? _scope;
     private AiConversation? _conversation;
     private CancellationTokenSource? _request;
@@ -57,6 +59,7 @@ public sealed partial class AiChatPanel : UserControl
     public AiChatPanel(App app, Func<AiClient>? createClient = null)
     {
         _app = app;
+        _chatSurface.ExternalArtifactRequested += e => { if (DocumentRequested is not null) DocumentRequested(e); else new AgentArtifactWindow(e, _app.AgentAdapter).Show(); };
         _createClient = createClient ?? (() => new AiClient());
         _back.IsVisible = _stop.IsVisible = false;
         _send.Name = "ChatSend"; _send.Width = 40; _send.Height = 40; _send.Padding = new Thickness(9);
@@ -75,7 +78,7 @@ public sealed partial class AiChatPanel : UserControl
         dock.Click += (_, _) =>
         {
             var menu = new ContextMenu();
-            foreach (var (mode, label) in new[] { ("floating", "Nổi trong bảng dự án"), ("right", "Ghim bên phải"), ("bottom", "Ghim phía dưới") })
+            foreach (var (mode, label) in new[] { ("right", "Ghim bên phải"), ("hidden", "Ẩn khung bên cạnh") })
             { var item = new MenuItem { Header = label }; item.Click += (_, _) => DockRequested?.Invoke(mode); menu.Items.Add(item); }
             menu.Items.Add(new Separator());
             var independent = new MenuItem { Header = "Tách AI của dự án ra màn hình", Icon = new AppIcon(IconKind.Sparkle) };
@@ -112,7 +115,7 @@ public sealed partial class AiChatPanel : UserControl
             Content = new StackPanel { Spacing = 4, Children = { _history, newChat, deleteChat, _includeProject, _includeHistory } } };
         var options = new StackPanel { Spacing = 4, Margin = new Thickness(12, 0, 12, 8), Children = { _profiles, details } };
         _optionsPanel = options;
-        _scroll = new ScrollViewer { Content = _messages, HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        _scroll = _chatSurface.Scroll;
         _scroll.ScrollChanged += (_, e) =>
         {
             if (e.ExtentDelta != default || e.ViewportDelta != default)
@@ -121,11 +124,12 @@ public sealed partial class AiChatPanel : UserControl
         };
         _messages.SizeChanged += (_, _) => UpdateBubbleWidths();
         var composerRow = BuildComposer();
-        var footer = new StackPanel { Spacing = 5, Margin = new Thickness(12), Children = { _status,
+        var footer = new StackPanel { Spacing = 5, Margin = new Thickness(12), Children = { _status, _busySendMode,
             new ScrollViewer { MaxHeight = 74, Content = _draftFiles, HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled }, _markerMode, composerRow } };
+        _composerFooter=footer;
         var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto") };
         root.Children.Add(_header); root.Children.Add(options); Grid.SetRow(options, 1);
-        root.Children.Add(_scroll); Grid.SetRow(_scroll, 2); root.Children.Add(footer); Grid.SetRow(footer, 3); Content = root;
+        root.Children.Add(_chatSurface); Grid.SetRow(_chatSurface, 2); _chatSurface.AttachComposer(footer); Content = root;
         _markerMode.IsCheckedChanged += (_, _) =>
         {
             _composer.PlaceholderText = _markerMode.IsChecked == true ? "Ghi mốc công việc tại thời điểm này…" : "Hỏi AI…";
@@ -137,6 +141,7 @@ public sealed partial class AiChatPanel : UserControl
         _composer.TextChanged += (_, _) =>
         {
             if (_loading || _scope is null) return;
+            if (_activeAgentTaskId.HasValue) { _send.IsVisible = !string.IsNullOrWhiteSpace(_composer.Text); _stop.IsVisible = !_send.IsVisible; }
             if (_conversation is null && string.IsNullOrEmpty(_composer.Text)) return;
             var conversation = EnsureConversation(); conversation.Draft = _composer.Text ?? ""; _app.SaveChatDraft(_scope, conversation);
         };
@@ -144,9 +149,9 @@ public sealed partial class AiChatPanel : UserControl
         InitializeComposerInput();
         SizeChanged += (_, _) =>
         {
-            var compact = Bounds.Height < 500; _optionsPanel.IsVisible = !compact;
+            var compact = Bounds.Height < 500; _optionsPanel.IsVisible = false;
             _markerMode.IsVisible = false;
-            _composer.MinHeight = compact ? 44 : 76; _composer.MaxHeight = compact ? 80 : 180;
+            _composer.MinHeight = compact ? 44 : 50; _composer.MaxHeight = compact ? 80 : 180;
             _status.TextWrapping = compact ? TextWrapping.NoWrap : TextWrapping.Wrap;
             _status.TextTrimming = compact ? TextTrimming.CharacterEllipsis : TextTrimming.None;
         };
@@ -176,6 +181,7 @@ public sealed partial class AiChatPanel : UserControl
     public void Cancel()
     {
         CancelActiveAgentTask();
+        if (_activeAgentTaskId.HasValue) { _status.Text = "Đang dừng Agent…"; return; }
         _pdfPreparation?.Cancel();
         _layoutCancellation?.Cancel();
         _flushStreaming?.Invoke();
@@ -206,7 +212,7 @@ public sealed partial class AiChatPanel : UserControl
         if (scope is not null) scope.SelectedConversationId = _conversation?.Id;
         LoadDraft(); _includeProject.IsChecked = _includeHistory.IsChecked = true;
         _includeProject.IsVisible = _includeHistory.IsVisible = scope?.Project is not null;
-        _header.IsVisible = !_detached && scope?.IsStandalone != true;
+        _header.IsVisible = !_workspacePresentation && !_detached && scope?.IsStandalone != true;
         RefreshHistory(); RefreshProfiles(); Render(); ScrollToLatest();
     }
     private void LoadDraft()
@@ -232,20 +238,20 @@ public sealed partial class AiChatPanel : UserControl
     private void RefreshHistory()
     {
         _loading = true; var items = _scope?.Conversations.Select(c => new ConversationItem(c)).ToArray() ?? [];
-        _history.ItemsSource = items; _history.SelectedItem = items.FirstOrDefault(c => c.Value == _conversation); _history.IsVisible = items.Length > 0; _loading = false;
+        _history.ItemsSource = items; _history.SelectedItem = items.FirstOrDefault(c => c.Value == _conversation); _history.IsVisible = items.Length > 0; _loading = false; ConversationsChanged?.Invoke();
     }
     private void ScrollToLatest() { _followLatest = true; Dispatcher.UIThread.Post(() => { if (_followLatest) _scroll.ScrollToEnd(); }); }
     private void UpdateBubbleWidths()
     {
         var width = Math.Max(100, _messages.Bounds.Width * .88);
-        foreach (var bubble in _bubbles.Values) bubble.MaxWidth = width;
+        foreach (var bubble in _bubbles.Values) bubble.MaxWidth = bubble.Message.Role == "user" ? width : double.PositiveInfinity;
     }
     private void Render()
     {
         _messages.Children.Clear(); _bubbles.Clear();
         if (_conversation is null || _conversation.Messages.Count == 0)
             _messages.Children.Add(new TextBlock { Text = (_scope?.IsStandalone == true ? "AI độc lập · không kèm dữ liệu dự án.\n\n" : "AI của dự án đang chọn.\n\n")
-                + "Chọn kết nối và đặt câu hỏi, hoặc bật ‘Chỉ lưu mốc’ để ghi lại công việc mà không gọi AI.\n\nCtrl+Enter để gửi; Enter để xuống dòng.", TextWrapping = TextWrapping.Wrap, Foreground = RichEditor.Brush("#796C62") });
+                + "Chọn kết nối và đặt câu hỏi, hoặc bật ‘Chỉ lưu mốc’ để ghi lại công việc mà không gọi AI.\n\nEnter để gửi · Shift+Enter để xuống dòng.", TextWrapping = TextWrapping.Wrap, Foreground = RichEditor.Brush("#796C62") });
         else
         {
             if (_conversation.Messages.Count > _visibleMessages)
@@ -275,6 +281,11 @@ public sealed partial class AiChatPanel : UserControl
     private void AddMessage(AiMessage message)
     {
         var bubble = new ChatMessageView(message);
+        if (message.Role == "assistant" && message.AiRunId is { } agentTask)
+        {
+            try { bubble.PresentAgent(_app.AgentAdapter, _app.AgentAdapter.ObserveTask(agentTask)); }
+            catch (KeyNotFoundException) { /* Shared project may refer to a task stored on another machine. Keep its final message. */ }
+        }
         if (message == _activeAnswer) bubble.SetThinking(_streamingReasoning);
         AddFileCards(bubble, message);
         AddProjectActions(bubble, message);
@@ -306,6 +317,14 @@ public sealed partial class AiChatPanel : UserControl
     }
     private async Task SendOrSave()
     {
+        if (_activeAgentTaskId is { } running && !string.IsNullOrWhiteSpace(_composer.Text))
+        {
+            if (_busySendMode.SelectedIndex == 1) { await QueueProjectTurn(running, _composer.Text.Trim()); return; }
+            if (_app.AgentAdapter.SupplementTask(running, Guid.NewGuid(), _composer.Text.Trim()))
+            { _composer.Text = ""; _status.Text = "Đã nhận bổ sung · giữ nguyên phạm vi và quyền của tác vụ."; }
+            else _status.Text = "Chưa gửi bổ sung · nội dung vẫn ở ô soạn.";
+            return;
+        }
         if (_request is not null || _preparing || _scope is null || string.IsNullOrWhiteSpace(_composer.Text) && _conversation?.DraftAttachments.Count is not > 0) return;
         if (_markerMode.IsChecked != true) { await Send(); return; }
         var conversation = EnsureConversation(); var text = _composer.Text?.Trim() ?? "";

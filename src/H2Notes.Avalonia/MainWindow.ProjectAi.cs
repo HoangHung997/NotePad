@@ -23,6 +23,7 @@ public partial class MainWindow
             _app.TrackWindow(DetachedAiWindow);
         }
         // Move the same editor, not a second chat session that could overwrite its draft.
+        _chat.MoveComposerTo(null);
         DetachChatHost(AiHost); _chat.SetDetached(true); _chat.SetCompact(false);
         DetachedAiWindow.AttachChat(_chat); DetachedAiWindow.UpdateProject(_notesProject);
         placement.IsVisible = true; DetachedAiWindow.Show(); DetachedAiWindow.Activate();

@@ -12,6 +12,21 @@ public sealed record WorkAssistantPermissionMapping(
 /// </summary>
 public static class WorkAssistantPermissionScopeMapper
 {
+    public static WorkAssistantPermissionMapping ForWorkspace(
+        H2AgentPermissionMode mode, string workspaceRoot, DateTime nowUtc)
+    {
+        if (mode == H2AgentPermissionMode.FullAccess) return FullAccess(nowUtc);
+        if (mode == H2AgentPermissionMode.UseProjectPolicy)
+            throw new ArgumentException("Chọn quyền cho thư mục, không dùng chính sách dự án.");
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspaceRoot));
+        if (!Directory.Exists(root) || root == Path.GetPathRoot(root))
+            throw new ArgumentException("Chọn một thư mục hiện có, không chọn cả ổ đĩa.");
+        return new(new H2AgentPermissionScope(mode, H2AgentResourceScopeKind.Workspace,
+            "workspace:" + root, mode != H2AgentPermissionMode.ObserveOnly,
+            mode == H2AgentPermissionMode.AskBeforeChanges, nowUtc, nowUtc.AddMinutes(30),
+            documentPath: root), mode == H2AgentPermissionMode.ObserveOnly);
+    }
+
     public static bool TryMap(
         H2AgentPermissionMode mode,
         H2ActiveWorkContext? context,
@@ -34,6 +49,12 @@ public static class WorkAssistantPermissionScopeMapper
         {
             error = "Preset quyền không hợp lệ.";
             return false;
+        }
+
+        if (mode == H2AgentPermissionMode.FullAccess)
+        {
+            mapping = FullAccess(nowUtc);
+            return true;
         }
 
         if (mode == H2AgentPermissionMode.UseProjectPolicy)
@@ -127,6 +148,10 @@ public static class WorkAssistantPermissionScopeMapper
         error = "Preset quyền chưa được hỗ trợ.";
         return false;
     }
+
+    private static WorkAssistantPermissionMapping FullAccess(DateTime nowUtc) => new(
+        new H2AgentPermissionScope(H2AgentPermissionMode.FullAccess, H2AgentResourceScopeKind.Machine,
+            H2AgentPermissionScope.CurrentMachineResourceKey, true, false, nowUtc, nowUtc.AddHours(1)), false);
 
     private static H2AgentPermissionScope BuildScope(
         H2AgentPermissionMode mode,

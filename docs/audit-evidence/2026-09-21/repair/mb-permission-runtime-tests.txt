@@ -1,0 +1,5 @@
+PASS MB-40 read-only task blocks mutation before executor
+PASS MB-40 declined resource scope blocks alternate tool before second executor
+PASS MB-40 model or skill text cannot grant mutation authority
+PASS MB-40 canonical registry scopes every mutation and shares workspace write scope
+RESULT: 4 passed, 0 failed.

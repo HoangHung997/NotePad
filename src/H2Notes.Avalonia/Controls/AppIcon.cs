@@ -8,10 +8,10 @@ namespace H2Notes.Avalonia.Controls;
 
 public enum IconKind
 {
-    Folder, Document, Sparkle, SparkleFilled, Settings, Pin, PinFilled, More, Close,
+    Chat, Folder, Document, Sparkle, SparkleFilled, Settings, Pin, PinFilled, More, Close,
     Plus, ChevronDown, ChevronUp, ChevronLeft, Grip, Search, Clipboard, Star,
     ResizeCorner, Dock, Send, Stop, Bold, Italic, Underline, Strike, TextColor,
-    Highlight, Bullets, NumberedList, Link, Undo, Redo, Microphone, Shield, ArrowUp
+    Highlight, Bullets, NumberedList, Link, Undo, Redo, Microphone, Shield, ArrowUp, Waveform
 }
 
 // Original 24-unit vectors traced to the approved H2 mockup's silhouettes.
@@ -32,6 +32,7 @@ public sealed class AppIcon : Control
     private const string SparklePath = "M12 2 C13.3 8.2 15.8 10.7 22 12 C15.8 13.3 13.3 15.8 12 22 C10.7 15.8 8.2 13.3 2 12 C8.2 10.7 10.7 8.2 12 2 Z";
     private static readonly IReadOnlyDictionary<IconKind, Shape[]> Shapes = new Dictionary<IconKind, Shape[]>
     {
+        [IconKind.Chat] = [Line("M4 3 H20 Q22 3 22 5 V16 Q22 18 20 18 H10 L4 22 V18 Q2 18 2 16 V5 Q2 3 4 3 Z")],
         [IconKind.Folder] = [Fill("M3 5 Q3 3 5 3 H9 L11 6 H20 Q22 6 22 8 V19 Q22 21 20 21 H4 Q2 21 2 19 V7 Q2 5 3 5 Z")],
         [IconKind.Document] = [Line("M5 2 H14 L20 8 V22 H5 Z M14 2 V8 H20 M8 12 H16 M8 16 H16 M8 19 H13")],
         [IconKind.Sparkle] = [Line(SparklePath)],
@@ -66,7 +67,8 @@ public sealed class AppIcon : Control
         [IconKind.Redo] = [Line("M16 4 L21 9 L16 14 M21 9 H10 C1 9 1 21 10 21")],
         [IconKind.Microphone] = [Line("M8 6 A4 4 0 0 1 16 6 V12 A4 4 0 0 1 8 12 Z M5 11 V12 A7 7 0 0 0 19 12 V11 M12 19 V22 M8 22 H16")],
         [IconKind.Shield] = [Line("M12 2 L20 5 V11 C20 17 16 20 12 22 C8 20 4 17 4 11 V5 Z M12 7 V12 M12 16 V16.1")],
-        [IconKind.ArrowUp] = [Line("M12 20 V4 M5 11 L12 4 L19 11")]
+        [IconKind.ArrowUp] = [Line("M12 20 V4 M5 11 L12 4 L19 11")],
+        [IconKind.Waveform] = [Line("M4 10 V14 M8 5 V19 M12 8 V16 M16 3 V21 M20 9 V15")]
     };
 
     static AppIcon() => AffectsRender<AppIcon>(KindProperty, ForegroundProperty);

@@ -114,19 +114,24 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         var before = SnapshotWord(request.SessionId);
         OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
 
-        if (request.Paragraphs.Count is < 1 or > 128)
-            throw new OfficeHostFaultException("invalid_request", "Word patch must contain 1..128 paragraphs.");
+        if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
+            throw new OfficeHostFaultException("word_patch_rejected", problem);
 
         var changed = new List<int>();
-        foreach (var patch in request.Paragraphs)
+        foreach (var patch in request.Paragraphs.OrderByDescending(p => p.ParagraphIndex))
         {
             if (patch.ParagraphIndex < 0 || patch.ParagraphIndex >= _word.Paragraphs.Count)
                 throw new OfficeHostFaultException("paragraph_not_found", $"Word paragraph {patch.ParagraphIndex} does not exist.");
             var paragraph = _word.Paragraphs[patch.ParagraphIndex];
-            if (patch.Text is not null) paragraph.Text = patch.Text;
             if (patch.Bold is bool bold) paragraph.Bold = bold;
             if (patch.Italic is bool italic) paragraph.Italic = italic;
             if (patch.Underline is bool underline) paragraph.Underline = underline;
+            if (patch.Text is not null)
+            {
+                _word.Paragraphs.RemoveAt(patch.ParagraphIndex);
+                _word.Paragraphs.InsertRange(patch.ParagraphIndex, WordPatchRules.Lines(patch.Text)
+                    .Select(text => new WordParagraphFixture(text, paragraph.Bold, paragraph.Italic, paragraph.Underline)));
+            }
             changed.Add(patch.ParagraphIndex);
         }
 

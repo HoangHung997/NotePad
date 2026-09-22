@@ -1,0 +1,549 @@
+PASS Plain text round trip
+PASS Import WPF styled spans without running XAML
+PASS XML external entity is not evaluated
+PASS Format only selected text
+PASS Insertion preserves surrounding formatting
+PASS Deletion crossing spans
+PASS Draft clone does not mutate original
+PASS Invalid rich-text range rejected
+PASS Selected formatting reports shared and mixed properties independently
+PASS Local configuration preserves friendly path and resolved workspace endpoint metadata
+PASS Work Assistant settings round-trip only through local configuration
+PASS Work Assistant settings never enter shared workspace models
+PASS Project move preserves identity and child order
+PASS Task reorder updates Next only on move
+PASS Foreign task cannot be moved into another project
+PASS Search keeps parent and original ordinal
+PASS Collapse hides checklist, not the model
+PASS Column preferences and rich task comments persist and old files get defaults
+PASS Isolated import retains originals, unknown fields, IDs and rich text
+PASS Corrupt state never replaced with empty state
+PASS Future schema cannot be overwritten
+PASS Nera fractional scroll preserved
+PASS Nera wheel animates and clamps
+PASS Manual import converts legacy hub and general notes without writing during preview
+PASS Manual import appends copies, retains edits/preferences and permanent source/pre-import backups
+PASS Manual import rejects invalid structures and future schemas before changing data
+PASS Manual import supports older standalone project notes and missing general NoteKind
+PASS Manual import uses the confirmed snapshot even if selected file later changes
+PASS Failed import save leaves live state and current file unchanged
+PASS Manual import rejects active file and oversized input
+PASS Desktop session restores the selected board and note stacking order on both launch paths
+PASS Hidden board and all-hidden session are not forced open
+PASS Session restore ignores deleted, archived, duplicate and inactive board IDs
+PASS First launch and pre-session data retain visible-note defaults
+PASS Disabling session restore starts quietly with Windows, manually opens only the board
+PASS Manual import preserves the current desktop session on disk
+PASS Settings exposes manual import without changing state on open or close
+PASS Notes have no taskbar/minimize/maximize; X hides, flushes draft and permits reopening
+PASS Board X hides without closing and switched board is the saved session selection
+PASS Application exit retains visible windows and captures draft and geometry before closing
+PASS Moving and resizing a note schedule autosave even when snapping is off
+PASS Settings and dialogs stay off the taskbar without minimize/maximize
+PASS Missing monitor is recovered while valid negative monitor coordinates are kept
+PASS Toolbar and menu follow uniform/mixed selection without edits or saves
+PASS Mixed bold toggles all on from menu and toolbar follows undo
+PASS Typing format and caret formatting agree without changing other text
+PASS Four columns; STT checkbox changes only its task and keeps ordinal
+PASS Auto height uses only enabled columns; clipped cells retain full tooltip text
+PASS Cell comment formats survive commit, autosave, cancel and reopening
+PASS Auto wraps unbroken text; fixed cells fit large fonts and retain span backgrounds
+PASS Rich editor applies formatting and undoes it
+PASS Text edit undo retains existing rich spans
+PASS Grid edit commit and Escape after autosave
+PASS Grid task drag preview leaves Next and project order unchanged
+PASS Project drag preview/cancel preserves groups and ordinals
+PASS Filtered grid does not reorder underlying data on drag
+PASS Main window constructs its named controls and loads notes
+METRIC 1000 projects/10000 tasks: initial layout 1588 ms; 27 visual elements (headless, not native FPS)
+PASS Viewport visual count stays bounded for 10,000 tasks
+PASS Workspace stores each project with rich text, chat, paths and ordinary notes while drafts stay local
+PASS Workspace migration preserves source bytes and immutable backup
+PASS AI time context exposes real timestamps and never invents legacy dates
+PASS Workspace location resolves mapped network and UNC aliases to one canonical endpoint
+PASS Workspace endpoint fallback switches only to reachable alias with matching WorkspaceId
+PASS Schema 5 workspace migrates atomically to schema 6 stable WorkspaceId
+PASS Logical WorkspaceId prevents same-machine duplicate aliases and self-transfer
+PASS Offline pending workspace snapshot survives restart and merges remote changes before replay
+PASS Offline pending replay keeps local same-field edit and audits remote conflict
+PASS Pending workspace snapshots stay append-only but bounded
+PASS Workspace rename keeps a stable GUID file path and project identity
+PASS Workspace transaction rollback restores previous complete generation
+PASS Workspace final validation failure retains recovery journal until rollback
+PASS Workspace transient mixed generation converges on bounded reread
+PASS Workspace persistent mixed generation offers guided last-known-good recovery with quarantine
+PASS Workspace persistent mismatch without local recovery fails closed and persists bounded diagnostics
+PASS Workspace rejects external modification, preserves bytes and opens only validated last-good read-only
+PASS Workspace prevents nested roots, foreign overwrite and duplicate IDs
+PASS Workspace commit lease serializes writers with byte-range lock and releases with the handle
+PASS Workspace instance lock prevents two copies on one PC
+PASS Incremental save persists only dirty projects while index order and selection update
+PASS Two NAS devices append AI runs to the same conversation without losing either run
+PASS Two NAS devices merge edits to different tasks and different fields of one task
+PASS Same-field NAS conflict keeps current writer, records audit, and does not block the workspace
+PASS Remote refresh brings NAS changes into an open device without discarding local edits
+PASS Workspace merge requires explicit conflict decisions and keep-both does not duplicate on repeat
+PASS Workspace merge asks before choosing project order and preserves rich names in duplicate
+PASS H2AgentAdapter boundary is provider-neutral and fake-testable
+PASS H2AgentAdapter accepts unscoped quick work and later project attachment
+PASS H2AgentAdapter exposes approval and cancellation without Agent internals
+PASS H2AgentAdapter source does not reference runtime transport or ToolRegistry
+PASS Coordinator device identity is stable protocol identity, not a machine-name key
+PASS Project event draft preserves idempotency identity and verifies payload hash
+PASS Server sequence is authoritative independently of client clock order
+PASS Conflict evidence is immutable and rejects ambiguous duplicate event identity
+PASS Snapshot is hash-verified and bounded to an accepted server watermark
+PASS AI lease binds one project request to a sync barrier and bounded heartbeat timeline
+PASS AI completion rejects non-terminal queue states
+PASS Coordinator service boundary is infrastructure and Agent-runtime neutral
+PASS Coordinator SQLite store rejects network database paths
+PASS Coordinator assigns durable server sequence and idempotent retry survives restart
+PASS Coordinator serializes concurrent client submissions into unique server order
+PASS Coordinator rejects ClientOperationId collision instead of duplicating or overwriting
+PASS Coordinator persists verified snapshot and structured conflict across restart
+PASS Coordinator persists FIFO AI queue and active lease across restart
+PASS Coordinator AI enqueue retries preserve exact content and server acceptance time
+PASS Coordinator client outbox survives restart and merges remote progress before pending local events
+PASS Coordinator client retains outbox when submit succeeds but acknowledgement pull is interrupted
+PASS Coordinator client durable outbox stores immutable events before optimistic projection
+PASS Coordinator clients keep conflicted local value optimistic only and converge after explicit resolution
+PASS Project event applier mutates existing H2 task and link models without shared workspace files
+PASS Coordinator client sync source does not use legacy shared workspace transaction primitives
+PASS Coordinator merges independent project fields with field-scoped revisions
+PASS Coordinator records same-field conflict without changing authoritative projection and resolves by event
+PASS Coordinator turns delete-vs-update into conflict and preserves deletion
+PASS Coordinator entity restore resets old field revisions and stale pre-delete edit conflicts
+PASS Coordinator compacts hot events only behind a verified snapshot and keeps archived events queryable
+PASS Coordinator logical archive restores compacted project truth and continues sequencing
+PASS Coordinator accepts only snapshots that equal applied replay and current revision metadata
+PASS Project AI grant and barrier confirmation recover lost responses across Coordinator restart
+PASS Project AI completion receipt survives lost response restart and later project turns
+PASS Project AI queue is FIFO while user messages remain shared and different projects run concurrently
+PASS AI project events are rejected before sync barrier and completion requires committed assistant message
+PASS Running AI lease expiry enters repair and blocks FIFO until explicit recovery
+PASS AI conflicting mutation prevents Completed and keeps next request blocked until review is resolved
+PASS AI conflict resolution rejects expired, completed, wrong-device and nonexistent leases without changing project truth
+PASS Running AI can resolve a conflict and its exact resolution retry remains safe after completion
+PASS Restarted Coordinator blocks expired Running lease until recovery and fences old owner after next run starts
+PASS Agent task correlation supports project and unscoped runs without ProjectRecord state
+PASS Agent task correlation can attach quick work to a project without rewriting task state
+PASS Agent task correlation does not mutate project JSON or embed Agent execution state
+PASS Agent correlation index fails closed on conflicting registration
+PASS Project overview is rebuilt from ProjectRecord AgentAdapter and workspace health
+PASS Needs attention derives only actionable Agent states plus one workspace item
+PASS Project activity is chronological source projection with bounded Agent evidence
+PASS Workspace health projection is rebuilt from real store pending and sync state
+PASS Product projections are disposable views and rebuild without mutating project truth
+PASS Product projection source has no database file or persistence path
+PASS ProjectRecord remains durable project truth and does not embed Agent execution state
+PASS TaskRecord remains a human project checklist item not an Agent execution step
+PASS Project model source contains no new Agent execution persistence markers
+PASS Agent correlation and projections leave ProjectRecord serialization independent
+PASS No durable ProjectState type exists in H2 runtime source
+PASS Command Center data source is projection-only and owns no truth store
+PASS Command Center query rebuilds from projects and Agent projections without mutating truth
+PASS Command Center projection source contains no persistence implementation
+PASS Project progress is completed human tasks over total human tasks
+PASS Project progress query is read-only and not a persisted AI percentage
+PASS Command Center project counts use canonical calculator while Agent state stays separate
+PASS Current H2 project UI sources delegate project percent to canonical calculator
+PASS Agent execution progress DTO cannot write project completion
+PASS Command Center is the default project surface and shows all high-value fields
+PASS Command Center project selection opens existing workspace and Projects nav returns to overview
+PASS Needs attention deep-links to source and disappears when source resolves
+PASS Command Center derived classifier covers all five groups without persisted board status
+PASS Command Center group filter changes only the projection and never project JSON
+PASS Sync health UI comes from storage lifecycle state, never Agent/model text
+PASS Command Center XAML binds only the required high-value overview fields
+PASS Opening a project is Agent-first with compact status and one-click details
+PASS Agent-first workspace mode is transient and does not add project persistence state
+PASS H2M-060 changes presentation only and does not replace project AI execution early
+PASS Project Tasks detail reuses ProjectGrid editing search completion drag comments and rich text
+PASS Project Tasks detail source stays independent from Agent execution models
+PASS Project Notes detail keeps rich human knowledge in ProjectRecord NotesRich
+PASS Project Notes remain human project knowledge without KnowledgeGraph or ResearchStore
+PASS Project resources projection combines links saved files and Agent evidence without mirroring filesystem metadata
+PASS Resource target policy allows only http https and existing absolute paths
+PASS Resources detail is one click and exposes safe actions without opening Agent evidence as a path
+PASS Project resources UI does not execute shell command strings or persist resource caches
+PASS Project History combines meaningful project Agent evidence and sync events without raw trace
+PASS Project History detail opens in one click and remains a projection-only UI
+PASS Project History implementation has no duplicate history or trace store
+PASS Evidence inspector resolves authoritative web and file provenance from Agent
+PASS Evidence inspector UI exposes provenance and safe source actions in one click
+PASS Evidence inspector has no H2 ResearchStore and keeps evidence Agent-owned
+PASS Project AiChatPanel sends new requests through H2AgentAdapter and never direct AiClient
+PASS Project AiChatPanel stop delegates cancellation to H2AgentAdapter
+PASS Legacy AiClient execution is standalone-only and cannot regain project scope
+PASS Project Agent presentation source does not use legacy direct execution internals
+PASS Legacy project conversations round-trip without metadata attachment or saved-file loss
+PASS New Agent presentation appends without rewriting legacy messages
+PASS Legacy untimed chat renders unknown time instead of current time
+PASS Legacy history migration has no destructive conversion store
+PASS AiProjectContext type is fully retired from runtime source
+PASS Legacy request context is confined to standalone direct-chat compatibility paths
+PASS Project Agent grounding is bounded and independent from legacy giant history builder
+PASS Legacy request context naming makes standalone-only compatibility explicit
+PASS Typed project host validates read-only confirm approval scope and stale version
+PASS Typed project host supports bounded add task append note replace note only
+PASS Typed project tool boundary exposes no unrestricted ProjectRecord mutation or Agent runtime types
+PASS App binds typed project host only through optional Agent adapter capability
+PASS H2 Agent fenced h2-actions text is never parsed or applied as project mutation
+PASS New project Agent source has no pseudo-action parser path
+PASS Work Assistant placement restores preferred monitor in DIPs and clamps to work area
+PASS Work Assistant bubble exposes idle working attention and completed states
+PASS Work Assistant bubble can live without MainWindow and disabled setting keeps it hidden
+PASS Work Assistant shell is wired to startup tray drag and local-only lifecycle
+PASS Work Assistant hotkey parser normalizes configurable chords and rejects invalid input
+PASS Work Assistant hotkey conflict fails gracefully and binding stays configurable
+PASS Work Assistant hotkey callback only opens compact assistant and does not start or mutate work
+PASS Work Assistant hotkey stays machine-local and is not shared project truth
+PASS ActiveWorkContext captures bounded foreground and optional structured provider context
+PASS ActiveWorkContext revalidation rejects stale window process or provider session
+PASS App captures ActiveWorkContext before compact assistant and clears stale target
+PASS ActiveWorkContext remains ephemeral and is not persisted as project truth
+PASS Work Assistant context chips show current interpretation and support remove reset scope
+PASS App projects captured context into chips without weakening stale-target revalidation
+PASS Context chip scope stays RAM-only and starts no work by itself
+PASS Quick Work Assistant request starts normal unscoped Agent task and survives panel collapse
+PASS Quick Work Assistant fails closed when selected active context is stale
+PASS Quick work uses one Agent adapter and introduces no QuickWorkSession model
+PASS Work Assistant allow-document preset maps to expiring workbook session scope, not full PC
+PASS Work Assistant ask-before-changes maps to scoped mutation plus approval
+PASS Mutation presets fail closed without a concrete document or session scope
+PASS Compact Work Assistant resets mutation preset whenever foreground context is recaptured
+PASS Quick Work Assistant forwards workbook-scoped grant through existing Agent adapter
+PASS Quick Work Assistant project-policy preset fails closed until task is project-scoped
+PASS Work Assistant permission mapping is a scope mapper, not a second execution engine
+PASS Work Assistant projects running attention and verified completion from one Agent task
+PASS Work Assistant cancel and retry are explicit and retry never auto-repeats mutation
+PASS Work Assistant can link completed task to project and open full Project Workspace
+PASS Work Assistant completion UX keeps one Agent runtime and has no generic Undo promise
+PASS H2M-090 classifies ProjectLayout as portable preference only
+PASS H2M-090 keeps machine geometry in local configuration per project
+PASS H2M-090 shared project JSON contains preferences but no machine geometry
+PASS H2M-090 NAS project file excludes machine-specific geometry
+PASS H2M-090 responsive UI reads and writes geometry only through LocalConfiguration
+PASS H2M-091 DesktopSession and note placements serialize only in local configuration
+PASS H2M-091 NAS snapshot strips DesktopSession and note window coordinates
+PASS H2M-091 local desktop session overrides foreign note geometry after NAS load
+PASS H2M-091 new PC without local session starts from safe desktop defaults
+PASS H2M-091 ProjectWorkspaceStore source explicitly keeps DesktopSession local
+PASS H2M-092 narrow Project Workspace uses compact picker and overlay drawer
+PASS H2M-092 medium detail layout keeps usable task and note panes
+PASS H2M-092 short narrow window switches between task and note detail instead of crushing both
+PASS H2M-092 wide Project Workspace preserves Agent-first majority and optional docked AI
+PASS H2M-092 placement infrastructure preserves valid multi-monitor coordinates and recovers missing monitor
+PASS H2M-100 no giant ProjectState or second durable project-agent state store
+PASS H2M-101 NeedsAttention remains rebuildable projection with no AIInboxStore
+PASS H2M-102 research remains evidence view with no independent ResearchStore
+PASS H2M-103 formal ProjectDecision subsystem remains deferred
+PASS H2M-104 quick work is Agent task with nullable ProjectId and no QuickWorkSession
+PASS H2M-105 project progress is deterministic task projection, never model-written percentage
+PASS H2M-093 startup composes concrete production Agent adapter
+PASS H2M-093 concrete bridge executes project task through real AgentRuntime and captures evidence
+PASS H2M-093 quick task supports null ProjectId later attachment and restart durability
+PASS H2M-093 production bridge keeps runtime internals out of H2 product UI
+PASS Office readback rejects unexpected target formatting and unsafe mixed-run replacement
+PASS Production ConfirmChanges greeting and multiline message complete without invented mutation
+PASS Production request uses selected model reasoning history and native attachment snapshot
+PASS Production project change waits for visible approval and obeys Allow
+PASS Production project change waits for visible approval and obeys Deny
+PASS Production scoped project access verifies notes past 20000 chars and tasks past 200
+PASS Production workbook grant cannot authorize generic workspace file write
+PASS Production attachment tool reads selected content beyond summary truncation
+PASS Production default composition discovers live Office and Web schemas
+PASS Verification projection rejects labels failed reports and later unverified completion
+PASS Agent layout keeps every tab clickable and chat below header at wide and narrow sizes
+PASS H2M-110 Command Center answers the five-second operational questions on real UI
+PASS H2M-111 Project AI-first workflow uses concrete bridge without polluting project checklist
+PASS H2M-112 Excel Work Assistant uses structured tools verifies and runs without MainWindow
+PASS H2M-113 Word legal Work Assistant uses unsaved structured Word and authoritative Web evidence
+PASS H2M-114 AutoCAD Work Assistant performs bounded selected-block mutation and reread verification
+PASS H2M-115 legacy migration preserves project history attachments saved files layout and new Agent work
+PASS H2M-116 two-PC projection keeps shared project truth and local Agent/layout state separate
+PASS H2M-120 legacy AiProjectContext is absent from new project Agent execution
+PASS H2M-121 h2-actions remain historical preview only with no execution dependency
+PASS H2M-122 normal project send cannot execute through direct legacy AiClient
+PASS H2M-123 ProjectAiWindow is a detached view of the same Agent workspace
+PASS H2M-124 superseded product docs are clearly historical and master files stay canonical
+H2M-132 METRIC startup_proxy_ui_ms=90,62
+H2M-132 METRIC command_center_refresh_20_total_ms=7,92
+H2M-132 METRIC project_switch_25_total_ms=581,68
+H2M-132 METRIC agent_progress_refresh_100_total_ms=1,21
+H2M-132 METRIC background_bubble_idle_250_pumps_ms=0,11
+H2M-132 METRIC background_bubble_managed_delta_bytes=245368
+H2M-132 METRIC workspace_save_250_projects_1250_tasks_ms=1941,59
+H2M-132 METRIC large_1000_projects_10000_tasks_layout_ms=595,54
+H2M-132 METRIC large_1000_projects_10000_tasks_visual_count=27
+PASS H2M-132 measures final product performance/resource proxies on Windows CI
+PASS AI streams Ollama with explicit model, context and protocol authentication
+PASS AI streams OpenAiResponses with explicit model, context and protocol authentication
+PASS AI streams OpenAiChat with explicit model, context and protocol authentication
+PASS AI streams Gemini with explicit model, context and protocol authentication
+PASS AI refuses unsafe online URLs, embedded credentials and key query strings
+PASS AI truncated stream is not reported complete or automatically retried
+PASS AI server errors do not reveal response body or retry
+PASS AI Ollama models and memory requests contain no project data
+PASS AI canceled request does not start a fallback provider
+PASS AI HTTP 401 has an actionable safe category without echoing secrets
+PASS AI HTTP 402 has an actionable safe category without echoing secrets
+PASS AI HTTP 403 has an actionable safe category without echoing secrets
+PASS AI HTTP 404 has an actionable safe category without echoing secrets
+PASS AI HTTP 429 has an actionable safe category without echoing secrets
+PASS AI HTTP 503 has an actionable safe category without echoing secrets
+PASS AI distinguishes Gemini model restriction and cloud extra usage without raw server messages
+PASS AI model list HTTP failure keeps the same actionable error as chat
+PASS AI completed stream without text is an error, not a blank successful answer
+PASS Ollama location labels distinguish local, cloud tags and remote servers
+PASS Ollama cloud is never described or requested as a local RAM load
+PASS Shared AI memory survives devices and retrieves project/time evidence without model context growth
+PASS Interactive AI context keeps recent turns and never resends historical image bytes
+PASS Responsive shell keeps rich draft, selection and undo across narrow and wide sizes
+PASS Project drawer switches selected project and AI draft remains with its owner
+PASS Compact task drag only commits Next on release and edits comment separately
+PASS All original vector icons render at three sizes and inherit theme color
+PASS Window resize hit testing and cursor axes match all eight sides
+PASS Window edge hover temporarily overrides child I-beam and restores it
+PASS Responsive shell uses vector icons and broad, working split handles
+PASS List toolbar actions preserve formatting and undo as one edit
+PASS Column resize hover and drag use the same header boundary
+PASS Legacy messages never acquire a fabricated timestamp on loading
+PASS Local timeline markers and failed answers never enter AI requests
+PASS Independent chat is saved in its own note file with history and time while draft stays device-local
+PASS Workspace v2 upgrades all files atomically so old clients reject local-only markers
+PASS Merge keep-both remaps independent conversation and parent IDs
+PASS Chat aligns user right, assistant left, shows time and groups by date/gap
+PASS Save marker works with no AI profile and preserves standalone/project isolation
+PASS Reopening returns to selected conversation rather than the last created
+PASS Streaming response targets message body, not its timestamp (mock transport)
+PASS Interrupted session keeps partial AI answer and original time without resending
+PASS Standalone chat shows safe HTTP error in the saved bubble after reopening without retrying
+PASS Saving a replacement AI connection refreshes the open panel without losing its draft
+PASS Independent chat X hides with saved draft and its own desktop placement
+PASS Detaching AI reuses project editor, history and draft without creating notebooks
+PASS Detached AI follows project selection both ways with isolated draft, notes and markers
+PASS Detached AI survives hiding the board; X hides only AI and preserves geometry/history
+PASS Moving project Agent to desktop and hiding board does not cancel an active reply
+PASS Repeated AI reparent drains pending old-root layout and keeps the same composer/progress
+PASS Desktop AI-only session restores selected project and window on restart/startup
+PASS Detached chat resize follows latest message but respects reading old history
+PASS Full project context includes all ordered tasks, notes, links and related conversations but no local markers/drafts
+PASS Fresh context is sent once; old snapshots never override current project data
+PASS AI file .docx generates valid actual bytes and reads Vietnamese content back
+PASS AI file .xlsx generates valid actual bytes and reads Vietnamese content back
+PASS AI file .csv generates valid actual bytes and reads Vietnamese content back
+PASS AI file .txt generates valid actual bytes and reads Vietnamese content back
+PASS AI file .md generates valid actual bytes and reads Vietnamese content back
+PASS Excel extraction includes every sheet, cached formulas, shared strings and cell addresses
+PASS Attachment readers reject oversized files, old Office, macros, DTD and empty input
+PASS Artifact validation rejects paths, executables, reserved names, data loss and excess sheets
+PASS Multimodal Ollama sends native image format and trusted system instruction without credentials in body
+PASS Multimodal OpenAiResponses sends native image format and trusted system instruction without credentials in body
+PASS Multimodal OpenAiChat sends native image format and trusted system instruction without credentials in body
+PASS Multimodal Gemini sends native image format and trusted system instruction without credentials in body
+PASS Sent attachments and export audit round-trip in one project file while draft attachments stay device-local
+PASS Workspace v3 upgrades every project to current schema with a backup before attachments are saved
+PASS Chat draft files stay with project; marker attachment stays local; artifact buttons render beside history
+PASS Project Agent send flushes editor and grounds exact snapshot without a confirmation dialog
+PASS Thinking follows newest wrapped text, rolling buffer, reopen and resize
+PASS Assistant Markdown renders natural structure, fenced tables and Unicode escapes
+PASS Composer Enter sends and Shift Enter stays available for a newline
+PASS Provider thinking is expandable, ephemeral and hidden at first answer; Send no longer opens confirmation
+PASS Cancelled and failed thinking does not remain visible or become answer text
+PASS AI existing profiles wait by default and preserve wait choice in model copies
+PASS AI weak-server wait and reasoning idle resets work for all four protocols
+PASS AI wait can be canceled during silence without retry
+PASS AI optional idle timeout stops a silent server without retry
+PASS AI typed stream separates provider reasoning and final text: Ollama
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: Ollama
+PASS AI reasoning-only completion is not a successful final answer: Ollama
+PASS AI reasoning does not mask truncated streams or trigger retries: Ollama
+PASS AI cancellation after reasoning stops buffered final tokens: Ollama
+PASS AI in-stream errors preserve prior events without exposing server secrets: Ollama
+PASS AI typed stream separates provider reasoning and final text: OpenAiResponses
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: OpenAiResponses
+PASS AI reasoning-only completion is not a successful final answer: OpenAiResponses
+PASS AI reasoning does not mask truncated streams or trigger retries: OpenAiResponses
+PASS AI cancellation after reasoning stops buffered final tokens: OpenAiResponses
+PASS AI in-stream errors preserve prior events without exposing server secrets: OpenAiResponses
+PASS AI typed stream separates provider reasoning and final text: OpenAiChat
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: OpenAiChat
+PASS AI reasoning-only completion is not a successful final answer: OpenAiChat
+PASS AI reasoning does not mask truncated streams or trigger retries: OpenAiChat
+PASS AI cancellation after reasoning stops buffered final tokens: OpenAiChat
+PASS AI in-stream errors preserve prior events without exposing server secrets: OpenAiChat
+PASS AI typed stream separates provider reasoning and final text: Gemini
+PASS AI legacy Stream excludes reasoning from saved and replayed turns: Gemini
+PASS AI reasoning-only completion is not a successful final answer: Gemini
+PASS AI reasoning does not mask truncated streams or trigger retries: Gemini
+PASS AI cancellation after reasoning stops buffered final tokens: Gemini
+PASS AI in-stream errors preserve prior events without exposing server secrets: Gemini
+PASS AI Ollama emits thinking before content when both arrive together
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":null,"reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"","reasoning":"trace"
+PASS AI Chat reasoning aliases remain separate from same-chunk content: "reasoning_content":"trace","reasoning":"trace"
+PASS AI Responses emits summary deltas only, not raw reasoning or duplicate done snapshots
+PASS AI Gemini preserves mixed-part order and ignores opaque thought signatures and other candidates
+PASS AI empty and non-string provider reasoning fields do not become text
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama default
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama True
+PASS AI Ollama thinking is explicit and never sent to other protocols: Ollama False
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses default
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses True
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiResponses False
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat default
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat True
+PASS AI Ollama thinking is explicit and never sent to other protocols: OpenAiChat False
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini default
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini True
+PASS AI Ollama thinking is explicit and never sent to other protocols: Gemini False
+PASS AI Ollama thinking defaults to model behavior and preserves all three profile choices
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://api.openai.com/v1
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://generativelanguage.googleapis.com/v1beta
+PASS AI public summary opt-in sets no hidden reasoning or effort settings: https://generativelanguage.googleapis.com/v1
+PASS AI summary opt-in never imposes settings on unsupported endpoints: http://192.168.1.208:11434 Ollama
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com/v1 OpenAiChat
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://example.test/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com.evil.test/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com:8443/v1 OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://api.openai.com/other-api OpenAiResponses
+PASS AI summary opt-in never imposes settings on unsupported endpoints: https://example.test/v1beta Gemini
+PASS AI Ollama permits HTTP loopback and labels it local: localhost
+PASS AI Ollama permits HTTP loopback and labels it local: LOCALHOST
+PASS AI Ollama permits HTTP loopback and labels it local: 127.0.0.1
+PASS AI Ollama permits HTTP loopback and labels it local: 127.254.1.2
+PASS AI Ollama permits HTTP loopback and labels it local: [::1]
+PASS AI Ollama permits HTTP loopback and labels it local: [::ffff:127.0.0.1]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 192.168.1.208
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 10.0.0.1
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 10.255.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 172.16.0.1
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 172.31.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: 192.168.255.254
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fc00::1]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fdff:ffff::208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fe80::208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [fe80::208%2512]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [::ffff:192.168.1.208]
+PASS AI Ollama permits explicitly configured private LAN HTTP and labels remote processing: [::ffff:10.0.0.1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: 8.8.8.8
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.167.1.208
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.169.1.208
+PASS AI Ollama rejects public or non-approved HTTP addresses: 172.15.255.254
+PASS AI Ollama rejects public or non-approved HTTP addresses: 172.32.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 11.0.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 100.64.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: 169.254.169.254
+PASS AI Ollama rejects public or non-approved HTTP addresses: 0.0.0.0
+PASS AI Ollama rejects public or non-approved HTTP addresses: 255.255.255.255
+PASS AI Ollama rejects public or non-approved HTTP addresses: 224.0.0.1
+PASS AI Ollama rejects public or non-approved HTTP addresses: [::]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [2001:4860:4860::8888]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [ff02::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [fec0::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [::ffff:8.8.8.8]
+PASS AI Ollama rejects public or non-approved HTTP addresses: [2002:0a00:0001::1]
+PASS AI Ollama rejects public or non-approved HTTP addresses: example.test
+PASS AI Ollama rejects public or non-approved HTTP addresses: ollama.local
+PASS AI Ollama rejects public or non-approved HTTP addresses: localhost.evil.test
+PASS AI Ollama rejects public or non-approved HTTP addresses: 192.168.1.208.evil.test
+PASS AI online protocols still require HTTPS even on private networks: OpenAiResponses
+PASS AI online protocols still require HTTPS even on private networks: OpenAiChat
+PASS AI online protocols still require HTTPS even on private networks: Gemini
+PASS AI URL credentials, secret queries, fragments, and cross-origin paths remain rejected
+PASS AI Ollama LAN model operations send no project data or API secrets
+PASS AI rejects redirect responses without retrying or exposing secrets: MovedPermanently
+PASS AI rejects redirect responses without retrying or exposing secrets: Found
+PASS AI rejects redirect responses without retrying or exposing secrets: RedirectKeepVerb
+PASS AI rejects redirect responses without retrying or exposing secrets: PermanentRedirect
+PASS AI default HTTP transport does not follow a LAN redirect
+PASS Word layout contains editable text, original graphics and valid OpenXML without external links
+PASS Word layout keeps per-page dimensions and rejects image-only or malformed outputs
+PASS Layout selection formatting preserves exact text and limits changes to selected characters
+PASS AI layout artifact is an explicit source request, never silently exports blank or model-rewritten Word
+PASS Layout review exposes editable OCR and formatting without saving or contacting a model
+PASS Composer upgrade keeps input above one unclipped bottom row at 340x420
+PASS Composer @ filters without accents, navigates and inserts without sending
+PASS Composer @ Ctrl+Enter selects suggestion before send and Escape preserves draft
+PASS Composer + menu exposes real filenames and drafts, not autonomous tools
+PASS Marker and data preview live only in context menus at every composer size
+PASS Marker mention toggles shared mode without sending then saves a private timestamped message
+PASS Marker action captured before a project switch cannot modify either draft
+PASS Context preview is reachable from plus and mention without sending a message
+PASS Composer clipboard Ctrl+V/context menu uses exactly one plain-text edit with undo
+PASS Composer plain text still pastes while attachment import is busy
+PASS Composer deferred clipboard cannot paste into a changed project or conversation
+PASS Composer deferred bitmap cannot attach after project switch
+PASS Composer delayed text does not overwrite a newly changed draft or selection
+PASS Composer bitmap bounds reject oversized images without allocating image pixels
+PASS Composer deferred import commits atomically and discards results after switching away/back
+PASS Composer invalid attachment batches report errors without throwing or partially committing
+PASS Composer drop file URI attaches local file; remote URI stays text
+PASS Composer local paths reject HTTP, remote file hosts and UNC shares
+PASS Composer local file safety walk accepts ordinary ancestors and a Windows drive root
+PASS Composer enforces four files, eight MB per file and 32 MB total without trimming history
+PASS Project actions parse the expanded allowlist but reject unknown capabilities
+PASS Read-only blocks project writes; confirm requires approval; full access does not
+PASS Project action validates entire batch before any mutation
+PASS AI can update and delete exact tasks by stable id
+PASS AI edits existing note instead of appending a duplicate and preserves surrounding rich formatting
+PASS AI can continue a note list naturally and style its own inserted label
+PASS Exact note mutations reject missing or ambiguous targets before mutation
+PASS Action instructions tell the model to infer local list style and edit rather than duplicate
+PASS Legacy h2-actions are read-only history under ReadOnly
+PASS Legacy h2-actions are read-only history under ConfirmChanges
+PASS Legacy h2-actions are read-only history under ProjectAccess
+PASS Historically applied h2-actions keep audit evidence without re-execution
+PASS H2 Agent fenced h2-actions text is never interpreted as legacy action UI
+PASS Project action UI source has no legacy execution hooks
+PASS Document Direct image=False failure preserves draft and never sends a text-only substitute
+PASS Document Docling image=False failure preserves draft and never sends a text-only substitute
+PASS Document MinerU image=True failure preserves draft and never sends a text-only substitute
+PASS AI settings exposes all four PDF paths without running an OCR engine
+PASS Image OCR is opt-in; converted images keep originals but send text across history
+PASS PDF current send keeps raw bytes while historical turns never resend them
+PASS PDF validates signature and 8MB bound without trusting MIME or history
+PASS PDF preprocessed Markdown replays as text with source provenance, never a native file
+PASS PDF native wire shape and explicitly supplied bytes: OpenAiResponses
+PASS PDF native wire shape and explicitly supplied bytes: OpenAiChat
+PASS PDF native wire shape and explicitly supplied bytes: Gemini
+PASS PDF rejects Ollama and unsupported or spoofed compatible providers before sending
+PASS PDF supported list covers common documented vision models but not arbitrary suffixes
+PASS PDF budget counts history and rejects unsupported attachment roles
+PASS PDF direct and text-only preprocessing never require a runtime or download
+PASS PDF preprocessing honors cancellation before reading runtime or launching
+PASS PDF preprocessing refuses untrusted bridge and invalid page/time settings
+PASS PDF OCR output reader rejects overflow, invalid UTF8, empty and NUL without truncating
+PASS PDF runtime manifest is readiness-only and cannot choose executable or escape model directory
+PASS PDF bounded local subprocess cancels promptly
+PASS PDF bounded local subprocess stops stdout flooding and redacts failed diagnostics
+PASS Reasoning common verified models expose exact supported effort values
+PASS Reasoning allowlist rejects model suffixes and impersonated official endpoints
+PASS Reasoning maximum maps to highest known wire value without mutating profile
+PASS Reasoning emits only its verified protocol parameter: Ollama
+PASS Reasoning unknown maximum is display-only, no invented API parameters: Ollama
+PASS Reasoning emits only its verified protocol parameter: OpenAiResponses
+PASS Reasoning unknown maximum is display-only, no invented API parameters: OpenAiResponses
+PASS Reasoning emits only its verified protocol parameter: OpenAiChat
+PASS Reasoning unknown maximum is display-only, no invented API parameters: OpenAiChat
+PASS Reasoning emits only its verified protocol parameter: Gemini
+PASS Reasoning unknown maximum is display-only, no invented API parameters: Gemini
+PASS Reasoning invalid explicit effort fails before transmitting
+PASS Reasoning and action audit metadata round trip with safe legacy defaults
+PASS Composer options keep a single row and collapse permission text without losing draft or selection
+PASS Composer send and stop share a black circular slot; timeline icon retains contrast
+PASS Short composer keeps history room and moves checked marker/history controls into plus
+PASS Composer permissions persist to the conversation and rebuild actions without replacing editor
+PASS Changing permission on an empty chat creates exactly one conversation
+PASS Project access warning defaults to cancel and cannot grant access after scope changes
+PASS Imported project permission needs a local grant; revocation saves locally and failed save cannot grant
+PASS Preparation and active request disable permission model and effort without applying hidden selections
+PASS Reasoning is capability-driven and request cloning never mutates the saved profile
+PASS One model popup contains the saved profile and a supported effort slider with default reset
+PASS Model card closes on project change and unknown models never expose a fake effort slider
+PASS Dictation is an honest Windows launcher and is never started by load resize or settings refresh
+PASS Win H native INPUT layout and partial key cleanup contain no Enter or unrelated modifiers
+RESULT: 538 passed, 0 failed. Temporary test evidence: C:\Users\hoang\AppData\Local\Temp\H2Notes-tests-4db2f40c9be94b6db39eb0ae4d710249

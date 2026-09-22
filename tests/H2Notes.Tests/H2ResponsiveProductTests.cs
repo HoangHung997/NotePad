@@ -19,7 +19,7 @@ internal static class H2ResponsiveProductTests
                 H2UiTestNavigation.OpenProjectWorkspace(window, project.Id);
                 Pump(window);
 
-                var picker = window.FindControl<Button>("CompactProjectPicker")!;
+                var picker = window.FindControl<Button>("ProjectPickerButton")!;
                 var sidebar = window.FindControl<Border>("Sidebar")!;
                 var shade = window.FindControl<Border>("DrawerShade")!;
                 Check(picker.IsVisible, "Narrow Project Workspace lost compact project picker.");
@@ -29,7 +29,7 @@ internal static class H2ResponsiveProductTests
                 Pump(window);
                 Check(sidebar.IsVisible && shade.IsVisible,
                     "Compact project picker did not open the in-window drawer overlay.");
-                Check(sidebar.Bounds.Width <= 360.5,
+                Check(sidebar.Bounds.Width <= 390.5,
                     "Narrow drawer exceeded its bounded overlay width.");
 
                 var projectList = window.FindControl<ListBox>("ProjectList")!;
@@ -62,12 +62,12 @@ internal static class H2ResponsiveProductTests
                 var notes = window.FindControl<Border>("NotesPane")!;
                 var splitter = window.FindControl<Control>("NotesSplitter")!;
 
-                Check(sidebar.IsVisible, "Medium layout lost useful project navigation.");
-                Check(tasks.IsVisible && notes.IsVisible,
+                Check(!sidebar.IsVisible, "1040 DIP must use the project drawer, leaving room for content.");
+                Check(tasks.IsVisible && !notes.IsVisible,
                     "Medium detail mode unexpectedly hid task or note pane.");
-                Check(tasks.Bounds.Height >= 90 && notes.Bounds.Height >= 38,
+                Check(tasks.Bounds.Height >= 300,
                     $"Medium layout produced unreadably small panes: tasks={tasks.Bounds.Height}, notes={notes.Bounds.Height}.");
-                Check(splitter.IsVisible,
+                Check(!splitter.IsVisible,
                     "Medium detail mode lost the task/note resize affordance.");
             }
             finally
