@@ -43,17 +43,18 @@ the prior real two-PC NAS failures remain open architecture evidence.
 # Execution rules
 
 1. Read `docs/H2_PRODUCT_MASTER_SPEC.md` completely before implementation.
-2. Read `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` completely before changing shared storage/data models.
-3. Preserve existing user projects/tasks/notes/chat history.
-4. Do not create duplicate H2 stores for Agent tasks/evidence/verification.
-5. Do not put machine-local UI state into shared NAS project data.
-6. Do not delete a legacy AI path until Agent replacement parity is proven.
-7. Every persistent schema change requires migration + rollback/read-old-data coverage.
-8. H2 Notes tests must remain green.
-9. Real NAS/multi-PC issues require real NAS evidence where specified by the bug ledger.
-10. UI redesign must be measured against actual use, not only static mockups.
-11. Do not reimplement Agent Core inside H2.
-12. Do not turn every useful view into a separate subsystem.
+2. Read `docs/H2_AGENT_CHAT_SURFACE_SPEC.md` before implementing or accepting any Agent chat, Project Agent or Work Assistant full-thread UI.
+3. Read `docs/H2_NOTES_NON_AI_BUG_LEDGER.md` completely before changing shared storage/data models.
+4. Preserve existing user projects/tasks/notes/chat history.
+5. Do not create duplicate H2 stores for Agent tasks/evidence/verification.
+6. Do not put machine-local UI state into shared NAS project data.
+7. Do not delete a legacy AI path until Agent replacement parity is proven.
+8. Every persistent schema change requires migration + rollback/read-old-data coverage.
+9. H2 Notes tests must remain green.
+10. Real NAS/multi-PC issues require real NAS evidence where specified by the bug ledger.
+11. UI redesign must be measured against actual use, not only static mockups.
+12. Do not reimplement Agent Core inside H2.
+13. Do not turn every useful view into a separate subsystem.
 
 ---
 

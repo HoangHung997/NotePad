@@ -8,6 +8,7 @@ Implementation timing: **After H2 Agent core passes its master acceptance gate a
 >
 > Read together with:
 >
+> - `docs/H2_AGENT_CHAT_SURFACE_SPEC.md`
 > - `docs/H2_PRODUCT_MASTER_TASKS.md`
 > - `docs/H2_AGENT_MASTER_SPEC.md`
 > - `docs/H2_AGENT_MASTER_TASKS.md`
