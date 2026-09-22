@@ -1,5 +1,6 @@
 using System.Text.Json;
 using H2Notes.Core;
+using H2AgentLab.Tasking;
 
 namespace H2AgentLab.Integration;
 
@@ -42,16 +43,16 @@ public sealed partial class H2ProductionAgentAdapter
         text = BoundRequired(text, nameof(text), 8_000, true);
         lock (live.Gate)
         {
-            if (live.SupplementalIds.Contains(inputId)) return true;
+            if (live.SupplementalIds.TryGetValue(inputId, out var previous)) return previous == text;
             if (!live.AcceptingInput || IsTerminal(live.Status) || live.Cancellation.IsCancellationRequested
                 || live.SupplementalIds.Count >= 24) return false;
-            live.SupplementalIds.Add(inputId); live.SupplementalInput.Enqueue(text);
+            live.SupplementalIds.Add(inputId, text); live.SupplementalInput.Enqueue(new(inputId, text));
             AddProgressLocked(live, "user", "supplement-received", text);
             return true;
         }
     }
 
-    private IReadOnlyList<string> TakeSupplementalInput(LiveTask live, bool closing)
+    private IReadOnlyList<AgentGoalInput> TakeSupplementalInput(LiveTask live, bool closing)
     {
         lock (live.Gate)
         {

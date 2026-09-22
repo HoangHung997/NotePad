@@ -30,7 +30,9 @@ public sealed record AgentRuntimeRequest(
     Action<IReadOnlyList<AgentEvidenceReference>>? EvidenceObserver = null,
     Action<VerificationReport, int>? VerificationObserver = null,
     AgentRuntimeInvocation? Invocation = null,
-    RuntimeCompactionResult? ContextCheckpoint = null);
+    RuntimeCompactionResult? ContextCheckpoint = null,
+    Func<bool, IReadOnlyList<AgentGoalInput>>? TakeGoalInput = null,
+    Action<AgentTaskContract>? ContractObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -150,6 +152,11 @@ public sealed class AgentRuntime : IAsyncDisposable
         if (request.MaxRepairRounds is < 0 or > 16)
             throw new ArgumentOutOfRangeException(nameof(request.MaxRepairRounds));
 
+        if (request.TakeGoalInput is not null && request.TakeSupplementalInput is not null)
+            throw new ArgumentException("Use one authoritative user-input source, not two queues.");
+        var initialContract = request.Contract.Goals is null
+            ? request.Contract.WithUserInput(new(request.Contract.TaskId, request.UserInput)) : request.Contract;
+        request.ContractObserver?.Invoke(initialContract);
         cancellationToken.ThrowIfCancellationRequested();
         var invocation = request.Invocation ?? new AgentRuntimeInvocation(AgentRuntimeEntryPoint.Lab);
         invocation.Validate();
@@ -167,7 +174,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         var layout = AgentPromptLayout.Create(
             stable,
             contextSnapshot.RuntimeContext,
-            request.UserInput);
+            request.UserInput + (initialContract.Goals!.HasOutcomes ? "\n" + initialContract.Goals.Describe() : ""));
         var messages = layout.Messages.ToArray();
         var userIndex = Array.FindLastIndex(messages, message => message.Role == AgentTransportMessageRole.User);
         if (userIndex >= 0)
@@ -200,7 +207,36 @@ public sealed class AgentRuntime : IAsyncDisposable
         var toolCalls = 0;
         var repairRounds = 0;
         var failedMutationSignatures = new HashSet<string>(StringComparer.Ordinal);
-        var effectiveContract = request.Contract;
+        var effectiveContract = initialContract;
+        IReadOnlyList<string> TakeInput(bool closing)
+        {
+            var inputs = request.TakeGoalInput?.Invoke(closing)
+                ?? (request.TakeSupplementalInput?.Invoke(closing) ?? [])
+                    .Select(text => new AgentGoalInput(Guid.NewGuid(), text)).ToArray();
+            foreach (var input in inputs) effectiveContract = effectiveContract.WithUserInput(input);
+            if (inputs.Count > 0)
+            {
+                // Keep historical reports, but a prospective user waiver/supersession changes
+                // only active goal coverage. It cannot remove a host mutation failure/unknown.
+                if (latestVerification is not null)
+                {
+                    var retired = effectiveContract.Goals!.Obligations.Where(x => !x.Active).Select(x => x.Id).ToHashSet();
+                    latestVerification = new(latestVerification.VerifierId,
+                        latestVerification.Criteria.Where(x => !retired.Contains(x.CriterionId)), latestVerification.ReportEvidenceIds);
+                }
+                request.ContractObserver?.Invoke(effectiveContract);
+            }
+            var messages = inputs.Select(x => x.Text).ToList();
+            if (effectiveContract.Goals!.HasOutcomes) messages.Add(effectiveContract.Goals.Describe());
+            return messages;
+        }
+        // Polling a completion boundary must distinguish new user input from our own summary.
+        IReadOnlyList<string> TakeClosingInput()
+        {
+            var before = effectiveContract.Goals!.RevisionId;
+            var messages = TakeInput(true);
+            return before == effectiveContract.Goals!.RevisionId ? [] : messages;
+        }
         var mutationAwaitingVerification = false;
         var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId)>();
         var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -223,7 +259,7 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 if (round.ToolCalls.Count == 0)
                 {
-                    var supplements = request.TakeSupplementalInput?.Invoke(true) ?? [];
+                    var supplements = TakeClosingInput();
                     if (supplements.Count > 0)
                     {
                         if (++toolRounds > request.MaxToolRounds)
@@ -260,6 +296,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                             + ". Kiểm tra phạm vi/thư mục hoặc thử lại.");
                     if (mutationAwaitingVerification)
                         throw new AgentVerificationRequiredException("The latest mutation has no verifier report.");
+                    try { effectiveContract.Goals?.EnsureComplete(); }
+                    catch (InvalidOperationException ex) { throw new AgentVerificationRequiredException(ex.Message, ex); }
                     EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
                     await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.CompletionValidated,
                         contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
@@ -387,6 +425,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 if (execution.ExecutedMutationSignatures.Count > 0)
                 {
                     effectiveContract = effectiveContract.WithExecutedMutation();
+                    effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.RecordMutation(observation.Contract.Goals!.RevisionId));
+                    request.ContractObserver?.Invoke(effectiveContract);
                     // An earlier successful mutation cannot verify a later, different write.
                     mutationAwaitingVerification = true;
                 }
@@ -396,6 +436,9 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                     if (report is not null)
                     {
+                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
+                            observation.Contract.Goals!.RevisionId, report, execution.Evidence));
+                        request.ContractObserver?.Invoke(effectiveContract);
                         mutationAwaitingVerification = false;
                         var effectiveReport = MergeVerificationReports(
                             latestVerification,
@@ -445,7 +488,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                 round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
                     new AgentTransportContinuationRequest(taskId, turnId, results,
                         execution.NewlyLoadedTools.Count == 0 ? null : execution.NewlyLoadedTools,
-                        request.TakeSupplementalInput?.Invoke(false)),
+                        TakeInput(false)),
                     usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
             }
         }

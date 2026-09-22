@@ -218,7 +218,18 @@ public sealed record H2AgentTaskSummary(
     DateTime CreatedUtc,
     DateTime UpdatedUtc,
     Guid? ThreadId = null,
-    Guid? TurnId = null);
+    Guid? TurnId = null)
+{
+    // Read-only Agent archive projection; never added to ProjectRecord or H2 TaskRecord.
+    public H2AgentGoalSnapshot? GoalState { get; init; }
+}
+
+public sealed record H2AgentOutcomeSnapshot(string Id, string Requirement, string SourceId,
+    string RevisionId, string TargetScope, string Status, string? ReplacedBy, IReadOnlyList<string> EvidenceIds);
+public sealed record H2AgentGoalRevisionSnapshot(string Id, string? ParentId, int Sequence,
+    string SourceId, string SourceText, IReadOnlyList<string> Added, IReadOnlyList<string> Retired);
+public sealed record H2AgentGoalSnapshot(string RevisionId, IReadOnlyList<H2AgentGoalRevisionSnapshot> Revisions,
+    IReadOnlyList<H2AgentOutcomeSnapshot> Outcomes, IReadOnlyList<string> MutationRevisions);
 
 public sealed record H2AgentTaskObservation(
     H2AgentTaskSummary Summary,

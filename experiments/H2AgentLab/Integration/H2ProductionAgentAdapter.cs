@@ -392,7 +392,24 @@ public sealed partial class H2ProductionAgentAdapter :
                 Invocation: new(live.ExecutionProjectId.HasValue ? AgentRuntimeEntryPoint.Project : AgentRuntimeEntryPoint.Global, live.ExecutionProjectId),
                 Images: live.RequestContext?.Images,
                 Files: live.RequestContext?.Files,
-                TakeSupplementalInput: closing => TakeSupplementalInput(live, closing),
+                TakeGoalInput: closing => TakeSupplementalInput(live, closing),
+                ContractObserver: current =>
+                {
+                    lock (live.Gate)
+                    {
+                        var previousRevision = live.GoalState?.RevisionId;
+                        var goals = current.Goals!;
+                        live.GoalState = new(goals.RevisionId,
+                            Array.AsReadOnly(goals.Revisions.Select(r => new H2AgentGoalRevisionSnapshot(r.Id,r.ParentId,r.Sequence,r.SourceId,
+                                r.SourceText,r.Added,r.Retired)).ToArray()),
+                            Array.AsReadOnly(goals.Obligations.Select(o => new H2AgentOutcomeSnapshot(o.Id,o.Requirement,o.SourceId,o.RevisionId,
+                                o.TargetScope,o.Status.ToString(),o.ReplacedBy,Array.AsReadOnly(o.Evidence.Select(e=>e.ReferenceId).ToArray()))).ToArray()),
+                            goals.MutationRevisions);
+                        if (goals.HasOutcomes && previousRevision != goals.RevisionId)
+                            AddProgressLocked(live,"goal","goal-revision",goals.Describe());
+                    }
+                    _archive.Upsert(live.Snapshot());
+                },
                 PublicTextObserver: text => { lock (live.Gate) live.StreamingText = text; },
                 CommentaryObserver: text => AddProgress(live, "commentary", "commentary", text),
                 EvidenceObserver: items =>
@@ -808,8 +825,9 @@ public sealed partial class H2ProductionAgentAdapter :
         public CancellationTokenSource Cancellation { get; } = new();
         public H2AgentTaskContext? RequestContext { get; set; }
         public H2ProductionAgentModel Model { get; init; } = null!;
-        public Queue<string> SupplementalInput { get; } = new();
-        public HashSet<Guid> SupplementalIds { get; } = [];
+        public Queue<AgentGoalInput> SupplementalInput { get; } = new();
+        public Dictionary<Guid, string> SupplementalIds { get; } = [];
+        public H2AgentGoalSnapshot? GoalState { get; set; }
         public bool AcceptingInput { get; set; } = true;
         public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -832,7 +850,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 CreatedUtc,
                 UpdatedUtc,
                 RequestContext?.ThreadId ?? TaskId,
-                RequestContext?.TurnId ?? TaskId);
+                RequestContext?.TurnId ?? TaskId) { GoalState = GoalState };
     }
 }
 

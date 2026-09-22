@@ -82,7 +82,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
-| AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | NOT_STARTED |
+| AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | ACTIVE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | NOT_STARTED |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | NOT_STARTED |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | NOT_STARTED |
@@ -229,7 +229,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** đúng đích, readback và artifact; không dùng FakeAdapter làm bằng chứng thật. Chưa có E4 có thể tiếp tục task core độc lập nhưng không đóng AR-024 hoặc MB-127.
 
-### [ ] AR-030 — Outcome obligations và phiên bản yêu cầu
+### [~] AR-030 — Outcome obligations và phiên bản yêu cầu
 
 **Sửa/reuse:** AgentTaskContract/AcceptanceEvidence, work-state representation, production request extraction, supplemental input.
 
@@ -477,42 +477,34 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR020_ENUMERATION_REPAIR_VALIDATED_NATIVE_E3_PENDING_CORE_READY",
-  "active_task": "AR-020",
-  "implementation_status": "IMPLEMENTED",
-  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "phase": "AR-030_ACTIVE_IMPLEMENTATION",
+  "active_task": "AR-030",
+  "implementation_status": "ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar020-enumeration-resume-2026-09-22",
+  "owner_session": "chatgpt-ar030-2026-09-22",
   "last_code_commit": "b270de5c22bfe880055975aaa35fbeebd6934f09",
   "last_validated_code_commit": "b270de5c22bfe880055975aaa35fbeebd6934f09",
-  "last_validation_result": "E1_E2_FULL_CI_PASS_NATIVE_E3_NOT_RUN",
+  "last_validation_result": "AR030_CANDIDATE_NOT_YET_TESTED",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Windows validation checkout restored byte-for-byte and CLEAN; local offline review snapshot matched Git blobs, not a full remote clone. This checkpoint verifies a non-force push and clean remote match. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "CI candidate delivery validates clean checkout and exact source patch, then stages only 13 allowed files and verifies non-force push. User-PC tree NOT_ACCESSIBLE. Local mirror is not remote history.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T15:12:23.606977+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T15:51:45.035749+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Native E3 marker/instance/view/Save As/reopen/modal/frozen-capture matrix. No known untested code diff remains in this repair."
+    "Build actual candidate and repair all regressions; validate RC-11/12 with real temporary file effects and explicitly scripted model transport.",
+    "Review full CI/publish/helper IPC and exact-SHA evidence before acceptance."
   ],
   "last_test_commands": [
     {
-      "command": "AR-020 Windows validation workflow including explicit negative controls",
-      "code_sha": "b270de5c22bfe880055975aaa35fbeebd6934f09",
-      "run_id": 35743581894,
-      "result": "36/36 x3; regressions 44/25/11/13; Agent suites 74/74"
+      "command": "git diff --check / pinned source hash and git apply --index --check",
+      "result": "SOURCE_CHECKS_ONLY_NOT_APPLICATION_TESTS"
     },
     {
-      "command": "Avalonia full CI including Windows publish and helper IPC",
-      "code_sha": "11754bda798e13e0311ec7d0c763ca52afa97fa1",
-      "source_head": "b270de5c22bfe880055975aaa35fbeebd6934f09",
-      "run_id": 35743581725,
-      "result": "SUCCESS; H2 719/719"
-    },
-    {
-      "command": "Native Office marker matrix",
-      "result": "NOT_RUN / AWAITING_ENVIRONMENT"
+      "command": "Windows .NET 10 AR-030 corpus and retained regression/full CI",
+      "result": "NOT_RUN_ON_NEW_CANDIDATE"
     }
   ],
   "ci_runs": [
@@ -815,7 +807,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "No main merge, personal-document mutation, new user endpoint/credential or paid model call."
   ],
   "external_blockers": [
-    "No authorized native Windows Office environment connected. Native E3/E4 NOT_RUN; core work can continue under tracker section 2.2."
+    "Native Office E3/E4 unavailable; does not block independent AR-030 E2 implementation."
   ],
   "deferred_acceptance": [
     {
@@ -826,11 +818,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "blocks_claim_of_certified_multi_pc": true
     }
   ],
-  "pending_user_decisions": [
-    "An authorized Windows Office environment/native matrix evidence remains needed for E3 only; it does not block independent AR-030."
-  ],
-  "next_exact_action": "Reconcile current main/branch/PR and clean working tree. The AR-020 enumeration repair is saved and E1/E2 validated; do not reapply the stale local ZIP. If new native Office evidence is supplied, inspect it under the existing AR-020 runbook and repair any demonstrated defect. Otherwise leave AR-020 IMPLEMENTED/AWAITING_ENVIRONMENT, and start only READY independent AR-030 on this same branch/PR: set the sole active implementation task to AR-030, read its approved specification/current contracts, then implement outcome obligations and user-sourced goal revisions with RC-11/12 E2 tests. AR-030 requires DONE AR-010/011, not Office E3. Do not mark AR-020 DONE, bypass dependent native gates, or repeatedly block independent core work on the absent Office device. AR-083 stays DEFERRED_BY_USER.",
-  "next_task_if_active_done": "AR-021",
+  "pending_user_decisions": [],
+  "next_exact_action": "Stay on AR-030 and the existing branch/PR. Run the read-only AR-030 validation plus unchanged full CI on actual candidate source, fix compile/test errors, inspect evidence, save checkpoint. Do not start AR-031 or declare native AR-020/E4/E5 passed.",
+  "next_task_if_active_done": "AR-031",
   "last_runtime_source_commit": "b270de5c22bfe880055975aaa35fbeebd6934f09",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
   "finalization_checked_head": "852c07e9b480231d3a4585be3f0900fc0c537686",
@@ -877,7 +867,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     ],
     "dependency_on_AR020_E3": false,
     "basis": "Approved tracker section 2.2; no Office-native requirement is waived"
-  }
+  },
+  "candidate_base": "1e05be0d9a360975f960165ce6a0dc3c6101b4bb",
+  "candidate_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Tasking/AgentGoalState.cs",
+  "parked_acceptance": [
+    {
+      "id": "AR-020",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "AWAITING_ENVIRONMENT",
+      "required_level": "E3",
+      "done": false
+    }
+  ]
 }
 ```
 

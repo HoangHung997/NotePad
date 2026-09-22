@@ -221,12 +221,24 @@ public sealed class AgentOrchestrator
         if (expandedOrEvidenceUpdatedContract.TaskId != current.TaskId)
             throw new InvalidOperationException("Task contract update changed task identity.");
 
+        var updated = expandedOrEvidenceUpdatedContract;
+        if (updated.Scope != current.Scope || updated.MutationAllowed && !current.MutationAllowed
+            || current.VerificationPolicy.RequireVerification && !updated.VerificationPolicy.RequireVerification
+            || !current.VerificationPolicy.AllowNotMechanicallyVerifiable && updated.VerificationPolicy.AllowNotMechanicallyVerifiable
+            || current.VerificationPolicy.RequiredVerifierIds.Except(updated.VerificationPolicy.RequiredVerifierIds).Any()
+            || current.PreserveConstraints.Except(updated.PreserveConstraints).Any())
+            throw new InvalidOperationException("Contract update cannot expand permissions or weaken host constraints.");
         var nextById = expandedOrEvidenceUpdatedContract.AcceptanceCriteria
             .ToDictionary(x => x.CriterionId, StringComparer.Ordinal);
         foreach (var existing in current.AcceptanceCriteria)
         {
-            if (!nextById.TryGetValue(existing.CriterionId, out var next)
-                || !string.Equals(next.Requirement, existing.Requirement, StringComparison.Ordinal))
+            var explicitlyRetired = current.Goals is not null
+                && expandedOrEvidenceUpdatedContract.Goals is { } goals
+                && goals.Revisions.Any(r => r.Id == current.Goals.RevisionId)
+                && goals.Obligations.Any(o => o.Id == existing.CriterionId && !o.Active)
+                && goals.Revisions.Any(r => r.Retired.Contains(existing.CriterionId));
+            if (!explicitlyRetired && (!nextById.TryGetValue(existing.CriterionId, out var next)
+                || !string.Equals(next.Requirement, existing.Requirement, StringComparison.Ordinal)))
                 throw new InvalidOperationException(
                     $"Task contract update removed or redefined acceptance criterion '{existing.CriterionId}'.");
         }

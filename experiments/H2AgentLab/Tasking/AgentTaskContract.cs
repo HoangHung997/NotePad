@@ -64,7 +64,8 @@ public sealed record AgentTaskContract
         IEnumerable<AgentAcceptanceCriterion>? acceptanceCriteria,
         AgentTaskRiskClass riskClass,
         AgentVerificationPolicy verificationPolicy,
-        bool mutationAllowed = false)
+        bool mutationAllowed = false,
+        AgentGoalState? goals = null)
     {
         if (taskId == Guid.Empty)
             throw new ArgumentException("Task ID cannot be empty.", nameof(taskId));
@@ -80,6 +81,9 @@ public sealed record AgentTaskContract
         RiskClass = riskClass;
         VerificationPolicy = verificationPolicy ?? throw new ArgumentNullException(nameof(verificationPolicy));
         MutationAllowed = mutationAllowed || IsMutating;
+        if (goals is not null && (goals.TaskId != taskId || goals.Scope != Scope))
+            throw new InvalidOperationException("Goal state cannot change task identity or permission scope.");
+        Goals = goals;
 
         if (!Enum.IsDefined(riskClass))
             throw new ArgumentOutOfRangeException(nameof(riskClass), "Unknown task risk class.");
@@ -96,6 +100,25 @@ public sealed record AgentTaskContract
     public AgentTaskRiskClass RiskClass { get; }
     public AgentVerificationPolicy VerificationPolicy { get; }
     public bool MutationAllowed { get; }
+    public AgentGoalState? Goals { get; }
+
+    public AgentTaskContract WithUserInput(AgentGoalInput input)
+        => WithGoals(Goals is null ? AgentGoalState.Create(TaskId, Scope, input) : Goals.Apply(input));
+
+    public AgentTaskContract WithGoals(AgentGoalState goals)
+    {
+        ArgumentNullException.ThrowIfNull(goals);
+        if (Goals is not null && (goals.Revisions.Count < Goals.Revisions.Count
+            || !Goals.Revisions.Select(x => (x.Id,x.ParentId,x.SourceId,x.SourceText))
+                .SequenceEqual(goals.Revisions.Take(Goals.Revisions.Count).Select(x => (x.Id,x.ParentId,x.SourceId,x.SourceText)))))
+            throw new InvalidOperationException("Goal update cannot rewrite or discard accepted user history.");
+        // Only source-backed goal criteria are replaceable by an explicit user revision.
+        // All pre-existing host safety and verification criteria are retained unchanged.
+        var criteria = AcceptanceCriteria.Where(x => !x.CriterionId.StartsWith("goal:", StringComparison.Ordinal))
+            .Concat(goals.Active.Select(x => new AgentAcceptanceCriterion(x.Id, x.Requirement, x.Evidence)));
+        return new(TaskId, UserGoal, Scope, Inputs, RequiredChanges, PreserveConstraints,
+            OutputRequirements, criteria, RiskClass, VerificationPolicy, MutationAllowed, goals);
+    }
 
     public bool IsMutating => RequiredChanges.Count > 0 || RiskClass != AgentTaskRiskClass.ReadOnly;
 
@@ -110,7 +133,7 @@ public sealed record AgentTaskContract
                 "Executed changes are re-observed and deterministically verified.")]),
             AgentTaskRiskClass.Medium,
             new AgentVerificationPolicy(requiredVerifierIds: [Runtime.AgentRuntimeDomainVerifierRouter.VerifierId]),
-            MutationAllowed);
+            MutationAllowed, Goals);
 
     /// <summary>
     /// Adds new acceptance requirements without permitting an existing criterion to disappear or
@@ -169,7 +192,7 @@ public sealed record AgentTaskContract
             criteria,
             RiskClass,
             VerificationPolicy,
-            MutationAllowed);
+            MutationAllowed, Goals);
 
     private static string NormalizeRequired(string? value, string parameterName, int maxLength)
     {
