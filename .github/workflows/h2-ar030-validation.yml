@@ -1,5 +1,8 @@
 name: AR-030 outcome and revision validation
 on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar030-validation.yml', 'src/**', 'experiments/**', 'tests/**']
   pull_request:
     branches: [main]
     paths:
@@ -10,17 +13,17 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: h2-ar030-${{ github.event.pull_request.number }}
+  group: h2-ar030-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: false
 jobs:
   goals:
-    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    if: github.repository == 'HoangHung997/NotePad' && (github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'))
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
