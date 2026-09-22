@@ -17,12 +17,18 @@ public interface IOfficeBackend
     OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest request);
 }
 
+public interface IOfficeCaptureBackend
+{
+    OfficeCaptureResult Capture(OfficeCaptureRequest request);
+}
+
 public sealed class OfficeHostFaultException : Exception
 {
-    public OfficeHostFaultException(string code, string message) : base(message)
+    public OfficeHostFaultException(string code, string message, bool noEffect = false) : base(message)
     {
-        Code = code;
+        Code = code; NoEffect = noEffect;
     }
 
     public string Code { get; }
+    public bool NoEffect { get; }
 }

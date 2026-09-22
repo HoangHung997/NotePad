@@ -740,7 +740,7 @@ public sealed partial class H2ProductionAgentAdapter :
         return completion.Task;
     }
 
-    private static async Task DrainShutdownAsync(LiveTask[] tasks, TaskCompletionSource completion)
+    private async Task DrainShutdownAsync(LiveTask[] tasks, TaskCompletionSource completion)
     {
         var errors = new List<Exception>();
         foreach (var task in tasks)
@@ -752,6 +752,7 @@ public sealed partial class H2ProductionAgentAdapter :
         {
             await Task.WhenAll(tasks.Select(task => task.Finished.Task)).ConfigureAwait(false);
             foreach (var task in tasks) task.Cancellation.Dispose();
+            DisposeCaptureClient();
             if (errors.Count > 0) completion.TrySetException(new AggregateException(errors));
             else completion.TrySetResult();
         }

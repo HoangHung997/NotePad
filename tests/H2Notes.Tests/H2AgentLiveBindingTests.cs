@@ -20,6 +20,35 @@ internal static class H2AgentLiveBindingTests
 {
     public static void Run(Action<string, Action> test)
     {
+        test("AR-020 native identity reaches concrete production binding and snapshot readback",()=>Temp(root=>
+        {
+            var office=new OfficeFixture(root);office.AddExcel("native",Path.Combine(root,"A.xlsx"),"NATIVE-IDENTITY-FIXTURE");
+            var identity=new OfficeNativeIdentity(21,301,1,1001,1001,11001,"doc-a","FIXTURE");
+            office.Books["native"]=office.Books["native"] with {NativeIdentity=identity};
+            var wire=new Wire(Search("excel.get_active_workbook"),Call("read","excel.get_active_workbook"));
+            var result=Execute(root,Guid.NewGuid(),"Read the open workbook",new(root,null),office,wire);
+            Check(result.Summary.Status==H2AgentTaskStatus.Completed,result.Summary.Error??"Native identity read failed.");
+            var binding=result.Progress.First(p=>p.TargetBinding is not null).TargetBinding!.Binding!;
+            Check(binding.ProcessId==21 && binding.ProcessStartUtcTicks==301 && binding.ViewIdentity==identity.ViewIdentity,"Native identity stripped from projection.");
+        }));
+        test("AR-020 wrong native document identity in readback is never forwarded as the bound file",()=>Temp(root=>
+        {
+            var office=new OfficeFixture(root);office.AddExcel("native",Path.Combine(root,"A.xlsx"),"WRONG-READBACK");
+            var identity=new OfficeNativeIdentity(21,301,1,1001,1001,11001,"doc-a","FIXTURE");
+            office.Books["native"]=office.Books["native"] with {NativeIdentity=identity};
+            office.BeforeRead=()=>office.Books["native"]=office.Books["native"] with {NativeIdentity=identity with {DocumentId="replacement"}};
+            var wire=new Wire(Search("excel.get_active_workbook"),Call("read","excel.get_active_workbook"));
+            var result=Execute(root,Guid.NewGuid(),"Read the open workbook",new(root,null),office,wire);
+            Rejected(result,"stale_resource");Check(wire.Results.All(r=>!r.Content.Contains("WRONG-READBACK")),"Mismatched body exposed to model.");
+        }));
+        test("AR-020 incomplete native discovery cannot manufacture a unique target",()=>Temp(root=>
+        {
+            var office=new OfficeFixture(root);office.AddExcel("native",Path.Combine(root,"A.xlsx"),"DO-NOT-READ");
+            office.DiscoveryReport=new(false,OfficeDiscoveryLimits.Coverage,2,2,1,[new("modal_blocked",2001)]);
+            var wire=new Wire(Search("excel.get_active_workbook"),Call("read","excel.get_active_workbook"));
+            var result=Execute(root,Guid.NewGuid(),"Read the open workbook",new(root,null),office,wire);
+            Rejected(result,"modal_blocked");Check(office.Reads.Count==0,"Incomplete catalog was used to choose a unique input.");
+        }));
         test("AR-012 RC-04 production Office generic-open selects only the project document", () => Temp(root =>
         {
             var work = Directory.CreateDirectory(Path.Combine(root, "project")).FullName;
@@ -326,7 +355,8 @@ internal static class H2AgentLiveBindingTests
         public void AddExcel(string id,string path,string marker)=>Books.Add(id,new(id,Path.GetFileName(path),path,true,"Data","A1",[new("Data","visible",[new("A1",marker,"",false,false,null,"General","general","bottom")],[],[],[])],"v1"));
         public void AddWord(string id,string path,string marker)=>Documents.Add(id,new(id,Path.GetFileName(path),path,false,0,0,"",[new(0,marker,"Normal",[])],[],[],[],[],"v1"));
         public void Rename(string id,string path)=>Books[id]=Books[id] with {Name=Path.GetFileName(path),FullName=path};
-        public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult(new ExcelDiscovery(Books.Values.Select(x=>new ExcelWorkbookInfo(x.SessionId,x.Name,x.FullName,x.Saved,"","","")).ToArray(),Active));}
+        public OfficeDiscoveryReport? DiscoveryReport;
+        public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult(new ExcelDiscovery(Books.Values.Select(x=>new ExcelWorkbookInfo(x.SessionId,x.Name,x.FullName,x.Saved,"","",""){NativeIdentity=x.NativeIdentity}).ToArray(),Active){Report=DiscoveryReport});}
         public Task<WordDiscovery> DiscoverWordAsync(CancellationToken ct=default){ct.ThrowIfCancellationRequested();return Task.FromResult(new WordDiscovery(Documents.Values.Select(x=>new WordDocumentInfo(x.SessionId,x.Name,x.FullName,x.Saved,0,0,"","")).ToArray(),Active));}
         public Task<ExcelLiveSnapshot> SnapshotExcelAsync(string id,CancellationToken ct=default){ct.ThrowIfCancellationRequested();Reads.Add(id);BeforeRead?.Invoke();return Task.FromResult(Books[WrongReadSession??id]);}
         public Task<WordLiveSnapshot> SnapshotWordAsync(string id,CancellationToken ct=default){ct.ThrowIfCancellationRequested();Reads.Add(id);return Task.FromResult(Documents[id]);}

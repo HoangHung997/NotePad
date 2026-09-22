@@ -128,7 +128,7 @@ public sealed class OfficeHostServer
         }
         catch (OfficeHostFaultException ex)
         {
-            response = Error(request.Id, ex.Code, ex.Message);
+            response = Error(request.Id, ex.Code, ex.Message) with { Error = new OfficeRpcError(ex.Code, ex.Message) { NoEffect = ex.NoEffect } };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -160,6 +160,8 @@ public sealed class OfficeHostServer
                 _fixtureMode,
                 Thread.CurrentThread.GetApartmentState() == ApartmentState.STA),
 
+            "office.capture" => _backend is IOfficeCaptureBackend capture ? capture.Capture(Parameters<OfficeCaptureRequest>(request))
+                : new OfficeCaptureResult("Unavailable","unsupported_operation",null,null,null,null,0),
             "excel.discover" => _backend.DiscoverExcel(),
             "excel.snapshot" => _backend.SnapshotExcel(Parameters<ExcelSnapshotRequest>(request).SessionId),
             "excel.patch" => PatchExcel(Parameters<ExcelPatchRequest>(request)),

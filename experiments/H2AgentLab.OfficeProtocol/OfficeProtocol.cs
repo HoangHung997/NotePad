@@ -3,7 +3,10 @@ using System.Text.Json;
 namespace H2AgentLab.OfficeProtocol;
 
 public sealed record OfficeRpcRequest(string Id, string Method, JsonElement Parameters);
-public sealed record OfficeRpcError(string Code, string Message);
+public sealed record OfficeRpcError(string Code, string Message)
+{
+    public bool NoEffect { get; init; }
+}
 public sealed record OfficeRpcResponse(string Id, bool Ok, JsonElement? Result, OfficeRpcError? Error);
 
 public sealed record OfficePermission(bool Granted);
@@ -15,11 +18,18 @@ public sealed record ExcelWorkbookInfo(
     bool Saved,
     string ActiveSheet,
     string SelectionAddress,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record ExcelDiscovery(
     IReadOnlyList<ExcelWorkbookInfo> Workbooks,
-    string? ActiveSessionId);
+    string? ActiveSessionId)
+{
+    public OfficeDiscoveryReport? Report { get; init; }
+}
 
 public sealed record ExcelCellState(
     string Address,
@@ -48,7 +58,11 @@ public sealed record ExcelLiveSnapshot(
     string ActiveSheet,
     string SelectionAddress,
     IReadOnlyList<ExcelSheetState> Sheets,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record ExcelSnapshotRequest(string SessionId);
 
@@ -99,11 +113,18 @@ public sealed record WordDocumentInfo(
     int SelectionStart,
     int SelectionEnd,
     string SelectionText,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record WordDiscovery(
     IReadOnlyList<WordDocumentInfo> Documents,
-    string? ActiveSessionId);
+    string? ActiveSessionId)
+{
+    public OfficeDiscoveryReport? Report { get; init; }
+}
 
 public sealed record WordRunState(
     int Index,
@@ -149,7 +170,11 @@ public sealed record WordLiveSnapshot(
     IReadOnlyList<WordSectionState> Sections,
     IReadOnlyList<WordPartState> Headers,
     IReadOnlyList<WordPartState> Footers,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record WordSnapshotRequest(string SessionId);
 

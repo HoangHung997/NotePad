@@ -68,7 +68,7 @@ public sealed record H2AgentResourceBinding(
             return FromLiveObservation(context.ApplicationKind, provider, context.DocumentSessionId,
                 context.DocumentPath, context.CapturedUtc, processId: context.ProcessId,
                 processStartUtcTicks: context.ProcessStartUtcTicks, windowIdentity: context.WindowIdentity,
-                viewIdentity: context.WindowIdentity, uiStateToken: SelectionToken(context.Selection));
+                viewIdentity: context.NativeViewIdentity ?? context.WindowIdentity, uiStateToken: SelectionToken(context.Selection));
         return new(Id("window", context.WindowIdentity), H2AgentResourceKind.Window,
             context.ApplicationKind, provider, null, null, null, null, context.ProcessId,
             context.ProcessStartUtcTicks, context.WindowIdentity, context.WindowIdentity,
@@ -252,7 +252,8 @@ public sealed class H2AgentTargetBindingPolicy
                H2AgentTargetScope.TryNormalize(_captured.DocumentPath, out var path) ? path : null)
            && (r.ProcessId is null || r.ProcessId == _captured.ProcessId)
            && (r.ProcessStartUtcTicks is null || r.ProcessStartUtcTicks == _captured.ProcessStartUtcTicks)
-           && (r.WindowIdentity is null || r.WindowIdentity == _captured.WindowIdentity);
+           && (r.WindowIdentity is null || r.WindowIdentity == _captured.WindowIdentity)
+           && (_captured.NativeViewIdentity is null || r.ViewIdentity == _captured.NativeViewIdentity);
     private H2AgentTargetResolution Unique(H2AgentResourceBinding[] candidates, string source)
         => candidates.Length == 1 ? Selected(candidates[0], source)
             : Missing(candidates.Length == 0 ? "resource_not_found" : "ambiguous_target");

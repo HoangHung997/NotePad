@@ -8,15 +8,16 @@ namespace H2AgentLab.Office;
 
 public sealed class OfficeHostClientException : IOException
 {
-    public OfficeHostClientException(string code, string message) : base(message)
+    public OfficeHostClientException(string code, string message, bool noEffect = false) : base(message)
     {
-        Code = code;
+        Code = code; NoEffect = noEffect;
     }
 
     public string Code { get; }
+    public bool NoEffect { get; }
 }
 
-public sealed class OfficeHostClient : IOfficeSessionClient
+public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -51,11 +52,15 @@ public sealed class OfficeHostClient : IOfficeSessionClient
     public int StartCount => _starts;
     public int? ProcessId => _process is { HasExited: false } ? _process.Id : null;
 
+    public Task<OfficeCaptureResult> CaptureAsync(OfficeCaptureRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<OfficeCaptureResult>("office.capture", request,
+            TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.CaptureDeadlineMilliseconds), cancellationToken);
+
     public Task<OfficePingResult> PingAsync(CancellationToken cancellationToken = default)
         => CallAsync<OfficePingResult>("ping", new { }, null, cancellationToken);
 
     public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken cancellationToken = default)
-        => CallAsync<ExcelDiscovery>("excel.discover", new { }, null, cancellationToken);
+        => CallAsync<ExcelDiscovery>("excel.discover", new { }, TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.DiscoveryDeadlineMilliseconds), cancellationToken);
 
     public Task<ExcelLiveSnapshot> SnapshotExcelAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<ExcelLiveSnapshot>(
@@ -80,7 +85,7 @@ public sealed class OfficeHostClient : IOfficeSessionClient
         => CallAsync<OfficeSaveCopyResult>("excel.saveCopy", request, null, cancellationToken);
 
     public Task<WordDiscovery> DiscoverWordAsync(CancellationToken cancellationToken = default)
-        => CallAsync<WordDiscovery>("word.discover", new { }, null, cancellationToken);
+        => CallAsync<WordDiscovery>("word.discover", new { }, TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.DiscoveryDeadlineMilliseconds), cancellationToken);
 
     public Task<WordLiveSnapshot> SnapshotWordAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<WordLiveSnapshot>(
@@ -120,6 +125,7 @@ public sealed class OfficeHostClient : IOfficeSessionClient
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         ArgumentNullException.ThrowIfNull(parameters);
 
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureStarted();
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -168,10 +174,11 @@ public sealed class OfficeHostClient : IOfficeSessionClient
 
             var response = JsonSerializer.Deserialize<OfficeRpcResponse>(responseJson, Json)
                 ?? throw new IOException("OfficeHost returned invalid response JSON.");
+            if (response.Id != request.Id) throw new IOException("OfficeHost response belongs to another invocation.");
             if (!response.Ok)
                 throw new OfficeHostClientException(
                     response.Error?.Code ?? "host_error",
-                    response.Error?.Message ?? "OfficeHost request failed.");
+                    response.Error?.Message ?? "OfficeHost request failed.", response.Error?.NoEffect == true);
             if (response.Result is not JsonElement result)
                 throw new IOException("OfficeHost response is missing result.");
             return result.Deserialize<T>(Json)
@@ -181,6 +188,11 @@ public sealed class OfficeHostClient : IOfficeSessionClient
         {
             StopHost();
             throw new TimeoutException($"OfficeHost call '{method}' timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            StopHost();
+            throw;
         }
         catch (OfficeHostClientException)
         {

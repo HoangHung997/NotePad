@@ -77,7 +77,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | DONE |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
-| AR-020 | Office discovery đa instance/view | 012 | E3 | NOT_STARTED |
+| AR-020 | Office discovery đa instance/view | 012 | E3 | ACTIVE / AWAITING_ENVIRONMENT |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
@@ -175,7 +175,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-012 acceptance — 2026-09-22:** IMPLEMENTED / E2_PASS / DONE at `ed46ab820c5b084c64a11c5c171d2ca0dbee5adf`; full CI `35724401082`, Windows publish and packaged-helper IPC PASS; 44/44 binding cases x3, AR-011/010/001 and 74/74 Agent suites. Old Word wrapper reproduces 3 stale-preflight errors; clean repaired source passes. [Evidence](agent-reliability/AR-012/acceptance.json). E3/E4 NOT_RUN, AR-083 DEFERRED_BY_USER; no other task closed.
 
-### [ ] AR-020 — Office discovery theo instance/window/view thật
+### [~] AR-020 — Office discovery theo instance/window/view thật
 
 **Sửa/reuse:** `ComOfficeBackend.DiscoverExcel/DiscoverWord/Find*`, OfficeProtocol, `CaptureActiveWorkContext`, OfficeHost lifecycle.
 
@@ -473,32 +473,25 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-012_ACCEPTED_NEXT_AR-020",
+  "phase": "AR-020_ACTIVE_NATIVE_DISCOVERY",
   "active_task": "AR-020",
-  "implementation_status": "NOT_STARTED",
-  "acceptance_status": "NOT_RUN",
+  "implementation_status": "ACTIVE",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar012-final-review-2026-09-22",
+  "owner_session": "chatgpt-ar020-2026-09-22",
   "last_code_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
   "last_validated_code_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
   "last_validation_result": "FULL_REQUIRED_CI_E2_AND_WORD_NEGATIVE_CONTROLS_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact positive Windows checkout CLEAN after test-only negative control; delivery patch verified byte-for-byte. This checkpoint stages three docs only and verifies clean tree/non-force push/remote HEAD. Offline review snapshot matches delivered code but is not the remote Git history. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Offline UTF-8 review snapshot of 619a86d verified against tracked blob hashes; not remote Git history. Guarded delivery stages only enumerated task files and verifies clean CI checkout/non-force push. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T12:10:01.830970+00:00",
-  "completed_this_session": [
-    {
-      "id": "AR-012",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "E2_PASS",
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "full_ci_run": 35724401082
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T12:29:39.406778+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-020 implementation and real native Office discovery acceptance have not started."
+    "Validate native-window catalog, targeted capture and retained regression on exact Windows CI source.",
+    "Native Word/Excel E3 RC-03/05 multi-instance/view/unsaved/Save As/modal marker readback NOT_RUN; no installed native environment in assistant container."
   ],
   "last_test_commands": [
     {
@@ -811,7 +804,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On existing feature/h2-agent-reliability-ar-000 and PR #3, reconcile latest main/checkpoint/tree/checks first. Start AR-020 only: re-read native Office discovery, AR SPEC sections 7/8.1 and the AR-020 task; inspect configured Windows Office/helper environment without adding credentials/endpoints. Implement/probe instance-window-view discovery, PID/start identity, unsaved/Save As continuity, metadata-only enumeration and typed busy/modal/capture failures in the existing OfficeHost path. Preserve all AR-012/011/010/001 corpora and full CI. E3 acceptance requires actual native Word/Excel instances/views and marker readback; absent environment means AWAITING_ENVIRONMENT, not fixture PASS. Do not merge main, change NAS protocol, create a parallel store/engine or certify multi-PC.",
+  "next_exact_action": "Continue only AR-020 on feature/h2-agent-reliability-ar-000 and PR #3. Inspect exact-source Windows build/AR-020 and retained corpora, fix failures and run full required CI. Collect E3 marker evidence only on an approved native Office environment; otherwise keep AR-020 AWAITING_ENVIRONMENT, not DONE. No model endpoint or personal document tests.",
   "next_task_if_active_done": "AR-021",
   "last_runtime_source_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
   "previous_saved_checkpoint_commit": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",

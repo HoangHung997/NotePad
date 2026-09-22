@@ -5,7 +5,7 @@ using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
 
-public sealed class ComOfficeBackend : IOfficeBackend
+public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IDisposable
 {
     private const int MaxExcelCells = 5_000;
     private const int MaxWordParagraphs = 2_000;
@@ -16,44 +16,24 @@ public sealed class ComOfficeBackend : IOfficeBackend
         @"\b(?:Luật|Nghị định|Thông tư|Quyết định)\s+(?:số\s+)?(?<id>[0-9]+(?:/[0-9]{4})?/[A-ZĐ0-9-]+(?:-[A-ZĐ0-9]+)?)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private readonly OfficeWindowCatalog _catalog;
+    public ComOfficeBackend(IOfficeWindowProbe? probe = null) => _catalog = new(probe ?? new OfficeNativeWindowProbe());
+    public void Dispose() => _catalog.Dispose();
+    public OfficeCaptureResult Capture(OfficeCaptureRequest request) => _catalog.Capture(request);
+
     public ExcelDiscovery DiscoverExcel()
     {
-        dynamic? app = TryActive("Excel.Application");
-        if (app is null) return new ExcelDiscovery([], null);
-        try
-        {
-            var list = new List<ExcelWorkbookInfo>();
-            var count = Convert.ToInt32(app.Workbooks.Count, CultureInfo.InvariantCulture);
-            var activeSession = "";
-            dynamic? active = null;
-            try { active = app.ActiveWorkbook; } catch { }
-            for (var i = 1; i <= count; i++)
-            {
-                dynamic workbook = app.Workbooks[i];
-                try
-                {
-                    // Discovery must remain cheap and must not read every open workbook's cells.
-                    // A state token is issued only by an explicit snapshot of the selected session.
-                    var sessionId = SessionIdForExcel(app, workbook);
-                    list.Add(new ExcelWorkbookInfo(
-                        sessionId, (string)workbook.Name, (string)workbook.FullName,
-                        (bool)workbook.Saved, "", "", ""));
-                    if (active is not null && SessionIdForExcel(app, active) == sessionId)
-                        activeSession = sessionId;
-                }
-                finally { Release(workbook); }
-            }
-            Release(active);
-            return new ExcelDiscovery(list, string.IsNullOrEmpty(activeSession) ? null : activeSession);
-        }
-        finally { Release(app); }
+        var views = _catalog.Refresh("excel");
+        return new(views.Select(v => new ExcelWorkbookInfo(v.SessionId,v.Name,v.FullName,v.Saved,"","","")
+            { NativeIdentity=v.Identity }).ToArray(), _catalog.ActiveSession(views)) { Report=_catalog.LastReport };
     }
 
     public ExcelLiveSnapshot SnapshotExcel(string sessionId)
     {
-        var (app, workbook) = FindExcel(sessionId);
-        try { return SnapshotExcelInternal(app, workbook); }
-        finally { Release(workbook); Release(app); }
+        var bound = _catalog.Require("excel", sessionId);
+        dynamic app = bound.App; dynamic workbook = bound.Document;
+        try { return SnapshotExcelInternal(bound); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
@@ -63,10 +43,11 @@ public sealed class ComOfficeBackend : IOfficeBackend
         var countError = ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1);
         if (request.Cells is null || countError is not null)
             throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, countError ?? "Excel patch cells are required.");
-        var (app, workbook) = FindExcel(request.SessionId);
+        var bound = _catalog.Require("excel", request.SessionId);
+        dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var before = SnapshotExcelInternal(app, workbook);
+            var before = SnapshotExcelInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
 
             dynamic? sheet = null;
@@ -109,7 +90,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
                     finally { Release(cell); }
                 }
 
-                var after = SnapshotExcelInternal(app, workbook);
+                var after = SnapshotExcelInternal(bound);
                 return new ExcelPatchResult(
                     before,
                     after,
@@ -117,32 +98,34 @@ public sealed class ComOfficeBackend : IOfficeBackend
             }
             finally { Release(sheet); }
         }
-        finally { Release(workbook); Release(app); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public ExcelLiveSnapshot RecalculateExcel(ExcelRecalculateRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var (app, workbook) = FindExcel(request.SessionId);
+        var bound = _catalog.Require("excel", request.SessionId);
+        dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var before = SnapshotExcelInternal(app, workbook);
+            var before = SnapshotExcelInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
             app.Calculate();
-            return SnapshotExcelInternal(app, workbook);
+            return SnapshotExcelInternal(bound);
         }
-        finally { Release(workbook); Release(app); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public OfficeSaveCopyResult SaveExcelCopy(OfficeSaveCopyRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var (app, workbook) = FindExcel(request.SessionId);
+        var bound = _catalog.Require("excel", request.SessionId);
+        dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var snapshot = SnapshotExcelInternal(app, workbook);
+            var snapshot = SnapshotExcelInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
             var destination = OfficeHostSafety.ValidateCopyDestination(request.DestinationPath, snapshot.FullName);
             workbook.SaveCopyAs(destination);
@@ -153,57 +136,33 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 snapshot.StateToken,
                 OfficeHostSafety.Sha256(bytes));
         }
-        finally { Release(workbook); Release(app); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public WordDiscovery DiscoverWord()
     {
-        dynamic? app = TryActive("Word.Application");
-        if (app is null) return new WordDiscovery([], null);
-        try
-        {
-            var list = new List<WordDocumentInfo>();
-            var count = Convert.ToInt32(app.Documents.Count, CultureInfo.InvariantCulture);
-            var activeSession = "";
-            dynamic? active = null;
-            try { active = app.ActiveDocument; } catch { }
-            for (var i = 1; i <= count; i++)
-            {
-                dynamic document = app.Documents[i];
-                try
-                {
-                    // Do not enumerate paragraphs/runs in unrelated user documents merely to
-                    // locate a test/selected document. Request word.get_document before editing.
-                    var sessionId = SessionIdForWord(app, document);
-                    list.Add(new WordDocumentInfo(
-                        sessionId, (string)document.Name, (string)document.FullName,
-                        (bool)document.Saved, 0, 0, "", ""));
-                    if (active is not null && SessionIdForWord(app, active) == sessionId)
-                        activeSession = sessionId;
-                }
-                finally { Release(document); }
-            }
-            Release(active);
-            return new WordDiscovery(list, string.IsNullOrEmpty(activeSession) ? null : activeSession);
-        }
-        finally { Release(app); }
+        var views = _catalog.Refresh("word");
+        return new(views.Select(v => new WordDocumentInfo(v.SessionId,v.Name,v.FullName,v.Saved,0,0,"","")
+            { NativeIdentity=v.Identity }).ToArray(), _catalog.ActiveSession(views)) { Report=_catalog.LastReport };
     }
 
     public WordLiveSnapshot SnapshotWord(string sessionId)
     {
-        var (app, document) = FindWord(sessionId);
-        try { return SnapshotWordInternal(app, document); }
-        finally { Release(document); Release(app); }
+        var bound = _catalog.Require("word", sessionId);
+        dynamic app = bound.App; dynamic document = bound.Document;
+        try { return SnapshotWordInternal(bound); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public WordPatchResult PatchWord(WordPatchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var (app, document) = FindWord(request.SessionId);
+        var bound = _catalog.Require("word", request.SessionId);
+        dynamic app = bound.App; dynamic document = bound.Document;
         try
         {
-            var before = SnapshotWordInternal(app, document);
+            var before = SnapshotWordInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
             if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
                 throw new OfficeHostFaultException("word_patch_rejected", problem);
@@ -250,22 +209,23 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 }
             }
 
-            var after = SnapshotWordInternal(app, document);
+            var after = SnapshotWordInternal(bound);
             return new WordPatchResult(
                 before,
                 after,
                 changed.Distinct().OrderBy(x => x).ToArray());
         }
-        finally { Release(document); Release(app); }
+        finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
     public WordLanguageEvidenceResult InspectWordLanguage(WordLanguageEvidenceRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (app, document) = FindWord(request.SessionId);
+        var bound = _catalog.Require("word", request.SessionId);
+        dynamic app = bound.App; dynamic document = bound.Document;
         try
         {
-            var snapshot = SnapshotWordInternal(app, document);
+            var snapshot = SnapshotWordInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
 
             var spelling = ReadWordSpellingEvidence(app, document);
@@ -281,8 +241,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
         }
         finally
         {
-            Release(document);
-            Release(app);
+            // Native source references are borrowed from the catalog, not owned here.
         }
     }
 
@@ -290,11 +249,12 @@ public sealed class ComOfficeBackend : IOfficeBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var (app, document) = FindWord(request.SessionId);
+        var bound = _catalog.Require("word", request.SessionId);
+        dynamic app = bound.App; dynamic document = bound.Document;
         dynamic? copy = null;
         try
         {
-            var snapshot = SnapshotWordInternal(app, document);
+            var snapshot = SnapshotWordInternal(bound);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
             var destination = OfficeHostSafety.ValidateCopyDestination(request.DestinationPath, snapshot.FullName);
 
@@ -324,14 +284,14 @@ public sealed class ComOfficeBackend : IOfficeBackend
                 try { copy.Close(false); } catch { }
             }
             Release(copy);
-            Release(document);
-            Release(app);
+            // Native source references are borrowed from the catalog, not owned here.
         }
     }
 
-    private static ExcelLiveSnapshot SnapshotExcelInternal(dynamic app, dynamic workbook)
+    private static ExcelLiveSnapshot SnapshotExcelInternal(OfficeViewLease bound)
     {
-        var sessionId = SessionIdForExcel(app, workbook);
+        dynamic app = bound.App; dynamic workbook = bound.Document; dynamic view = bound.View;
+        var sessionId = bound.SessionId;
         var name = SafeString(() => workbook.Name);
         var fullName = SafeString(() => workbook.FullName, name);
         var saved = SafeBool(() => workbook.Saved);
@@ -339,15 +299,16 @@ public sealed class ComOfficeBackend : IOfficeBackend
         var selectionAddress = "";
         try
         {
-            dynamic activeSheet = workbook.ActiveSheet;
+            dynamic activeSheet = view.ActiveSheet;
             try { activeSheetName = SafeString(() => activeSheet.Name); }
             finally { Release(activeSheet); }
         }
         catch { }
         try
         {
-            if (SessionIdForExcel(app, app.ActiveWorkbook) == sessionId)
-                selectionAddress = SafeString(() => app.Selection.Address[false, false]);
+            dynamic selection = view.Selection;
+            try { selectionAddress = SafeString(() => selection.Address[false, false]); }
+            finally { Release(selection); }
         }
         catch { }
 
@@ -466,12 +427,13 @@ public sealed class ComOfficeBackend : IOfficeBackend
             activeSheetName,
             selectionAddress,
             sheets,
-            OfficeHostSafety.StableToken(basis));
+            OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
     }
 
-    private static WordLiveSnapshot SnapshotWordInternal(dynamic app, dynamic document)
+    private static WordLiveSnapshot SnapshotWordInternal(OfficeViewLease bound)
     {
-        var sessionId = SessionIdForWord(app, document);
+        dynamic app = bound.App; dynamic document = bound.Document; dynamic view = bound.View;
+        var sessionId = bound.SessionId;
         var name = SafeString(() => document.Name);
         var fullName = SafeString(() => document.FullName, name);
         var saved = SafeBool(() => document.Saved);
@@ -480,9 +442,8 @@ public sealed class ComOfficeBackend : IOfficeBackend
         var selectionText = "";
         try
         {
-            if (SessionIdForWord(app, app.ActiveDocument) == sessionId)
             {
-                dynamic selection = app.Selection;
+                dynamic selection = view.Selection;
                 dynamic range = selection.Range;
                 try
                 {
@@ -529,7 +490,7 @@ public sealed class ComOfficeBackend : IOfficeBackend
             sections,
             headers,
             footers,
-            OfficeHostSafety.StableToken(basis));
+            OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
     }
 
     private static IReadOnlyList<WordSpellingEvidence> ReadWordSpellingEvidence(
@@ -945,77 +906,6 @@ public sealed class ComOfficeBackend : IOfficeBackend
         finally { Release(target); Release(source); }
     }
 
-    private static (dynamic App, dynamic Workbook) FindExcel(string sessionId)
-    {
-        dynamic? app = TryActive("Excel.Application")
-            ?? throw new OfficeHostFaultException("office_unavailable", "No running Excel instance was found.");
-        try
-        {
-            var count = Convert.ToInt32(app.Workbooks.Count, CultureInfo.InvariantCulture);
-            for (var i = 1; i <= count; i++)
-            {
-                dynamic workbook = app.Workbooks[i];
-                if (SessionIdForExcel(app, workbook) == sessionId)
-                    return (app, workbook);
-                Release(workbook);
-            }
-            throw new OfficeHostFaultException("session_not_found", "Excel workbook session is no longer available.");
-        }
-        catch
-        {
-            Release(app);
-            throw;
-        }
-    }
-
-    private static (dynamic App, dynamic Document) FindWord(string sessionId)
-    {
-        dynamic? app = TryActive("Word.Application")
-            ?? throw new OfficeHostFaultException("office_unavailable", "No running Word instance was found.");
-        try
-        {
-            var count = Convert.ToInt32(app.Documents.Count, CultureInfo.InvariantCulture);
-            for (var i = 1; i <= count; i++)
-            {
-                dynamic document = app.Documents[i];
-                if (SessionIdForWord(app, document) == sessionId)
-                    return (app, document);
-                Release(document);
-            }
-            throw new OfficeHostFaultException("session_not_found", "Word document session is no longer available.");
-        }
-        catch
-        {
-            Release(app);
-            throw;
-        }
-    }
-
-    private static string SessionIdForExcel(dynamic app, dynamic workbook)
-        => OfficeHostSafety.StableSessionId(
-            "excel",
-            SafeString(() => app.Hwnd),
-            SafeString(() => workbook.Name),
-            SafeString(() => workbook.FullName));
-
-    private static string SessionIdForWord(dynamic app, dynamic document)
-        => OfficeHostSafety.StableSessionId(
-            "word",
-            SafeString(() => app.Hwnd),
-            SafeString(() => document.Name),
-            SafeString(() => document.FullName));
-
-    private static dynamic? TryActive(string progId)
-    {
-        if (!OperatingSystem.IsWindows()) return null;
-        var type = Type.GetTypeFromProgID(progId, throwOnError: false);
-        if (type is null) return null;
-        var clsid = type.GUID;
-        var hr = GetActiveObject(ref clsid, IntPtr.Zero, out var value);
-        if (hr < 0 || value is null) return null;
-        return value;
-    }
-
     private static string ValidateSingleCellAddress(string address)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(address);
@@ -1092,9 +982,4 @@ public sealed class ComOfficeBackend : IOfficeBackend
         }
     }
 
-    [DllImport("oleaut32.dll", PreserveSig = true)]
-    private static extern int GetActiveObject(
-        ref Guid rclsid,
-        IntPtr reserved,
-        [MarshalAs(UnmanagedType.IUnknown)] out object? ppunk);
 }

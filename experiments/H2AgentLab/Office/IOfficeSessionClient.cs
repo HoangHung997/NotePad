@@ -19,3 +19,9 @@ public interface IOfficeSessionClient : IDisposable
     Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(WordLanguageEvidenceRequest request, CancellationToken cancellationToken = default);
     Task<OfficeSaveCopyResult> SaveWordCopyAsync(OfficeSaveCopyRequest request, CancellationToken cancellationToken = default);
 }
+
+/// <summary>Optional additive targeted capture, so fixture and legacy session clients remain compatible.</summary>
+public interface IOfficeCaptureClient
+{
+    Task<OfficeCaptureResult> CaptureAsync(OfficeCaptureRequest request, CancellationToken cancellationToken = default);
+}

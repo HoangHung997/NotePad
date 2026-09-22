@@ -122,6 +122,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                     or ArgumentException or InvalidOperationException or TimeoutException or KeyNotFoundException
                     or UnauthorizedAccessException or NotSupportedException)
                 {
+                    if (ex is H2AgentLab.Office.OfficeHostClientException { NoEffect: true } rejected)
+                        return ToolOutcomeBridge.Failure(call, descriptor, rejected.Code, ToolErrorPhase.Preflight, ToolMutationEffect.None);
                     return ToolOutcomeBridge.FromException(call, descriptor, ex,
                         ex is H2AgentLab.Office.OfficeHostClientException office ? office.Code : null);
                 }

@@ -92,7 +92,11 @@ public sealed class WorkAssistantActiveContextCapture : IWorkAssistantActiveCont
                 DocumentSessionId = BoundOrNull(enrichment.DocumentSessionId, 240),
                 DocumentPath = BoundOrNull(enrichment.DocumentPath, 1_024),
                 Selection = BoundOrNull(enrichment.Selection, 1_200),
-                Provider = BoundOrNull(enrichment.Provider, 120)
+                Provider = BoundOrNull(enrichment.Provider, 120),
+                NativeViewIdentity = BoundOrNull(enrichment.NativeViewIdentity, 240),
+                EnrichmentStatus = BoundOrNull(enrichment.Status, 32),
+                EnrichmentErrorCode = BoundOrNull(enrichment.ErrorCode, 64),
+                EnrichmentElapsedMilliseconds = enrichment.ElapsedMilliseconds
             };
         }
         catch (Exception ex) when (ex is InvalidOperationException

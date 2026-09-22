@@ -31,6 +31,11 @@ public sealed record H2ActiveWorkContext(
     string? Provider,
     DateTime CapturedUtc)
 {
+    public string? NativeViewIdentity { get; init; }
+    public string? EnrichmentStatus { get; init; }
+    public string? EnrichmentErrorCode { get; init; }
+    public long? EnrichmentElapsedMilliseconds { get; init; }
+
     public string ToBoundedSummary()
     {
         var parts = new List<string>
@@ -45,6 +50,7 @@ public sealed record H2ActiveWorkContext(
             parts.Add("Document=" + DocumentPath);
         if (!string.IsNullOrWhiteSpace(Selection))
             parts.Add("Selection=" + Selection);
+        if (EnrichmentStatus is not null) parts.Add("OfficeCapture=" + EnrichmentStatus + ":" + EnrichmentErrorCode);
         return Bound(string.Join("\n", parts), 4_000);
     }
 
@@ -67,7 +73,13 @@ public sealed record H2ActiveWorkContextEnrichment(
     string? DocumentSessionId = null,
     string? DocumentPath = null,
     string? Selection = null,
-    string? Provider = null);
+    string? Provider = null)
+{
+    public string? NativeViewIdentity { get; init; }
+    public string? Status { get; init; }
+    public string? ErrorCode { get; init; }
+    public long? ElapsedMilliseconds { get; init; }
+}
 
 /// <summary>
 /// Optional H2-facing enrichment/revalidation capability.

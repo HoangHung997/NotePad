@@ -31,44 +31,59 @@ public sealed partial class H2ProductionAgentAdapter
         };
     }
 
+    private readonly object _captureGate = new();
+    private IOfficeSessionClient? _captureClient;
+
     public H2ActiveWorkContextEnrichment? CaptureActiveWorkContext(H2ActiveWorkContext foregroundContext)
     {
+        ArgumentNullException.ThrowIfNull(foregroundContext);
         if (foregroundContext.ApplicationKind is not (H2ApplicationKind.Excel or H2ApplicationKind.Word)) return null;
-        try
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        H2ActiveWorkContextEnrichment Fault(string code) => new(foregroundContext.ApplicationKind, Provider: "office-host")
+            { Status="Unavailable", ErrorCode=code, ElapsedMilliseconds=clock.ElapsedMilliseconds };
+        lock (_captureGate)
         {
-            using var client = new OfficeHostClient(H2HelperLocator.Resolve("H2AgentLab.OfficeHost"),
-                defaultTimeout: TimeSpan.FromSeconds(3));
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            var handle = foregroundContext.NativeWindowHandle.ToString(CultureInfo.InvariantCulture);
-            if (foregroundContext.ApplicationKind == H2ApplicationKind.Excel)
+            if (_disposed) return Fault("provider_unavailable");
+            try
             {
-                var discovery = client.DiscoverExcelAsync(timeout.Token).GetAwaiter().GetResult();
-                var selected = discovery.Workbooks.SingleOrDefault(item => item.SessionId == discovery.ActiveSessionId
-                    && item.SessionId == OfficeSessionId("excel", handle, item.Name, item.FullName));
-                return selected is null ? null : new(H2ApplicationKind.Excel, selected.SessionId,
-                    selected.FullName, selected.ActiveSheet + "!" + selected.SelectionAddress, "office-host");
+                if (foregroundContext.ProcessId<=0 || foregroundContext.ProcessStartUtcTicks<=0 || foregroundContext.NativeWindowHandle<=0)
+                    return Fault("stale_resource");
+                // Reuse the owned helper connection, NOT stale capture results. Every request targets
+                // the original HWND/PID/start, even when H2 has since become foreground.
+                _captureClient ??= _officeClientFactory is not null ? _officeClientFactory()
+                    : new OfficeHostClient(H2HelperLocator.Resolve("H2AgentLab.OfficeHost"));
+                if (_captureClient is not IOfficeCaptureClient targeted) return Fault("unsupported_operation");
+                using var deadline=new CancellationTokenSource(TimeSpan.FromMilliseconds(OfficeProtocol.OfficeDiscoveryLimits.CaptureDeadlineMilliseconds));
+                var capture=targeted.CaptureAsync(new(foregroundContext.ApplicationKind==H2ApplicationKind.Excel?"excel":"word",
+                    foregroundContext.NativeWindowHandle,foregroundContext.ProcessId,foregroundContext.ProcessStartUtcTicks),deadline.Token).GetAwaiter().GetResult();
+                if(capture.Identity is { } identity && (identity.ProcessId!=foregroundContext.ProcessId
+                    || identity.ProcessStartUtcTicks!=foregroundContext.ProcessStartUtcTicks || identity.RootWindowHandle!=foregroundContext.NativeWindowHandle))
+                    return Fault("stale_resource");
+                if (capture.Status is not ("Ready" or "Degraded") || capture.Identity is null || string.IsNullOrWhiteSpace(capture.SessionId))
+                    return Fault(capture.Code ?? "native_object_unavailable");
+                return new(foregroundContext.ApplicationKind,capture.SessionId,capture.FullName,capture.Selection,"office-host")
+                    { NativeViewIdentity=capture.Identity.ViewIdentity,Status=capture.Status,ErrorCode=capture.Code,
+                      ElapsedMilliseconds=clock.ElapsedMilliseconds };
             }
-            else
+            catch (Exception ex) when (ex is IOException or OperationCanceledException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
             {
-                var discovery = client.DiscoverWordAsync(timeout.Token).GetAwaiter().GetResult();
-                var selected = discovery.Documents.SingleOrDefault(item => item.SessionId == discovery.ActiveSessionId
-                    && item.SessionId == OfficeSessionId("word", handle, item.Name, item.FullName));
-                return selected is null ? null : new(H2ApplicationKind.Word, selected.SessionId,
-                    selected.FullName, selected.SelectionText, "office-host");
+                var code=ex is OperationCanceledException or TimeoutException?"deadline_exceeded"
+                    : ex is OfficeHostClientException office?office.Code:ex is FileNotFoundException?"needs_configuration":"provider_unavailable";
+                _captureClient?.Dispose();_captureClient=null;
+                return Fault(code); // retain window metadata + typed failure, never silently null
             }
         }
-        catch (Exception ex) when (ex is IOException or OperationCanceledException or InvalidOperationException)
-        { return null; }
     }
 
     public bool RevalidateActiveWorkContext(H2ActiveWorkContext context)
     {
         if (context.Provider != "office-host") return string.IsNullOrEmpty(context.DocumentSessionId);
         var current = CaptureActiveWorkContext(context);
-        return current is not null && current.DocumentSessionId == context.DocumentSessionId
-            && string.Equals(current.DocumentPath, context.DocumentPath, StringComparison.OrdinalIgnoreCase);
+        return current is { Status: "Ready" or "Degraded" } && current.DocumentSessionId == context.DocumentSessionId
+            && string.Equals(current.DocumentPath, context.DocumentPath, StringComparison.OrdinalIgnoreCase)
+            && (context.NativeViewIdentity is null || context.NativeViewIdentity==current.NativeViewIdentity);
     }
 
-    private static string OfficeSessionId(params string[] parts)
-        => "office-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", parts)))).ToLowerInvariant()[..24];
+    private void DisposeCaptureClient()
+    { lock(_captureGate) { _captureClient?.Dispose(); _captureClient=null; } }
 }

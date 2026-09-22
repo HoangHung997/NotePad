@@ -27,8 +27,8 @@ public static class Program
                 shutdown.Cancel();
             };
 
-            new OfficeHostServer(pipeName, backend, fixture)
-                .Run(shutdown.Token);
+            try { new OfficeHostServer(pipeName, backend, fixture).Run(shutdown.Token); }
+            finally { (backend as IDisposable)?.Dispose(); }
             return 0;
         }
         catch (OperationCanceledException)

@@ -146,13 +146,16 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 result = observed.Discovery is ExcelDiscovery excel
                     ? new { Workbooks = excel.Workbooks.Where(item => ids.Contains(item.SessionId)).ToArray(),
                         ActiveSessionId = ids.Contains(excel.ActiveSessionId) ? excel.ActiveSessionId : null,
-                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code }
+                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code, Report = excel.Report, truncated = excel.Report?.Complete == false }
                     : new { Documents = ((WordDiscovery)observed.Discovery).Documents.Where(item => ids.Contains(item.SessionId)).ToArray(),
                         ActiveSessionId = ids.Contains(((WordDiscovery)observed.Discovery).ActiveSessionId) ? ((WordDiscovery)observed.Discovery).ActiveSessionId : null,
-                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code };
+                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code, Report = ((WordDiscovery)observed.Discovery).Report, truncated = ((WordDiscovery)observed.Discovery).Report?.Complete == false };
             }
             else
             {
+                var report = observed.Discovery is ExcelDiscovery ex ? ex.Report : ((WordDiscovery)observed.Discovery).Report;
+                // An incomplete catalog must not turn one visible candidate into false uniqueness.
+                if (report is { Complete: false }) throw new ToolPreflightException(report.Issues.FirstOrDefault()?.Code ?? "native_object_unavailable");
                 target = Resolve(application, observed.Resources, session.Length == 0 ? null : session);
                 if (!target.Resolved) throw new ToolPreflightException(target.Code == "outside_resource_scope" ? "target_not_grounded" : target.Code);
                 session = target.Binding!.DocumentSessionId!;
@@ -167,12 +170,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     if (application == H2ApplicationKind.Excel)
                     {
                         var view = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                        ValidateSnapshot(target, view.SessionId, view.FullName, view.ActiveSheet + "!" + view.SelectionAddress, false, true);
+                        ValidateSnapshot(target, view.SessionId, view.FullName, view.ActiveSheet + "!" + view.SelectionAddress, false, true, native: view.NativeIdentity);
                     }
                     else
                     {
                         var view = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
-                        ValidateSnapshot(target, view.SessionId, view.FullName, view.SelectionText, false, true);
+                        ValidateSnapshot(target, view.SessionId, view.FullName, WordSelection(view), false, true, native: view.NativeIdentity);
                     }
                 }
                 if (name == "excel.get_active_workbook") result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
@@ -203,12 +206,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     var sheetName = H2ProductionToolSession.Arg(call, "sheet_name") ?? "";
                     var beforeWrite = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
                     ValidateSnapshot(target, beforeWrite.SessionId, beforeWrite.FullName, beforeWrite.ActiveSheet + "!" + beforeWrite.SelectionAddress, false,
-                        _intent == H2AgentTargetIntent.CapturedSelection);
+                        _intent == H2AgentTargetIntent.CapturedSelection, native: beforeWrite.NativeIdentity);
                     if (beforeWrite.StateToken != token) throw new ToolPreflightException("stale_resource");
                     var patch = await Client.PatchExcelAsync(new(session, token, true, sheetName, cells), ct).ConfigureAwait(false);
                     var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true);
-                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                    ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true, native: patch.Before.NativeIdentity);
+                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true, native: after.NativeIdentity);
                     await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                     var sheet = after.Sheets.Single(item => item.Name == sheetName);
                     var targets = cells.Select(cell => new LiveExcelExpectedCell(sheetName, cell.Address,
@@ -224,10 +227,10 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 {
                     RequireAuthorization();
                     var before = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, before.SessionId, before.FullName, before.ActiveSheet + "!" + before.SelectionAddress, false);
+                    ValidateSnapshot(target, before.SessionId, before.FullName, before.ActiveSheet + "!" + before.SelectionAddress, false, native: before.NativeIdentity);
                     var calculated = await Client.RecalculateExcelAsync(new(session, token, true), ct).ConfigureAwait(false);
                     var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true, native: after.NativeIdentity);
                     await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                     var preserve = before.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula)))
                         .SequenceEqual(after.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula))));
@@ -242,7 +245,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             {
                 RequireAuthorization();
                 var beforeWord = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
-                ValidateSnapshot(target, beforeWord.SessionId, beforeWord.FullName, beforeWord.SelectionText, false);
+                ValidateSnapshot(target, beforeWord.SessionId, beforeWord.FullName, WordSelection(beforeWord), false, native: beforeWord.NativeIdentity);
                 // This mismatch is observed BEFORE PatchWordAsync. Preserve the no-effect
                 // proof instead of converting a safe preflight reject into an uncertain write.
                 if (token != beforeWord.StateToken) throw new ToolPreflightException("stale_resource");
@@ -271,8 +274,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         failureId = _wordRecovery.Reject(name, beforeWord, paragraphs), mutationApplied = false });
                 }
                 var after = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
-                ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true);
-                ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true, native: patch.Before.NativeIdentity);
+                ValidateSnapshot(target, after.SessionId, after.FullName, null, true, native: after.NativeIdentity);
                 await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                 var verified = OfficeMutationReadback.VerifyWordPatch(patch.Before, after, paragraphs);
                 Record(call, verified, "office-state:" + after.StateToken);
@@ -284,14 +287,14 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             else
             {
                 var snapshot = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
-                ValidateSnapshot(target, snapshot.SessionId, snapshot.FullName, snapshot.SelectionText, false);
+                ValidateSnapshot(target, snapshot.SessionId, snapshot.FullName, WordSelection(snapshot), false, native: snapshot.NativeIdentity);
                 result = name == "word.find_text" ? (object)snapshot.Paragraphs.Where(p => p.Text.Contains(H2ProductionToolSession.Arg(call, "query") ?? "", StringComparison.OrdinalIgnoreCase)).ToArray() : snapshot;
             }
                 // A mismatched read response is not forwarded to the model. After any possible
                 // mutation a mismatch is an execution error with Unknown effect, never a preflight reject.
                 var mutating = StructuredOfficeCapabilityCatalog.All.Any(item => item.Name == name && item.Access == AgentToolAccess.Mutating);
-                if (result is ExcelLiveSnapshot x) ValidateSnapshot(target, x.SessionId, x.FullName, x.ActiveSheet + "!" + x.SelectionAddress, mutating);
-                else if (result is WordLiveSnapshot w) ValidateSnapshot(target, w.SessionId, w.FullName, w.SelectionText, mutating);
+                if (result is ExcelLiveSnapshot x) ValidateSnapshot(target, x.SessionId, x.FullName, x.ActiveSheet + "!" + x.SelectionAddress, mutating, native: x.NativeIdentity);
+                else if (result is WordLiveSnapshot w) ValidateSnapshot(target, w.SessionId, w.FullName, WordSelection(w), mutating, native: w.NativeIdentity);
                 else if (result is WordLanguageEvidenceResult language && language.SessionId != session)
                     throw new ToolPreflightException("stale_resource");
                 await RevalidateAsync(application, target, ct, mutating).ConfigureAwait(false);
@@ -309,15 +312,21 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         if (application == H2ApplicationKind.Excel)
         {
             var discovery = await Client.DiscoverExcelAsync(ct).ConfigureAwait(false);
-            return new(discovery, discovery.Workbooks.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved)).ToArray());
+            return new(discovery, discovery.Workbooks.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved, item.NativeIdentity)).ToArray());
         }
         var word = await Client.DiscoverWordAsync(ct).ConfigureAwait(false);
-        return new(word, word.Documents.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved)).ToArray());
+        return new(word, word.Documents.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved, item.NativeIdentity)).ToArray());
     }
 
-    private H2AgentResourceBinding Observe(H2ApplicationKind app, string session, string path, bool dirty)
+    private H2AgentResourceBinding Observe(H2ApplicationKind app, string session, string path, bool dirty, OfficeNativeIdentity? native = null)
         => H2AgentResourceBinding.FromLiveObservation(app, "office-host", session, path, DateTime.UtcNow,
-            providerInstanceId: Client.InstanceIdentity, dirty: dirty);
+            providerInstanceId: native is null ? Client.InstanceIdentity : Client.InstanceIdentity + ":" + native.DocumentId,
+            providerVersion: native?.ProviderVersion, processId: native?.ProcessId,
+            processStartUtcTicks: native?.ProcessStartUtcTicks, windowIdentity: native?.WindowIdentity,
+            viewIdentity: native?.ViewIdentity, dirty: dirty);
+
+    private static string WordSelection(WordLiveSnapshot snapshot) => snapshot.NativeIdentity is null ? snapshot.SelectionText
+        : $"word-range:{snapshot.SelectionStart}:{snapshot.SelectionEnd}";
 
     private H2AgentTargetResolution Resolve(H2ApplicationKind application, IReadOnlyList<H2AgentResourceBinding> observed, string? session)
     {
@@ -360,9 +369,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     }
 
     private void ValidateSnapshot(H2AgentTargetResolution target, string session, string path, string? selection,
-        bool afterPossibleWrite, bool checkSelection = false)
+        bool afterPossibleWrite, bool checkSelection = false, OfficeNativeIdentity? native = null)
     {
-        var current = Observe(target.Binding!.ApplicationKind, session, path, false);
+        var current = Observe(target.Binding!.ApplicationKind, session, path, false, native);
         var identityMatches = target.Binding.MatchesObservation(current, requireContentVersion: false);
         var capture = _binding.CapturedContext;
         var selectionMatches = !checkSelection || capture is not null && !string.IsNullOrWhiteSpace(capture.Selection)
