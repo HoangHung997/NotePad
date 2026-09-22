@@ -1,0 +1,175 @@
+name: AR-032 scoped history implementation and validation
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar032-implementation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar032-implementation
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      code: ${{ steps.save.outputs.code }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Save only reviewed source and active-task documents on unchanged branch
+        id: save
+        shell: python
+        run: |
+          import base64,datetime,hashlib,json,os,pathlib,subprocess
+          REPO='HoangHung997/NotePad';BRANCH='feature/h2-agent-reliability-ar-000'
+          BASE='60843a827a64d427514a319fd639c888b76f18b9';MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0'
+          WORKFLOW='.github/workflows/h2-ar032-implementation.yml';TRACKER='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+          def require(ok,msg):
+              if not ok: raise RuntimeError(msg)
+          def git(*args): return subprocess.check_output(['git',*args],text=True,timeout=90).strip()
+          def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          def read_blob(sha):
+              response=json.loads(subprocess.check_output(['gh','api','repos/'+REPO+'/git/blobs/'+sha],timeout=60))
+              b=base64.b64decode(response['content']);require(len(b)<100000 and blob(b)==sha,'Reviewed blob mismatch')
+              return b
+          head=os.environ['CHECKED_HEAD']
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong/dirty checkout')
+          require(git('rev-parse','HEAD^')==BASE and git('diff','--name-only',BASE,head)==WORKFLOW,'Concurrent work; reconcile without reset')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main advanced')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Branch advanced')
+          require(git('hash-object',TRACKER)=='f2556767a2c6401f27ba74d89279f708c9132569','Checkpoint changed')
+          changes=[
+              ('experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs','18dc332320077502a34d55ec744027fe4cf2798c','753b4624cb94a80e8c169940be75172b6fb7ce87'),
+              ('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs','0875c1b55b243a6837b5925d4e8722098178b1a0','c7977adba9e1d2a60d2a4ca5bd1e77a99b065e0f'),
+              ('experiments/H2AgentLab/Integration/H2ProductionToolSession.cs','2b375d0fe30047fde2ced9ff3ca4cdd49dd387e1','6ad06248fa88838548dfec9945e049d0ec6b2551'),
+              ('tests/H2Notes.Tests/Program.cs','77d602a294d954229e709fb8580a38dda58eb633','02c419ca78f1095c13eb37113921890d110d4d11')]
+          additions=[
+              ('experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.History.cs','471d39dd28b5a8df10edb4be0f911343911d280e'),
+              ('experiments/H2AgentLab/Integration/H2HistoryRuntimeTools.cs','76cedcdc44b5d8fa8dfb6d025a9222a7ea3e8744'),
+              ('tests/H2Notes.Tests/H2AgentHistoryRetrievalTests.cs','208f0b748680e808715fe5bc3ebd68e1dafa9ee8')]
+          for path,old,new in changes: require(blob(pathlib.Path(path).read_bytes())==old,'Source changed: '+path)
+          for path,sha in additions: require(not pathlib.Path(path).exists(),'New file already exists: '+path)
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'ar032-delivery';out.mkdir()
+          patch=read_blob('0fb686786dfee776771b810162d3313e6f06e898');require(len(patch)==8483,'Patch length mismatch')
+          patchfile=out/'reviewed-existing.patch';patchfile.write_bytes(patch)
+          subprocess.run(['git','apply','--index','--check',str(patchfile)],check=True)
+          subprocess.run(['git','apply','--index',str(patchfile)],check=True)
+          for path,old,new in changes: require(blob(pathlib.Path(path).read_bytes())==new,'Postimage differs: '+path)
+          for path,sha in additions: pathlib.Path(path).write_bytes(read_blob(sha))
+          text=pathlib.Path(TRACKER).read_text(encoding='utf-8');start=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+8;end=text.index('\n```',start)
+          state=json.loads(text[start:end]);require(state['active_task']=='AR-032' and state['implementation_status']=='NOT_STARTED','Another task is active')
+          state.update({'phase':'AR-032_ACTIVE_SCOPED_HISTORY_VALIDATION','implementation_status':'ACTIVE','acceptance_status':'NOT_RUN',
+              'owner_session':'chatgpt-ar032-scoped-history-2026-09-23','completed_this_session':[],
+              'checkpoint_saved_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'uncommitted_files':[],
+              'working_tree':'CI source delivery requires exact preimages, unchanged main/branch, nine staged source/test/docs paths and clean verified push. Local review is an offline snapshot; user-PC tree NOT_ACCESSIBLE.',
+              'pending_code_lookup':'git log -1 --format=%H -- experiments/H2AgentLab/Integration/H2HistoryRuntimeTools.cs',
+              'remaining_in_active_task':['Compile and run AR-032 on the newly saved source; repair failures and inspect exact full CI before E2 acceptance.'],
+              'next_exact_action':'Keep AR-032 the only ACTIVE implementation. Inspect source delivery and Windows validation/full Avalonia workflow_dispatch on its exact saved SHA. Fix every failing new/retained test; inspect artifacts and source receipts before acceptance. Reuse existing archive/registry; AR-020 E3 pending, E4 NOT_RUN, AR-083 DEFERRED_BY_USER.',
+              'next_task_if_active_done':'AR-033'})
+          text=text[:start]+json.dumps(state,ensure_ascii=False,indent=2)+text[end:]
+          row='| AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | NOT_STARTED |'
+          require(text.count(row)==1 and text.count('### [ ] AR-032')==1,'Task anchors changed')
+          text=text.replace(row,row.replace('NOT_STARTED','ACTIVE'),1).replace('### [ ] AR-032','### [~] AR-032',1)
+          pathlib.Path(TRACKER).write_text(text,encoding='utf-8')
+          report='docs/agent-reliability/AR-032/implementation.md';p=pathlib.Path(report);p.parent.mkdir(parents=True,exist_ok=True)
+          require(not p.exists(),'Existing AR-032 report requires reconciliation')
+          p.write_text('''# AR-032 — scoped source-backed history retrieval
+
+          Status: ACTIVE / NOT_RUN. Source must compile and pass E2 and full CI on its actual commit before acceptance.
+
+          The existing AgentIntegrationTaskArchive owns all journal source data. An in-memory sequence/hash locator index is rebuilt by the existing Apply/replay path; it stores no duplicate payloads and changes no journal schema. The production adapter registers search_history/read_history through its existing ToolSession/ToolRegistry. Both Global and Project use that same path.
+
+          Global defaults to the exact host thread; Project may use the same project or, when IncludeProjectContent is false, only its thread. Model-supplied TaskId/ThreadId filters narrow this authority, never widen it. Cross-thread Global browsing is not added: open the intended thread through the existing UI. Historical sources are data, not a new instruction, grant or proof of current completion. Correlation changes are rechecked on every read.
+
+          Search pages return at most three results and inspect at most 32 source payloads. A page with no match may still carry nextCursor. Query fence and filters are pinned; locators are invocation-local and bounded. Exact source sequence plus TaskId permits rediscovery after restart. Every source read checks on-disk bytes against the append/replay receipt, rejecting missing or rehashed edits. Current metadata is labelled separately from the historical version.
+
+          Read returns exact bounded text chunks with journal/version/content hashes. Existing h2a1_ ArtifactStore text is readable only when the selected source snapshot cites matching proof; no arbitrary LocalPath/URI is opened. Binary/public file artifacts remain metadata. Search/read are read-only and cannot provide current-task verification. Three unfinished source locators precede long context; raw prior goal/output/drafts are not placed in host-priority instructions. The original six Completed convenience window is not the sole continuation route.
+
+          Planned tests: RC-15 old unfinished work beyond six/200, literal Unicode formula/path retrieval, stable paging and invalid/foreign tokens, task/thread/project isolation, reclassified Global history, late source corruption, exact archived text and proof mismatch, ten real component checkpoint/reopen cycles, and concrete Global/Project registry runs with a scripted transport including historical-injection denial. The checkpoint test is not a semantic model summarizer or E4. Until logs are inspected, these are definitions, not PASS.
+
+          Remaining limits: local startup/index scans scale with retained bounded history; lexical search is not semantic search; model quality/native Office is not tested. Retrieval never resumes tool actions or uncertain writes (AR-041), and cannot close obligations from historical evidence. No engine/store/ProjectRecord ownership or UI layout redesign. AR-020 E3 pending, E4 NOT_RUN, AR-083 DEFERRED_BY_USER.
+          '''.replace('\n          ','\n'),encoding='utf-8')
+          paths=[p[0] for p in changes]+[p[0] for p in additions]+[TRACKER,report]
+          subprocess.run(['git','add','--',*paths],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())==set(paths),'Unexpected staged files')
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          (out/'applied.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary']))
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch work')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git','commit','-m','feat(AR-032): retrieve scoped Agent history and evidence from existing journal'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+BRANCH],check=True,timeout=120)
+          code=git('rev-parse','HEAD');require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==code,'Save not verified')
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'base':BASE,'paths':paths,'working_tree':'CLEAN','tests':'NOT_RUN_AT_SAVE'},indent=2))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('code='+code+'\n')
+          print('Saved reviewed AR-032 source:',code)
+      - name: Dispatch unchanged full Avalonia workflow on the saved branch
+        run: gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref=feature/h2-agent-reliability-ar-000
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR032-Source-Delivery
+          path: ${{ runner.temp }}/ar032-delivery/
+          if-no-files-found: error
+          retention-days: 14
+  validation:
+    needs: integrate
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.integrate.outputs.code }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Record exact source identity and build
+        id: build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar032 | Out-Null
+          if (git status --porcelain) { throw 'Dirty source checkout' }
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';E1='Scoped source policy';E2='Real local journal and production registry with scripted transport; component checkpoint cycles';E3='NOT_RUN';E4='NOT_RUN';E5='AR-083 DEFERRED_BY_USER'} | ConvertTo-Json | Set-Content artifacts/ar032/identity.json
+          python -c "import pathlib,subprocess,hashlib,json,zipfile;p=pathlib.Path('artifacts/ar032');names=[n for n in subprocess.check_output(['git','ls-files'],text=True).splitlines() if pathlib.Path(n).suffix in ('.cs','.csproj','.md','.slnx','.yml','.ps1','.py')];rows=[];z=zipfile.ZipFile(p/'committed-source.zip','w',zipfile.ZIP_DEFLATED);[(z.writestr(n,b),rows.append({'path':n,'sha256':hashlib.sha256(b).hexdigest(),'blob':hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()})) for n in names for b in [subprocess.check_output(['git','show','HEAD:'+n])]];z.close();(p/'source-receipt.json').write_text(json.dumps({'code_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'files':rows},indent=2))"
+          if ($LASTEXITCODE) { throw 'Source receipt failed' }
+          dotnet --info | Set-Content artifacts/ar032/dotnet-info.txt
+          dotnet restore H2Notes.Avalonia.slnx
+          if ($LASTEXITCODE) { throw 'Restore failed' }
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar032/build.log
+          if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Run repeated history corpus and retained regressions
+        id: corpora
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop';$failed=@()
+          foreach($name in 'AR-032-1','AR-032-2','AR-032-3','AR-031','AR-030','AR-020','AR-012','AR-011','AR-010','AR-001') {
+            $env:H2_AR032_EVIDENCE_DIR=Join-Path $PWD "artifacts/ar032/$name"
+            $env:H2_AR031_EVIDENCE_DIR=Join-Path $PWD "artifacts/ar032/$name"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $name.Substring(0,6) 2>&1 | Tee-Object "artifacts/ar032/$name.log"
+            if ($LASTEXITCODE -ne 0 -or (Get-Content "artifacts/ar032/$name.log" -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { $failed+=$name }
+          }
+          @{failed=$failed} | ConvertTo-Json | Set-Content artifacts/ar032/corpora-result.json
+          if ($failed.Count) { throw ('Failed corpora: '+($failed -join ',')) }
+      - name: Run mandatory independent Agent suites
+        if: always() && steps.build.outcome == 'success'
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar032/all-agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR032-E1-E2-Evidence
+          path: artifacts/ar032/
+          if-no-files-found: error
+          retention-days: 14
