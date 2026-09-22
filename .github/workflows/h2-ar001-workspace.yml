@@ -4,8 +4,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/h2-ar001-workspace.yml'
-      - 'tools/agent-reliability/apply_ar001.py'
-      - 'tools/agent-reliability/Ar001Contracts.cs.txt'
+      - 'tools/agent-reliability/repair_ar001.py'
+      - 'tests/H2Notes.Tests/H2AgentReliabilityContractTests.cs'
+      - 'tests/H2Notes.Tests/H2WorkAssistantRepairTests.cs'
+      - 'experiments/H2AgentLab/Integration/**'
+      - 'experiments/H2AgentLab/Tools/ToolExecutionScheduler.cs'
 permissions:
   contents: read
 concurrency:
@@ -29,41 +32,24 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Apply guarded AR-001 source and test changes
+      - name: Apply exact observed AR-001 repair without overwriting other changes
         id: apply
         shell: bash
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
-          python3 tools/agent-reliability/apply_ar001.py
+          python3 tools/agent-reliability/repair_ar001.py
           if test -f "$RUNNER_TEMP/ar001-outputs.txt"; then
-            python3 - <<'PY'
-          import os, subprocess
-          from pathlib import Path
-          workflow=Path('.github/workflows/avalonia-ci.yml')
-          # Preserve the proposed workflow patch but do not ask the CI token to write workflows.
-          original=subprocess.check_output(['git','show','HEAD:'+str(workflow)])
-          (Path(os.environ['RUNNER_TEMP'])/'ar001-proposed-avalonia-ci.yml').write_bytes(workflow.read_bytes())
-          workflow.write_bytes(original)
-          outputs=Path(os.environ['RUNNER_TEMP'])/'ar001-outputs.txt'
-          files=outputs.read_text().splitlines()
-          assert files.count(str(workflow))==1
-          files.remove(str(workflow))
-          outputs.write_text('\n'.join(files)+'\n')
-          report=Path('docs/agent-reliability/AR-001/implementation.md')
-          text=report.read_text().replace('Full CI runs `dotnet run', 'Focused AR-001 CI runs `dotnet run').replace('three times, then every existing suite and publish/helper smoke.', 'three times; the unchanged full Avalonia CI runs every existing suite and publish/helper smoke separately. The proposed main-workflow edits were not applied because the CI token cannot write workflow files.')
-          report.write_text(text,encoding='utf-8')
-          PY
             test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$AR_HEAD"
             mapfile -t outputs < "$RUNNER_TEMP/ar001-outputs.txt"
-            test "${#outputs[@]}" -eq 18
+            test "${#outputs[@]}" -eq 4
             git add -- "${outputs[@]}"
             git diff --cached --check
-            test "$(git diff --cached --name-only | wc -l)" -eq 18
+            test "$(git diff --cached --name-only | wc -l)" -eq 4
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(AR-001): unify tool contracts and drain owned tasks before fixture cleanup'
+            git commit -m 'fix(AR-001): remove UI context dependency from executor and provider teardown'
             git push origin "HEAD:refs/heads/$AR_BRANCH"
             test -z "$(git status --porcelain)"
             test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
@@ -73,57 +59,35 @@ jobs:
           fi
           echo "code_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Saved source: $(git rev-parse HEAD)"
-      - name: Dispatch existing full Avalonia CI on the saved branch
+      - name: Dispatch unchanged full Avalonia CI on saved source
         if: steps.apply.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
           import json, os, urllib.request
-          request = urllib.request.Request(
-              'https://api.github.com/repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches',
-              data=json.dumps({'ref':os.environ['AR_BRANCH']}).encode(), method='POST',
-              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json',
-                       'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'})
-          with urllib.request.urlopen(request,timeout=30) as result:
-              if result.status != 204: raise SystemExit('Workflow dispatch was not accepted')
-          print('Full existing Avalonia CI requested on committed AR-001 branch; no success is inferred.')
+          request=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches',
+              data=json.dumps({'ref':os.environ['AR_BRANCH']}).encode(),method='POST',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'})
+          with urllib.request.urlopen(request,timeout=30) as response:
+              if response.status!=204: raise SystemExit('Full CI dispatch not accepted')
+          print('Full CI dispatched; results must be checked, not inferred.')
           PY
-      - name: Export bounded tracked source and exact patch for review
+      - name: Retain exact source checkpoint and patch
         if: always()
         shell: bash
         run: |
-          python3 - <<'PY'
-          import hashlib, json, os, subprocess, zipfile
-          from pathlib import Path
-          root=Path(os.environ['RUNNER_TEMP'])/'ar001-workspace';root.mkdir(exist_ok=True)
-          paths=subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
-          suffixes={'.cs','.csproj','.slnx','.sln','.props','.targets','.axaml','.json','.md','.yml','.yaml','.py','.ps1','.sh','.cmd','.txt','.config'}
-          manifest={'head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'branch':os.environ['AR_BRANCH'],'files':{}}
-          with zipfile.ZipFile(root/'source.zip','w',zipfile.ZIP_DEFLATED) as archive:
-              for name in paths:
-                  if not name: continue
-                  path=Path(name)
-                  if path.is_symlink() or not path.is_file() or path.stat().st_size>2000000: continue
-                  if any(part in {'bin','obj','.git','.artifacts','audit-evidence'} for part in path.parts): continue
-                  if path.suffix.lower() not in suffixes and name!='.gitignore': continue
-                  data=path.read_bytes()
-                  try: data.decode('utf-8-sig')
-                  except UnicodeDecodeError: continue
-                  archive.writestr(name,data)
-                  manifest['files'][name]={'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)}
-              archive.writestr('AR001_SOURCE_MANIFEST.json',json.dumps(manifest,indent=2))
-          patch=subprocess.check_output(['git','diff','--binary','e573394963ea44398217721ed5f200f899234d31','--','src','experiments','tests','docs'])
-          (root/'implementation.patch').write_bytes(patch)
-          print('Exact checkout:',manifest['head'],'; source files:',len(manifest['files']))
-          PY
+          mkdir -p "$RUNNER_TEMP/ar001-delivery"
+          git rev-parse HEAD > "$RUNNER_TEMP/ar001-delivery/code-sha.txt"
+          git status --porcelain > "$RUNNER_TEMP/ar001-delivery/working-tree.txt"
+          git diff --binary 88cc6241d9488e26e0652751a7c14c26df4aecb3 -- experiments tests docs > "$RUNNER_TEMP/ar001-delivery/repair.patch"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ar001-source-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/ar001-workspace/
+          name: AR001-Repair-Delivery
+          path: ${{ runner.temp }}/ar001-delivery/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
   focused-tests:
     needs: workspace
     runs-on: windows-latest
@@ -135,7 +99,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Record source and build
+      - name: Record exact source and build
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifacts/ar001 | Out-Null
@@ -159,3 +123,4 @@ jobs:
           name: AR001-Focused-E1-E2-Evidence
           path: artifacts/ar001/
           if-no-files-found: error
+          retention-days: 14
