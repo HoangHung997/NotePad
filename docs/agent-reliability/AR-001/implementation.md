@@ -24,3 +24,8 @@ Source c26b3521ce4b7d60e69f3942dda123c23fd53cf3 passed the AR-001 corpus 13/13 i
 ## Test-only compile correction
 
 Run 35692802913 on 82af106655358fa4f27d60f3da2a53e35341f1cb failed compilation (CS8852) because the added Phase-11 test assigned the init-only FeedObserved property after construction. The fixture now binds that callback in an object initializer, preserving the provider contract and all feed assertions. The failed build is not counted as a test pass. Detailed failed/passing attempts are retained in ci-attempts.json. Full CI still requires a clean run on the corrected source.
+
+
+## MB-33 completion-contract drift exposed by full CI
+
+Full run 35693115516 / job 106634126497 on f023b611b0d03d55c11c257babcfa5529893f5bb passed H2 603/603, architecture 35/35, Phase-11 15/15 and all suites through MB-32, then MB-33 was 3 passed / 1 failed: the serialized-mutation fixture had no verifier report. The completion gate correctly refused it. The fixture now writes both call IDs to its own temporary file, independently reads exact ordered effects, requires the readback verifier in the task contract, checks max concurrency stays one, and rejects missing/partial side effects. No runtime completion rule is weakened. An independent diagnostic runner reuses every Agent suite flag from the existing full workflow and aggregates failures without hiding later failures behind an early guard; its final exit is nonzero when any required suite fails. Full CI/publish still remain required. Latest focused AR-001 on f023 passed 13/13 in each of three repetitions (artifact 10679343679, SHA256 60abc903fd33a6354646770a2826f61adc63592d0e18a3edbd6e9a482f2a4407).

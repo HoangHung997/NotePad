@@ -469,14 +469,14 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar001-2026-09-22",
-  "last_code_commit": "82af106655358fa4f27d60f3da2a53e35341f1cb",
-  "last_validated_code_commit": "82af106655358fa4f27d60f3da2a53e35341f1cb",
-  "last_validation_result": "BUILD_FAILED_CS8852_TEST_FIX_PENDING_VALIDATION",
+  "last_code_commit": "f023b611b0d03d55c11c257babcfa5529893f5bb",
+  "last_validated_code_commit": "f023b611b0d03d55c11c257babcfa5529893f5bb",
+  "last_validation_result": "FULL_CI_FAILED_MB33_FIXTURE_MISSING_VERIFIER",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
   "working_tree": "Offline source snapshot verified by hash; guarded source changes applied to isolated CI checkout. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T06:02:45.755014+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T06:12:41.901732+00:00",
   "completed_this_session": [
     {
       "task": "AR-001",
@@ -491,7 +491,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "remaining_in_active_task": [
-    "Run repeated AR-001 corpus and all full CI suites/publish after the test-only init-property fix; do not close from the earlier c26 13/13 result."
+    "Validate MB-33 fixture readback correction; inspect all remaining Agent suites and full CI/publish on corrected source."
   ],
   "last_test_commands": [
     {
@@ -600,6 +600,16 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "tests": "NOT_RUN",
       "artifact_id": 10678948191,
       "artifact_sha256": "e5264e73d4f255e9afa06e3e04b0e5e88d24ba7e862b22b827ad785ec07c7b74"
+    },
+    {
+      "id": 35693115516,
+      "code_sha": "f023b611b0d03d55c11c257babcfa5529893f5bb",
+      "result": "FAILURE",
+      "h2_tests": "603/603",
+      "architecture": "35/35",
+      "phase11": "15/15",
+      "mb33": "3 passed / 1 failed: fixture missing verifier",
+      "publish": "NOT_RUN"
     }
   ],
   "evidence_locations": [
@@ -630,7 +640,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Check actual newest branch SHA and its dispatched full Avalonia CI plus focused AR-001 logs. Repair remaining failures on AR-001, preserve exact-set/safety assertions, require nonempty publish and helper IPC smoke. AR-010 is not started.",
+  "next_exact_action": "Run exact-head required full CI and independent Agent suite diagnostic runner; fix remaining AR-001 baseline contract drift without weakening safety. Do not start AR-010.",
   "next_task_if_active_done": "AR-010",
   "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
