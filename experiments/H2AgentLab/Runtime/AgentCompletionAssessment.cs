@@ -37,14 +37,15 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
         public Guid? ResolvedBy { get; set; }
     }
     private readonly Dictionary<Guid, Attempt> _attempts = [];
-    private readonly Dictionary<(string Verifier, string Criterion), VerificationCriterionResult> _criteria = [];
+    private readonly Dictionary<(string Verifier, string Criterion, string Target), VerificationCriterionResult> _criteria = [];
     private readonly List<H2AgentAlternateResolution> _resolutions = [];
-    private readonly HashSet<string> _proofIds = new(StringComparer.Ordinal);
     public int UnverifiedMutations => _attempts.Values.Count(a => a.Value.Mutation && !a.Verified && a.ResolvedBy is null);
     public int OutstandingProofs => _attempts.Values.Count(a => !a.Verified && a.ResolvedBy is null
         && a.Coverage.Values.Any(c => c.Status != VerificationCriterionStatus.Passed));
     public IReadOnlyList<AgentVerificationAttempt> Attempts => _attempts.Values.Select(a => a.Value).ToArray();
-    public IReadOnlyCollection<string> ProofIds => _proofIds;
+    public IReadOnlyCollection<string> ProofIds => _criteria.Values.Where(c => c.Status == VerificationCriterionStatus.Passed)
+        .SelectMany(c => c.EvidenceIds).Concat(_attempts.Values.Where(a => a.Verified && a.ResolvedBy is null)
+            .SelectMany(a => a.Coverage.Values).SelectMany(c => c.EvidenceIds)).Distinct(StringComparer.Ordinal).ToArray();
 
     public void Register(AgentRuntimeVerificationContext context)
     {
@@ -76,6 +77,7 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
     public VerificationReport Observe(AgentRuntimeVerificationContext context, VerificationReport report)
     {
         var current = context.Calls.Where(c => c.Invocation is not null).ToDictionary(c => c.Invocation!.InvocationId);
+        var acceptedResults = new Dictionary<string, VerificationCriterionResult>(StringComparer.Ordinal);
         foreach (var result in report.Criteria)
         {
             var accepted = result;
@@ -83,7 +85,7 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
                 && result.CriterionId != AgentRuntimeDomainVerifierRouter.MutationCriterionId
                 && !Proof(context.Evidence, result.EvidenceIds))
                 accepted = new(result.CriterionId, VerificationCriterionStatus.NotVerified, result.EvidenceIds);
-            _criteria[(report.VerifierId, result.CriterionId)] = accepted;
+            acceptedResults[result.CriterionId] = accepted;
         }
         var coverage = report.CallCoverage.ToArray();
         if (coverage.Length == 0 && context.MutationCallIds.Count == 1)
@@ -96,6 +98,8 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
                 .Select(c => new VerificationCallCoverage(item.Value.InvocationId, c.CriterionId, item.Value.TargetId,
                     c.CriterionId, c.Status, c.EvidenceIds)).ToArray();
         }
+        if (coverage.GroupBy(c => (c.InvocationId, c.CriterionId)).Any(g => g.Count() > 1))
+            throw new AgentVerificationRequiredException("Duplicate verifier coverage identity.");
         foreach (var c in coverage)
         {
             if (!current.ContainsKey(c.InvocationId) || !_attempts.TryGetValue(c.InvocationId, out var attempt)
@@ -106,7 +110,26 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
             attempt.Coverage[c.CriterionId] = passed ? c : c with { Status = c.Status == VerificationCriterionStatus.Failed
                 ? VerificationCriterionStatus.Failed : VerificationCriterionStatus.NotVerified };
             attempt.VerifierId = report.VerifierId;
-            if (passed) foreach (var id in c.EvidenceIds) _proofIds.Add(id);
+
+        }
+        foreach (var result in acceptedResults.Values)
+        {
+            var bound = coverage.Where(c => c.CriterionId == result.CriterionId).ToArray();
+            if (bound.Length == 0)
+            {
+                // Even a nonmutating observation cannot overwrite another resource's failure.
+                var targets = string.Join("|", current.Keys.Select(id => _attempts[id].Value.TargetId).Order(StringComparer.Ordinal));
+                _criteria[(report.VerifierId, result.CriterionId, "observation:" + targets)] = result;
+                continue;
+            }
+            foreach (var item in bound)
+            {
+                var accepted = _attempts[item.InvocationId].Coverage[item.CriterionId];
+                var status = accepted.Status;
+                _criteria[(report.VerifierId, result.CriterionId, accepted.TargetId)] = new(result.CriterionId,
+                    status, accepted.EvidenceIds, status == VerificationCriterionStatus.Failed
+                        ? result.Failure ?? new(result.CriterionId, "Target postcondition is not verified.") : null);
+            }
         }
         foreach (var id in current.Keys)
         {
@@ -135,8 +158,7 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
                 throw new AgentVerificationRequiredException("Alternate recovery lacks matching obligation, target or verified postcondition.");
             Resolve(old, replacement, "verified-alternate");
         }
-        var retired = context.Contract.Goals!.Obligations.Where(o => !o.Active).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var key in _criteria.Keys.Where(k => retired.Contains(k.Criterion)).ToArray()) _criteria.Remove(key);
+        ApplyRevision(context.Contract);
         return Aggregate(report.VerifierId) with { CallCoverage = coverage, AlternateResolutions = report.AlternateResolutions };
     }
 
@@ -152,9 +174,13 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
         && old.Value.Status != ToolOutcomeStatus.Running
         && old.Value.Effect is not (ToolMutationEffect.Unknown or ToolMutationEffect.PartiallyApplied);
     private static bool SameCoverage(Attempt old, Attempt current) => old.Coverage.Count > 0
+        && old.Coverage.Keys.Any(current.Coverage.ContainsKey)
         && old.Coverage.All(p => current.Coverage.TryGetValue(p.Key, out var next)
-            && next.Status == VerificationCriterionStatus.Passed && next.TargetId == p.Value.TargetId
-            && next.PostconditionId == p.Value.PostconditionId);
+            ? next.Status == VerificationCriterionStatus.Passed && next.TargetId == p.Value.TargetId
+                && next.PostconditionId == p.Value.PostconditionId
+            : p.Value.Status == VerificationCriterionStatus.Passed);
+    // A failed-only correction may preserve already passed criteria on the predecessor;
+    // their target-bound reports and proof IDs remain active and are rechecked at completion.
     private void Resolve(Attempt old, Attempt current, string reason)
     {
         old.ResolvedBy = current.Value.InvocationId;
@@ -163,7 +189,25 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
             c.PostconditionId, reason, c.EvidenceIds.ToArray()));
         // Remove only the resolved predecessor's active report; immutable history remains.
         if (old.VerifierId != current.VerifierId && old.VerifierId is not null)
-            foreach (var id in old.Coverage.Keys) _criteria.Remove((old.VerifierId, id));
+            foreach (var claim in old.Coverage.Values)
+                _criteria.Remove((old.VerifierId, claim.CriterionId, claim.TargetId));
+    }
+    public VerificationReport? ApplyRevision(AgentTaskContract contract)
+    {
+        var retired = contract.Goals!.Obligations.Where(o => !o.Active).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var key in _criteria.Keys.Where(k => retired.Contains(k.Criterion)).ToArray()) _criteria.Remove(key);
+        foreach (var old in _attempts.Values.Where(a => a.ResolvedBy is null && !a.Verified
+            && a.Value.Effect == ToolMutationEffect.None && a.Value.Status != ToolOutcomeStatus.Running
+            && a.Coverage.Count > 0 && a.Coverage.Keys.All(retired.Contains)))
+        {
+            // Only a trusted, source-backed user revision can retire unexecuted work.
+            // An existing Applied/Unknown/Running operation can never use this waiver.
+            old.ResolvedBy = Guid.Empty;
+            var c = old.Coverage.Values.First();
+            _resolutions.Add(new(old.Value.InvocationId, Guid.Empty, c.CriterionId, c.TargetId,
+                c.PostconditionId, "user-retired-unapplied", []));
+        }
+        return _criteria.Count == 0 ? null : Aggregate(_criteria.Keys.Last().Verifier);
     }
     public bool IsResolved(Guid failed) => _attempts.TryGetValue(failed, out var a) && a.ResolvedBy is not null;
     public bool CanResolveExactRetry(Guid failed, Guid successful)

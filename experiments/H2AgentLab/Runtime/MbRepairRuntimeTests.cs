@@ -433,6 +433,11 @@ public static class MbRepairRuntimeTests
         }
     }
 
+    private static VerificationReport BindFixture(AgentRuntimeVerificationContext context, VerificationReport report)
+        => report with { CallCoverage = context.Calls.Where(c => context.MutationCallIds.Contains(c.Id))
+            .SelectMany(call => report.Criteria.Select(c => new VerificationCallCoverage(call.Invocation!.InvocationId,
+                c.CriterionId, "fixture:repair", c.CriterionId, c.Status, c.EvidenceIds))).ToArray() };
+
     private sealed class PreserveCriteriaVerifier : IAgentRuntimeVerifier
     {
         private int _writes;
@@ -448,7 +453,7 @@ public static class MbRepairRuntimeTests
             _writes++;
             if (_writes == 1)
             {
-                return Task.FromResult<VerificationReport?>(new VerificationReport(
+                return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                     "mb43-verifier",
                     [
                         new VerificationCriterionResult(
@@ -463,17 +468,17 @@ public static class MbRepairRuntimeTests
                                 "criterion-b",
                                 "Criterion B still needs correction.",
                                 ["evidence:b:fail"]))
-                    ]));
+                    ])));
             }
 
-            return Task.FromResult<VerificationReport?>(new VerificationReport(
+            return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                 "mb43-verifier",
                 [
                     new VerificationCriterionResult(
                         "criterion-b",
                         VerificationCriterionStatus.Passed,
                         ["evidence:b:pass"])
-                ]));
+                ])));
         }
     }
 
@@ -506,7 +511,7 @@ public static class MbRepairRuntimeTests
                         "Fixture is still bad.",
                         ["evidence:bad"]));
             return Task.FromResult<VerificationReport?>(
-                new VerificationReport("mb43-verifier", [result]));
+                BindFixture(context, new VerificationReport("mb43-verifier", [result])));
         }
     }
 
@@ -523,7 +528,7 @@ public static class MbRepairRuntimeTests
                 return Task.FromResult<VerificationReport?>(null);
 
             Verifications++;
-            return Task.FromResult<VerificationReport?>(new VerificationReport(
+            return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                 "mb43-verifier",
                 [
                     new VerificationCriterionResult(
@@ -534,7 +539,7 @@ public static class MbRepairRuntimeTests
                             "fixture.correct",
                             $"Attempt {Verifications} still fails.",
                             [$"evidence:failure:{Verifications}"]))
-                ]));
+                ])));
         }
     }
 }

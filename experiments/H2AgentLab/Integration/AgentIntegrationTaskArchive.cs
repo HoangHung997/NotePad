@@ -126,6 +126,7 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             var copy = Clone(item) with { PendingApproval = null,
                 Recovery = new(interrupted, pending, _sequence, Array.AsReadOnly(operations)) };
             return interrupted || pending ? copy with { Status = H2AgentTaskStatus.Blocked,
+                Completion = copy.Completion is null ? null : copy.Completion with { State = "Interrupted", PendingOperations = Math.Max(copy.Completion.PendingOperations, pending ? 1 : 0) },
                 Error = _readOnly ? "RecoveryRequired: chỉ đọc được phần lịch sử đã xác thực; chưa đủ nguồn để xác nhận trạng thái mới nhất."
                     : pending ? "Interrupted / ReconcileRequired: tác động cần đối soát; không tự lặp lệnh ghi."
                     : "Interrupted: công việc còn dở; quyền cũ không được khôi phục và chưa tự chạy tiếp." } : copy;

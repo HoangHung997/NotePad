@@ -359,7 +359,11 @@ public static class MbSchedulerRuntimeTests
             if (!context.Calls.Any(call => call.Name == "fixture.write_shared"))
                 return Task.FromResult<VerificationReport?>(null);
             Observations++;
-            return Task.FromResult<VerificationReport?>(Observe());
+            var report = Observe();
+            return Task.FromResult<VerificationReport?>(report with
+            { CallCoverage = context.Calls.Where(c => c.Name == "fixture.write_shared").SelectMany(call =>
+                report.Criteria.Select(c => new VerificationCallCoverage(call.Invocation!.InvocationId, c.CriterionId,
+                    path, "ordered-two-writes", c.Status, c.EvidenceIds))).ToArray() });
         }
     }
 

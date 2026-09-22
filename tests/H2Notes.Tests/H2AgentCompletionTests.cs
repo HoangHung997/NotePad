@@ -20,6 +20,57 @@ internal static class H2AgentCompletionTests
 {
     public static void Run(Action<string, Action> test)
     {
+        test("AR-033 same verifier cannot erase a nonmutating failure on another resource", () =>
+        {
+            var a = new AgentCompletionAssessment(true); var contract = Contract();
+            var before = Context(contract, "A", "first"); a.Register(before);
+            _ = a.Observe(before, Report("verify-a", "criterion-a", false, before));
+            var after = Context(contract, "B", "second"); a.Register(after);
+            var report = a.Observe(after, Report("verify-a", "criterion-a", true, after));
+            Check(!report.Passed, "Same verifier erased a different resource failure.");
+        });
+        test("AR-033 same-resource readback correction retains an exact active proof", () =>
+        {
+            var a = new AgentCompletionAssessment(true); var contract = Contract();
+            var before = Context(contract, "A", "first"); a.Register(before);
+            _ = a.Observe(before, Report("verify-a", "criterion-a", false, before));
+            var after = Context(contract, "A", "second"); a.Register(after);
+            var report = a.Observe(after, Report("verify-a", "criterion-a", true, after));
+            Check(report.Passed && a.ProofIds.Contains("proof-second"), "Read-only completion proof was omitted.");
+        });
+        foreach (var uncertain in new[] { false, true })
+            test("AR-033 trusted user waiver preserves uncertain effects=" + uncertain, () =>
+            {
+                var contract = Contract().WithUserInput(new(Guid.NewGuid(), "Write A; Write B"));
+                var goal = contract.Goals!.Active.First().Id;
+                var c = Context(contract, "A", "failed", error:true, effect:uncertain ? ToolMutationEffect.Unknown : ToolMutationEffect.None);
+                var a = new AgentCompletionAssessment(true); a.Register(c);
+                _ = a.Observe(c, Covered("verify-a", goal, false, c, "A", "desired"));
+                var revised = contract.WithUserInput(new(Guid.NewGuid(), "Cancel outcome 1"));
+                _ = a.ApplyRevision(revised);
+                Check(a.IsResolved(c.Calls[0].Invocation!.InvocationId) == !uncertain,
+                    "Trusted waiver either failed to retire unapplied work or erased an uncertain effect.");
+                Check(revised.Goals!.Obligations.Single(o => o.Id == goal).Status == AgentObligationStatus.WaivedByUser,
+                    "Waiver source history disappeared.");
+            });
+        test("AR-033 duplicate per-call proof claims are not silently overwritten", () =>
+        {
+            var c = Context(Contract(), "A", "one", mutation:true); var a = new AgentCompletionAssessment(true); a.Register(c);
+            var r = Covered("verify-a", "criterion-a", true, c, "A", "desired");
+            Reject(() => a.Observe(c,r with { CallCoverage = r.CallCoverage.Concat(r.CallCoverage).ToArray() }), "Duplicate");
+        });
+        test("AR-033 corrupt history cannot present a previous completion projection as current", () => Fixture(root =>
+        {
+            var now = DateTime.UtcNow; var id = Guid.NewGuid();
+            var summary = new H2AgentTaskSummary(id,null,"Fixture",H2AgentTaskStatus.Completed,null,[],"old",null,now,now)
+                { Completion = new("CompletedVerified",1,1,0,0,0,0,["fixture"],[]) };
+            using (var archive = new AgentIntegrationTaskArchive(root))
+            { archive.Upsert(summary); archive.Upsert(summary with { Status=H2AgentTaskStatus.Running }); }
+            File.WriteAllText(Directory.GetFiles(Path.Combine(root,"journal-v2"),"event-*.json").Order().Last(),"{torn");
+            using var reopened = new AgentIntegrationTaskArchive(root); var value=reopened.Get(id)!;
+            Check(value.Status==H2AgentTaskStatus.Blocked && value.Completion?.State=="Interrupted",
+                "Recovered prefix falsely retained a current CompletedVerified label.");
+        }));
         test("AR-033 different verifier cannot erase another criterion failure", () =>
         {
             var a = new AgentCompletionAssessment(true); var contract = Contract();
@@ -131,7 +182,7 @@ internal static class H2AgentCompletionTests
         {
             foreach(var path in Directory.GetFiles(Path.Combine(factory.StateRoot!,"artifacts","context"),"*.txt")) File.Delete(path);
         };
-        var goal=mode==Mode.MissingOutput ? "Write A.txt; Write B.txt; Export PDF" : mode==Mode.MissingVerifier ? "Write A.txt; Write B.txt" : "Write A.txt";
+        var goal=mode==Mode.MissingOutput ? "Write A.txt; Write B.txt; Export PDF" : mode==Mode.MissingVerifier ? "Write A.txt; Write B.txt" : "Write A.txt; Confirm A.txt";
         var id = adapter.StartTaskAsync(project ? Guid.NewGuid():null, goal, ContextFor(root), false).Result;
         var result=Wait(adapter,id);Drain(adapter);
         if(mode==Mode.Alternate)
@@ -190,7 +241,7 @@ internal static class H2AgentCompletionTests
             if(mode is Mode.Unrelated or Mode.ModelClaims)return report;
             Check(File.ReadAllText(workspace.Resolve(path))=="ONE","Fixture readback differs.");
             var proof=c.Evidence.Select(e=>e.ReferenceId).ToArray();
-            var matched=c.Contract.Goals!.Active.Where(o=>o.Requirement=="Write "+path).ToArray();
+            var matched=c.Contract.Goals!.Active.Where(o=>o.Requirement=="Write "+path || o.Requirement=="Confirm "+path).ToArray();
             if(mode==Mode.WrongTarget)matched=[c.Contract.Goals.Active.First()];
             var extra=matched.Select(o=>new VerificationCriterionResult(o.Id,VerificationCriterionStatus.Passed,proof)).ToArray();
             var binding=matched.Select(o=>new VerificationCallCoverage(call.Invocation!.InvocationId,o.Id,"file:"+workspace.Resolve(path),"contents=ONE",VerificationCriterionStatus.Passed,proof));

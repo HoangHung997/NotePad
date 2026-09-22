@@ -277,6 +277,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                             usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
                         continue;
                     }
+                    latestVerification = assessment.ApplyRevision(effectiveContract);
+                    unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId));
+                    mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                     if (unresolvedCalls.Any(f => f.FailureId is not null) && !completionRepairRequested
                         && toolRounds < request.MaxToolRounds && repairRounds < request.MaxRepairRounds)
                     {
