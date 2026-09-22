@@ -37,6 +37,8 @@ public sealed partial class AiChatPanel
         if (prompt.Length == 0)
             prompt = "Phân tích các tệp đính kèm và tóm tắt nội dung chính.";
 
+        if (_app.AgentAdapter is IH2AgentArchiveStatus archive && !archive.GetArchiveStatus().CanWrite)
+        { _status.Text = "Agent: cần phục hồi nhật ký trước khi chạy; bản nháp được giữ nguyên."; return; }
         PrepareProjectContext?.Invoke();
         if (_profiles.SelectedItem is not AiProfile selectedProfile || string.IsNullOrWhiteSpace(selectedProfile.Model))
         { _status.Text = "Mở Thiết lập AI để chọn model và lưu kết nối trước."; return; }

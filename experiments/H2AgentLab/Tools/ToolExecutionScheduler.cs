@@ -5,7 +5,11 @@ namespace H2AgentLab.Tools;
 public sealed record ToolExecutionRequest(
     ToolDescriptor Descriptor,
     global::H2AgentLab.ToolCall Call,
-    string? ResourceKey = null);
+    string? ResourceKey = null)
+{
+    public Action<global::H2AgentLab.ToolCall>? BeforeExecute { get; init; }
+    public Action<global::H2AgentLab.ToolCall, ToolExecutionOutput>? AfterExecute { get; init; }
+}
 
 public sealed record ToolExecutionResult(
     int Index,
@@ -84,9 +88,15 @@ public sealed class ToolExecutionScheduler : IDisposable
             ToolExecutionOutput output;
             try
             {
-                output = request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!)
-                    ? ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None)
-                    : await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+                if (request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!))
+                    output = ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                else
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    request.BeforeExecute?.Invoke(call); // Durable intent/dispatch, still under the resource gate.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    output = await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+                }
             }
             catch (ToolInvocationCancelledException cancelled)
             {
@@ -94,9 +104,12 @@ public sealed class ToolExecutionScheduler : IDisposable
                 // before releasing its gate, so queued writes cannot repeat an uncertain effect.
                 if (request.Descriptor.IsMutating && cancelled.Observed.Outcome.IsPending)
                     _uncertainResources.TryAdd(resourceKey!, 0);
+                request.AfterExecute?.Invoke(call, cancelled.Observed);
                 throw;
             }
             if (request.Descriptor.IsMutating && output.Outcome.IsPending) _uncertainResources.TryAdd(resourceKey!, 0);
+            try { request.AfterExecute?.Invoke(call, output); }
+            catch { if (request.Descriptor.IsMutating) _uncertainResources.TryAdd(resourceKey!, 0); throw; }
             results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output.DomainPayload)
             { Outcome = output.Outcome };
         }

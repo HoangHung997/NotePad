@@ -17,6 +17,8 @@ using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
 using NeraSpreadSheet.Scrolling;
 
+if (args.Length == 3 && args[0] == "--ar031-crash-probe")
+    return H2AgentArchiveJournalTests.Probe(args[1], args[2]);
 if (args.Length >= 2 && args[0] == "--desktop-session-probe")
     return DesktopSessionProbe.Run(args[1], args.Contains("--startup"));
 if (args.Length >= 2 && args[0] == "--live-ai-probe" && args.Contains("--allow-live-ai"))
@@ -696,6 +698,7 @@ H2AgentResourceBindingTests.Run(Test);
 H2AgentLiveBindingTests.Run(Test);
 H2OfficeDiscoveryTests.Run(Test);
 H2AgentGoalRevisionTests.Run(Test);
+H2AgentArchiveJournalTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);

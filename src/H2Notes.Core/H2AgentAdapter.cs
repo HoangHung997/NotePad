@@ -222,6 +222,7 @@ public sealed record H2AgentTaskSummary(
 {
     // Read-only Agent archive projection; never added to ProjectRecord or H2 TaskRecord.
     public H2AgentGoalSnapshot? GoalState { get; init; }
+    public H2AgentRecoverySnapshot? Recovery { get; init; }
 }
 
 public sealed record H2AgentOutcomeSnapshot(string Id, string Requirement, string SourceId,
@@ -242,6 +243,7 @@ public static class H2AgentVerification
 {
     public static bool IsVerified(H2AgentTaskSummary task)
         => task.Status == H2AgentTaskStatus.Completed
+            && task.Recovery?.ReconcileRequired != true
             && task.Evidence.LastOrDefault(item => item.VerificationPassed.HasValue)?.VerificationPassed == true;
 }
 

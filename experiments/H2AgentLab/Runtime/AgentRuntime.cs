@@ -32,7 +32,8 @@ public sealed record AgentRuntimeRequest(
     AgentRuntimeInvocation? Invocation = null,
     RuntimeCompactionResult? ContextCheckpoint = null,
     Func<bool, IReadOnlyList<AgentGoalInput>>? TakeGoalInput = null,
-    Action<AgentTaskContract>? ContractObserver = null);
+    Action<AgentTaskContract>? ContractObserver = null,
+    Action<H2AgentOperationRecord>? JournalObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -332,6 +333,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     round.ToolCalls,
                     failedMutationSignatures,
                     uncertainResources,
+                    request.JournalObserver,
                     cancellationToken).ConfigureAwait(false);
 
                 var results = execution.Results.ToArray();
@@ -524,6 +526,17 @@ public sealed class AgentRuntime : IAsyncDisposable
             usage, cancellationToken, publicTextObserver).ConfigureAwait(false);
     }
 
+    private static H2AgentOperationRecord JournalRecord(AgentTaskContract contract, Guid turnId,
+        global::H2AgentLab.ToolCall call, string? resourceKey, ToolExecutionOutput? output)
+    {
+        static string Hash(string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        var invocation = call.Invocation ?? throw new InvalidOperationException("Journal requires a bound invocation.");
+        return new(invocation.InvocationId, invocation.LogicalOperationId, turnId, contract.Goals!.RevisionId,
+            call.Id, call.Name, output is null ? "Dispatched" : "Result", output?.Outcome.Status.ToString() ?? "NotKnown",
+            output?.Outcome.Effect.ToString() ?? "Unknown", Hash(call.Arguments.GetRawText()),
+            resourceKey is null ? null : Hash(resourceKey), output is null ? null : Hash(output.DomainPayload), output?.Outcome.Error?.Code);
+    }
+
     public void Cancel()
         => _transport.Cancel();
 
@@ -534,6 +547,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         IReadOnlySet<string> failedMutationSignatures,
         IReadOnlySet<string> uncertainResources,
+        Action<H2AgentOperationRecord>? journalObserver,
         CancellationToken cancellationToken)
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
@@ -725,7 +739,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                 new ToolExecutionRequest(
                     descriptor,
                     call,
-                    permission.ResourceKey),
+                    permission.ResourceKey)
+                {
+                    BeforeExecute = descriptor.IsMutating && journalObserver is not null
+                        ? bound => journalObserver(JournalRecord(contract, turnId, bound, permission.ResourceKey, null)) : null,
+                    AfterExecute = descriptor.IsMutating && journalObserver is not null
+                        ? (bound, output) => journalObserver(JournalRecord(contract, turnId, bound, permission.ResourceKey, output)) : null
+                },
                 permissionRequest with { ResourceKey = permission.ResourceKey },
                 mutationSignature));
         }

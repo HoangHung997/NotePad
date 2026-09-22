@@ -83,7 +83,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
-| AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | NOT_STARTED |
+| AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | ACTIVE |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | NOT_STARTED |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | NOT_STARTED |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | NOT_STARTED |
@@ -239,7 +239,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** không gắn mọi task ReadOnly mãi sau mutation; không cho model tự đóng outcome bằng final text; requirements hiện hành và lịch sử truy vết rõ. Không đưa internal steps vào H2 TaskRecord.
 
-### [ ] AR-031 — Journal/checkpoint trong Agent store
+### [~] AR-031 — Journal/checkpoint trong Agent store
 
 **Sửa/reuse:** AgentIntegrationTaskArchive, task/thread durable records, ArtifactStore và transaction primitives hiện hữu phù hợp local storage.
 
@@ -477,13 +477,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-030_ACCEPTED_NEXT_AR-031",
+  "phase": "AR-031_ACTIVE_IMPLEMENTATION_VALIDATION",
   "active_task": "AR-031",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar030-resolver-final-2026-09-23",
+  "owner_session": "chatgpt-ar031-local-journal",
   "last_code_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
   "last_validated_code_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
   "last_validation_result": "AR030_39_PASS_X3; EVIDENCE_6_PASS; FULL_CI_758_PASS; E2_ACCEPTED",
@@ -492,16 +492,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "working_tree": "Exact focused CI checkout CLEAN; docs writer requires three allowed documents, unchanged refs and a verified non-force push. Local mirror is an offline snapshot; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
   "checkpoint_saved_at_utc": "2026-09-22T20:05:36.382684+00:00",
-  "completed_this_session": [
-    {
-      "task": "AR-030",
-      "implementation": "IMPLEMENTED",
-      "acceptance": "E2_PASS",
-      "code_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083"
-    }
-  ],
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-031 NOT_STARTED: read storage/Coordinator prerequisites, then implement existing Agent-store journal/checkpoint recovery and RC-22/34 tests."
+    "Compile and execute AR-031 on the new implementation commit; repair every regression and inspect full CI before acceptance."
   ],
   "last_test_commands": [
     {
@@ -884,11 +877,12 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-030/evidence-regression-observation.json",
     "docs/agent-reliability/AR-030/evidence-regression-observation.md",
     "docs/agent-reliability/AR-030/acceptance.json",
-    "docs/agent-reliability/AR-030/implementation.md"
+    "docs/agent-reliability/AR-030/implementation.md",
+    "docs/agent-reliability/AR-031/implementation.md"
   ],
   "known_failures": [],
   "external_blockers": [
-    "AR-020 native Word/Excel E3 and H2 UI/model E4 remain pending; they do not block independent AR-031."
+    "Local .NET/PowerShell unavailable; use existing Windows CI. Native Office/model not used by this slice."
   ],
   "deferred_acceptance": [
     {
@@ -900,7 +894,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Use the existing branch and PR #3. Reconcile refs, working tree and SESSION HANDOFF without reset. AR-030 is E2 accepted; do not reapply old local patches. Start only AR-031 after reading the current bug ledger and Coordinator specification before storage work. Extend the existing Agent archive/store with versioned journal/checkpoints, validated recovery and rebuildable indexes; run RC-22/34 and retained regression. No parallel truth store, ProjectRecord Agent state or automatic uncertain-write replay (AR-041 owns resume). Keep AR-020 native E3 pending and AR-083 deferred.",
+  "next_exact_action": "On the existing branch/PR, inspect AR-031 delivery and exact checkout identity; run registered archive/crash/production tests, retained AR regressions and all mandatory Agent/full-CI suites. Repair failures before marking AR-031 complete. Preserve AR-020 E3 pending and AR-083 deferred.",
   "next_task_if_active_done": "AR-032",
   "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",

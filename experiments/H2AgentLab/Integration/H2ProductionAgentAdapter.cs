@@ -26,6 +26,7 @@ public sealed partial class H2ProductionAgentAdapter :
     IH2AgentAdapter,
     IH2ProjectToolHostConsumer,
     IH2ActiveWorkContextProvider,
+    IH2AgentArchiveStatus,
     IDisposable,
     IAsyncDisposable
 {
@@ -49,20 +50,23 @@ public sealed partial class H2ProductionAgentAdapter :
         IAgentRuntimeFactory? runtimeFactory = null,
         Func<Guid?, string?, H2ProductionAgentModel>? requestModelResolver = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
-        Func<H2ActiveWorkContext, bool>? captureValidator = null)
+        Func<H2ActiveWorkContext, bool>? captureValidator = null,
+        AgentArchiveOptions? archiveOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateRoot);
         _stateRoot = Path.GetFullPath(stateRoot);
-        Directory.CreateDirectory(_stateRoot);
         _modelResolver = modelResolver ?? throw new ArgumentNullException(nameof(modelResolver));
         _requestModelResolver = requestModelResolver;
         _officeClientFactory = officeClientFactory;
         _captureValidator = captureValidator;
         _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory(
             transportFactory ?? new AgentTransportFactory());
-        _archive = new AgentIntegrationTaskArchive(Path.Combine(_stateRoot, "integration"));
-        InitializeChatArchive();
+        _archive = new AgentIntegrationTaskArchive(Path.Combine(_stateRoot, "integration"), archiveOptions);
+        try { InitializeChatArchive(); }
+        catch { _archive.Dispose(); throw; }
     }
+
+    public H2AgentArchiveStatus GetArchiveStatus() => _archive.Status;
 
     public void BindProjectToolHost(IH2ProjectToolHost host)
         => _projectTools = host ?? throw new ArgumentNullException(nameof(host));
@@ -84,6 +88,7 @@ public sealed partial class H2ProductionAgentAdapter :
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
+        _archive.EnsureWritable();
         goal = BoundRequired(goal, nameof(goal), 8_000, allowWhitespace: true);
         if (projectId == Guid.Empty)
             throw new ArgumentException("ProjectId cannot be empty.", nameof(projectId));
@@ -128,6 +133,8 @@ public sealed partial class H2ProductionAgentAdapter :
             created)
         {
             RequestContext = SnapshotContext(context),
+            ThreadId = context?.ThreadId ?? taskId,
+            TurnId = context?.TurnId ?? taskId,
             Model = SnapshotModel(context)
         };
 
@@ -142,9 +149,17 @@ public sealed partial class H2ProductionAgentAdapter :
             _live.Add(taskId, live);
         }
 
-        _archive.Upsert(live.Snapshot());
-        RegisterChatTask(live);
-        AddProgress(live, "lifecycle", "queued", "Agent task queued by H2 production bridge.");
+        try
+        {
+            _archive.Upsert(live.Snapshot());
+            RegisterChatTask(live);
+            AddProgress(live, "lifecycle", "queued", "Agent task queued by H2 production bridge.");
+        }
+        catch
+        {
+            lock (_gate) _live.Remove(taskId);
+            live.Cancellation.Dispose(); live.Finished.TrySetResult(); throw;
+        }
         _ = ExecuteWhenReadyAsync(live);
 
         return Task.FromResult(taskId);
@@ -393,6 +408,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 Images: live.RequestContext?.Images,
                 Files: live.RequestContext?.Files,
                 TakeGoalInput: closing => TakeSupplementalInput(live, closing),
+                JournalObserver: receipt => _archive.RecordOperation(live.TaskId, receipt),
                 ContractObserver: current =>
                 {
                     lock (live.Gate)
@@ -426,6 +442,9 @@ public sealed partial class H2ProductionAgentAdapter :
                 },
                 VerificationObserver: (report, index) =>
                 {
+                    _archive.RecordVerification(live.TaskId, new { GoalRevisionId = live.GoalState?.RevisionId,
+                        report.VerifierId, Criteria = report.Criteria.Select(c => new { c.CriterionId, c.Status, c.EvidenceIds }),
+                        report.ReportEvidenceIds });
                     lock (live.Gate)
                     {
                         live.Evidence.Add(new("verification:" + live.TaskId.ToString("N") + ":" + index,
@@ -642,7 +661,13 @@ public sealed partial class H2ProductionAgentAdapter :
                 "final",
                 status.ToString().ToLowerInvariant(),
                 "Agent task reached terminal host state " + status + ".");
-            _archive.Upsert(live.SnapshotLocked());
+            try { _archive.Upsert(live.SnapshotLocked()); }
+            catch
+            {
+                live.Status = H2AgentTaskStatus.Blocked;
+                live.Error = "Agent archive cần phục hồi; không xác nhận kết quả hoàn tất chưa được lưu.";
+                approval?.TrySetCanceled(); throw;
+            }
         }
 
         approval?.TrySetCanceled();
@@ -665,14 +690,17 @@ public sealed partial class H2ProductionAgentAdapter :
         string message,
         H2AgentToolOutcome? outcome = null, H2AgentTargetResolution? targetBinding = null)
     {
-        live.Progress.Add(new(
-            live.Progress.Count,
-            DateTime.UtcNow,
-            BoundCode(kind),
-            BoundCode(code),
-            Bound(message, 2_000)) { ToolOutcome = outcome, TargetBinding = targetBinding });
+        var progress = new H2AgentProgress(live.Progress.Count, DateTime.UtcNow,
+            BoundCode(kind), BoundCode(code), Bound(message, 2_000)) { ToolOutcome = outcome, TargetBinding = targetBinding };
+        try { PersistProgress(live.TaskId, progress); }
+        catch
+        {
+            live.Status = H2AgentTaskStatus.Blocked; live.PendingApproval = null;
+            live.Error = "Agent archive cần phục hồi; progress chưa được lưu, không xác nhận hoàn tất.";
+            throw;
+        }
+        live.Progress.Add(progress);
         live.UpdatedUtc = DateTime.UtcNow;
-        PersistProgress(live.TaskId, live.Progress[^1]);
     }
 
     private bool TryLive(Guid taskId, out LiveTask live)
@@ -770,10 +798,12 @@ public sealed partial class H2ProductionAgentAdapter :
             await Task.WhenAll(tasks.Select(task => task.Finished.Task)).ConfigureAwait(false);
             foreach (var task in tasks) task.Cancellation.Dispose();
             DisposeCaptureClient();
+            _archive.Dispose();
             if (errors.Count > 0) completion.TrySetException(new AggregateException(errors));
             else completion.TrySetResult();
         }
         catch (Exception ex) { completion.TrySetException(ex); }
+        finally { _archive.Dispose(); }
     }
 
     private sealed class LiveTask
@@ -804,6 +834,8 @@ public sealed partial class H2ProductionAgentAdapter :
 
         public object Gate { get; } = new();
         public Guid TaskId { get; }
+        public Guid ThreadId { get; init; }
+        public Guid TurnId { get; init; }
         public Guid? ProjectId { get; set; } // UI/history correlation only.
         public Guid? ExecutionProjectId { get; } // Frozen before queueing; never changed by AttachProject.
         public string Goal { get; }
@@ -849,178 +881,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 Error,
                 CreatedUtc,
                 UpdatedUtc,
-                RequestContext?.ThreadId ?? TaskId,
-                RequestContext?.TurnId ?? TaskId) { GoalState = GoalState };
-    }
-}
-
-/// <summary>
-/// Agent-owned bounded durable projection for H2 integration. It is not H2 project state: only
-/// task summary/evidence needed to rehydrate Command Center/History survives process restart.
-/// </summary>
-internal sealed partial class AgentIntegrationTaskArchive
-{
-    private const int SchemaVersion = 1;
-    private const int MaxRecords = 200;
-    private readonly object _gate = new();
-    private readonly string _path;
-    private readonly JsonSerializerOptions _json = new() { WriteIndented = true };
-    private List<H2AgentTaskSummary> _records;
-
-    public AgentIntegrationTaskArchive(string root)
-    {
-        root = Path.GetFullPath(root);
-        Directory.CreateDirectory(root);
-        _path = Path.Combine(root, "recent-tasks-v1.json");
-        _records = Load();
-        foreach (var record in _records) if (!File.Exists(TaskPath(record.TaskId))) SaveDurableTask(record);
-    }
-
-    public void Upsert(H2AgentTaskSummary summary)
-    {
-        ArgumentNullException.ThrowIfNull(summary);
-        lock (_gate)
-        {
-            SaveDurableTask(summary);
-            var index = _records.FindIndex(x => x.TaskId == summary.TaskId);
-            if (index >= 0) _records[index] = Snapshot(summary);
-            else _records.Add(Snapshot(summary));
-            TrimAndSave();
-        }
-    }
-
-    public bool AttachProject(Guid taskId, Guid projectId)
-    {
-        lock (_gate)
-        {
-            var index = _records.FindIndex(x => x.TaskId == taskId);
-            var current = index >= 0 ? _records[index] : LoadDurableTask(taskId);
-            if (current is null) return false;
-            if (current.ProjectId is { } existing && existing != projectId)
-                return false;
-            var updated = current with
-            {
-                ProjectId = projectId,
-                UpdatedUtc = DateTime.UtcNow
-            };
-            if (index >= 0) _records[index] = updated;
-            else _records.Add(updated);
-            SaveDurableTask(updated);
-            TrimAndSave();
-            return true;
-        }
-    }
-
-    public H2AgentTaskSummary? Get(Guid taskId)
-    {
-        lock (_gate)
-            return (LoadDurableTask(taskId) ?? _records.FirstOrDefault(x => x.TaskId == taskId)) is { } value
-                ? Snapshot(value)
-                : null;
-    }
-
-    public IReadOnlyList<H2AgentTaskSummary> Recent(Guid? projectId, int limit)
-    {
-        lock (_gate)
-            return _records
-                .Where(x => projectId is null || x.ProjectId == projectId)
-                .OrderByDescending(x => x.UpdatedUtc)
-                .Take(limit)
-                .Select(Snapshot)
-                .ToArray();
-    }
-
-    public H2AgentEvidence? GetEvidence(string evidenceId)
-    {
-        lock (_gate)
-            return _records.SelectMany(x => x.Evidence)
-                .FirstOrDefault(x => string.Equals(
-                    x.EvidenceId,
-                    evidenceId,
-                    StringComparison.Ordinal)) ?? FindDurableEvidence(evidenceId);
-    }
-
-    private List<H2AgentTaskSummary> Load()
-    {
-        if (!File.Exists(_path))
-            return [];
-
-        try
-        {
-            if (new FileInfo(_path).Length > 4 * 1024 * 1024)
-                throw new InvalidDataException("Agent integration archive exceeds the 4 MB bound.");
-
-            var envelope = JsonSerializer.Deserialize<ArchiveEnvelope>(
-                File.ReadAllText(_path),
-                _json) ?? throw new InvalidDataException("Agent integration archive is invalid.");
-            if (envelope.Schema != SchemaVersion || envelope.Tasks is null)
-                throw new InvalidDataException("Unsupported Agent integration archive schema.");
-
-            var now = DateTime.UtcNow;
-            return envelope.Tasks
-                .Where(x => x.TaskId != Guid.Empty)
-                .Select(x => IsTerminal(x.Status)
-                    ? Snapshot(x)
-                    : x with
-                    {
-                        Status = H2AgentTaskStatus.Failed,
-                        PendingApproval = null,
-                        Error = "Agent task was interrupted when the previous H2 process ended.",
-                        UpdatedUtc = now
-                    })
-                .OrderByDescending(x => x.UpdatedUtc)
-                .Take(MaxRecords)
-                .ToList();
-        }
-        catch (Exception ex) when (
-            ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
-        {
-            try
-            {
-                File.Move(
-                    _path,
-                    _path + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"),
-                    false);
-            }
-            catch { }
-            return [];
-        }
-    }
-
-    private void TrimAndSave()
-    {
-        _records = _records
-            .OrderByDescending(x => x.UpdatedUtc)
-            .ThenByDescending(x => x.CreatedUtc)
-            .Take(MaxRecords)
-            .ToList();
-
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(
-            new ArchiveEnvelope
-            {
-                Schema = SchemaVersion,
-                // Compatibility index only; full transcripts are kept in each durable task record.
-                Tasks = _records.Select(value => Snapshot(value) with { FinalText = value.FinalText is { Length: > 8000 } text ? text[..8000] : value.FinalText }).ToList()
-            },
-            _json);
-        ProjectWorkspaceStore.AtomicWrite(_path, bytes);
-    }
-
-    private static H2AgentTaskSummary Snapshot(H2AgentTaskSummary value)
-        => value with
-        {
-            Evidence = value.Evidence.ToArray()
-        };
-
-    private static bool IsTerminal(H2AgentTaskStatus status)
-        => status is H2AgentTaskStatus.Completed
-            or H2AgentTaskStatus.Blocked
-            or H2AgentTaskStatus.Cancelled
-            or H2AgentTaskStatus.Failed;
-
-    private sealed class ArchiveEnvelope
-    {
-        public int Schema { get; set; }
-        public List<H2AgentTaskSummary> Tasks { get; set; } = [];
+                ThreadId,
+                TurnId) { GoalState = GoalState };
     }
 }
