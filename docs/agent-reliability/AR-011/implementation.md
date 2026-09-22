@@ -1,6 +1,6 @@
 # AR-011 — typed execution outcome, readiness and bounded projection
 
-Status: ACTIVE / NOT_RUN. No new C# or application PASS is claimed until exact-source Windows CI is reviewed.
+Status: **IMPLEMENTED / E2_PASS / DONE** on `38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7`. Full CI and acceptance details are recorded below and in [acceptance.json](acceptance.json). Earlier review sections preserve the implementation chronology; their pending statements are historical, not the current status. Native E3/E4 remain NOT_RUN / AWAITING_ENVIRONMENT.
 
 ## Scope and compatibility
 
@@ -12,7 +12,7 @@ Errors before any effect use explicit preflight proof. Exceptions after dispatch
 
 Readiness and non-callable unavailable capability notices are in the same registry. Search separates registered/ready/exposed; configured web fetch/feed is distinct from absent search/browser backends. Provider health reads only cached state; packaged Office helper checks do not launch Office. Packaged helper means Degraded/not-probed, never proof of native Office readiness. Limits use the existing output projector/artifact store and shared Excel cardinality; bounded model projections explicitly carry completeness=false and existing artifact references. Native Office discovery/paging/partial writes remain later tasks.
 
-## Registered E1/E2 tests (awaiting execution)
+## Registered E1/E2 tests
 
 H2AgentToolOutcomeTests is wired into the existing H2Notes.Tests runner. Concrete production adapter, actual permission wrapper/registry/scheduler/runtime and H2 activity projection run on disposable temporary files with a scripted no-network transport. Cases include success without verifier, job result/replay, no-effect preflight, real write then lost response with same-batch/next-round fencing, partial effects, typed paging, malformed JSON/metadata, unavailable tool discovery, missing web configuration, denied permission, cancellation during actual executor work, canonical identities and cached provider readiness. Test-only controlled executors are injected; no Office application, paid model or personal document is used. Preserve AR-010/001 and all mandatory suites.
 
@@ -22,11 +22,11 @@ Remote main: 1283bc13e07c3cd47d04886166de3dfc595422c0. Existing PR #3, branch fe
 
 E3 native Office/provider/model and E4 real H2 UI/model/tools: NOT_RUN / AWAITING_ENVIRONMENT. AR-083: DEFERRED_BY_USER, physical E5 not certified. MB-124–127 and remaining AR tasks are unchanged. No merge into main is authorized.
 
-## First executed evidence and review repair (not final acceptance)
+## First executed evidence and review repair (historical, not final acceptance)
 
 Run 35703236866 tested application source 4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5: build PASS; AR-011 18/18 in each of three iterations, retained AR-010/001 PASS; independent required Agent suites 72/74. Both failures trace to the unchanged MB-40 denial regression: the new conservative pending-effect completion message dropped the original denial code, and the legacy adapter prioritized human error text instead of the explicit code field. Preserve the code through the typed metadata and final blocked reason; do not weaken the permission test or infer no-effect from a denial word alone. Only explicit preflight proof supports None.
 
-Review additionally found the Work Assistant desktop ticker still rendered generic tool-ok as completed for Running/unknown/unverified metadata. It now uses the same typed projection as chat; concrete AR-011 tests compare both on actual observations. Local command timeout advice no longer recommends retry; existing process regression additionally asserts Unknown/ReconcileRequired and no contradictory retry text. These repairs need their own exact-source tests; no prior PASS transfers to the changed code.
+Review additionally found the Work Assistant desktop ticker still rendered generic tool-ok as completed for Running/unknown/unverified metadata. It now uses the same typed projection as chat; concrete AR-011 tests compare both on actual observations. Local command timeout advice no longer recommends retry; existing process regression additionally asserts Unknown/ReconcileRequired and no contradictory retry text. These repairs needed their own exact-source tests; the accepted result below includes those tests.
 
 First downloaded fixture evidence artifact 10683975729: SHA256 00b6256e5d44975697d78ef7cb1d937b0e53b775807f0f10058170176bb2161e, ZIP CRC verified, identity and all result logs read. This remains failed full-corpus evidence, not acceptance.
 
@@ -36,16 +36,18 @@ The existing MCP fixtures return top-level isError, whose true value is a tool e
 
 ## Resumed review: cancellation fence and model-visible controls
 
-Pre-review source `4eef57a1a6fc4c0014516c1215fd1d5fd22945b3` passed the existing 22 AR-011 tests x3, 11 AR-010, 13 AR-001 and all 74 Agent suites in run 35704689725. The evidence archive was downloaded and its hash/CRC/identity/results verified; it does not certify the following new changes.
+Pre-review source `4eef57a1a6fc4c0014516c1215fd1d5fd22945b3` passed the existing 22 AR-011 tests x3, 11 AR-010, 13 AR-001 and all 74 Agent suites in run 35704689725. The evidence archive was downloaded and its hash/CRC/identity/results verified; it did not certify the following new changes.
 
 Provider-local cancellation after a mutation may leave the batch token live. The scheduler now fences the resource while still holding its gate, before rethrowing the typed cancellation. A queued/future same-resource write must not execute; an unrelated resource is not globally fenced.
 
 Concrete transports send `AgentToolResult.Content`, not out-of-band Outcome. Cursor-bearing results now include model-visible control metadata, reserve its space within the advertised per-tool limit, and retain the exact cursor when raw output is moved to an artifact. Oversized escaped metadata is stored in the existing ArtifactStore with an explicit bounded reference; no second store or restart/job semantics are added. Raw domain bytes remain unchanged for verifier/evidence. Tests feed actual production observations through Ollama and Chat Completions serialization with an injected no-network HTTP handler.
 
-Three additional cases and a strengthened paging case are registered in the existing runner. A Windows negative control will run these tests against the three pre-repair runtime files, then restore the exact patched source and require clean-tree positive tests. No PASS is claimed until those runs are inspected. Native E3/E4 and AR-083 deferral remain unchanged.
+Three additional cases and a strengthened paging case are registered in the existing runner. The Windows negative control ran these tests against the three pre-repair runtime files, then restored the exact patched source and required clean-tree positive tests. Results are recorded below. Native E3/E4 and AR-083 deferral remain unchanged.
 
 ## Accepted exact-source result
 
 **AR-011 = IMPLEMENTED / E2_PASS / DONE** on `38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7`. Full CI **35709818021**: all required steps passed, including H2 tests **639 passed / 0 failed**, Windows publish and packaged Office/Desktop helper startup/IPC. Focused run **35709753515** reproduced the four old-runtime gaps (**21 passed / 4 expected failures**), restored clean repaired source, then passed **25/25 AR-011 x3**, **11/11 AR-010**, **13/13 AR-001**, and **74/74 Agent suites**. Archive hashes, raw result summaries, old failure messages and exact identities were read back. Actual Ollama/Chat Completions wire serialization is exercised with no-network handlers; native model/Office is not certified.
 
 The downloaded portable package has **109,984,499 bytes / 482 ZIP entries** with verified SHA256/CRC/nonempty helpers. Detailed steps, code identity, artifact hashes, scope and limits are in [acceptance.json](acceptance.json). The canonical handoff advances only to **AR-012 NOT_STARTED** on the same branch/PR. Native E3/E4 remain AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER. No merge authorized.
+
+Temporary resumed-review delivery payload and writer workflow were removed in `a6ab3eb31d3b250a48aebffea71a64375bdb3fd6`; retained AR-011 validation is read-only. This status-header clarification is documentation-only and does not transfer the exact-source CI result to an unobserved later SHA.
