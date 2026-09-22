@@ -1,0 +1,72 @@
+name: AR-033 proof regression controls (read-only)
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar033-proof-control.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar033-proof-control
+  cancel-in-progress: false
+jobs:
+  controls:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ac8ed01e464beebf8d11f052da3edffce6c2ae1b
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compare unchanged tests with two prior classes then restore exact current source
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,re,subprocess
+          P=pathlib.Path; out=P('artifacts/ar033-controls');out.mkdir(parents=True)
+          base='ac8ed01e464beebf8d11f052da3edffce6c2ae1b';prior='5e142678157862ade7c117691a79dac08b3d0041'
+          paths=['experiments/H2AgentLab/Runtime/AgentCompletionAssessment.cs','experiments/H2AgentLab/Runtime/AgentRuntime.cs']
+          def git(*args):return subprocess.check_output(['git',*args],text=True,timeout=60).strip()
+          def require(ok,msg):
+              if not ok:raise RuntimeError(msg)
+          def run(name,args):
+              p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=300)
+              (out/(name+'.log')).write_bytes(p.stdout)
+              return p.returncode,p.stdout.decode('utf-8-sig',errors='replace')
+          require(git('rev-parse','HEAD')==base and not git('status','--porcelain'),'Unexpected checkout')
+          originals={p:P(p).read_bytes() for p in paths};negative=None;error=None
+          env=os.environ;env['H2_AR033_EVIDENCE_DIR']=str(out/'negative-traces')
+          try:
+              for path in paths:P(path).write_bytes(subprocess.check_output(['git','show',prior+':'+path]))
+              require(set(git('diff','--name-only').splitlines())==set(paths),'Unexpected negative-control change')
+              rc,_=run('restore',['dotnet','restore','H2Notes.Avalonia.slnx']);require(rc==0,'Restore failed')
+              rc,_=run('prior-build',['dotnet','build','H2Notes.Avalonia.slnx','-c','Release','--no-restore']);require(rc==0,'Prior class control must compile')
+              rc,text=run('prior-AR033',['dotnet','run','--project','tests/H2Notes.Tests/H2Notes.Tests.csproj','-c','Release','--no-build','--','--filter','AR-033'])
+              failures=re.findall(r'^FAIL (.+)$',text,re.M);counts=re.findall(r'RESULT: (\d+) passed, (\d+) failed',text)
+              negative={'exit_code':rc,'counts':counts,'failures':failures}
+              (out/'negative.json').write_text(json.dumps(negative,indent=2))
+              expected=['native verifier receipt','generic read-only verification','corrective write must recheck','concrete completion remains blocked for Contradictory']
+              require(rc!=0 and counts==[('31','4')] and len(failures)==4 and all(any(s in f for f in failures) for s in expected),'Unexpected control results; inspect logs, do not weaken tests')
+          except Exception as exc:error=exc
+          finally:
+              for path,data in originals.items():P(path).write_bytes(data)
+              require(all(P(p).read_bytes()==b for p,b in originals.items()) and not git('status','--porcelain'),'Current source was not restored exactly')
+              (out/'restoration.json').write_text(json.dumps({'code_sha':base,'prior_classes':prior,'working_tree':'CLEAN','sha256':{p:hashlib.sha256(b).hexdigest() for p,b in originals.items()}},indent=2))
+          rc,_=run('current-build',['dotnet','build','H2Notes.Avalonia.slnx','-c','Release','--no-restore']);require(rc==0,'Current rebuild failed')
+          env['H2_AR033_EVIDENCE_DIR']=str(out/'positive-traces')
+          rc,text=run('current-AR033',['dotnet','run','--project','tests/H2Notes.Tests/H2Notes.Tests.csproj','-c','Release','--no-build','--','--filter','AR-033'])
+          counts=re.findall(r'RESULT: (\d+) passed, (\d+) failed',text)
+          (out/'positive.json').write_text(json.dumps({'code_sha':base,'exit_code':rc,'counts':counts,'negative_discrepancy':None if error is None else str(error)},indent=2))
+          require(rc==0 and counts==[('35','0')],'Current source tests failed')
+          if error is not None:raise error
+          print('Two-class control reproduced four defects; exact current source restored; 35 current tests pass. E3/E4 NOT_RUN.')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR033-Proof-Control-Evidence
+          path: artifacts/ar033-controls/
+          if-no-files-found: error
+          retention-days: 14
