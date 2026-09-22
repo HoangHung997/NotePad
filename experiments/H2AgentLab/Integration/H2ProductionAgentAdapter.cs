@@ -196,13 +196,40 @@ public sealed partial class H2ProductionAgentAdapter :
             throw new KeyNotFoundException("Agent task is not available.");
         }
 
-        lock (live.Gate)
+        Exception? progressFailure = null;
+        try
         {
-            if (IsTerminal(live.Status))
-                return;
-            AddProgressLocked(live, "lifecycle", "cancel-requested", "Cancellation requested by H2 host.");
+            lock (live.Gate)
+            {
+                // Blocked is a UI state, not a quiescence barrier. The finally below
+                // still cancels a live execution whose persistence already failed.
+                if (IsTerminal(live.Status))
+                    return;
+                AddProgressLocked(live, "lifecycle", "cancel-requested", "Cancellation requested by H2 host.");
+            }
         }
-        live.Cancellation.Cancel();
+        catch (Exception ex)
+        {
+            progressFailure = ex;
+            throw;
+        }
+        finally
+        {
+            // Do not let a full or damaged archive veto a host cancellation request.
+            // Run callbacks outside live.Gate; do not invent a durable cancel receipt.
+            try
+            {
+                if (!live.Finished.Task.IsCompleted)
+                    live.Cancellation.Cancel();
+            }
+            catch (ObjectDisposedException) when (live.Finished.Task.IsCompleted) { }
+            catch (Exception cancellationFailure) when (progressFailure is not null)
+            {
+                // CancellationTokenSource still signals its token before reporting
+                // callback failures. Preserve the original storage error for the UI.
+                progressFailure.Data["H2.CancellationFailureType"] = cancellationFailure.GetType().FullName;
+            }
+        }
     }
 
     public bool RespondToApproval(

@@ -19,6 +19,7 @@ internal static partial class H2AgentArchiveJournalTests
     internal static void Run(Action<string, Action> test)
     {
         RunBoundaryTests(test);
+        H2AgentArchiveCancellationTests.Run(test);
         test("AR-031 source journal preserves revisions progress and exact evidence after restart", () => Fixture(root =>
         {
             var task = Summary(); var thread = new H2AgentThread(task.ThreadId!.Value, null, "history", task.CreatedUtc, task.CreatedUtc, "draft");
