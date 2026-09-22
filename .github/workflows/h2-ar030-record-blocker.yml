@@ -1,0 +1,111 @@
+name: AR-030 documentation-only pending-repair checkpoint
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar030-record-blocker.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar030-documentation-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Record observed CI and pending tool-blocked repair in the canonical tracker only
+        shell: python
+        run: |
+          import datetime,hashlib,json,os,pathlib,re,subprocess
+          BRANCH='feature/h2-agent-reliability-ar-000'
+          BASE='b5060f877616f28bc3903df69585ac419f9a8d1e'
+          NOTE='docs/agent-reliability/AR-030/integrity-review-pending.md'
+          TRACKER='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+          OUT=pathlib.Path(os.environ['RUNNER_TEMP'])/'ar030-pending';OUT.mkdir()
+          def require(ok,message):
+              if not ok: raise RuntimeError(message)
+          def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
+          def api(path):return json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/'+path]))
+          head=os.environ['CHECKED_HEAD']
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong or dirty checkout')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0','Main advanced; reconcile')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch work')
+          require(set(git('diff','--name-only',BASE,'HEAD').splitlines())=={NOTE,'.github/workflows/h2-ar030-record-blocker.yml'},'Unexpected work; do not overwrite checkpoint')
+          require(git('hash-object',TRACKER)=='7037991364865cf51d6d1ee385826cfd06ac1f4d','Tracker changed')
+          runs=[]
+          for run_id,job_id in [(35766312352,106876620967),(35766312391,106876620469)]:
+              run=api('actions/runs/'+str(run_id));jobs=api('actions/runs/'+str(run_id)+'/jobs?per_page=100')
+              require(run['head_sha']==BASE and run['status']=='completed' and run['conclusion']=='success','Baseline CI identity/result differs')
+              require(jobs['total_count']==len(jobs['jobs'])==1 and jobs['jobs'][0]['id']==job_id,'Incomplete job inventory')
+              require(all(s['conclusion']=='success' for s in jobs['jobs'][0]['steps']),'A skipped step is not PASS')
+              runs.append({'id':run_id,'job_id':job_id,'head_sha':BASE,'result':'SUCCESS','applies_to':'PRE_REPAIR_SOURCE_ONLY'})
+          raw=subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/actions/jobs/106876620469/logs'])
+          (OUT/'pre-repair-full-ci.log').write_bytes(raw)
+          lines=raw.decode('utf-8-sig').splitlines();checkout=None
+          for i,line in enumerate(lines):
+              if '[command]' in line and 'log -1 --format=%H' in line:
+                  for nxt in lines[i+1:i+5]:
+                      match=re.search(r'\b([a-f0-9]{40})\b',nxt)
+                      if match:checkout=match.group(1);break
+                  if checkout:break
+          require(checkout is not None,'Actual CI checkout not found in log')
+          subprocess.run(['git','fetch','--no-tags','--depth=1','origin',checkout],check=True)
+          require(not git('diff','--name-only',BASE,checkout,'--','src','experiments','tests','.github/workflows/avalonia-ci.yml'),'Full-CI source differs')
+          results=re.findall(r'RESULT: (\d+) passed, (\d+) failed',raw.decode('utf-8-sig'))
+          require(results and results[0][1]=='0','Full baseline H2 results missing')
+          runs[-1].update({'actual_checkout_sha':checkout,'H2_passed':int(results[0][0]),'H2_failed':0,'log_sha256':hashlib.sha256(raw).hexdigest()})
+          original=pathlib.Path(TRACKER).read_text(encoding='utf-8')
+          start=original.index('```yaml\n',original.index('## 7. SESSION HANDOFF'))+len('```yaml\n')
+          end=original.index('\n```',start);state=json.loads(original[start:end])
+          require(state['active_task']=='AR-030','Another task is active')
+          state.update({'phase':'AR-030_ACTIVE_INTEGRITY_REPAIR_BLOCKED','implementation_status':'ACTIVE','acceptance_status':'REPAIR_REQUIRED',
+            'owner_session':'chatgpt-ar030-integrity-review','last_code_commit':'bf1470ce047afc8a06260f51cd3a736d984e80a8',
+            'last_validated_code_commit':BASE,'last_full_ci_checkout_sha':checkout,
+            'last_validation_result':'PRE_REPAIR_E1_E2_FULL_CI_PASS; NEW_INTEGRITY_PATCH_NOT_RUN',
+            'checkpoint_saved_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'working_tree':'Documentation CI checkout clean before the tracker-only update; application/test source unchanged. Local candidate is a text review snapshot, not remote Git history. User-PC tree NOT_ACCESSIBLE.',
+            'uncommitted_files':['LOCAL_ONLY: experiments/H2AgentLab/Tasking/AgentTaskContract.cs','LOCAL_ONLY: experiments/H2AgentLab/Tasking/AgentGoalState.cs','LOCAL_ONLY: tests/H2Notes.Tests/H2AgentGoalProposalBoundaryTests.cs','LOCAL_ONLY: tests/H2Notes.Tests/H2AgentGoalProofIntegrityTests.cs','LOCAL_ONLY: .github/workflows/h2-ar030-validation.yml'],
+            'completed_this_session':[],
+            'remaining_in_active_task':['Review and publish the five-file local integrity patch through an authorized source-write action; then compile and test it.','Nine new integrity cases and the five-failure old-class control are NOT_RUN, not passing evidence.','Run RC-11/12, retained regressions and full CI/publish/helper IPC on the actual repaired SHA before AR-030 acceptance.'],
+            'known_failures':['SOURCE_OBSERVED: first mutation can drop host-required verifiers and duplicate an existing mutation criterion.','SOURCE_OBSERVED: partial or ambiguous evidence-ID resolution can be labelled Verified.','The attempted GitHub.create_blob runtime write was blocked by the tool safety layer; no runtime blob/commit was returned. It was not retried through another encoding, endpoint or workflow.'],
+            'external_blockers':['New runtime write blocked by tool safety layer; documentation writes remain separately available.','Local .NET/CSharp compiler/PowerShell unavailable; local draft application tests NOT_RUN.'],
+            'last_test_commands':[{'command':'Existing AR-030 corpus on b5060f8','run_id':35766312352,'result':'30/30 x3; retained 36/44/25/11/13; 74/74 Agent suites; PRE_REPAIR only'},{'command':'New integrity corpus and prior-two-class controls','result':'NOT_RUN; proposed expectations are not evidence'},{'command':'Full Avalonia CI on pre-repair source','run_id':35766312391,'result':'SUCCESS; see actual checkout and count in ci_runs'}],
+            'pending_user_decisions':[],
+            'next_exact_action':'Keep AR-030 as sole active task. Reconcile current refs, tracker and working tree; review the local H2_AR030_Integrity_Repair handoff and publish its source changes only through an authorized available write path. Do not bypass a tool safety decision. Then build Windows/.NET 10, run the nine integrity cases, expected old-class controls, RC-11/12, retained AR regressions, all mandatory Agent suites and full CI/publish/helper IPC on the new SHA. Do not mark AR-030 DONE from pre-repair green CI. Preserve AR-020 native E3 pending and AR-083 DEFERRED_BY_USER.',
+            'next_task_if_active_done':'AR-031'})
+          state.setdefault('ci_runs',[]).extend(runs)
+          state['evidence_locations']=list(dict.fromkeys(state.get('evidence_locations',[])+[NOTE,'conversation artifact: H2_AR030_Integrity_Repair.zip (LOCAL_ONLY, source patch NOT_PUSHED)']))
+          revised=original[:start]+json.dumps(state,ensure_ascii=False,indent=2)+original[end:]
+          require('### [x] AR-030' not in revised and '| E5 | DEFERRED_BY_USER |' in revised,'Acceptance boundary changed')
+          pathlib.Path(TRACKER).write_text(revised,encoding='utf-8')
+          require(git('diff','--name-only')==TRACKER,'Only canonical tracker may change')
+          subprocess.run(['git','add','--',TRACKER],check=True);subprocess.run(['git','diff','--cached','--check'],check=True)
+          require(git('diff','--cached','--name-only')==TRACKER,'Non-document stage is forbidden')
+          (OUT/'tracker.patch').write_bytes(subprocess.check_output(['git','diff','--cached']))
+          (OUT/'baseline-ci.json').write_text(json.dumps(runs,indent=2))
+          (OUT/'SESSION-HANDOFF.json').write_text(json.dumps(state,ensure_ascii=False,indent=2),encoding='utf-8')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent work; preserve patch only')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git','commit','-m','docs(AR-030): save pending integrity repair and exact pre-repair evidence'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+BRANCH],check=True)
+          saved=git('rev-parse','HEAD');require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==saved,'Documentation save not verified')
+          (OUT/'saved.json').write_text(json.dumps({'checkpoint_sha':saved,'source_tested':BASE,'runtime_patch_pushed':False,'AR030_done':False},indent=2))
+          print('Saved documentation checkpoint:',saved,'; runtime repair NOT_PUSHED / NOT_RUN')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR030-Pending-Repair-Checkpoint
+          path: ${{ runner.temp }}/ar030-pending/
+          if-no-files-found: error
+          retention-days: 14
