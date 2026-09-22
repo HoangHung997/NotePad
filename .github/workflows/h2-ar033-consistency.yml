@@ -48,7 +48,12 @@ jobs:
           path='experiments/H2AgentLab/Runtime/AgentCompletionAssessment.cs'
           file=pathlib.Path(path); original=file.read_bytes()
           def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
-          assert blob(original)=='deb9b24d9175e7b59a14fc729815d0056f808665'
+          committed=subprocess.check_output(['git','show','HEAD:'+path],timeout=60)
+          assert blob(committed)=='deb9b24d9175e7b59a14fc729815d0056f808665'
+          # Preserve both identities: Git stores LF; the Windows checkout may use CRLF.
+          # Accept only those exact byte representations, never an arbitrary source edit.
+          assert b'\r' not in committed and original in (committed,committed.replace(b'\n',b'\r\n'))
+          (root/'checkout-format.json').write_text(json.dumps({'committed_blob':blob(committed),'checkout_blob':blob(original),'checkout_sha256':hashlib.sha256(original).hexdigest(),'line_endings':'CRLF' if b'\r\n' in original else 'LF'},indent=2))
           before=subprocess.check_output(['git','show','b44306681f13e5ae1919e022658e95c0574b2ef6:'+path],timeout=60)
           assert blob(before)=='2fbfd682c5ac3880fe46297315c8ca5c34692be5'
           try:
