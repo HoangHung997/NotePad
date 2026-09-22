@@ -1,0 +1,51 @@
+name: AR-020 enumeration repair checkpoint (E3 pending)
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar020-enumeration-checkpoint.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar020-enumeration-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      AR_HEAD: ${{ github.event.pull_request.head.sha }}
+      REVIEWED_ARTIFACTS: '{"evidence_id":10702215725,"evidence_bytes":72973484,"evidence_sha256":"facd5ff918a8414b8bac8cda5d3b9c31896e5df3d2a4eb8dd1b0d19f1e065a53","package_id":10702356537,"package_sha256":"4ef1da09f789e3da52459bdb2d03f10422e39601844c960afae9cb7a0d0a9571","package_bytes":110024765,"package_entries":482}'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact saved test evidence and write only three checkpoint documents
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, gzip, hashlib, json, subprocess
+          # Reviewed one-time document writer in this same repository, not an external script.
+          result = json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/bb4067527029ae253b520c0447a7edd7767f1e2b']))
+          encoded = base64.b64decode(result['content'])
+          if len(encoded) != 9332 or hashlib.sha256(encoded).hexdigest() != 'ad7f9d52cf5b28db862b77faff9078122d533993c362324abe30e6f51f68c7fa':
+              raise SystemExit('Reviewed writer blob mismatch; no writes')
+          source = gzip.decompress(base64.b64decode(encoded, validate=True))
+          if len(source) != 17477 or hashlib.sha256(source).hexdigest() != '8b8db9584c502a601e74aef4f4db7923f776701304a6fecf29779b01ee45d8d4':
+              raise SystemExit('Reviewed writer source mismatch; no writes')
+          exec(compile(source, 'reviewed_ar020_checkpoint.py', 'exec'))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR020-Enumeration-Saved-Checkpoint
+          path: ${{ runner.temp }}/ar020-enumeration-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
