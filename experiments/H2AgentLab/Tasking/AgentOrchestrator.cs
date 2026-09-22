@@ -228,6 +228,14 @@ public sealed class AgentOrchestrator
             || current.VerificationPolicy.RequiredVerifierIds.Except(updated.VerificationPolicy.RequiredVerifierIds).Any()
             || current.PreserveConstraints.Except(updated.PreserveConstraints).Any())
             throw new InvalidOperationException("Contract update cannot expand permissions or weaken host constraints.");
+        if (current.Goals is not null)
+        {
+            if (updated.Goals is null)
+                throw new InvalidOperationException("Contract update cannot remove accepted goal state.");
+            // Reuse the contract's monotonic history checks even for callers supplying
+            // a newly constructed contract instead of using WithUserInput/WithGoals.
+            _ = current.WithGoals(updated.Goals);
+        }
         var nextById = expandedOrEvidenceUpdatedContract.AcceptanceCriteria
             .ToDictionary(x => x.CriterionId, StringComparer.Ordinal);
         foreach (var existing in current.AcceptanceCriteria)

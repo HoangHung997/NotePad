@@ -112,9 +112,20 @@ public sealed record AgentTaskContract
             || !Goals.Revisions.Select(x => (x.Id,x.ParentId,x.SourceId,x.SourceText))
                 .SequenceEqual(goals.Revisions.Take(Goals.Revisions.Count).Select(x => (x.Id,x.ParentId,x.SourceId,x.SourceText)))))
             throw new InvalidOperationException("Goal update cannot rewrite or discard accepted user history.");
-        // Only source-backed goal criteria are replaceable by an explicit user revision.
-        // All pre-existing host safety and verification criteria are retained unchanged.
-        var criteria = AcceptanceCriteria.Where(x => !x.CriterionId.StartsWith("goal:", StringComparison.Ordinal))
+        // A proposal may share its revision with the user input that it quotes. Source
+        // lineage alone therefore does not prove that all accepted obligations survived.
+        if (Goals is not null && (Goals.Obligations.Any(old => !goals.Obligations.Any(next =>
+                next.Id == old.Id && next.Requirement == old.Requirement && next.SourceId == old.SourceId
+                && next.RevisionId == old.RevisionId && next.TargetScope == old.TargetScope
+                && old.Evidence.All(e => next.Evidence.Contains(e))
+                && (old.Active || next.Status == old.Status && next.ReplacedBy == old.ReplacedBy)))
+            || Goals.MutationRevisions.Except(goals.MutationRevisions).Any()))
+            throw new InvalidOperationException("Goal update cannot discard accepted obligations, evidence or mutation history.");
+        // Only IDs actually owned by the previous goal state may be replaced. A host
+        // criterion is not a managed obligation merely because it starts with goal:.
+        var managed = Goals?.Obligations.Select(x => x.Id).ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
+        var criteria = AcceptanceCriteria.Where(x => !managed.Contains(x.CriterionId))
             .Concat(goals.Active.Select(x => new AgentAcceptanceCriterion(x.Id, x.Requirement, x.Evidence)));
         return new(TaskId, UserGoal, Scope, Inputs, RequiredChanges, PreserveConstraints,
             OutputRequirements, criteria, RiskClass, VerificationPolicy, MutationAllowed, goals);
