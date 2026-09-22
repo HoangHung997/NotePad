@@ -75,7 +75,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
 | AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | DONE |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | DONE |
-| AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | ACTIVE |
+| AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | NOT_STARTED |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
@@ -149,7 +149,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-010 acceptance - 2026-09-22:** IMPLEMENTED / E2_PASS / DONE on `14767f0fdaf3ead109867c41caf34111adb8c02a`; full CI `35698496546` and packaged-helper IPC/publish PASS; AR-010 11/11 x3, AR-001 13/13 and 74/74 Agent suites on exact code in `35698479792`, repeated on read-only workflow head in `35698742558`. [Evidence](agent-reliability/AR-010/acceptance.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER; no other task closed.
 
-### [~] AR-011 — Hợp đồng kết quả, lỗi, readiness và giới hạn
+### [x] AR-011 — Hợp đồng kết quả, lỗi, readiness và giới hạn
 
 **Sửa/reuse:** ToolDescriptor/ToolRegistry, production tool wrappers, provider metadata và error mapping. Xây envelope nhỏ theo SPEC §6; adapter cho kết quả cũ khi cần.
 
@@ -158,6 +158,9 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test:** success không có verifier; Running+JobId; lỗi trước ghi; giả lập write applied nhưng mất response; output paged; malformed payload; tool registered nhưng unavailable; cancellation không bị nuốt thành retry chung.
 
 **Acceptance:** executor → runtime → UI projection giữ nguyên ý nghĩa, không parse chỉ bằng tìm chữ “success”. Domain payload không bị ép mất thông tin. Tool search giải thích capability thiếu cấu hình.
+
+
+**AR-011 accepted 2026-09-22:** IMPLEMENTED / E2_PASS on `38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7`; full CI `35709818021`, H2 639/0, AR-011 25/25 x3, AR-010 11/11, AR-001 13/13 and Agent 74/74. Four old-runtime failures reproduced and repaired. [Evidence](agent-reliability/AR-011/acceptance.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER. No other task closed.
 
 ### [ ] AR-012 — Resource binding và hai chính sách chọn đích
 
@@ -467,67 +470,81 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-011_ACTIVE",
-  "active_task": "AR-011",
-  "implementation_status": "ACTIVE",
-  "acceptance_status": "REPAIR_REQUIRED",
+  "phase": "AR-011_ACCEPTED_NEXT_AR-012",
+  "active_task": "AR-012",
+  "implementation_status": "NOT_STARTED",
+  "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar011-resume-2026-09-22",
-  "last_code_commit": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
-  "last_validated_code_commit": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
-  "last_validation_result": "PRE_REVIEW_AR011_22x3_AGENT74_PASS_NEW_REVIEW_REPAIR_REQUIRED",
+  "last_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+  "last_validated_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+  "last_validation_result": "FULL_REQUIRED_CI_E2_AND_NEGATIVE_CONTROLS_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Source snapshot 49660c82 verified against Git blobs; this checkpoint accompanies guarded in-scope runtime/test delivery. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Exact-source positive CI restored and verified CLEAN after negative control. This checkpoint writes only three declared docs and verifies non-force push/remote HEAD. Offline text review matches delivered source; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T09:16:46.539970+00:00",
-  "completed_this_session": [],
+  "checkpoint_saved_at_utc": "2026-09-22T09:32:04.069843+00:00",
+  "completed_this_session": [
+    {
+      "id": "AR-011",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "E2_PASS",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+      "full_ci_run": 35709818021
+    }
+  ],
   "remaining_in_active_task": [
-    "New review repair: fence provider-local cancelled mutations before gate release; preserve model-visible exact cursor/job/effect metadata within whole output limit using existing evidence store. Exact-source tests and full CI pending."
+    "AR-012 has not started. Resource binding/target grounding remains a separate scope from permissions."
   ],
   "last_test_commands": [
     {
       "command": "dotnet restore H2Notes.Avalonia.slnx",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
       "command": "dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
       "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
+    },
+    {
+      "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-011",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+      "result": "PASS",
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
       "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-010",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
       "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
       "command": "tools/agent-reliability/run_agent_suites.ps1",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     },
     {
-      "command": "All existing .github/workflows/avalonia-ci.yml required suites/publish/helper commands",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "command": "All required Avalonia CI suite/publish/packaged helper smoke commands",
+      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
       "result": "PASS",
-      "source": "Full CI 35698496546 or focused evidence 35698479792 as listed in AR-010 acceptance.json"
+      "evidence": "Full CI 35709818021 or focused positive run 35709753515; see AR-011 acceptance.json"
     }
   ],
   "ci_runs": [
@@ -707,6 +724,25 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "artifact_id": 10684530320,
       "artifact_sha256": "6e6a3ab4e09a97d405d01b5a5ee914dc41c9ee55c2ad6fd5040430efd98e349b",
       "qualification": "Existing subset passed before additional review; not acceptance of newly repaired code"
+    },
+    {
+      "id": 35709818021,
+      "tested_code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+      "result": "SUCCESS",
+      "h2_tests": {
+        "passed": 639,
+        "failed": 0
+      },
+      "all_required_steps": "PASS",
+      "publish_and_helper_IPC": "PASS"
+    },
+    {
+      "id": 35709753515,
+      "tested_code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+      "result": "SUCCESS",
+      "negative_control": "21 passed, 4 expected failures on old runtime + new tests",
+      "positive": "25/25 x3, AR010 11/11, AR001 13/13, Agent 74/74",
+      "artifact_id": 10686570321
     }
   ],
   "evidence_locations": [
@@ -717,11 +753,16 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-001/ci-attempts.json",
     "docs/agent-reliability/AR-001/acceptance.json",
     "docs/agent-reliability/AR-010/acceptance.json",
-    "docs/agent-reliability/AR-010/implementation.md"
+    "docs/agent-reliability/AR-010/implementation.md",
+    "docs/agent-reliability/AR-011/acceptance.json",
+    "docs/agent-reliability/AR-011/implementation.md"
   ],
   "known_failures": [
-    "Pre-review 4eef source passes existing suites, but new review identified provider-local cancellation fence and model-wire cursor/bound gaps. Newly added regression must demonstrate old failures and final repair.",
-    "E3/E4 NOT_RUN / AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER."
+    "No remaining observed AR-011/010/001 or required-suite failure at accepted source.",
+    "E3 native Office/provider/model and E4 actual H2 UI/model/tools remain NOT_RUN / AWAITING_ENVIRONMENT.",
+    "AR-083 remains DEFERRED_BY_USER. NAS probe package/local harness are not E5; one-PC native tests remain mandatory.",
+    "Runtime job/status metadata and in-memory fences do not implement durable jobs, semantic memory, restart reconciliation or cross-PC locking. AR-012 and AR-030+ remain open.",
+    "AR-000/001/010 acceptance history and MB-124–127/H2M-133 debts are unchanged. User-PC working tree is NOT_ACCESSIBLE."
   ],
   "external_blockers": [
     "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
@@ -737,18 +778,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Keep AR-011 ACTIVE. Review the exact-source negative-control and positive CI for cancellation fencing and model-visible bounded cursor/control projection. Run retained AR-010/001 and 74 Agent suites, full CI/publish/helper smoke; save acceptance only when actual results pass. Do not start AR-012 or merge main.",
-  "next_task_if_active_done": "AR-012",
-  "last_runtime_source_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-  "previous_saved_checkpoint_commit": "89a4964d57a8fa5a129b76cb341f23ac1d471262",
-  "finalization_checked_head": "dd7a85a2ff6db98a9c476b9f14849daafa7f9201",
-  "additional_ci_after_recorded_run": "Later documentation/finalization-workflow removal may trigger separate runs; do not transfer exact-source PASS to an unobserved later SHA. Accepted code and package remain pinned above.",
+  "next_exact_action": "On existing feature/h2-agent-reliability-ar-000 and PR #3, reconcile main/ref/working tree and SESSION HANDOFF. Execute AR-012 only: read SPEC section 5 and AR-012 acceptance, bind exact resource/target identity independently of permission, test Global explicit targets and Project implicit/explicit boundaries, ambiguous and stale active targets, path-prefix/junction/alias fail-closed cases. Retain AR-011/010/001 and all required suites. No second engine/store, new model endpoint or NAS certification.",
+  "next_task_if_active_done": "AR-020",
+  "last_runtime_source_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+  "previous_saved_checkpoint_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+  "finalization_checked_head": "b9273edd5fe7df60002d2735b548695b1dae24e3",
+  "additional_ci_after_recorded_run": "Finalization and removal of temporary delivery files are docs/workflow-only relative to accepted runtime. Any later automatically triggered CI is separate; do not transfer the accepted result to an unobserved SHA.",
   "last_completed_task": {
-    "id": "AR-010",
+    "id": "AR-011",
     "implementation_status": "IMPLEMENTED",
     "acceptance_status": "E2_PASS",
-    "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-    "full_ci_run": 35698496546
+    "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
+    "full_ci_run": 35709818021
   },
   "historical_failure_notes_retained": [
     "B01 skill-name drift",
@@ -759,11 +800,11 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   ],
   "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs",
   "previous_completed_task": {
-    "id": "AR-001",
+    "id": "AR-010",
     "implementation_status": "IMPLEMENTED",
     "acceptance_status": "E2_PASS",
-    "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
-    "full_ci_run": 35694774117
+    "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+    "full_ci_run": 35698496546
   }
 }
 ```
