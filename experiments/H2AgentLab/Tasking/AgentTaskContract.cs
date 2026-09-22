@@ -136,15 +136,21 @@ public sealed record AgentTaskContract
     // Permission is a capability, not evidence that the user's request requires a mutation.
     // The runtime promotes a conversational contract only after an authorized tool executes.
     public AgentTaskContract WithExecutedMutation()
-        => IsMutating ? this : new(
-            TaskId, UserGoal, Scope, Inputs, ["verify executed changes"], PreserveConstraints,
-            OutputRequirements,
-            AcceptanceCriteria.Concat([new AgentAcceptanceCriterion(
-                Runtime.AgentRuntimeDomainVerifierRouter.MutationCriterionId,
-                "Executed changes are re-observed and deterministically verified.")]),
-            AgentTaskRiskClass.Medium,
-            new AgentVerificationPolicy(requiredVerifierIds: [Runtime.AgentRuntimeDomainVerifierRouter.VerifierId]),
+    {
+        if (IsMutating) return this;
+        // An observed mutation strengthens the contract. It must not replace a
+        // host-required verifier, nor duplicate/redefine an existing criterion.
+        var mutationCriterionId = Runtime.AgentRuntimeDomainVerifierRouter.MutationCriterionId;
+        var criteria = AcceptanceCriteria.Any(x => x.CriterionId == mutationCriterionId)
+            ? AcceptanceCriteria
+            : AcceptanceCriteria.Concat([new AgentAcceptanceCriterion(mutationCriterionId,
+                "Executed changes are re-observed and deterministically verified.")]);
+        return new(TaskId, UserGoal, Scope, Inputs, ["verify executed changes"], PreserveConstraints,
+            OutputRequirements, criteria, AgentTaskRiskClass.Medium,
+            new AgentVerificationPolicy(requiredVerifierIds: VerificationPolicy.RequiredVerifierIds
+                .Append(Runtime.AgentRuntimeDomainVerifierRouter.VerifierId)),
             MutationAllowed, Goals);
+    }
 
     /// <summary>
     /// Adds new acceptance requirements without permitting an existing criterion to disappear or

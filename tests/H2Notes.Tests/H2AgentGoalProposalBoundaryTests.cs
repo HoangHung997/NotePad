@@ -4,6 +4,7 @@ internal static class H2AgentGoalProposalBoundaryTests
 {
     public static void Run(Action<string,Action> test)
     {
+        H2AgentMutationPolicyTests.Run(test);
         test("AR-030 proposal numeric quote cannot collide with extracted obligation ID",()=>{
             var s=AgentGoalState.Create(Guid.NewGuid(),"scope",new(Guid.NewGuid(),"Write item 0; Export PDF"));
             var n=s.AddProposal(s.Revisions[0].SourceId,"0");
