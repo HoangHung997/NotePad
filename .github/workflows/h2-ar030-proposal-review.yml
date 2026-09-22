@@ -1,0 +1,146 @@
+name: AR-030 proposal boundary review
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar030-proposal-review.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar030-proposal-review
+  cancel-in-progress: false
+jobs:
+  repair:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      code: ${{ steps.save.outputs.code }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AR_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Save only three reviewed CSharp files
+        id: save
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          BASE='63788fe0fb65d4e47f0ce79cda8cfe9c8448de6e';BRANCH='feature/h2-agent-reliability-ar-000'
+          def git(*a):return subprocess.check_output(['git',*a],text=True).strip()
+          def require(ok,message):
+              if not ok: raise RuntimeError(message)
+          def digest(data):return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          head=os.environ['AR_HEAD']
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong/dirty checkout')
+          require(git('rev-parse','HEAD^')==BASE,'Other source work appeared')
+          require(git('diff','--name-only',BASE,head)=='.github/workflows/h2-ar030-proposal-review.yml','Unexpected candidate diff')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0','Main advanced')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Branch advanced')
+          state=Path('experiments/H2AgentLab/Tasking/AgentGoalState.cs');tests=Path('tests/H2Notes.Tests/H2AgentGoalRevisionTests.cs');extra=Path('tests/H2Notes.Tests/H2AgentGoalProposalBoundaryTests.cs')
+          require(digest(state.read_bytes())=='16ad70d0595012d4f663646137b991c05f59adaa' and digest(tests.read_bytes())=='1f88df36a549fa5857862670a94fef24233c2801' and not extra.exists(),'Source preimage differs')
+          source=state.read_text().replace('        if(string.IsNullOrWhiteSpace(exactRequirement) || !source.SourceText.Contains(exactRequirement,StringComparison.Ordinal))','        if(source.Id != RevisionId)\n            throw new InvalidOperationException("A proposal must quote the current user revision, not revive superseded or waived work.");\n        if(string.IsNullOrWhiteSpace(exactRequirement) || !source.SourceText.Contains(exactRequirement,StringComparison.Ordinal))').replace('Id("goal",TaskId.ToString("N"),sourceId+":"+exactRequirement)','Id("goal",TaskId.ToString("N"),"proposal:"+sourceId+":"+exactRequirement)')
+          test=tests.read_text().replace('    public static void Run(Action<string,Action> test)\n    {','    public static void Run(Action<string,Action> test)\n    {\n        H2AgentGoalProposalBoundaryTests.Run(test);')
+          require(digest(source.encode())=='244a6590737c2c61cdc7c15d4207e8400d35268f' and digest(test.encode())=='7f9bf6ba17d118fd7c59a81adb08a756c79b0142','Reviewed postimage mismatch')
+          data=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/93977dd308a36c5cf58988fbe2d745fd2130275a']))
+          content=base64.b64decode(data['content']);require(digest(content)=='93977dd308a36c5cf58988fbe2d745fd2130275a','Test blob mismatch')
+          state.write_text(source);tests.write_text(test);extra.write_bytes(content)
+          paths=[str(state),str(tests),str(extra)];subprocess.run(['git','add','--',*paths],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())==set(paths),'Unexpected staged change')
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          out=Path(os.environ['RUNNER_TEMP'])/'ar030-review';out.mkdir()
+          (out/'repair.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary']))
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch change')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git','commit','-m','fix(AR-030): isolate proposal IDs and reject superseded source proposals'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+BRANCH],check=True)
+          saved=git('rev-parse','HEAD');require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==saved,'Saved code not verified')
+          (out/'saved.json').write_text(json.dumps({'code_sha':saved,'source_base':BASE,'working_tree':'CLEAN','tests':'NOT_RUN_YET'},indent=2))
+          with open(os.environ['GITHUB_OUTPUT'],'a')as f:f.write('code='+saved+'\n')
+          print('Saved repaired source:',saved)
+          PY
+      - name: Dispatch unchanged full CI on saved source
+        run: gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref=feature/h2-agent-reliability-ar-000
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR030-Proposal-Repair
+          path: ${{ runner.temp }}/ar030-review/
+          if-no-files-found: error
+          retention-days: 14
+  validation:
+    needs: repair
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.repair.outputs.code }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and record actual evidence identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar030-review | Out-Null
+          if (git status --porcelain) { throw 'Dirty source' }
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';os=[Environment]::OSVersion.VersionString;E1='Goal contracts';E2='Production file runtime / scripted transport and explicit criterion fixture';E3='NOT_RUN';E4='NOT_RUN';E5='AR-083 DEFERRED_BY_USER'} | ConvertTo-Json | Set-Content artifacts/ar030-review/identity.json
+          dotnet --info | Set-Content artifacts/ar030-review/dotnet-info.txt
+          dotnet restore H2Notes.Avalonia.slnx
+          if ($LASTEXITCODE) { throw 'Restore failed' }
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar030-review/build.log
+          if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Reproduce both old proposal defects with real prior source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='experiments/H2AgentLab/Tasking/AgentGoalState.cs';$before=[IO.File]::ReadAllBytes((Resolve-Path $path))
+          try {
+            python -c "import pathlib,subprocess; p='experiments/H2AgentLab/Tasking/AgentGoalState.cs';pathlib.Path(p).write_bytes(subprocess.check_output(['git','show','63788fe0fb65d4e47f0ce79cda8cfe9c8448de6e:'+p]))"
+            if ($LASTEXITCODE) { throw 'Old source missing' }
+            @{test_sha=(git rev-parse HEAD);old_goal_source='63788fe0fb65d4e47f0ce79cda8cfe9c8448de6e';substitution=$path} | ConvertTo-Json | Set-Content artifacts/ar030-review/negative-identity.json
+            dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar030-review/negative-build.log
+            if ($LASTEXITCODE) { throw 'Compile failure is not valid negative evidence' }
+            foreach($case in @(@{name='negative-id';filter='AR-030 proposal numeric quote';error='Proposal ID collided'},@{name='negative-source';filter='AR-030 stale proposal';error='Expected stale proposal rejection'})) {
+              $log='artifacts/ar030-review/'+$case.name+'.log'
+              dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $case.filter 2>&1 | Tee-Object $log
+              $exit=$LASTEXITCODE;$text=Get-Content $log -Raw
+              if ($exit -eq 0 -or $text -notmatch 'RESULT: 0 passed, 1 failed' -or -not $text.Contains($case.error)) { throw 'Expected old proposal failure missing' }
+            }
+          } finally { [IO.File]::WriteAllBytes((Join-Path $PWD $path),$before) }
+          if (git status --porcelain) { throw 'Source not restored clean' }
+          'CLEAN: exact original bytes restored' | Set-Content artifacts/ar030-review/restored.txt
+      - name: Rebuild and repeat real positive source with all retained corpora
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar030-review/positive-build.log
+          if ($LASTEXITCODE) { throw 'Positive build failed' }
+          $failed=@()
+          foreach($name in 'AR-030-1','AR-030-2','AR-030-3','AR-020','AR-012','AR-011','AR-010','AR-001') {
+            $env:H2_AR030_EVIDENCE_DIR=Join-Path $PWD "artifacts/ar030-review/$name"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $name.Substring(0,6) 2>&1 | Tee-Object "artifacts/ar030-review/$name.log"
+            if ($LASTEXITCODE -ne 0 -or (Get-Content "artifacts/ar030-review/$name.log" -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { $failed+=$name }
+          }
+          if ($failed.Count) { throw ('Failed: '+($failed -join ',')) }
+      - name: Run all mandatory Agent suites independently
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar030-review/all-agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR030-Reviewed-E1-E2-Evidence
+          path: artifacts/ar030-review/
+          if-no-files-found: error
+          retention-days: 14
