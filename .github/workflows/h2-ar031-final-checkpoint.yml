@@ -1,0 +1,45 @@
+name: AR-031 verified checkpoint and writer cleanup
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar031-final-checkpoint.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar031-final-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Independently verify completed source and evidence before saving the canonical checkpoint
+        shell: python
+        run: |
+          import base64,hashlib,json,subprocess
+          expected='7bf76cf7a9da63ecf74fb29ffd50ef2555162df3'
+          response=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/'+expected],timeout=60))
+          content=base64.b64decode(response['content'])
+          actual=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
+          if len(content)!=17592 or actual!=expected or hashlib.sha256(content).hexdigest()!='6c9ac407f5b36922b578320258566ee3f3207e83830ad0c54ad5b0bcc58ed543':
+              raise RuntimeError('Reviewed documentation and cleanup script differs')
+          # Pinned reviewed checkpoint code, not log/model text. Source/test files are never written.
+          exec(compile(content,'reviewed-ar031-checkpoint.py','exec'))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR031-Verified-Checkpoint
+          path: ${{ runner.temp }}/ar031-final/
+          if-no-files-found: error
+          retention-days: 14
