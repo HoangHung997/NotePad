@@ -470,7 +470,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-012_ACTIVE_RESUMED_DRAFT",
+  "phase": "AR-012_ACTIVE_INTEGRATION_VALIDATION",
   "active_task": "AR-012",
   "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
@@ -482,15 +482,14 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "last_validation_result": "FULL_REQUIRED_CI_E2_AND_NEGATIVE_CONTROLS_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Resumed local draft applied in a clean GitHub checkout with exact preimages. Candidate is untested until Windows CI finishes; user-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Prior draft and new integration applied with exact preimages in clean CI checkout; actual tested SHA must be read from Windows evidence. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T10:24:55.918579+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T10:56:37.472775+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Compile and execute the 19 resumed AR-012 cases; none previously ran.",
-    "Wire resolver into production Office and desktop; keep native discovery support gaps explicit.",
-    "Expose external binding in existing activity/chips and test path aliases/reparse behavior.",
-    "Review exact-source full CI/publish/helper evidence before acceptance."
+    "Review exact-source build, 34-case binding corpus, retained AR-011/010/001 and all required Agent suites.",
+    "Review native-boundary limitations and fix observed code/test errors; fixture IDs do not certify multi-instance Office.",
+    "Review full CI, real publish/helper smoke; save acceptance only when task evidence is sufficient."
   ],
   "last_test_commands": [
     {
@@ -773,7 +772,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue AR-012 only. Inspect actual build/focused results; finish ResolveOpen Office/desktop integration and real external-target UI projection. Add path/provider regressions and full required CI. Do not close AR-012 based on the untested local draft.",
+  "next_exact_action": "Continue AR-012 only. Read the actual new Windows build/test logs and fix regressions without weakening permission/binding assertions. Office wrapper now calls ResolveOpen and pins session/helper/path at dispatch/readback; desktop uses frozen capture, and target binding is projected through existing UI. E3/E4 NOT_RUN, AR-083 deferred. Do not advance task before exact-source evidence.",
   "next_task_if_active_done": "AR-020",
   "last_runtime_source_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
   "previous_saved_checkpoint_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",

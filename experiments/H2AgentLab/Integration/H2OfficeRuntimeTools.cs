@@ -11,15 +11,43 @@ namespace H2AgentLab.Integration;
 
 /// <summary>Executes structured operations through the isolated STA OfficeHost, with real
 /// post-action snapshots. No fixture backend is constructed by production composition.</summary>
-internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
-    IReadOnlyList<H2AgentTargetPath>? projectTargets = null) : IAgentRuntimeDomainVerifier, IDisposable
+internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDisposable
 {
-    private OfficeHostClient? _client;
+    private readonly Func<bool> authorized;
+    private readonly string outputRoot;
+    private readonly H2AgentPermissionScope? scope;
+    private readonly H2AgentTargetBindingPolicy _binding;
+    private readonly H2AgentTargetIntent _intent;
+    private readonly Action<H2AgentTargetResolution>? _targetObserved;
+    private readonly Func<IOfficeSessionClient>? _clientFactory;
+    private readonly Func<H2ActiveWorkContext, bool> _captureValidator;
+    private IOfficeSessionClient? _client;
+    private readonly Dictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
+    private readonly Dictionary<string, H2AgentTargetResolution> _pins = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, AgentRuntimeDomainVerification> _reports = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly OfficeRejectedMutationRecovery _wordRecovery = new();
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
-    private OfficeHostClient Client => _client ??= new(H2HelperLocator.Resolve("H2AgentLab.OfficeHost"), defaultTimeout: TimeSpan.FromSeconds(60));
+    private IOfficeSessionClient Client => _client ??= _clientFactory is not null
+        ? _clientFactory() ?? throw new ToolPreflightException("needs_configuration")
+        : new OfficeHostClient(H2HelperLocator.Resolve("H2AgentLab.OfficeHost"), defaultTimeout: TimeSpan.FromSeconds(60));
+
+    // Preserve the old constructor used by cardinality-only callers. It does NOT authorize
+    // arbitrary global sessions; a selected workspace or explicit target is still required.
+    public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
+        IReadOnlyList<H2AgentTargetPath>? projectTargets = null)
+        : this(authorized, outputRoot, scope, projectTargets, null, H2AgentTargetIntent.OpenDocument, null, null, null) { }
+
+    public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
+        IReadOnlyList<H2AgentTargetPath>? projectTargets, H2AgentTargetBindingPolicy? binding,
+        H2AgentTargetIntent intent, Action<H2AgentTargetResolution>? targetObserved,
+        Func<IOfficeSessionClient>? clientFactory, Func<H2ActiveWorkContext, bool>? captureValidator)
+    {
+        this.authorized = authorized; this.outputRoot = outputRoot; this.scope = scope;
+        _binding = binding ?? new H2AgentTargetBindingPolicy(null, outputRoot, projectTargets);
+        _intent = intent; _targetObserved = targetObserved; _clientFactory = clientFactory;
+        _captureValidator = captureValidator ?? H2CapturedWindowIdentity.IsCurrent;
+    }
     public string DomainId => "h2-office-live";
 
     public void Register(ToolRegistry registry)
@@ -59,7 +87,7 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
             if (name.EndsWith("save_copy", StringComparison.Ordinal))
             { properties["destination"] = new { type = "string", description = "New file path under the approved output workspace. Existing files are never overwritten." }; required.Add("destination"); }
             if (name == "word.find_text") { properties["query"] = new { type = "string" }; required.Add("query"); }
-            var description = capability.Description + " Discovery lists metadata only, with no usable state token. Get the selected/active document or an explicit session snapshot before any mutation. Word replacement/format uses paragraph indexes; Excel patches use observed cell addresses.";
+            var description = capability.Description + " Discovery lists metadata only, with no usable state token. Get the host-bound document or an explicit session snapshot before any mutation. A model-supplied session cannot resolve ambiguous targets or override captured active/selection intent. Word replacement/format uses paragraph indexes; Excel patches use observed cell addresses.";
             if (name is "word.replace_range" or "word.insert_text")
                 description += " Newlines in text create real Word paragraphs and inherit the original paragraph style/format. All paragraph indexes refer to the BEFORE snapshot, even when earlier replacements add paragraphs. To rewrite a CV, use newline-separated text on existing paragraphs, never invent new paragraph indexes. Mixed character formatting requires a separate explicit formatting operation. Read back the new snapshot before further edits.";
             registry.Register(new ToolDescriptor(name, new(capability.Namespace, "Structured live OfficeHost operations."), description,
@@ -68,7 +96,7 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                 new DelegatingToolExecutor("h2-office-host", ExecuteAsync), resourceScope: new(capability.ResourceScope, "observed-session"),
                 serializationKey: "office-host", canProvideVerificationEvidence: true,
                 preference: new("active-content", ToolInteractionFidelity.Structured),
-                readiness: new(!OperatingSystem.IsWindows() ? ToolReadinessState.Unsupported
+                readiness: new(_clientFactory is not null ? ToolReadinessState.Ready : !OperatingSystem.IsWindows() ? ToolReadinessState.Unsupported
                     : H2HelperLocator.IsPackaged("H2AgentLab.OfficeHost") ? ToolReadinessState.Degraded : ToolReadinessState.Unavailable),
                 limits: new(MaxBatchItems: name is "excel.write_range" or "excel.set_formula" or "excel.apply_format" ? ExcelPatchLimits.MaxCells : null),
                 dependencies: ["office-host"], resultFormat: ToolResultFormat.Json, preflight: CountPreflight));
@@ -104,52 +132,63 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
             var name = call.Name;
             var session = H2ProductionToolSession.Arg(call, "session_id") ?? "";
             var token = H2ProductionToolSession.Arg(call, "state_token") ?? "";
-            if (projectTargets is not null && session.Length > 0)
+            var application = name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
+            var listing = name is "excel.list_workbooks" or "word.list_documents";
+            var observed = await DiscoverAsync(application, ct).ConfigureAwait(false);
+            H2AgentTargetResolution? target = null;
+            if (listing)
             {
-                var targetPath = name.StartsWith("excel.", StringComparison.Ordinal)
-                    ? (await Client.DiscoverExcelAsync(ct).ConfigureAwait(false)).Workbooks.SingleOrDefault(w => w.SessionId == session)?.FullName
-                    : (await Client.DiscoverWordAsync(ct).ConfigureAwait(false)).Documents.SingleOrDefault(d => d.SessionId == session)?.FullName;
-                if (!H2AgentTargetScope.Contains(projectTargets, targetPath))
-                    throw new UnauthorizedAccessException("Tài liệu này không thuộc dự án hoặc đích được chỉ rõ. Chọn liên kết/tệp cụ thể trước khi tiếp tục.");
+                // Show only in-scope metadata. Merely discovering a session does not bind it.
+                var ids = observed.Resources.Where(item => _binding.IsCandidate(item, DateTime.UtcNow)
+                    && ScopeContains(item.DocumentSessionId!, item.CanonicalPath))
+                    .Select(item => item.DocumentSessionId).ToHashSet(StringComparer.Ordinal);
+                var decision = Resolve(application, observed.Resources, null);
+                result = observed.Discovery is ExcelDiscovery excel
+                    ? new { Workbooks = excel.Workbooks.Where(item => ids.Contains(item.SessionId)).ToArray(),
+                        ActiveSessionId = ids.Contains(excel.ActiveSessionId) ? excel.ActiveSessionId : null,
+                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code }
+                    : new { Documents = ((WordDiscovery)observed.Discovery).Documents.Where(item => ids.Contains(item.SessionId)).ToArray(),
+                        ActiveSessionId = ids.Contains(((WordDiscovery)observed.Discovery).ActiveSessionId) ? ((WordDiscovery)observed.Discovery).ActiveSessionId : null,
+                        SelectedSessionId = decision.Resolved && ids.Contains(decision.Binding!.DocumentSessionId) ? decision.Binding.DocumentSessionId : null, TargetSelection = decision.Code };
             }
-            if (session.Length > 0 && scope?.ScopeKind is H2AgentResourceScopeKind.Document or H2AgentResourceScopeKind.Session)
+            else
             {
-                if (session != scope.DocumentSessionId) throw new UnauthorizedAccessException("Office session is outside the selected resource.");
-                var path = name.StartsWith("excel.", StringComparison.Ordinal)
-                    ? (await Client.DiscoverExcelAsync(ct).ConfigureAwait(false)).Workbooks.SingleOrDefault(w => w.SessionId == session)?.FullName
-                    : (await Client.DiscoverWordAsync(ct).ConfigureAwait(false)).Documents.SingleOrDefault(d => d.SessionId == session)?.FullName;
-                if (path is null || (!string.IsNullOrWhiteSpace(scope.DocumentPath)
-                    && !string.Equals(path, scope.DocumentPath, StringComparison.OrdinalIgnoreCase)))
-                    throw new UnauthorizedAccessException("Selected Office document was closed or replaced; select it again.");
-            }
-            if (name is "excel.list_workbooks" or "excel.get_active_workbook")
-            {
-                var discovery = await Client.DiscoverExcelAsync(ct).ConfigureAwait(false);
-                var workbooks = projectTargets is null ? discovery.Workbooks : discovery.Workbooks.Where(w => H2AgentTargetScope.Contains(projectTargets, w.FullName)).ToArray();
-                var selected = scope?.DocumentSessionId ?? discovery.ActiveSessionId;
-                result = name == "excel.get_active_workbook" && workbooks.Any(w => w.SessionId == selected)
-                    ? await Client.SnapshotExcelAsync(selected!, ct).ConfigureAwait(false)
-                    : new ExcelDiscovery(workbooks, workbooks.Any(w => w.SessionId == discovery.ActiveSessionId) ? discovery.ActiveSessionId : null);
-            }
-            else if (name is "word.list_documents" or "word.get_active_document")
-            {
-                var discovery = await Client.DiscoverWordAsync(ct).ConfigureAwait(false);
-                var documents = projectTargets is null ? discovery.Documents : discovery.Documents.Where(d => H2AgentTargetScope.Contains(projectTargets, d.FullName)).ToArray();
-                var selected = scope?.DocumentSessionId ?? discovery.ActiveSessionId;
-                result = name == "word.get_active_document" && documents.Any(d => d.SessionId == selected)
-                    ? await Client.SnapshotWordAsync(selected!, ct).ConfigureAwait(false)
-                    : new WordDiscovery(documents, documents.Any(d => d.SessionId == discovery.ActiveSessionId) ? discovery.ActiveSessionId : null);
-            }
+                target = Resolve(application, observed.Resources, session.Length == 0 ? null : session);
+                if (!target.Resolved) throw new ToolPreflightException(target.Code);
+                session = target.Binding!.DocumentSessionId!;
+                ValidateScope(session, target.Binding.CanonicalPath); // execution permission remains separate
+                _selected[application] = target;
+                _pins[application + ":" + session] = target;
+                _targetObserved?.Invoke(target);
+                if (_intent == H2AgentTargetIntent.CapturedSelection)
+                {
+                    // Metadata discovery deliberately has no selection/content. Read ONLY the bound
+                    // session, then compare the original UI precondition; never query another foreground.
+                    if (application == H2ApplicationKind.Excel)
+                    {
+                        var view = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                        ValidateSnapshot(target, view.SessionId, view.FullName, view.ActiveSheet + "!" + view.SelectionAddress, false, true);
+                    }
+                    else
+                    {
+                        var view = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
+                        ValidateSnapshot(target, view.SessionId, view.FullName, view.SelectionText, false, true);
+                    }
+                }
+                if (name == "excel.get_active_workbook") result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                else if (name == "word.get_active_document") result = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
             else if (name.EndsWith("save_copy", StringComparison.Ordinal))
             {
                 RequireAuthorization();
                 var destination = new SafeWorkspace(outputRoot, scope?.Mode == H2AgentPermissionMode.FullAccess
-                    ? () => scope.HasFullAccessAt(DateTime.UtcNow) : null).Resolve(H2ProductionToolSession.Arg(call, "destination") ?? "");
+                    ? () => scope.HasFullAccessAt(DateTime.UtcNow) : null, groundedTarget: _binding.AllowsPath).Resolve(H2ProductionToolSession.Arg(call, "destination") ?? "");
                 if (File.Exists(destination)) throw new IOException("Choose a new output file; overwriting is not permitted.");
                 var request = new OfficeSaveCopyRequest(session, token, true, destination);
                 var saved = name.StartsWith("excel.") ? await Client.SaveExcelCopyAsync(request, ct).ConfigureAwait(false)
                     : await Client.SaveWordCopyAsync(request, ct).ConfigureAwait(false);
                 var actual = SafeWorkspace.Hash(await File.ReadAllBytesAsync(destination, ct).ConfigureAwait(false));
+                if (saved.SessionId != session) throw new OfficeHostClientException("stale_resource", "Save-copy response changed source identity.");
+                await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                 Record(call, string.Equals(actual, saved.SavedCopySha256, StringComparison.OrdinalIgnoreCase), "saved-copy:" + actual);
                 result = saved;
             }
@@ -162,8 +201,15 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                     if (ExcelPatchLimits.ValidationError(cells.Length) is { } problem)
                         throw new ArgumentException(problem);
                     var sheetName = H2ProductionToolSession.Arg(call, "sheet_name") ?? "";
+                    var beforeWrite = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                    ValidateSnapshot(target, beforeWrite.SessionId, beforeWrite.FullName, beforeWrite.ActiveSheet + "!" + beforeWrite.SelectionAddress, false,
+                        _intent == H2AgentTargetIntent.CapturedSelection);
+                    if (beforeWrite.StateToken != token) throw new ToolPreflightException("stale_resource");
                     var patch = await Client.PatchExcelAsync(new(session, token, true, sheetName, cells), ct).ConfigureAwait(false);
                     var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                    ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true);
+                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                    await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                     var sheet = after.Sheets.Single(item => item.Name == sheetName);
                     var targets = cells.Select(cell => new LiveExcelExpectedCell(sheetName, cell.Address,
                         OfficeMutationReadback.ExpectedExcelCell(
@@ -178,8 +224,11 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                 {
                     RequireAuthorization();
                     var before = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                    ValidateSnapshot(target, before.SessionId, before.FullName, before.ActiveSheet + "!" + before.SelectionAddress, false);
                     var calculated = await Client.RecalculateExcelAsync(new(session, token, true), ct).ConfigureAwait(false);
                     var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                    await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                     var preserve = before.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula)))
                         .SequenceEqual(after.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula))));
                     Record(call, preserve && calculated.StateToken == after.StateToken, "office-state:" + after.StateToken);
@@ -193,6 +242,7 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
             {
                 RequireAuthorization();
                 var beforeWord = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
+                ValidateSnapshot(target, beforeWord.SessionId, beforeWord.FullName, beforeWord.SelectionText, false);
                 if (token != beforeWord.StateToken)
                     return JsonSerializer.Serialize(new { ok = false, error = "stale_state", message = "Read word.read_paragraphs for the current state token before editing." });
                 WordParagraphPatch[] paragraphs;
@@ -220,6 +270,9 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                         failureId = _wordRecovery.Reject(name, beforeWord, paragraphs), mutationApplied = false });
                 }
                 var after = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
+                ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true);
+                ValidateSnapshot(target, after.SessionId, after.FullName, null, true);
+                await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
                 var verified = OfficeMutationReadback.VerifyWordPatch(patch.Before, after, paragraphs);
                 Record(call, verified, "office-state:" + after.StateToken);
                 var resolvedFailureIds = _wordRecovery.Resolve(name, patch.Before, paragraphs, verified);
@@ -230,11 +283,99 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
             else
             {
                 var snapshot = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
+                ValidateSnapshot(target, snapshot.SessionId, snapshot.FullName, snapshot.SelectionText, false);
                 result = name == "word.find_text" ? (object)snapshot.Paragraphs.Where(p => p.Text.Contains(H2ProductionToolSession.Arg(call, "query") ?? "", StringComparison.OrdinalIgnoreCase)).ToArray() : snapshot;
+            }
+                // A mismatched read response is not forwarded to the model. After any possible
+                // mutation a mismatch is an execution error with Unknown effect, never a preflight reject.
+                var mutating = StructuredOfficeCapabilityCatalog.All.Any(item => item.Name == name && item.Access == AgentToolAccess.Mutating);
+                if (result is ExcelLiveSnapshot x) ValidateSnapshot(target, x.SessionId, x.FullName, x.ActiveSheet + "!" + x.SelectionAddress, mutating);
+                else if (result is WordLiveSnapshot w) ValidateSnapshot(target, w.SessionId, w.FullName, w.SelectionText, mutating);
+                await RevalidateAsync(application, target, ct, mutating).ConfigureAwait(false);
             }
             return JsonSerializer.Serialize(result);
         }
+        catch { _reports.TryRemove(call.Id, out _); throw; }
         finally { _gate.Release(); }
+    }
+
+    private sealed record DiscoveryObservation(object Discovery, IReadOnlyList<H2AgentResourceBinding> Resources);
+
+    private async Task<DiscoveryObservation> DiscoverAsync(H2ApplicationKind application, CancellationToken ct)
+    {
+        if (application == H2ApplicationKind.Excel)
+        {
+            var discovery = await Client.DiscoverExcelAsync(ct).ConfigureAwait(false);
+            return new(discovery, discovery.Workbooks.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved)).ToArray());
+        }
+        var word = await Client.DiscoverWordAsync(ct).ConfigureAwait(false);
+        return new(word, word.Documents.Select(item => Observe(application, item.SessionId, item.FullName, !item.Saved)).ToArray());
+    }
+
+    private H2AgentResourceBinding Observe(H2ApplicationKind app, string session, string path, bool dirty)
+        => H2AgentResourceBinding.FromLiveObservation(app, "office-host", session, path, DateTime.UtcNow,
+            providerInstanceId: Client.InstanceIdentity, dirty: dirty);
+
+    private H2AgentTargetResolution Resolve(H2ApplicationKind application, IReadOnlyList<H2AgentResourceBinding> observed, string? session)
+    {
+        // Captured selection is checked on the one selected native snapshot, not on a blank metadata page.
+        var intent = _intent == H2AgentTargetIntent.CapturedSelection ? H2AgentTargetIntent.CapturedActive : _intent;
+        H2AgentTargetResolution result;
+        var alreadyBound = session is null ? _selected.TryGetValue(application, out var prior)
+            : _pins.TryGetValue(application + ":" + session, out prior);
+        if (alreadyBound)
+        {
+            var matches = observed.Where(item => item.DocumentSessionId == prior.Binding!.DocumentSessionId).ToArray();
+            result = matches.Length == 1 && prior.Binding!.MatchesObservation(matches[0], requireContentVersion: false)
+                ? prior : new(null, matches.Length > 1 ? "ambiguous_target" : "stale_resource", false, "bound-session");
+        }
+        else result = _binding.ResolveOpen(application, observed, intent, DateTime.UtcNow, session);
+        if (result.Resolved && (result.Source == "captured-active" || intent is H2AgentTargetIntent.CapturedActive or H2AgentTargetIntent.CapturedSelection))
+        {
+            var capture = _binding.CapturedContext;
+            if (capture is null || DateTime.UtcNow - capture.CapturedUtc > H2AgentTargetBindingPolicy.MaxCaptureAge || !_captureValidator(capture))
+                return new(null, "stale_resource", false, "captured-window");
+        }
+        return result;
+    }
+
+    private bool ScopeContains(string session, string? path)
+    {
+        if (scope?.ScopeKind is not (H2AgentResourceScopeKind.Document or H2AgentResourceScopeKind.Session)) return true;
+        if (session != scope.DocumentSessionId) return false;
+        if (string.IsNullOrEmpty(scope.DocumentPath)) return true;
+        if (H2AgentTargetScope.TryNormalize(scope.DocumentPath, out var selectedPath))
+            return H2AgentTargetScope.PathComparer.Equals(selectedPath, path);
+        // Unsaved Session scope is identified by the live session, never by a guessed disk path.
+        return scope.ScopeKind == H2AgentResourceScopeKind.Session && path is null
+            && scope.DocumentPath.IndexOfAny(['/', '\\', ':']) < 0;
+    }
+
+    private void ValidateScope(string session, string? path)
+    {
+        if (!ScopeContains(session, path)) throw new ToolPreflightException("outside_resource_scope");
+    }
+
+    private void ValidateSnapshot(H2AgentTargetResolution target, string session, string path, string? selection,
+        bool afterPossibleWrite, bool checkSelection = false)
+    {
+        var current = Observe(target.Binding!.ApplicationKind, session, path, false);
+        var identityMatches = target.Binding.MatchesObservation(current, requireContentVersion: false);
+        var capture = _binding.CapturedContext;
+        var selectionMatches = !checkSelection || capture is not null && !string.IsNullOrWhiteSpace(capture.Selection)
+            && capture.Selection != "!" && capture.Selection == selection;
+        if (identityMatches && selectionMatches) return;
+        if (afterPossibleWrite) throw new OfficeHostClientException("stale_resource", "Native readback no longer matches the bound resource; reconcile before another write.");
+        throw new ToolPreflightException("stale_resource");
+    }
+
+    private async Task RevalidateAsync(H2ApplicationKind application, H2AgentTargetResolution target, CancellationToken ct, bool afterPossibleWrite)
+    {
+        var observation = await DiscoverAsync(application, ct).ConfigureAwait(false);
+        var current = Resolve(application, observation.Resources, target.Binding!.DocumentSessionId);
+        if (current.Resolved && target.Binding.MatchesObservation(current.Binding!, requireContentVersion: false)) return;
+        if (afterPossibleWrite) throw new OfficeHostClientException("stale_resource", "Resource identity changed after dispatch; effects need reconciliation.");
+        throw new ToolPreflightException(current.Code);
     }
 
     private void RequireAuthorization() { if (!authorized()) throw new UnauthorizedAccessException("Office mutation is not authorized."); }

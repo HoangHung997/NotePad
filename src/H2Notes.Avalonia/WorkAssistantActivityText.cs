@@ -5,7 +5,7 @@ namespace H2Notes.Avalonia;
 /// <summary>Public activity only; never displays tool arguments, document bodies or hidden reasoning.</summary>
 public static class WorkAssistantActivityText
 {
-    public static string? FromProgress(H2AgentProgress progress) => progress.ToolOutcome is not null
+    public static string? FromProgress(H2AgentProgress progress) => progress.ToolOutcome is not null || progress.TargetBinding is not null
         ? H2AgentActivity.Label(progress) : progress.Code switch
     {
         "queued" => "Đang chuẩn bị yêu cầu…",

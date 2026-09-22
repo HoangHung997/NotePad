@@ -174,7 +174,8 @@ public sealed record H2AgentTaskContext(
     Guid? TurnId = null,
     Guid? AfterTaskId = null,
     IReadOnlyList<H2AgentTargetPath>? TargetPaths = null,
-    H2ActiveWorkContext? ActiveWorkContext = null);
+    H2ActiveWorkContext? ActiveWorkContext = null,
+    H2AgentTargetIntent? TargetIntent = null);
 
 public sealed record H2AgentChatTurn(string SourceId, string Role, string Content);
 
@@ -186,6 +187,7 @@ public sealed record H2AgentProgress(
     string Message)
 {
     public H2AgentToolOutcome? ToolOutcome { get; init; }
+    public H2AgentTargetResolution? TargetBinding { get; init; }
 }
 
 public sealed record H2AgentApproval(

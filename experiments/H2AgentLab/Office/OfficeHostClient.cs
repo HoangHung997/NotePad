@@ -16,7 +16,7 @@ public sealed class OfficeHostClientException : IOException
     public string Code { get; }
 }
 
-public sealed class OfficeHostClient : IDisposable
+public sealed class OfficeHostClient : IOfficeSessionClient
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -30,6 +30,8 @@ public sealed class OfficeHostClient : IDisposable
     private string? _pipeName;
     private bool _disposed;
     private int _starts;
+    private readonly Guid _connectionIdentity = Guid.NewGuid();
+    public string InstanceIdentity => "office-connection:" + _connectionIdentity.ToString("N") + ":" + _starts;
 
     public OfficeHostClient(
         string hostExecutable,

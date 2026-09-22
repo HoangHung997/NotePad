@@ -97,6 +97,11 @@ public sealed class AgentTurnView : StackPanel
         }
         foreach (var item in _events.Values.TakeLast(_visibleEvents))
         {
+            if (item.TargetBinding is { } target)
+            {
+                _activityRows.Children.Add(CreateTargetChip(target));
+                continue;
+            }
             var row = new SelectableTextBlock { Name = "AgentActivityRow", Text = H2AgentActivity.Label(item), FontSize = 12,
                 TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse(item.Code == "tool-error" ? "#9C422B" : "#796C62") };
             ToolTip.SetTip(row, item.AtUtc.ToLocalTime().ToString("HH:mm:ss") + " · " + item.Kind + "/" + item.Code);
@@ -105,6 +110,19 @@ public sealed class AgentTurnView : StackPanel
                     Content = new SelectableTextBlock { Text = item.Message, TextWrapping = TextWrapping.Wrap, FontSize = 11 } });
             else _activityRows.Children.Add(row);
         }
+    }
+
+    // Used by the existing Global and Project turn renderer, not a separate chat surface.
+    public static Border CreateTargetChip(H2AgentTargetResolution target)
+    {
+        var chip = new Border { Name = "AgentTargetChip", CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 3), HorizontalAlignment = HorizontalAlignment.Left,
+            Background = Brush.Parse(target.IsExternal ? "#FFF1D6" : "#EAF1ED"),
+            Child = new SelectableTextBlock { Text = target.ScopeLabel, TextWrapping = TextWrapping.Wrap, FontSize = 12,
+                Foreground = Brush.Parse(target.IsExternal ? "#7F4800" : "#315442") } };
+        ToolTip.SetTip(chip, "Host-bound target · " + target.Source + " · " + target.Binding?.Provenance
+            + " · identity only; content verification is separate.");
+        return chip;
     }
 
     private void RenderArtifacts(IH2AgentAdapter? adapter, H2AgentTaskSummary task)

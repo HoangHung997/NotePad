@@ -9,7 +9,8 @@ public static class H2AgentActivity
     public static bool IsTerminal(H2AgentTaskStatus status) => status is H2AgentTaskStatus.Completed
         or H2AgentTaskStatus.Cancelled or H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Failed;
 
-    public static string Label(H2AgentProgress item) => item.ToolOutcome is { } outcome
+    public static string Label(H2AgentProgress item) => item.TargetBinding is { } target
+        ? target.ScopeLabel : item.ToolOutcome is { } outcome
         ? OutcomeLabel(item.Message, outcome) : item.Code switch
     {
         "queued" => "Đã nhận yêu cầu", "started" => "Đang làm việc",

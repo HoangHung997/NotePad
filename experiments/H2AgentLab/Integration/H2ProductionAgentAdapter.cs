@@ -35,6 +35,8 @@ public sealed partial class H2ProductionAgentAdapter :
     private readonly Func<Guid?, string?, H2ProductionAgentModel>? _requestModelResolver;
     private readonly IAgentRuntimeFactory _runtimeFactory;
     private readonly AgentIntegrationTaskArchive _archive;
+    private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
+    private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
     private readonly Dictionary<Guid, LiveTask> _live = [];
     private IH2ProjectToolHost? _projectTools;
     private bool _disposed;
@@ -45,13 +47,17 @@ public sealed partial class H2ProductionAgentAdapter :
         Func<H2ProductionAgentModel> modelResolver,
         IAgentTransportFactory? transportFactory = null,
         IAgentRuntimeFactory? runtimeFactory = null,
-        Func<Guid?, string?, H2ProductionAgentModel>? requestModelResolver = null)
+        Func<Guid?, string?, H2ProductionAgentModel>? requestModelResolver = null,
+        Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+        Func<H2ActiveWorkContext, bool>? captureValidator = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateRoot);
         _stateRoot = Path.GetFullPath(stateRoot);
         Directory.CreateDirectory(_stateRoot);
         _modelResolver = modelResolver ?? throw new ArgumentNullException(nameof(modelResolver));
         _requestModelResolver = requestModelResolver;
+        _officeClientFactory = officeClientFactory;
+        _captureValidator = captureValidator;
         _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory(
             transportFactory ?? new AgentTransportFactory());
         _archive = new AgentIntegrationTaskArchive(Path.Combine(_stateRoot, "integration"));
@@ -85,8 +91,9 @@ public sealed partial class H2ProductionAgentAdapter :
         var workspace = ResolveWorkspace(context?.WorkspaceRoot);
         context = (context ?? new H2AgentTaskContext(workspace, null)) with {
             WorkspaceRoot = workspace,
-            TargetPaths = (context?.TargetPaths ?? []).Concat(H2AgentTargetScope.FromUserRequest(goal))
-                .DistinctBy(t => t.Path, StringComparer.OrdinalIgnoreCase).ToArray() };
+            TargetPaths = H2AgentTargetScope.FromUserRequest(goal).Concat(context?.TargetPaths ?? [])
+                .DistinctBy(t => t.Path, H2AgentTargetScope.PathComparer).ToArray(),
+            TargetIntent = H2AgentTargetBindingPolicy.IntentFromUserRequest(goal, context?.TargetIntent) };
         if (context?.ThreadId is { } threadId && GetThread(threadId) is { } thread && thread.ProjectId != projectId)
             throw new ArgumentException("Conversation belongs to a different project scope.");
         if (context?.AfterTaskId is { } predecessor)
@@ -330,7 +337,9 @@ public sealed partial class H2ProductionAgentAdapter :
 
             using var toolSession = new H2ProductionToolSession(live.TaskId, live.ExecutionProjectId, live.ReadOnly,
                 live.RequestContext, _projectTools,
-                (title, details, ct) => RequestApprovalAsync(live, title, details, ct));
+                (title, details, ct) => RequestApprovalAsync(live, title, details, ct), targetPolicy,
+                resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
+                    resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator);
             using var tools = new global::H2AgentLab.AgentTools(
                 safeWorkspace,
                 taskStateRoot,
@@ -637,14 +646,14 @@ public sealed partial class H2ProductionAgentAdapter :
         string kind,
         string code,
         string message,
-        H2AgentToolOutcome? outcome = null)
+        H2AgentToolOutcome? outcome = null, H2AgentTargetResolution? targetBinding = null)
     {
         live.Progress.Add(new(
             live.Progress.Count,
             DateTime.UtcNow,
             BoundCode(kind),
             BoundCode(code),
-            Bound(message, 2_000)) { ToolOutcome = outcome });
+            Bound(message, 2_000)) { ToolOutcome = outcome, TargetBinding = targetBinding });
         live.UpdatedUtc = DateTime.UtcNow;
         PersistProgress(live.TaskId, live.Progress[^1]);
     }

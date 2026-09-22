@@ -10,7 +10,9 @@ internal sealed partial class H2ProductionToolSession
     private partial void ConfigureDomains(AgentTools tools, ToolRegistry registry, List<IAgentRuntimeDomainVerifier> verifiers)
     {
         var office = new H2OfficeRuntimeTools(() => IsExecutingAuthorizedCall, tools.Workspace.Root, _scope,
-            _projectId.HasValue ? (_context?.TargetPaths ?? []).Append(new H2Notes.Core.H2AgentTargetPath(tools.Workspace.Root, true, "project-workspace")).ToArray() : null);
+            _projectId.HasValue ? (_context?.TargetPaths ?? []).Append(new H2Notes.Core.H2AgentTargetPath(tools.Workspace.Root, true, "project-workspace")).ToArray() : null,
+            _targetPolicy, _context?.TargetIntent ?? H2Notes.Core.H2AgentTargetIntent.OpenDocument,
+            _targetObserved, _officeClientFactory, _captureValidator);
         _owned.Add(office);
         if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace) office.Register(registry);
         verifiers.RemoveAll(item => item is StructuredOfficeRuntimeDomainVerifier);

@@ -47,6 +47,8 @@ public sealed record H2AgentResourceBinding(
             throw new ArgumentException("Live identity must contain exact bounded host/provider fields and UTC time.");
         // Office exposes an unsaved document name in FullName on some builds. It is NOT a disk path.
         var canonical = H2AgentTargetScope.TryNormalize(path, out var normalized) ? normalized : null;
+        if (canonical is null && !string.IsNullOrEmpty(path) && path.IndexOfAny(['/', '\\', ':']) >= 0)
+            throw new ArgumentException("Malformed live path is not an unsaved document name.");
         return new(Id("live", applicationKind.ToString(), providerId, providerInstanceId, providerVersion,
                 sessionId, processId?.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 processStartUtcTicks?.ToString(System.Globalization.CultureInfo.InvariantCulture), windowIdentity, viewIdentity),
@@ -66,11 +68,11 @@ public sealed record H2AgentResourceBinding(
             return FromLiveObservation(context.ApplicationKind, provider, context.DocumentSessionId,
                 context.DocumentPath, context.CapturedUtc, processId: context.ProcessId,
                 processStartUtcTicks: context.ProcessStartUtcTicks, windowIdentity: context.WindowIdentity,
-                viewIdentity: context.WindowIdentity, uiStateToken: context.Selection);
+                viewIdentity: context.WindowIdentity, uiStateToken: SelectionToken(context.Selection));
         return new(Id("window", context.WindowIdentity), H2AgentResourceKind.Window,
             context.ApplicationKind, provider, null, null, null, null, context.ProcessId,
             context.ProcessStartUtcTicks, context.WindowIdentity, context.WindowIdentity,
-            null, context.Selection, null, context.CapturedUtc);
+            null, SelectionToken(context.Selection), null, context.CapturedUtc);
     }
 
     public static H2AgentResourceBinding FromDisk(string path, string contentVersion, DateTime observedUtc)
@@ -98,6 +100,10 @@ public sealed record H2AgentResourceBinding(
            && H2AgentTargetScope.PathComparer.Equals(CanonicalPath, current.CanonicalPath)
            && (!requireContentVersion || ContentVersion is not null && ContentVersion == current.ContentVersion)
            && (!requireUiState || UiStateToken is not null && UiStateToken == current.UiStateToken);
+
+    public static string? SelectionToken(string? value)
+        => string.IsNullOrEmpty(value) ? null : value.Length <= 512 && !value.Any(char.IsControl)
+            ? value : "selection-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private static bool Token(string? value) => value is { Length: > 0 and <= 512 } && !value.Any(char.IsControl);
     private static bool Optional(string? value) => value is null || Token(value);
@@ -167,26 +173,72 @@ public sealed class H2AgentTargetBindingPolicy
             if (requestedSessionId is not null && requestedSessionId != matching[0].DocumentSessionId)
                 return Missing("outside_resource_scope");
             if (intent == H2AgentTargetIntent.CapturedSelection
-                && (string.IsNullOrWhiteSpace(_captured.Selection) || matching[0].UiStateToken != _captured.Selection))
+                && (string.IsNullOrWhiteSpace(_captured.Selection) || matching[0].UiStateToken != H2AgentResourceBinding.SelectionToken(_captured.Selection)))
                 return Missing("stale_resource");
             return Selected(matching[0], "captured-active");
         }
 
-        // A session supplied by the model is a selection among allowed observations, never a scope grant.
-        if (requestedSessionId is not null)
+        // Resolve host priority BEFORE checking the proposed session. The model cannot turn
+        // two equivalent project candidates into an exact user choice merely by naming one.
+        var explicitFiles = _targets.Where(t => t.Source == "user-path" && !t.IncludeChildren).ToArray();
+        var explicitlyNamed = allowed.Where(r => H2AgentTargetScope.Contains(explicitFiles, r.CanonicalPath)).ToArray();
+        // An explicitly named existing Office input which is closed must not be replaced by
+        // a different open workbook/document. New save-copy destinations are not input files.
+        var inputExtensions = application == H2ApplicationKind.Excel
+            ? new[] { ".xlsx", ".xls", ".xlsm", ".xlsb" } : new[] { ".docx", ".doc", ".docm" };
+        if (explicitlyNamed.Length == 0 && explicitFiles.Any(t => File.Exists(t.Path)
+            && inputExtensions.Contains(Path.GetExtension(t.Path), StringComparer.OrdinalIgnoreCase)))
+            return Missing("resource_not_found");
+        H2AgentTargetResolution resolution;
+        if (explicitlyNamed.Length > 0)
         {
-            var exact = allowed.Where(r => r.DocumentSessionId == requestedSessionId).ToArray();
-            return exact.Length == 1 ? Selected(exact[0], "allowed-session")
-                : Missing(exact.Length > 1 ? "ambiguous_target" : "outside_resource_scope");
+            // Several separately named input files may be processed by their exact sessions;
+            // a folder grant or discovery order alone is not such a choice.
+            var candidates = requestedSessionId is null ? explicitlyNamed
+                : explicitlyNamed.Where(r => r.DocumentSessionId == requestedSessionId).ToArray();
+            resolution = Unique(candidates, "user-path");
         }
-        var explicitlyNamed = allowed.Where(r => H2AgentTargetScope.Contains(
-            _targets.Where(t => t.Source == "user-path").ToArray(), r.CanonicalPath)).ToArray();
-        if (explicitlyNamed.Length > 0) return Unique(explicitlyNamed, "user-path");
-        var active = allowed.Where(r => CapturedMatch(r, utcNow)).ToArray();
-        if (active.Length > 0) return Unique(active, "captured-active");
-        if (!ExecutionProjectId.HasValue && _captured is not null && _captured.ApplicationKind == application)
-            return Missing("stale_resource"); // Never retarget a stale captured document to a new foreground one.
-        return Unique(allowed, ExecutionProjectId.HasValue ? "project-open" : "selected-open");
+        else
+        {
+            var active = allowed.Where(r => CapturedMatch(r, utcNow)).ToArray();
+            if (active.Length > 0) resolution = Unique(active, "captured-active");
+            else if (!ExecutionProjectId.HasValue && _captured is not null && _captured.ApplicationKind == application)
+                resolution = Missing("stale_resource");
+            else resolution = Unique(allowed, ExecutionProjectId.HasValue ? "project-open" : "selected-open");
+        }
+        if (resolution.Resolved && requestedSessionId is not null
+            && resolution.Binding!.DocumentSessionId != requestedSessionId)
+            return Missing("outside_resource_scope");
+        return resolution;
+    }
+
+    public H2ActiveWorkContext? CapturedContext => _captured;
+    public bool IsCandidate(H2AgentResourceBinding observation, DateTime utcNow)
+        => AllowsPath(observation.CanonicalPath) || !ExecutionProjectId.HasValue && CapturedMatch(observation, utcNow);
+
+    // Only the current direct user message / host UI can request this restriction. File/Web
+    // contents and later tool arguments are never inspected here and cannot downgrade it.
+    public static H2AgentTargetIntent IntentFromUserRequest(string goal, H2AgentTargetIntent? hostIntent = null)
+    {
+        if (hostIntent is not null && !Enum.IsDefined(hostIntent.Value))
+            throw new ArgumentException("Unknown host target intent.");
+        var text = (goal ?? "").ToLowerInvariant();
+        var selection = new[] { "current selection", "selection này", "ô đang chọn", "vùng đang chọn", "ô này" };
+        var active = new[] { "đang active", "đang hoạt động", "active workbook", "active document", "active window" };
+        if (hostIntent == H2AgentTargetIntent.CapturedSelection || selection.Any(text.Contains)) return H2AgentTargetIntent.CapturedSelection;
+        if (hostIntent == H2AgentTargetIntent.CapturedActive || active.Any(text.Contains)) return H2AgentTargetIntent.CapturedActive;
+        return H2AgentTargetIntent.OpenDocument;
+    }
+
+    public H2AgentTargetResolution ResolveCapturedWindow(H2AgentResourceBinding observed, DateTime utcNow)
+    {
+        if (_captured is null || !CaptureFresh(utcNow) || observed.Kind != H2AgentResourceKind.Window
+            || observed.WindowIdentity != _captured.WindowIdentity || observed.ProcessId != _captured.ProcessId
+            || observed.ProcessStartUtcTicks != _captured.ProcessStartUtcTicks
+            || observed.ObservedUtc.Kind != DateTimeKind.Utc || observed.ObservedUtc > utcNow
+            || utcNow - observed.ObservedUtc > MaxCaptureAge) return Missing("stale_resource");
+        if (ExecutionProjectId.HasValue && !AllowsPath(_captured.DocumentPath)) return Missing("outside_resource_scope");
+        return new(observed, "resolved", IsExternal(_captured.DocumentPath), "captured-window");
     }
 
     private bool CaptureFresh(DateTime now) => _captured is not null && _captured.CapturedUtc.Kind == DateTimeKind.Utc

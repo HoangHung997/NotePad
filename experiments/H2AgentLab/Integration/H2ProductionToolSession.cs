@@ -21,13 +21,23 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly IH2ProjectToolHost? _projects;
     private readonly Guid _taskId;
     private SafeWorkspace? _fileTargets;
+    private readonly H2AgentTargetBindingPolicy? _targetPolicy;
+    private readonly Action<H2AgentTargetResolution>? _targetObserved;
+    private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
+    private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
 
     public H2ProductionToolSession(Guid taskId, Guid? projectId, bool readOnly,
         H2AgentTaskContext? context, IH2ProjectToolHost? projects,
-        Func<string, string, CancellationToken, Task<bool>> approve)
+        Func<string, string, CancellationToken, Task<bool>> approve,
+        H2AgentTargetBindingPolicy? targetPolicy = null,
+        Action<H2AgentTargetResolution>? targetObserved = null,
+        Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+        Func<H2ActiveWorkContext, bool>? captureValidator = null)
     {
         _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
+        _targetPolicy = targetPolicy; _targetObserved = targetObserved;
+        _officeClientFactory = officeClientFactory; _captureValidator = captureValidator;
     }
 
     public bool IsExecutingAuthorizedCall => _executingAuthorizedCall.Value;
@@ -45,6 +55,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         }
         H2AttachmentRuntimeTools.Register(registry, _context);
         ConfigureDomains(tools, registry, verifiers);
+        if (tools.Desktop is null && _desktopBindingFailure is not null)
+            registry.RegisterCapabilityNotice(new("desktop.bound_window", "Desktop actions require a current host-captured target; Full Access does not choose one.",
+                new(ToolReadinessState.Unavailable, _desktopBindingFailure)));
         if (!_readOnly && _scope?.Mode == H2AgentPermissionMode.FullAccess)
         {
             var commands = new H2LocalCommandTool();
@@ -81,6 +94,19 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 }
                 ct.ThrowIfCancellationRequested();
                 _executingAuthorizedCall.Value = true;
+                if (_targetPolicy is not null && _fileTargets is not null && descriptor.Namespace.Name is "files" or "autocad")
+                {
+                    var path = Arg(call, "path") ?? Arg(call, "destination");
+                    if (path is not null && H2AgentTargetScope.TryNormalize(path, out var canonical, _fileTargets.Root))
+                    {
+                        // No content hash was read here; do not label this path binding ContentVerified.
+                        var id = "path-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                            System.Text.Encoding.UTF8.GetBytes(OperatingSystem.IsWindows() ? canonical.ToUpperInvariant() : canonical))).ToLowerInvariant();
+                        _targetObserved?.Invoke(new(new(id, H2AgentResourceKind.DiskFile, H2ApplicationKind.Unknown,
+                            "filesystem", null, null, null, canonical, null, null, null, null, null, null, null, DateTime.UtcNow),
+                            "resolved", _targetPolicy.IsExternal(canonical), "host-file-target"));
+                    }
+                }
                 try
                 {
                     // Common metadata stays out-of-band; the domain verifier sees exact old bytes.
@@ -209,10 +235,18 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 && H2AgentTargetScope.Contains([t], Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) == true)
             && (_scope.HasFullAccessAt(DateTime.UtcNow) || call.Name != "replace_project_note");
 
-    private static string ResourceKey(ToolDescriptor descriptor, ToolCall call)
-        => descriptor.Namespace.Name == "h2" ? "h2-project:" + Arg(call, "project_id")
-            : (Arg(call, "session_id") ?? Arg(call, "document_session_id") ?? Arg(call, "destination")
-                ?? Arg(call, "path") ?? descriptor.ResourceScope?.ScopeId ?? descriptor.Name);
+    private string ResourceKey(ToolDescriptor descriptor, ToolCall call)
+    {
+        if (descriptor.Namespace.Name == "h2") return "h2-project:" + Arg(call, "project_id");
+        if (descriptor.Namespace.Name == "desktop") return _selectedWindowIdentity ?? "unbound-window";
+        if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)
+            return descriptor.Namespace.Name + ":session:" + session;
+        var path = Arg(call, "destination") ?? Arg(call, "path");
+        if (path is not null && _fileTargets is not null && H2AgentTargetScope.TryNormalize(path, out var canonical, _fileTargets.Root))
+            return "file:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(OperatingSystem.IsWindows() ? canonical.ToUpperInvariant() : canonical))).ToLowerInvariant();
+        return descriptor.ResourceScope?.ScopeId ?? descriptor.Name;
+    }
 
     internal static string? Arg(ToolCall call, string name)
         => call.Arguments.TryGetProperty(name, out var node) && node.ValueKind == JsonValueKind.String ? node.GetString() : null;

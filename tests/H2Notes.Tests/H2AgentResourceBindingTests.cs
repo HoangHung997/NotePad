@@ -57,7 +57,7 @@ internal static class H2AgentResourceBindingTests
             var b = Live("b", Path.Combine(root, "BaoCao (1).xlsx"));
             var policy = new H2AgentTargetBindingPolicy(Guid.NewGuid(), root);
             Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now).Code == "ambiguous_target", "First/fuzzy candidate selected.");
-            Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now, "b").Binding == b, "Exact allowed session not selected.");
+            Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now, "b").Code == "ambiguous_target", "Model session resolved ambiguity without a host choice.");
         }));
         test("AR-012 RC-04 project open request ignores outside active but active request never substitutes", () => InWorkspace(root =>
         {
@@ -107,7 +107,9 @@ internal static class H2AgentResourceBindingTests
             var b = Live("same-session", Path.Combine(root, "same.xlsx"), window: "win-b");
             var policy = new H2AgentTargetBindingPolicy(null, root, captured: Capture(b));
             Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.CapturedActive, Now).Binding == b, "Wrong workbook view selected.");
-            Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now, "same-session").Code == "ambiguous_target", "Session alone resolved two different views.");
+            Check(policy.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now, "same-session").Binding == b, "Host-captured view was lost.");
+            var noCapture = new H2AgentTargetBindingPolicy(null, root);
+            Check(noCapture.ResolveOpen(H2ApplicationKind.Excel, [a, b], H2AgentTargetIntent.OpenDocument, Now, "same-session").Code == "ambiguous_target", "Session alone resolved two views.");
         }));
         test("AR-012 RC-07 UI-only state does not change content identity or redirect selection", () => InWorkspace(root =>
         {
