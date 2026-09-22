@@ -28,6 +28,27 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Preserve exact committed text sources without build outputs or credentials
+        shell: python
+        run: |
+          import hashlib, json, pathlib, subprocess, zipfile
+          def git(*args): return subprocess.check_output(['git', *args])
+          if git('status', '--porcelain').strip(): raise RuntimeError('Source capture requires a clean checkout')
+          out=pathlib.Path('artifacts/ar030'); out.mkdir(parents=True, exist_ok=True)
+          suffixes={'.cs','.csproj','.axaml','.props','.targets','.slnx','.md','.yml','.yaml','.ps1','.py'}
+          entries=[]; total=0
+          with zipfile.ZipFile(out/'validated-text-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for name in git('ls-files','-z').decode('utf-8').split('\0'):
+                  if not name or pathlib.PurePosixPath(name).suffix not in suffixes: continue
+                  if '/' in name and not name.startswith(('src/','experiments/','tests/','docs/','tools/','.github/')): continue
+                  data=git('show','HEAD:'+name)
+                  total+=len(data)
+                  if len(data)>2000000 or total>25000000: raise RuntimeError('Text source receipt exceeded its bound')
+                  data.decode('utf-8-sig')
+                  archive.writestr(name,data)
+                  entries.append({'path':name,'blob_sha':hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest(),'sha256':hashlib.sha256(data).hexdigest()})
+          receipt={'code_sha':git('rev-parse','HEAD').decode().strip(),'working_tree':'CLEAN','kind':'COMMITTED_TEXT_ONLY_NOT_A_BUILD','bytes':total,'entries':entries,'zip_sha256':hashlib.sha256((out/'validated-text-source.zip').read_bytes()).hexdigest()}
+          (out/'validated-text-source.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2),encoding='utf-8')
       - name: Record exact identity and build
         shell: pwsh
         run: |
