@@ -1,6 +1,6 @@
 # AR-010 — shared production/Lab runtime boundaries
 
-Status: ACTIVE / NOT_RUN until exact-source Windows CI is reviewed.
+Status: IMPLEMENTED / E2_PASS / DONE on 14767f0fdaf3ead109867c41caf34111adb8c02a.
 
 ## Scope
 
@@ -23,3 +23,9 @@ E3/E4 remain NOT_RUN / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER.
 ## Review repair before acceptance
 
 The initial exact-source build and three focused iterations passed. Further code review found that a throwing/null host-hook factory could leave a newly constructed transport without an owner. Hook construction/validation now precedes registry/provider/transport allocation. Two registered regressions require the original hook error and zero transport allocations for exception/null cases. This change needs its own exact-source test results; no earlier PASS is transferred to it.
+
+## Accepted execution evidence
+
+Full CI **35698496546** passed all required steps on `14767f0fdaf3ead109867c41caf34111adb8c02a`, including Windows publish and packaged-helper IPC. H2 tests: **614 passed, 0 failed**. Focused run **35698479792**: **11/11 AR-010 cases x3**, AR-001 **13/13**, Agent suites **74/74**. Read-only workflow run **35698742558** repeats those results on `d9c3831e65f2616dabbd9a69643bbfd4e2cf265a`. Both downloaded evidence archives had SHA256/ZIP CRC and identities/results/traces verified. Detailed exact steps, artifact hashes, commands and limits are in [acceptance.json](acceptance.json).
+
+The reviewed factory resource-ownership repair is included in these results. No native Office/model/UI or physical two-PC acceptance is claimed. The temporary source-delivery payload/script have been removed; normal AR-010 CI is read-only. SESSION HANDOFF advances only to **AR-011 NOT_STARTED**, on the same branch/PR. No merge is authorized.
