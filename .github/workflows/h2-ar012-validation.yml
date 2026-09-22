@@ -31,7 +31,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Transfer prior local draft with exact preimages, no reset or overwrite
+      - name: Integrate reviewed target binding with exact preimages
         id: patch
         shell: bash
         run: |
@@ -43,43 +43,43 @@ jobs:
           def require(ok, message):
               if not ok: raise RuntimeError(message)
           head=os.environ['AR_HEAD']; branch=os.environ['AR_BRANCH']
-          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'), 'Dirty or unexpected checkout')
-          require(branch=='feature/h2-agent-reliability-ar-000', 'Wrong branch')
-          if Path('src/H2Notes.Core/H2AgentResourceBinding.cs').exists():
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Unexpected or dirty checkout')
+          require(branch=='feature/h2-agent-reliability-ar-000','Wrong branch')
+          if Path('experiments/H2AgentLab/Office/IOfficeSessionClient.cs').exists():
               with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('sha='+head+'\n')
-              print('Draft already transferred; only validate the current immutable checkout.')
+              print('Integration already transferred; validate this immutable source only.')
               raise SystemExit(0)
-          base='d5aa1003c912ca1a695d3d5c3eb4f0b8d6ab6bca'
-          require(git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0','Main changed; reconcile first')
-          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Branch changed; preserve other work')
-          require(not git('diff','--name-only',base,'HEAD','--','src','experiments','tests','docs'), 'Code or checkpoint changed; reconcile first')
-          data=''.join(Path('tools/agent-reliability/ar012-draft-'+str(i)+'.b64').read_text() for i in range(4))
+          base='708a286be70610dd78db173876056fc696fe0328'
+          require(git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0','Main advanced: reconcile first')
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Branch advanced: preserve other work')
+          require(not git('diff','--name-only',base,'HEAD','--','src','experiments','tests','docs'),'Code or checkpoint advanced')
+          data=''.join(Path('tools/agent-reliability/ar012-integration-'+str(i)+'.b64').read_text() for i in range(10))
+          require(len(data)==28448,'Unexpected transfer length')
           patch=gzip.decompress(base64.b64decode(data,validate=True))
-          require(hashlib.sha256(patch).hexdigest()=='60168ea2645e0f96b1e5226716d56d19e2b833debfe29304d96afc1ee67cab06','Draft payload mismatch')
-          require(len(patch)<100000,'Unbounded patch')
-          source=['experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs','experiments/H2AgentLab/Integration/H2ProductionToolSession.cs','experiments/H2AgentLab/LabSession.cs','src/H2Notes.Avalonia/App.axaml.cs','src/H2Notes.Core/H2AgentAdapter.cs','src/H2Notes.Core/H2AgentTargetScope.cs','src/H2Notes.Core/H2AgentResourceBinding.cs','tests/H2Notes.Tests/H2AgentResourceBindingTests.cs','tests/H2Notes.Tests/H2WorkAssistantRepairTests.cs','tests/H2Notes.Tests/Program.cs']
-          require({line.split(' b/',1)[1] for line in patch.decode().splitlines() if line.startswith('diff --git ')}==set(source),'Unexpected patch paths')
+          require(len(patch)==90973 and hashlib.sha256(patch).hexdigest()=='5d952a95b2914382bc54c63816c828fa811c759ab61cca56d09b7c7c6eea60e1','Patch mismatch')
+          source=['experiments/H2AgentLab/Desktop/SelectedDesktopWindowController.cs','experiments/H2AgentLab/Integration/H2CapturedWindowIdentity.cs','experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs','experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs','experiments/H2AgentLab/Integration/H2ProductionToolSession.Desktop.cs','experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs','experiments/H2AgentLab/Integration/H2ProductionToolSession.cs','experiments/H2AgentLab/Office/IOfficeSessionClient.cs','experiments/H2AgentLab/Office/OfficeHostClient.cs','src/H2Notes.Avalonia/Controls/AgentTurnView.cs','src/H2Notes.Avalonia/WorkAssistantActivityText.cs','src/H2Notes.Core/H2AgentAdapter.cs','src/H2Notes.Core/H2AgentResourceBinding.cs','src/H2Notes.Core/H2AgentThread.cs','tests/H2Notes.Tests/H2AgentLiveBindingTests.cs','tests/H2Notes.Tests/H2AgentResourceBindingTests.cs','tests/H2Notes.Tests/Program.cs']
+          require({line.split(' b/',1)[1] for line in patch.decode().splitlines() if line.startswith('diff --git ')}==set(source),'Unexpected patch scope')
           subprocess.run(['git','apply','--check'],input=patch,check=True)
           subprocess.run(['git','apply'],input=patch,check=True)
-          tracker=Path('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'); text=tracker.read_text()
+          tracker=Path('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md');text=tracker.read_text()
           start=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+len('```yaml\n');end=text.index('\n```',start)
-          state=json.loads(text[start:end]);require(state['active_task']=='AR-012' and state['implementation_status']=='NOT_STARTED','Another active checkpoint exists')
-          state.update(phase='AR-012_ACTIVE_RESUMED_DRAFT', implementation_status='ACTIVE',acceptance_status='NOT_RUN',owner_session='chatgpt-ar012-resume-2026-09-22',completed_this_session=[],uncommitted_files=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),working_tree='Resumed local draft applied in a clean GitHub checkout with exact preimages. Candidate is untested until Windows CI finishes; user-PC working tree NOT_ACCESSIBLE.',next_exact_action='Continue AR-012 only. Inspect actual build/focused results; finish ResolveOpen Office/desktop integration and real external-target UI projection. Add path/provider regressions and full required CI. Do not close AR-012 based on the untested local draft.',remaining_in_active_task=['Compile and execute the 19 resumed AR-012 cases; none previously ran.','Wire resolver into production Office and desktop; keep native discovery support gaps explicit.','Expose external binding in existing activity/chips and test path aliases/reparse behavior.','Review exact-source full CI/publish/helper evidence before acceptance.'])
-          state['current_candidate_commit_lookup']='git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs'
-          text=text[:start]+json.dumps(state,ensure_ascii=False,indent=2)+text[end:]
-          text=text.replace('| AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |','| AR-012 | Scope + resource binding nền | 011 | E1/E2 | ACTIVE |',1).replace('### [ ] AR-012','### [~] AR-012',1)
-          tracker.write_text(text)
-          subprocess.run(['git','add','--',*source,str(tracker)],check=True)
-          require(set(git('diff','--cached','--name-only').splitlines())==set(source+[str(tracker)]),'Unexpected staged files')
+          state=json.loads(text[start:end]);require(state['active_task']=='AR-012' and state['implementation_status']=='ACTIVE','Wrong active checkpoint')
+          state.update(phase='AR-012_ACTIVE_INTEGRATION_VALIDATION',acceptance_status='NOT_RUN',completed_this_session=[],uncommitted_files=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),working_tree='Prior draft and new integration applied with exact preimages in clean CI checkout; actual tested SHA must be read from Windows evidence. User-PC tree NOT_ACCESSIBLE.',remaining_in_active_task=['Review exact-source build, 34-case binding corpus, retained AR-011/010/001 and all required Agent suites.','Review native-boundary limitations and fix observed code/test errors; fixture IDs do not certify multi-instance Office.','Review full CI, real publish/helper smoke; save acceptance only when task evidence is sufficient.'],next_exact_action='Continue AR-012 only. Read the actual new Windows build/test logs and fix regressions without weakening permission/binding assertions. Office wrapper now calls ResolveOpen and pins session/helper/path at dispatch/readback; desktop uses frozen capture, and target binding is projected through existing UI. E3/E4 NOT_RUN, AR-083 deferred. Do not advance task before exact-source evidence.')
+          text=text[:start]+json.dumps(state,ensure_ascii=False,indent=2)+text[end:];tracker.write_text(text)
+          report=Path('docs/agent-reliability/AR-012/implementation.md');report.parent.mkdir(parents=True,exist_ok=True)
+          report.write_text('# AR-012 — scoped resource binding\n\nStatus: ACTIVE / NOT_RUN for the new integration until exact-source Windows evidence is reviewed.\n\nThe prior 19-case draft has been transferred to the existing branch, not a new engine/store. New integration calls the existing deterministic binding policy from Office dispatch/readback, keeps per-session pins, rejects ambiguous model-selected targets, protects frozen active/selection context, and checks selected desktop identity before action. Existing progress/archive and AgentTurnView now project Project/Global/External target chips; permission gates stay separate. Fifteen new registered cases exercise the production wrapper with a controlled no-network Office transport, real temporary file effects, headless UI tree and a dedicated Windows junction.\n\nNative Office multi-instance PID/view discovery, content-version separation, atomic handle-based file I/O and NAS alias certification are NOT claimed. Current native catalog session/path and helper-connection identity are checked as available; incomplete or stale explicit capture fails closed. Arbitrary FullAccess PowerShell/Python is not an OS sandbox. No new model credential/endpoint, personal document, outgoing user message or second Agent store. E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER.\n')
+          outputs=source+[str(tracker),str(report)]
+          subprocess.run(['git','add','--',*outputs],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())==set(outputs),'Unexpected staged paths')
           subprocess.run(['git','diff','--cached','--check'],check=True)
           git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
-          subprocess.run(['git','commit','-m','feat(AR-012): resume scoped-binding draft for Windows validation'],check=True)
-          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent update; no push')
+          subprocess.run(['git','commit','-m','feat(AR-012): bind Office desktop and UI to immutable scoped targets'],check=True)
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent branch update; no push')
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
-          saved=git('rev-parse','HEAD');require(not git('status','--porcelain'),'Unexpected uncommitted work')
+          saved=git('rev-parse','HEAD');require(not git('status','--porcelain'),'Uncommitted changes remain')
           require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==saved,'Remote mismatch')
           with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('sha='+saved+'\nchanged=true\n')
-          print('Saved AR-012 draft:',saved,'; acceptance NOT_RUN')
+          print('Saved AR-012 integration candidate:',saved,'; acceptance NOT_RUN')
           PY
       - name: Run unchanged full required workflow on saved code
         if: steps.patch.outputs.changed == 'true'
@@ -109,12 +109,18 @@ jobs:
           if ($LASTEXITCODE) { throw 'Restore failed' }
           dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar012/build.log
           if ($LASTEXITCODE) { throw 'Build failed' }
-      - name: Execute binding and retained corpora without masking failure
+      - name: Repeat bindings and run retained corpora
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
           $failures=@()
-          foreach ($task in 'AR-012','AR-011','AR-010','AR-001') {
+          foreach ($iteration in 1..3) {
+            $log="artifacts/ar012/AR-012-$iteration.log"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-012 2>&1 | Tee-Object $log
+            $exit=$LASTEXITCODE
+            if ($exit -ne 0 -or (Get-Content $log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { $failures += "AR-012-$iteration" }
+          }
+          foreach ($task in 'AR-011','AR-010','AR-001') {
             $log="artifacts/ar012/$task.log"
             dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $task 2>&1 | Tee-Object $log
             $exit=$LASTEXITCODE
