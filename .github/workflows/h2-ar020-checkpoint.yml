@@ -1,0 +1,199 @@
+name: AR-020 one-time implementation checkpoint (E3 pending)
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar020-checkpoint.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar020-doc-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify real evidence and update only three implementation documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime as dt
+          import hashlib
+          import io
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import zipfile
+          REPO='HoangHung997/NotePad'
+          BRANCH='feature/h2-agent-reliability-ar-000'
+          MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0'
+          RUNTIME='577a5237375257c147bddcd6a96b039b620df966'
+          TESTED='3486e6badb38c8984aa756696e2a113f49bc3d15'
+          TRACKER=Path('docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md')
+          REPORT=Path('docs/agent-reliability/AR-020/implementation.md')
+          MANIFEST=Path('docs/agent-reliability/AR-020/implementation-evidence.json')
+          OUTPUTS=[str(TRACKER),str(REPORT),str(MANIFEST)]
+          out=Path(os.environ['RUNNER_TEMP'])/'ar020-checkpoint';out.mkdir(exist_ok=True)
+          def require(ok,message):
+              if not ok: raise RuntimeError(message)
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          def get(path,limit=8_000_000):
+              require(path.startswith(('/actions/runs/','/actions/jobs/','/actions/artifacts/')),'Read outside evidence inventory forbidden')
+              request=urllib.request.Request('https://api.github.com/repos/'+REPO+path,headers={
+                  'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28','User-Agent':'H2-AR020-documentation'})
+              try:
+                  response=urllib.request.build_opener(NoRedirect()).open(request,timeout=30)
+              except urllib.error.HTTPError as error:
+                  require(error.code in (301,302,303,307,308),'Evidence API read failed')
+                  location=error.headers['Location'];parsed=urllib.parse.urlparse(location)
+                  require(parsed.scheme=='https' and parsed.hostname and (parsed.hostname.endswith('.blob.core.windows.net')
+                      or parsed.hostname.endswith('.actions.githubusercontent.com')),'Unapproved evidence redirect')
+                  # The signed evidence download receives NO GitHub credential.
+                  response=urllib.request.urlopen(urllib.request.Request(location,headers={'User-Agent':'H2-AR020-documentation'}),timeout=45)
+              with response:
+                  data=response.read(limit+1)
+              require(len(data)<=limit,'Evidence exceeds its bounded read')
+              return data
+          def api(path): return json.loads(get(path))
+          head=os.environ['AR_HEAD']
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong or dirty checkout')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main advanced; reconcile first')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Branch advanced; preserve new work')
+          require(git('rev-parse','HEAD^')==TESTED,'Other work appeared; do not overwrite its checkpoint')
+          require(set(git('diff','--name-only',TESTED,'HEAD').splitlines())=={'.github/workflows/h2-ar020-checkpoint.yml'},'Unexpected delta')
+          require(hashlib.sha256(TRACKER.read_bytes()).hexdigest()=='273fc8eb51a04935a349484202e730c81dbda275bbbd4529e74a2ad38d0cc142','Tracker drift')
+          require(hashlib.sha256(REPORT.read_bytes()).hexdigest()=='4fc17b4249faca2f1338d07031e944fcab4ceab74a117266a03ec00079cbf34f','Report drift')
+          require(not MANIFEST.exists(),'Implementation evidence already exists')
+          full=api('/actions/runs/35735271912')
+          require(full['name']=='Avalonia CI' and full['head_sha']==TESTED and full['status']=='completed' and full['conclusion']=='success','Exact full CI not green')
+          jobs=api('/actions/runs/35735271912/jobs?per_page=100')
+          require(jobs['total_count']==len(jobs['jobs'])==1,'Incomplete full job inventory')
+          job=jobs['jobs'][0]
+          require(job['id']==106770799844 and job['conclusion']=='success','Wrong full job')
+          require(all(s['status']=='completed' and s['conclusion']=='success' for s in job['steps']),'Skipped steps are not PASS')
+          for name in ['Run H2 Notes tests','Publish self-contained Windows x64','Verify packaged Agent helpers start and answer IPC','Upload Avalonia portable build']:
+              require(any(s['name']==name for s in job['steps']),'Missing mandatory step '+name)
+          log=get('/actions/jobs/106770799844/logs')
+          (out/'full-ci.log').write_bytes(log)
+          log_text=log.decode('utf-8-sig');lines=log_text.splitlines();checkout=None
+          for i,line in enumerate(lines):
+              if '[command]' in line and 'git log -1 --format=%H' in line:
+                  for following in lines[i+1:i+4]:
+                      match=re.search(r'\b([0-9a-f]{40})\b',following)
+                      if match: checkout=match.group(1);break
+                  if checkout: break
+          require(checkout is not None,'Actual checkout identity missing from full job log')
+          subprocess.run(['git','fetch','--no-tags','--depth=1','origin',checkout],check=True,stdout=subprocess.DEVNULL)
+          require(not git('diff','--name-only',TESTED,checkout,'--','src','experiments','tests','.github/workflows/avalonia-ci.yml'),'PR test-merge differs from tested runtime source')
+          results=re.findall(r'RESULT: (\d+) passed, (\d+) failed',log_text)
+          require(results and results[0]==('711','0'),'H2 result differs; inspect instead of assuming a count')
+          focused=api('/actions/runs/35735271906')
+          require(focused['head_sha']==TESTED and focused['status']=='completed' and focused['conclusion']=='success','Focused corpus not green')
+          focused_jobs=api('/actions/runs/35735271906/jobs?per_page=100')
+          require(focused_jobs['total_count']==len(focused_jobs['jobs'])==1,'Incomplete focused job inventory')
+          require(all(s['conclusion']=='success' for s in focused_jobs['jobs'][0]['steps']),'Focused steps not all successful')
+          artifact=api('/actions/artifacts/10697576344')
+          digest='e88cf02ff92f01a13601b4706b6ae4343850d610c82169365623c30a05a00845'
+          require(not artifact['expired'] and artifact['digest']=='sha256:'+digest,'Focused evidence identity differs')
+          raw=get('/actions/artifacts/10697576344/zip',2_000_000)
+          require(hashlib.sha256(raw).hexdigest()==digest,'Downloaded evidence hash differs')
+          archive=zipfile.ZipFile(io.BytesIO(raw));require(archive.testzip() is None,'Evidence ZIP CRC failed')
+          require(len(archive.infolist())==626 and sum(i.file_size for i in archive.infolist())<30_000_000,'Unexpected evidence inventory')
+          def text(name): return archive.read(name).decode('utf-8-sig')
+          identity=json.loads(text('identity.json'))
+          require(identity['code_sha']==TESTED and identity['working_tree']=='CLEAN','Focused positive code identity differs')
+          require(len(identity['office'])==2 and all(not o['registered'] and o['activation']=='NOT_RUN' and o['native_markers']=='NOT_RUN' for o in identity['office']),'Native environment changed; inspect it explicitly')
+          positive={}
+          for name,count in [('AR-020-1',28),('AR-020-2',28),('AR-020-3',28),('AR-012',44),('AR-011',25),('AR-010',11),('AR-001',13)]:
+              require(re.findall(r'RESULT: (\d+) passed, (\d+) failed',text(name+'.log'))==[(str(count),'0')],'Unexpected positive result '+name)
+              positive[name]={'passed':count,'failed':0}
+          negatives=[]
+          for name,error in [('negative-cap','Expected preflight session_capacity'),('negative-retirement','Capacity error leaked its owned helper or retried automatically.')]:
+              actual=text(name+'.log');require('RESULT: 0 passed, 1 failed' in actual and error in actual,'Missing expected old-runtime failure')
+              negatives.append({'case':name,'passed':0,'expected_failures':1,'observed_error':error})
+          suites=json.loads(text('all-agent-suites/suite-results.json'))
+          require(suites['code_sha']==TESTED and len(suites['suites'])==74 and all(x['exit_code']==0 for x in suites['suites']),'Mandatory Agent suite failure')
+          portable=api('/actions/artifacts/10697891367')
+          require(portable['workflow_run']['head_sha']==TESTED and portable['size_in_bytes']==110024372 and portable['digest']=='sha256:cbac20f67961ffd50dfb2c01da5354b0d3e44094d691703edb29b557629fcba5','Package identity differs')
+          inventory=api('/actions/runs/35735271912/artifacts?per_page=100')
+          require(inventory['total_count']==len(inventory['artifacts'])==2 and all(x['size_in_bytes']>0 for x in inventory['artifacts']),'Missing published package')
+          now=dt.datetime.now(dt.timezone.utc).isoformat()
+          commands=[
+              {'command':'dotnet restore H2Notes.Avalonia.slnx; dotnet build H2Notes.Avalonia.slnx -c Release --no-restore','run_id':35735271906,'code_sha':TESTED,'result':'PASS'},
+              {'command':'H2Notes.Tests --filter AR-020 (3 repetitions)','run_id':35735271906,'code_sha':TESTED,'result':'28/28 x3; E1/E2 only'},
+              {'command':'H2Notes.Tests --filter AR-012 / AR-011 / AR-010 / AR-001','run_id':35735271906,'code_sha':TESTED,'result':'44/44,25/25,11/11,13/13'},
+              {'command':'tools/agent-reliability/run_agent_suites.ps1','run_id':35735271906,'code_sha':TESTED,'result':'74/74'},
+              {'command':'All mandatory Avalonia CI build/test/publish/helper IPC steps','run_id':35735271912,'code_sha':checkout,'source_head':TESTED,'result':'PASS; 711 H2 tests / 0 failures'},
+              {'command':'Invoke-Ar020NativeProbe.ps1 on native Office test documents','result':'NOT_RUN / AWAITING_ENVIRONMENT'}]
+          limits=['E1/E2 native-object probes and controlled Office clients are not E3 native Office acceptance.',
+              'Excel.Application and Word.Application are both unregistered on the measured Windows runner; no activation or native marker read was attempted.',
+              'E4 actual H2 UI/model/tools remains NOT_RUN. AR-083 remains DEFERRED_BY_USER, not E5_PASS.',
+              'Native Office/build compatibility, multi-instance/view marker selection, Save As, close/reopen and modal behavior still require the E3 matrix.',
+              'Document/view identities are helper-local; no durable job/resume, semantic-memory, complete Office paging/layout, NAS alias or OS-sandbox guarantee is added.',
+              'No new user model endpoint/credential, paid model call, personal-document mutation, outbound user message or main merge occurred.']
+          next_action='Keep AR-020 active on feature/h2-agent-reliability-ar-000 and PR #3. Reconcile latest refs/checkpoint before work. Obtain an authorized Windows environment with installed Word/Excel and dedicated small test documents, or receive its native evidence. Follow docs/agent-reliability/AR-020/native-runbook.md: exact read-only catalog and DOC-A/DOC-B/UNSAVED-ONLY marker identity, two instances/views, Save As, close/reopen, busy/modal and frozen-capture matrix. Do not start or close user Office apps automatically. Record actual native versions, IDs, code SHA, incomplete/unsupported cases and failures. Do not mark AR-020 DONE or AR-083 passed from these fixture/helper results.'
+          manifest={'task':'AR-020','spec_version':'H2-AR-SPEC-1.0','implementation_status':'IMPLEMENTED','acceptance_status':'AWAITING_ENVIRONMENT','done':False,'required_acceptance_level':'E3','validated_level':'E2','branch':BRANCH,'pr':3,'main_sha':MAIN,'runtime_code_sha':RUNTIME,'focused_tested_code_sha':TESTED,'captured_at_utc':now,'environment':identity,
+              'full_ci':{'run_id':full['id'],'source_head':TESTED,'actual_checkout_sha':checkout,'checkout_kind':'GitHub PR test merge; NOT merged into main','application_test_and_required_workflow_diff':'EMPTY_VERIFIED','job_id':job['id'],'conclusion':'success','h2_tests':{'passed':711,'failed':0},'steps':job['steps'],'log_sha256':hashlib.sha256(log).hexdigest()},
+              'focused':{'run_id':focused['id'],'job_id':focused_jobs['jobs'][0]['id'],'code_sha':TESTED,'artifact_id':artifact['id'],'sha256':digest,'zip_entries':626,'positive_results':positive,'negative_identity':json.loads(text('negative-identity.json')),'expected_old_failures':negatives,'required_agent_suites':suites['suites'],'positive_checkout_restored':'CLEAN; exact original checkout bytes and hashes verified by successful gate','native_wrapper':'PowerShell syntax PASS only; native invocation NOT_RUN'},
+              'prior_attempts':[{'run_id':35729096391,'code_sha':'9e2536970263eaa92ceea89131969fcd55a8ff3c','result':'BUILD_FAILED_CS0136; tests NOT_RUN'},
+                  {'run_id':35730353508,'code_sha':'0827e036264bd4884f17a778e36b63b15d10f35c','AR020':'26/26 x3; E2 only','native_office':'NOT_RUN / unregistered'},
+                  {'run_id':35734416863,'code_sha':RUNTIME,'result':'Expected negative failures reproduced; workflow clean-restore guard failed; positives and suites SKIPPED','artifact_id':10696834103,'sha256':'37a26d1419ce7f0ea5ceefd08fbed55febeec7b5c6bce0243a447062c57c1366','repair':'Restore exact saved pre-control checkout bytes and keep clean-tree assertion, with EOL/status diagnostics. The original run did not record which paths were dirty; do not invent them.'}],
+              'package':{'artifact_id':portable['id'],'source_head':TESTED,'actual_build_checkout_sha':checkout,'size_in_bytes':portable['size_in_bytes'],'sha256':portable['digest'][7:],'zip_entries':482,'label':'E2_PREVIEW_NATIVE_E3_PENDING','verification':'Downloaded exact ZIP in assistant session; hash/CRC of all entries checked and app/Office/Desktop helper executables and DLLs nonempty. Packaged-helper startup/IPC passed in full CI; native document behavior NOT_RUN.'},
+              'commands':commands,'limitations':limits,'next_exact_action':next_action}
+          original=TRACKER.read_text(encoding='utf-8');start=original.index('```yaml\n',original.index('## 7. SESSION HANDOFF'))+len('```yaml\n');end=original.index('\n```',start)
+          state=json.loads(original[start:end]);require(state['active_task']=='AR-020','Another active task appeared')
+          state.update({'phase':'AR-020_IMPLEMENTED_AWAITING_NATIVE_E3','active_task':'AR-020','implementation_status':'IMPLEMENTED','acceptance_status':'AWAITING_ENVIRONMENT','owner_session':'chatgpt-ar020-final-review-2026-09-22','last_code_commit':RUNTIME,'last_runtime_source_commit':RUNTIME,'last_validated_code_commit':TESTED,'last_full_ci_checkout_sha':checkout,'last_validation_result':'FULL_CI_AND_E2_PASS_NATIVE_E3_NOT_RUN','checkpoint_saved_at_utc':now,'finalization_checked_head':head,'working_tree':'Positive Windows test checkout CLEAN after restoring exact pre-control bytes; local offline review snapshot clean and matches delivered source, not remote Git history. Checkpoint stages only three docs and verifies non-force push/remote HEAD. User-PC tree NOT_ACCESSIBLE.','uncommitted_files':[],'completed_this_session':[],'implemented_this_session':[{'id':'AR-020','code_sha':RUNTIME,'validated_level':'E2','acceptance_status':'AWAITING_ENVIRONMENT','done':False}],'remaining_in_active_task':['Actual native E3 multi-instance/view Office acceptance and any resulting compatibility repairs; see native-runbook.md.'],'last_test_commands':commands,'known_failures':limits,'external_blockers':['No authorized native Windows Office environment accessible; both Office ProgIDs unregistered in CI.'],'pending_user_decisions':['Provide/authorize a Windows Office test environment or return its dedicated read-only native matrix evidence. Do not waive E3 implicitly.'],'next_exact_action':next_action,'next_task_if_active_done':'AR-021','additional_ci_after_recorded_run':'Later documentation/writer-removal commits are not the exact source tested above. Their runs are separate and not assumed PASS.'})
+          state.setdefault('ci_runs',[]).extend([{'id':35734416863,'code_sha':RUNTIME,'result':'FAILURE','stage':'Negative-control clean-restore guard; positives NOT_RUN'}, {'id':35735271906,'code_sha':TESTED,'result':'SUCCESS','evidence_level':'E2','AR020':'28/28 x3','Agent_suites':'74/74'}, {'id':35735271912,'source_head':TESTED,'actual_checkout_sha':checkout,'result':'SUCCESS','H2_tests':'711/711','publish_helper_IPC':'PASS','native_E3':'NOT_RUN'}])
+          state['evidence_locations']=list(dict.fromkeys(state.get('evidence_locations',[])+[str(MANIFEST),str(REPORT),'docs/agent-reliability/AR-020/native-runbook.md']))
+          revised=original[:start]+json.dumps(state,ensure_ascii=False,indent=2)+original[end:]
+          row='| AR-020 | Office discovery đa instance/view | 012 | E3 | ACTIVE / AWAITING_ENVIRONMENT |'
+          require(revised.count(row)==1 and '### [~] AR-020' in revised,'AR-020 status anchor drift')
+          revised=revised.replace(row,row.replace('ACTIVE /','IMPLEMENTED /'),1)
+          anchor='### [ ] AR-021';require(revised.count(anchor)==1,'AR-021 anchor drift')
+          note='**AR-020 implementation checkpoint (2026-09-22):** IMPLEMENTED / AWAITING_ENVIRONMENT, **not DONE**. Exact-source full CI and E2 fixtures passed; 28/28 AR-020 x3, retained corpora and 74/74 Agent suites. Native Office E3 is NOT_RUN because the measured runner has neither Word nor Excel registered. [Implementation evidence](agent-reliability/AR-020/implementation-evidence.json). AR-083 remains DEFERRED_BY_USER.\n\n'
+          revised=revised.replace(anchor,note+anchor,1)
+          require('### [x] AR-020' not in revised and '| E5 | DEFERRED_BY_USER |' in revised,'Acceptance boundary was lost')
+          report=REPORT.read_text(encoding='utf-8').replace('Status: ACTIVE / AWAITING_ENVIRONMENT. Application tests NOT_RUN until exact CI evidence is reviewed.','Status: IMPLEMENTED / AWAITING_ENVIRONMENT. E1/E2 and full CI passed; required native E3 NOT_RUN. AR-020 is not DONE.',1)
+          report+='\n## Verified implementation checkpoint; native E3 still required\n\nRuntime source `'+RUNTIME+'`; exact focused checkout `'+TESTED+'`. Focused run **35735271906** passed **28/28 AR-020 in each of three repetitions**, **44/44 AR-012**, **25/25 AR-011**, **11/11 AR-010**, **13/13 AR-001** and **74/74 mandatory Agent suites**. Both new old-runtime negative controls failed for the expected semantic reasons, then the positive checkout was restored byte-for-byte and verified clean. The earlier restore-guard failure is retained in the manifest, not converted to PASS.\n\nFull Avalonia CI **35735271912**, actual PR test-merge checkout `'+checkout+'`, passed **711 H2 tests / 0 failures**, every mandatory step, Windows publish and packaged-helper startup/IPC. Application/test/workflow source matches `'+TESTED+'`. This was not a merge into main. Exact portable ZIP **110,024,372 bytes / 482 entries**, SHA256 `cbac20f67961ffd50dfb2c01da5354b0d3e44094d691703edb29b557629fcba5`, was downloaded and CRC/hash checked. It is an **E2 preview, not native Office acceptance**.\n\nThe measured runner reports Word.Application and Excel.Application unregistered. Native marker reads, real multi-instance/view and modal behavior remain NOT_RUN. No task is advanced or marked DONE. The canonical handoff retains AR-020 and the exact E3 environment action; AR-083 remains DEFERRED_BY_USER. [Detailed implementation evidence](implementation-evidence.json) and [native runbook](native-runbook.md).\n'
+          TRACKER.write_text(revised,encoding='utf-8');REPORT.write_text(report,encoding='utf-8');MANIFEST.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          subprocess.run(['git','add','--',*OUTPUTS],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())==set(OUTPUTS),'Unexpected staged files')
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          (out/'documentation.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary']))
+          for path in OUTPUTS: (out/Path(path).name).write_bytes(Path(path).read_bytes())
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch advance; saved patch only')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git','commit','-m','docs(AR-020): record E2 implementation pass and retain native E3 blocker'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+BRANCH],check=True)
+          saved=git('rev-parse','HEAD');require(not git('status','--porcelain'),'Dirty saved checkpoint')
+          require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==saved,'Remote save not verified')
+          (out/'saved.json').write_text(json.dumps({'checkpoint_sha':saved,'runtime_code_sha':RUNTIME,'focused_code_sha':TESTED,'full_ci_checkout_sha':checkout,'working_tree':'CLEAN','AR020_done':False,'acceptance':'AWAITING_ENVIRONMENT'},indent=2))
+          print('Saved implementation checkpoint:',saved,'; AR-020 remains awaiting native E3; no DONE claim.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR020-Saved-Implementation-Checkpoint
+          path: ${{ runner.temp }}/ar020-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
