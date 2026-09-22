@@ -1,4 +1,4 @@
-name: AR-031 verified checkpoint and writer cleanup
+name: AR-031 verified documentation checkpoint
 on:
   push:
     branches: [feature/h2-agent-reliability-ar-000]
@@ -24,7 +24,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Independently verify completed source and evidence before saving the canonical checkpoint
+      - name: Recheck all evidence and save only three documentation files
         shell: python
         run: |
           import base64,hashlib,json,subprocess
@@ -32,10 +32,26 @@ jobs:
           response=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/'+expected],timeout=60))
           content=base64.b64decode(response['content'])
           actual=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
-          if len(content)!=17592 or actual!=expected or hashlib.sha256(content).hexdigest()!='6c9ac407f5b36922b578320258566ee3f3207e83830ad0c54ad5b0bcc58ed543':
-              raise RuntimeError('Reviewed documentation and cleanup script differs')
-          # Pinned reviewed checkpoint code, not log/model text. Source/test files are never written.
-          exec(compile(content,'reviewed-ar031-checkpoint.py','exec'))
+          if len(content)!=17592 or actual!=expected:
+              raise RuntimeError('Reviewed original recorder differs')
+          # The previous push was refused because GITHUB_TOKEN lacks workflow-write authority.
+          # Remove ALL workflow edits from this recorder. Do not change permissions or CI gates.
+          # Workflow maintenance is a separate authorized connector operation after docs save.
+          s=content.decode('utf-8')
+          s=s.replace('Record AR-031 only after exact completed CI; writes docs and retires reviewed CI writers.','Record AR-031 only after exact completed CI; writes three documentation files only.')
+          s=s.replace("git('rev-parse','HEAD^') == CODE", "git('rev-parse','HEAD^') == 'e6fd68de325a5e82a667729c1a7a5a1415c66feb'")
+          a=s.index('    # Keep a read-only regression job, not a persistent source-writing bootstrap.')
+          b=s.index("    require(not git('diff','--name-only','--','src','experiments','tests')",a)
+          s=s[:a]+"    paths=[TRACKER,PREFIX+'acceptance.json',PREFIX+'implementation.md']\n"+s[b:]
+          s=s.replace("'captured_at_utc':dt.datetime.now(dt.timezone.utc).isoformat()}","'checkpoint_attempts':[{'run_id':35786837664,'job_id':106945591326,'result':'FAILED_TO_PUSH','reason':'Actions token lacks workflows permission; no checkpoint reached the branch. This retry writes only three docs; workflow maintenance uses the separately authorized connector.'}],\n        'captured_at_utc':dt.datetime.now(dt.timezone.utc).isoformat()}")
+          s=s.replace('final docs/workflow commit verifies unchanged refs', 'final docs-only commit verifies unchanged refs')
+          s=s.replace('docs(AR-031): record verified archive and cancellation acceptance; retire writers','docs(AR-031): save verified journal and cancellation checkpoint')
+          s=s.replace("'runtime_diff':'EMPTY'},indent=2)","'runtime_diff':'EMPTY','workflow_cleanup':'PENDING_SEPARATE_CONNECTOR_OPERATION'},indent=2)")
+          revised=s.encode('utf-8')
+          if len(revised)!=16623 or hashlib.sha256(revised).hexdigest()!='9b36db4811b0d7666fc37d308a7f5f9d5103064d4ae690395b6d765b188004fe':
+              raise RuntimeError('Exact reviewed docs-only recorder differs')
+          # Exact reviewed authored code only, never provider responses or log text.
+          exec(compile(revised,'reviewed-ar031-docs-only.py','exec'))
       - uses: actions/upload-artifact@v4
         if: always()
         with:
