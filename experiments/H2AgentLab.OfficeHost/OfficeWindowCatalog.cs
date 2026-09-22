@@ -119,6 +119,25 @@ public sealed class OfficeWindowCatalog : IDisposable
         }
         finally { foreach(var pending in next.Values) pending.Dispose(); }
     }
+    /// <summary>Re-probe borrowed identities without replacing catalog references mid-operation.
+    /// After an effect, a stale view must never be described as a no-effect preflight rejection.</summary>
+    public void ValidateCurrent(OfficeViewLease selected, bool noEffect)
+    {
+        ObjectDisposedException.ThrowIf(_disposed,this);
+        try
+        {
+            if (!_views.Values.Any(v=>ReferenceEquals(v,selected)))
+                throw new OfficeHostFaultException("stale_resource","The native binding is no longer owned by this helper.",noEffect);
+            using var observed=_probe.Open(selected.Candidate);
+            if (observed.Candidate!=selected.Candidate || observed.ViewHandle!=selected.ViewHandle
+                || observed.FullName!=selected.FullName || observed.Name!=selected.Name
+                || !SameObject(selected.Document,observed.Document))
+                throw new OfficeHostFaultException("stale_resource","Native view/document identity changed during the operation.",noEffect);
+        }
+        catch(Exception ex) when(OfficeNativeWindowProbe.IsProbeFailure(ex))
+        { throw new OfficeHostFaultException(OfficeNativeWindowProbe.FaultCode(ex),
+            "Native identity revalidation failed; inspect the effect separately before retrying.",noEffect); }
+    }
     public OfficeViewLease Require(string application,string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId)) throw new OfficeHostFaultException("invalid_arguments","An exact observed session is required.",true);
@@ -139,6 +158,7 @@ public sealed class OfficeWindowCatalog : IDisposable
             if(matches.Length!=1 || !LastReport.Complete)
                 return new("Unavailable",LastReport.Issues.FirstOrDefault()?.Code ?? (matches.Length>1?"ambiguous_target":"stale_resource"),null,null,null,null,clock.ElapsedMilliseconds);
             var selected=matches[0]; var selection=selected.ReadSelection();
+            ValidateCurrent(selected,true);
             if(selection.Length>1024) return new("Degraded","selection_too_large",selected.SessionId,selected.FullName,null,selected.Identity,clock.ElapsedMilliseconds);
             return new("Ready",null,selected.SessionId,selected.FullName,selection,selected.Identity,clock.ElapsedMilliseconds);
         }

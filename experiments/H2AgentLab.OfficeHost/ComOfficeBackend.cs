@@ -47,7 +47,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var before = SnapshotExcelInternal(bound);
+            var before = SnapshotExcelInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
 
             dynamic? sheet = null;
@@ -109,7 +109,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var before = SnapshotExcelInternal(bound);
+            var before = SnapshotExcelInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
             app.Calculate();
             return SnapshotExcelInternal(bound);
@@ -125,7 +125,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic workbook = bound.Document;
         try
         {
-            var snapshot = SnapshotExcelInternal(bound);
+            var snapshot = SnapshotExcelInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
             var destination = OfficeHostSafety.ValidateCopyDestination(request.DestinationPath, snapshot.FullName);
             workbook.SaveCopyAs(destination);
@@ -162,7 +162,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic document = bound.Document;
         try
         {
-            var before = SnapshotWordInternal(bound);
+            var before = SnapshotWordInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
             if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
                 throw new OfficeHostFaultException("word_patch_rejected", problem);
@@ -225,7 +225,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic document = bound.Document;
         try
         {
-            var snapshot = SnapshotWordInternal(bound);
+            var snapshot = SnapshotWordInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
 
             var spelling = ReadWordSpellingEvidence(app, document);
@@ -254,7 +254,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic? copy = null;
         try
         {
-            var snapshot = SnapshotWordInternal(bound);
+            var snapshot = SnapshotWordInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, snapshot.StateToken);
             var destination = OfficeHostSafety.ValidateCopyDestination(request.DestinationPath, snapshot.FullName);
 
@@ -288,8 +288,9 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         }
     }
 
-    private static ExcelLiveSnapshot SnapshotExcelInternal(OfficeViewLease bound)
+    private ExcelLiveSnapshot SnapshotExcelInternal(OfficeViewLease bound, bool beforeMutation = false)
     {
+        _catalog.ValidateCurrent(bound, beforeMutation);
         dynamic app = bound.App; dynamic workbook = bound.Document; dynamic view = bound.View;
         var sessionId = bound.SessionId;
         var name = SafeString(() => workbook.Name);
@@ -419,7 +420,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             selectionAddress,
             sheets
         };
-        return new ExcelLiveSnapshot(
+        var observed = new ExcelLiveSnapshot(
             sessionId,
             name,
             fullName,
@@ -428,10 +429,13 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             selectionAddress,
             sheets,
             OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
+        _catalog.ValidateCurrent(bound, beforeMutation);
+        return observed;
     }
 
-    private static WordLiveSnapshot SnapshotWordInternal(OfficeViewLease bound)
+    private WordLiveSnapshot SnapshotWordInternal(OfficeViewLease bound, bool beforeMutation = false)
     {
+        _catalog.ValidateCurrent(bound, beforeMutation);
         dynamic app = bound.App; dynamic document = bound.Document; dynamic view = bound.View;
         var sessionId = bound.SessionId;
         var name = SafeString(() => document.Name);
@@ -477,7 +481,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             headers,
             footers
         };
-        return new WordLiveSnapshot(
+        var observed = new WordLiveSnapshot(
             sessionId,
             name,
             fullName,
@@ -491,6 +495,8 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             headers,
             footers,
             OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
+        _catalog.ValidateCurrent(bound, beforeMutation);
+        return observed;
     }
 
     private static IReadOnlyList<WordSpellingEvidence> ReadWordSpellingEvidence(

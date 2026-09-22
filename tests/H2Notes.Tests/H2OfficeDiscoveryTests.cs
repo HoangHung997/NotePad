@@ -36,13 +36,26 @@ internal static class H2OfficeDiscoveryTests
             var p=new Probe();p.Add(11,101,1001,"A.xlsx");p.Add(12,102,2001,"B.xlsx");p.ForegroundRoot=2001;
             using var b=new ComOfficeBackend(p);var c=b.Capture(new("excel",1001,11,101));
             Check(c.Status=="Ready" && c.FullName=="A.xlsx" && c.Selection=="Sheet1!A1","Capture followed foreground.");
-            Check(p.Opens.SequenceEqual([1001L]) && p.SelectionReads==1,"Capture probed unrelated documents.");
+            Check(p.Opens.SequenceEqual([1001L,1001L]) && p.SelectionReads==1,"Capture probed unrelated documents.");
         });
         test("AR-020 wrong PID or process start cannot recover a captured view",()=>{
             var p=new Probe();p.Add(11,101,1001,"A.xlsx");using var b=new ComOfficeBackend(p);
             Check(b.Capture(new("excel",1001,99,101)).Code=="stale_resource","Wrong PID accepted.");
             Check(b.Capture(new("excel",1001,11,102)).Code=="stale_resource","Reused PID accepted.");
             Check(p.SelectionReads==0,"Invalid capture read selection.");
+        });
+        test("AR-020 capture rejects a document switched while selection was being read",()=>{
+            var p=new Probe();var item=p.Add(11,101,1001,"A.xlsx");
+            item.OnSelection=()=>item.Document=new object();using var b=new ComOfficeBackend(p);
+            var result=b.Capture(new("excel",1001,11,101));
+            Check(result.Code=="stale_resource" && result.SessionId is null,"Mixed document/selection snapshot escaped revalidation.");
+        });
+        test("AR-020 post-effect native identity failure never claims no effect",()=>{
+            var p=new Probe();var item=p.Add(11,101,1001,"A.xlsx");using var c=new OfficeWindowCatalog(p);
+            var bound=c.Refresh("excel").Single();item.Document=new object();
+            try { c.ValidateCurrent(bound,false);throw new InvalidOperationException("Expected stale native identity"); }
+            catch(OfficeHostFaultException e){Check(e.Code=="stale_resource" && !e.NoEffect,"Post-effect stale result became no-effect proof.");}
+            Fault(()=>c.ValidateCurrent(bound,true),"stale_resource");
         });
         test("AR-020 Save As retires old session before any body read or mutation",()=>{
             var p=new Probe();var v=p.Add(11,101,1001,"A.xlsx");using var b=new ComOfficeBackend(p);var id=b.DiscoverExcel().Workbooks[0].SessionId;
@@ -92,6 +105,24 @@ internal static class H2OfficeDiscoveryTests
             var old=JsonSerializer.Deserialize<OfficeRpcResponse>("{\"Id\":\"old\",\"Ok\":false,\"Error\":{\"Code\":\"busy\",\"Message\":\"busy\"}}")!;
             Check(!old.Error!.NoEffect,"Legacy error was invented as preflight.");
         });
+        test("AR-020 opt-in marker aid rejects unconsented native access before probing",()=>{
+            try {OfficeNativeMarkerProbe.Run(["--native-catalog","not-used.json"]);throw new InvalidOperationException("Consent was bypassed.");}
+            catch(ArgumentException e){Check(e.Message.Contains("allow-native-office"),"Wrong preflight rejection.");}
+        });
+        foreach(var kind in new[]{"excel","word"})
+            test("AR-020 marker aid requires exact process view and observed body for "+kind,()=>{
+                var b=new MarkerBackend();var c=new OfficeMarkerCase("FIXTURE",kind,11,101,1001,1001,"Document1","DOC-A");
+                var good=OfficeNativeMarkerProbe.Observe(b,c);
+                Check(good.Passed && good.Identity==b.Identity && b.BodyReads==1,"Exact marker fixture was not read.");
+                var wrong=OfficeNativeMarkerProbe.Observe(b,c with {ProcessStartUtcTicks=102});
+                Check(!wrong.Passed && wrong.Code=="stale_resource" && b.BodyReads==1,"Wrong identity read a body.");
+                b.Text="DOC-B";
+                Check(!OfficeNativeMarkerProbe.Observe(b,c).Passed,"Missing marker was accepted.");
+                b.WrongReadback=true;
+                Check(OfficeNativeMarkerProbe.Observe(b,c).Code=="stale_resource","Wrong-view readback certified a marker.");
+                b.Complete=false;var reads=b.BodyReads;
+                Check(OfficeNativeMarkerProbe.Observe(b,c).Code=="incomplete_discovery" && b.BodyReads==reads,"Partial catalog read a guessed document.");
+            });
         test("AR-020 production capture reuses owned helper but not stale capture output",()=>Temp(root=>{
             var client=new CaptureClient();var created=0;
             var adapter=new H2ProductionAgentAdapter(root,()=>new(new AiProfile(),""),officeClientFactory:()=>{created++;return client;});
@@ -124,7 +155,7 @@ internal static class H2OfficeDiscoveryTests
     {public WorkAssistantWindowSnapshot? CaptureForeground()=>new(1001,11,101,"EXCEL","Synthetic Office");public WorkAssistantWindowSnapshot? InspectWindow(long handle)=>CaptureForeground();}
     private sealed class Probe:IOfficeWindowProbe
     {
-        public sealed class Item {public required OfficeWindowCandidate Candidate;public required string Name;public object Document=new();public string? Fault;}
+        public sealed class Item {public required OfficeWindowCandidate Candidate;public required string Name;public object Document=new();public string? Fault;public Action? OnSelection;}
         public List<Item> Views=[];public List<long> Opens=[];public int Releases,SelectionReads;
         public long ForegroundRoot{get;set;}
         public Item Add(int pid,long start,long hwnd,string name,object? document=null,string application="excel")
@@ -135,8 +166,30 @@ internal static class H2OfficeDiscoveryTests
             Opens.Add(candidate.RootHandle);var i=Views.First(x=>x.Candidate==candidate);
             if(i.Fault is{} code)throw new OfficeHostFaultException(code,"Controlled failure",true);
             return new(candidate,candidate.RootHandle,new object(),i.Document,new object(),i.Name,i.Name,false,"FIXTURE-NOT-OFFICE",
-                ()=>{SelectionReads++;return candidate.Application=="word"?"word-range:3:9":"Sheet1!A1";},()=>Releases++);
+                ()=>{SelectionReads++;i.OnSelection?.Invoke();return candidate.Application=="word"?"word-range:3:9":"Sheet1!A1";},()=>Releases++);
         }
+    }
+    // Test-only seam for the manual native marker report. These tests are never E3 evidence.
+    private sealed class MarkerBackend:IOfficeBackend
+    {
+        public OfficeNativeIdentity Identity=new(11,101,1,1001,1001,11001,"controlled-document","FIXTURE");
+        public bool Complete=true,WrongReadback;public int BodyReads;public string Text="DOC-A";
+        private OfficeDiscoveryReport Report=>new(Complete,"CONTROLLED_FIXTURE",0,1,1,[]);
+        public ExcelDiscovery DiscoverExcel()=>new([new("session","Document1","Document1",false,"","",""){NativeIdentity=Identity}],null){Report=Report};
+        public WordDiscovery DiscoverWord()=>new([new("session","Document1","Document1",false,0,0,"",""){NativeIdentity=Identity}],null){Report=Report};
+        public ExcelLiveSnapshot SnapshotExcel(string id)
+        { BodyReads++;return new(id,"Document1","Document1",false,"Sheet1","A1",
+            [new("Sheet1","Visible",[new("A1",Text,"",false,false,null,"General","left","top")],[],[],[])],"state")
+            {NativeIdentity=WrongReadback?Identity with{ViewWindowHandle=2001}:Identity}; }
+        public WordLiveSnapshot SnapshotWord(string id)
+        { BodyReads++;return new(id,"Document1","Document1",false,0,0,"",[new(0,Text,"Normal",[])],[],[],[],[],"state")
+            {NativeIdentity=WrongReadback?Identity with{ViewWindowHandle=2001}:Identity}; }
+        public ExcelPatchResult PatchExcel(ExcelPatchRequest r)=>throw new InvalidOperationException("Marker probe must not mutate.");
+        public ExcelLiveSnapshot RecalculateExcel(ExcelRecalculateRequest r)=>throw new InvalidOperationException("Marker probe must not mutate.");
+        public OfficeSaveCopyResult SaveExcelCopy(OfficeSaveCopyRequest r)=>throw new InvalidOperationException("Marker probe must not mutate.");
+        public WordPatchResult PatchWord(WordPatchRequest r)=>throw new InvalidOperationException("Marker probe must not mutate.");
+        public WordLanguageEvidenceResult InspectWordLanguage(WordLanguageEvidenceRequest r)=>throw new InvalidOperationException("Marker probe must not inspect language.");
+        public OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest r)=>throw new InvalidOperationException("Marker probe must not mutate.");
     }
     private sealed class CaptureClient:IOfficeSessionClient,IOfficeCaptureClient
     {

@@ -268,9 +268,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         next = "No document content was changed. Correct the patch for the same original paragraphs and retry. A verified correction resolves this rejected attempt." });
                 WordPatchResult patch;
                 try { patch = await Client.PatchWordAsync(new(session, token, true, paragraphs), ct).ConfigureAwait(false); }
-                catch (OfficeHostClientException ex) when (ex.Code == "word_patch_rejected")
+                catch (OfficeHostClientException rejected) when (rejected.Code == "word_patch_rejected")
                 {
-                    return JsonSerializer.Serialize(new { ok = false, error = ex.Code, message = ex.Message,
+                    return JsonSerializer.Serialize(new { ok = false, error = rejected.Code, message = rejected.Message,
                         failureId = _wordRecovery.Reject(name, beforeWord, paragraphs), mutationApplied = false });
                 }
                 var after = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);

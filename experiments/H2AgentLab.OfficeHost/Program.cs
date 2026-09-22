@@ -7,6 +7,8 @@ public static class Program
     {
         try
         {
+            if (args.Length>0 && (args[0] is "--native-catalog" or "--native-markers"))
+                return OfficeNativeMarkerProbe.Run(args);
             var pipeIndex = Array.IndexOf(args, "--pipe");
             if (pipeIndex < 0 || pipeIndex + 1 >= args.Length || string.IsNullOrWhiteSpace(args[pipeIndex + 1]))
             {

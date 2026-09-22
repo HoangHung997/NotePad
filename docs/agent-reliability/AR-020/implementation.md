@@ -11,3 +11,13 @@ Native identities pass into the existing production binding and snapshot checks.
 E1/E2 tests use injected native-object probes/Office clients plus concrete H2 capture, binding and headless UI projection. They cannot certify native Office. E3 must read DOC-A/B/UNSAVED-ONLY on two native instances and views, including Save As, close/reopen and modal cases; currently NOT_RUN. AR-083 remains DEFERRED_BY_USER and no E5 is claimed.
 
 Sources reviewed: Microsoft Learn AccessibleObjectFromWindow (oleacc.h), Excel Window.Hwnd/ActiveSheet/Selection and Word Window.Hwnd/Document/Selection. Native API documentation is not a compatibility test.
+
+## First build and review repair (not acceptance)
+
+Exact source `9e2536970263eaa92ceea89131969fcd55a8ff3c` was delivered and the Windows environment was measured in run `35729096391`.
+The build failed with CS0136 in H2OfficeRuntimeTools (a catch-variable name collided with a discovery pattern variable); tests were NOT_RUN.
+Excel.Application and Word.Application were both unregistered on that runner. This is an actual E3 environment gap, not a waived gate.
+
+Review adds a borrowed-view re-probe after selection capture and around snapshot reads, preserving NoEffect=false when an identity error occurs after a possible mutation.
+The opt-in native marker helper/runbook reads only exact user-supplied small test resources; it never starts/closes Office, never modifies documents, and never automatically awards E3.
+Its fake backend tests prove harness logic only. Native view enumeration/marker/reopen/modal behavior remains AWAITING_ENVIRONMENT until the full native matrix is executed.
