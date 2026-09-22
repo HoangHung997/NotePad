@@ -63,7 +63,18 @@ public sealed class CapabilityProviderToolRegistryAdapter
                     summary.ResourceScope,
                     summary.ResourceScope),
                 serializationKey: summary.SerializationKey,
-                canProvideVerificationEvidence: false);
+                canProvideVerificationEvidence: false,
+                readiness: new(provider.Health.Status switch {
+                    ProviderHealthStatus.Ready => ToolReadinessState.Ready,
+                    ProviderHealthStatus.Degraded => ToolReadinessState.Degraded,
+                    ProviderHealthStatus.Connecting => ToolReadinessState.Busy,
+                    _ => ToolReadinessState.Unavailable }),
+                dependencies: [provider.Provenance.ProviderId],
+                readinessSnapshot: () => new(provider.Health.Status switch {
+                    ProviderHealthStatus.Ready => ToolReadinessState.Ready,
+                    ProviderHealthStatus.Degraded => ToolReadinessState.Degraded,
+                    ProviderHealthStatus.Connecting => ToolReadinessState.Busy,
+                    _ => ToolReadinessState.Unavailable }));
 
             _registry.Register(descriptor);
             descriptors.Add(descriptor);
@@ -99,10 +110,9 @@ public sealed class CapabilityProviderToolRegistryAdapter
                 throw new InvalidOperationException(
                     $"Provider executor expected '{_toolName}', received '{call.Name}'.");
 
-            return _provider.ExecuteToolAsync(
-                _toolName,
-                call.Arguments,
-                cancellationToken);
+            return _provider is IInvocationAwareCapabilityProvider aware
+                ? aware.ExecuteToolAsync(_toolName, call.Arguments, ToolInvocation.Bind(call), cancellationToken)
+                : _provider.ExecuteToolAsync(_toolName, call.Arguments, cancellationToken);
         }
     }
 }

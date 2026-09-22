@@ -9,7 +9,11 @@ using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace H2AgentLab;
 
-public sealed record ToolCall(string Id, string Name, JsonElement Arguments);
+public sealed record ToolCall(string Id, string Name, JsonElement Arguments)
+{
+    // Assigned by the host, never taken from tool arguments or used as a permission grant.
+    public H2AgentLab.Tools.ToolInvocation? Invocation { get; init; }
+}
 public sealed record Approval(string Title, string Details);
 public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     Func<Approval, CancellationToken, Task<bool>> approve, Action<string, string> journal)

@@ -97,7 +97,7 @@ public sealed class AgentVerificationRequiredException : InvalidOperationExcepti
 public sealed class AgentRuntime : IAsyncDisposable
 {
     // MB-10: this is the new provider-neutral runtime path; UI ownership moves here in MB-11.
-    private const int MaxToolOutputCharacters = 64_000;
+    private const int MaxToolOutputCharacters = ToolOutcomeBridge.MaxModelOutputCharacters;
 
     private readonly IAgentTransport _transport;
     private readonly AgentContextManager _contextManager;
@@ -205,6 +205,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId)>();
         var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
         var completionRepairRequested = false;
+        var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
+        var uncertainResources = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -246,6 +248,10 @@ public sealed class AgentRuntime : IAsyncDisposable
                     await _hooks.BeforeCompletionAsync(new(hookScope, effectiveContract, round.Text,
                         latestVerification, unresolvedCalls.Count, mutationAwaitingVerification), cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (pendingOperations.Count > 0)
+                        throw new AgentVerificationRequiredException("Chưa thể hoàn tất: còn công việc đang chạy hoặc tác động cần đối soát. "
+                            + string.Join("; ", pendingOperations.Values.Take(8).Select(o => o.Status + (o.Job is null ? "" : " job=" + o.Job.JobId)))
+                            + ". Không tự lặp thao tác ghi.");
                     if (unresolvedCalls.Count > 0)
                         throw new AgentVerificationRequiredException(
                             "Chưa hoàn thành: công cụ vẫn còn lỗi — " + string.Join("; ",
@@ -286,6 +292,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     toolRounds,
                     round.ToolCalls,
                     failedMutationSignatures,
+                    uncertainResources,
                     cancellationToken).ConfigureAwait(false);
 
                 var results = execution.Results.ToArray();
@@ -297,6 +304,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     RawToolOutputs = execution.RawToolOutputs,
                     MutationCallIds = execution.Calls.Where(call =>
                         execution.RawToolOutputs.ContainsKey(call.Id)
+                        && execution.Results.Any(r => r.ToolCallId == call.Id && r.Outcome?.Effect != ToolMutationEffect.None)
                         && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
                         .Select(call => call.Id).ToArray()
                 };
@@ -315,9 +323,14 @@ public sealed class AgentRuntime : IAsyncDisposable
                     var recoveryOutput = execution.RawToolOutputs.TryGetValue(executedCall.Id, out var rawRecovery)
                         ? rawRecovery : result.Content;
                     request.ToolResultObserver?.Invoke(result);
+                    if (result.Outcome is { IsPending: true } pending)
+                    {
+                        pendingOperations[pending.Invocation.LogicalOperationId] = pending;
+                        if (pending.Resource is not null) uncertainResources.Add(pending.Resource.Id);
+                    }
                     if (result.IsError)
                     {
-                        var code = "tool_error";
+                        var code = result.Outcome?.Error?.Code ?? "tool_error";
                         string[] recovery = [executedName];
                         string? failureId = null;
                         try
@@ -435,6 +448,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                     usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
             }
         }
+        catch (ToolInvocationCancelledException cancelled)
+        {
+            request.ToolResultObserver?.Invoke(new(cancelled.ToolCallId, cancelled.ToolName,
+                cancelled.Observed.DomainPayload, true) { Outcome = cancelled.Observed.Outcome });
+            _transport.Cancel();
+            throw;
+        }
         catch (OperationCanceledException)
         {
             _transport.Cancel();
@@ -469,6 +489,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         int toolRound,
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         IReadOnlySet<string> failedMutationSignatures,
+        IReadOnlySet<string> uncertainResources,
         CancellationToken cancellationToken)
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
@@ -489,19 +510,35 @@ public sealed class AgentRuntime : IAsyncDisposable
                 throw new InvalidOperationException(
                     "Model proposed a missing or duplicate tool-call ID.");
 
-            var arguments = ParseArguments(transportCall.ArgumentsJson);
-            var call = new global::H2AgentLab.ToolCall(
-                transportCall.Id,
-                ResolveCallableName(transportCall.Name),
-                arguments);
+            JsonElement arguments;
+            var invalidArguments = false;
+            try { arguments = ParseArguments(transportCall.ArgumentsJson); }
+            catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
+            { arguments = JsonSerializer.SerializeToElement(new { }); invalidArguments = true; }
+            var resolvedName = ResolveCallableName(transportCall.Name);
+            var call = new global::H2AgentLab.ToolCall(transportCall.Id, resolvedName, arguments)
+            { Invocation = ToolInvocation.Create(contract.TaskId, resolvedName, arguments) };
             calls[i] = call;
+            if (invalidArguments)
+            {
+                var rejected = ToolOutcomeBridge.Failure(call, null, "invalid_arguments", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
 
             if (string.Equals(
                     call.Name,
                     DeferredToolDiscovery.SearchToolName,
                     StringComparison.Ordinal))
             {
-                var output = _discovery.ExecuteToolSearch(call);
+                string output;
+                try { output = _discovery.ExecuteToolSearch(call); }
+                catch (ArgumentException)
+                {
+                    var rejected = ToolOutcomeBridge.Failure(call, null, "invalid_arguments", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                    results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                    continue;
+                }
                 var trace = _discovery.LoadTrace.Last();
                 foreach (var name in trace.NewlyLoadedNames)
                 {
@@ -538,6 +575,23 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            if (descriptor.Preflight?.Invoke(call) is { } preflight)
+            {
+                preflight = ToolOutcomeBridge.Validate(preflight, call, descriptor);
+                var projected = _evidenceProjector?.Project(descriptor, $"tool-result:{turnId:N}:{toolRound}:{i}",
+                    ((long)toolRound * 1_000L) + i, preflight.DomainPayload);
+                if (projected is not null) evidence.Add(projected.Evidence);
+                results[i] = new(call.Id, transportCall.Name, BoundToolOutput(projected?.ModelContent ?? preflight.DomainPayload),
+                    preflight.Outcome.IsError) { Outcome = preflight.Outcome };
+                continue;
+            }
+            if (!descriptor.CurrentReadiness.CanExecute)
+            {
+                var rejected = ToolOutcomeBridge.Failure(call, descriptor, ToolOutcomeBridge.ReadinessCode(descriptor.CurrentReadiness),
+                    ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
             if (!_discovery.LoadedSchemaNames.Contains(
                     descriptor.Name,
                     StringComparer.Ordinal))
@@ -594,6 +648,14 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            if (descriptor.IsMutating && uncertainResources.Contains(OutcomeResourceId(permission.ResourceKey ?? resourceKey ?? descriptor.Name)))
+            {
+                // This attempt did not execute. The earlier pending operation remains unresolved;
+                // changing arguments or tool names does not permit blindly writing that resource.
+                var rejected = ToolOutcomeBridge.Failure(call, descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
             var mutationSignature = descriptor.IsMutating
                 ? MutationSignature(call)
                 : null;
@@ -637,7 +699,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var rawOutput = scheduledResult.Output ?? "";
                 var deniedBeforeExecution = IsPermissionDenial(rawOutput);
                 if (!deniedBeforeExecution) rawToolOutputs[calls[original].Id] = rawOutput;
-                if (!deniedBeforeExecution && scheduled[i].MutationSignature is { } mutationSignature)
+                if (!deniedBeforeExecution && scheduledResult.Outcome?.Effect != ToolMutationEffect.None
+                    && scheduled[i].MutationSignature is { } mutationSignature)
                     executedMutationSignatures.Add(mutationSignature);
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
@@ -651,11 +714,28 @@ public sealed class AgentRuntime : IAsyncDisposable
                 if (projection is not null)
                     evidence.Add(projection.Evidence);
 
-                results[original] = new AgentToolResult(
-                    calls[original].Id,
-                    transportCalls[original].Name,
-                    BoundToolOutput(projection?.ModelContent ?? rawOutput),
-                    IsError: deniedBeforeExecution || IsToolFailure(rawOutput));
+                var outcome = scheduledResult.Outcome ?? ToolOutcomeBridge.FromLegacy(calls[original], scheduled[i].Request.Descriptor, rawOutput).Outcome;
+                outcome = outcome with { Resource = outcome.Resource ?? new ToolOutcomeResource(
+                    OutcomeResourceId(scheduled[i].Permission.ResourceKey ?? scheduled[i].Request.Descriptor.Name)),
+                    EvidenceRefs = projection is null ? outcome.EvidenceRefs : [projection.Evidence.ReferenceId] };
+                var outputLimit = scheduled[i].Request.Descriptor.Limits.MaxOutputCharacters;
+                if (projection is not null && rawOutput.Length > Math.Min(AgentRuntimeEvidenceProjector.MaxInlineToolOutputCharacters, outputLimit))
+                    outcome = outcome with { Completeness = new(false, Reason: "artifact_projection"),
+                        ArtifactRefs = [projection.Evidence.ReferenceId] };
+                var modelContent = projection?.ModelContent ?? rawOutput;
+                if (modelContent.Length > outputLimit)
+                {
+                    // Never silently claim an excerpt is complete. Production always supplies
+                    // the existing artifact projector; an unconfigured test host has no cursor.
+                    outcome = outcome with { Completeness = new(false, Reason: projection is null ? "bounded_excerpt_without_artifact" : "artifact_projection") };
+                    modelContent = projection is null ? modelContent[..Math.Max(0, outputLimit - 32)] + "…[truncated]"
+                        : JsonSerializer.Serialize(new { complete = false, artifactRef = projection.Evidence.ReferenceId, reason = "read_existing_artifact" });
+                }
+                // Legacy payload shape stays available to existing consumers/verifiers. A pending
+                // or uncertain operation additionally tells the model not to treat it as completion.
+                if (outcome.IsPending) modelContent += "\n[HOST TOOL OUTCOME] " + JsonSerializer.Serialize(outcome);
+                results[original] = new AgentToolResult(calls[original].Id, transportCalls[original].Name,
+                    BoundToolOutput(modelContent), IsError: deniedBeforeExecution || outcome.IsError) { Outcome = outcome };
             }
         }
 
@@ -663,6 +743,13 @@ public sealed class AgentRuntime : IAsyncDisposable
             throw new InvalidOperationException(
                 "AgentRuntime tool batch did not produce one result per tool call.");
 
+        for (var i = 0; i < results.Length; i++)
+        {
+            if (results[i]!.Outcome is not null) continue;
+            _registry.TryGet(calls[i].Name, out var d);
+            var outcome = ToolOutcomeBridge.FromLegacy(calls[i], d, results[i]!.Content, preflight: true).Outcome;
+            results[i] = results[i]! with { Outcome = outcome };
+        }
         return new ExecutionBatch(
             calls,
             results.Select(x => x!).ToArray(),
@@ -677,6 +764,9 @@ public sealed class AgentRuntime : IAsyncDisposable
 
     private static string? ResourceKey(ToolDescriptor descriptor)
         => descriptor.ResourceScope?.ScopeId;
+
+    private static string OutcomeResourceId(string key)
+        => "scope-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key))).ToLowerInvariant();
 
     private string ResolveCallableName(string supplied)
     {
@@ -711,19 +801,6 @@ public sealed class AgentRuntime : IAsyncDisposable
         var before = failed.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         var after = retry.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         return before.Count > 0 && before.Count == after.Count && before.All(p => after.TryGetValue(p.Key, out var value) && JsonElement.DeepEquals(p.Value, value));
-    }
-
-    private static bool IsToolFailure(string output)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(output);
-            var root = document.RootElement;
-            return root.ValueKind == JsonValueKind.Object
-                && ((root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False)
-                    || (root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False));
-        }
-        catch (JsonException) { return false; }
     }
 
     private static bool IsPermissionDenial(string output)

@@ -1,0 +1,23 @@
+# AR-011 — typed execution outcome, readiness and bounded projection
+
+Status: ACTIVE / NOT_RUN. No new C# or application PASS is claimed until exact-source Windows CI is reviewed.
+
+## Scope and compatibility
+
+Existing ToolDescriptor/ToolRegistry/scheduler/AgentRuntime/production permission wrappers and H2AgentProgress stay authoritative. A small typed ToolOutcome carries host InvocationId (fresh per attempt), task-scoped LogicalOperationId, status, effect, verification, completeness, job/error/resource references. No ProjectRecord, parallel engine, evidence store, new model endpoint or NAS protocol is introduced. Legacy domain strings remain exact raw verifier inputs and artifact contents. New consumers can serialize data inside the logical envelope; AgentToolResult carries metadata out-of-band during migration. Not every legacy external provider wire protocol supports these IDs; the optional identity-aware interface forwards IDs where implemented and does not certify durable idempotency.
+
+Success is execution, not verification. Provider verification claims cannot self-award host reports. Existing VerificationObserver and completion gates remain authoritative. Tool activity at execution time correctly reports NotRun; a later separate host-verification activity is still the authority. Running with JobId, partial and unknown effects cannot complete the task. Unknown/pending effects fence further same-resource writes in the current scheduler/runtime; this is conservative in-memory protection, NOT AR-040 job polling or AR-041 restart/reconciliation. Starting a durable background job was not added.
+
+Errors before any effect use explicit preflight proof. Exceptions after dispatch of a mutating executor conservatively carry Unknown; IOException after a real fixture file write cannot become a generic safe retry. Cancellation is propagated, with effect metadata, and never converted to an automatic retry. Recovery advice is bounded catalog data, not executable authority. Existing closed-file preflight faults retain their legacy structured payload and guarded recovery identity.
+
+Readiness and non-callable unavailable capability notices are in the same registry. Search separates registered/ready/exposed; configured web fetch/feed is distinct from absent search/browser backends. Provider health reads only cached state; packaged Office helper checks do not launch Office. Packaged helper means Degraded/not-probed, never proof of native Office readiness. Limits use the existing output projector/artifact store and shared Excel cardinality; bounded model projections explicitly carry completeness=false and existing artifact references. Native Office discovery/paging/partial writes remain later tasks.
+
+## Registered E1/E2 tests (awaiting execution)
+
+H2AgentToolOutcomeTests is wired into the existing H2Notes.Tests runner. Concrete production adapter, actual permission wrapper/registry/scheduler/runtime and H2 activity projection run on disposable temporary files with a scripted no-network transport. Cases include success without verifier, job result/replay, no-effect preflight, real write then lost response with same-batch/next-round fencing, partial effects, typed paging, malformed JSON/metadata, unavailable tool discovery, missing web configuration, denied permission, cancellation during actual executor work, canonical identities and cached provider readiness. Test-only controlled executors are injected; no Office application, paid model or personal document is used. Preserve AR-010/001 and all mandatory suites.
+
+## Baseline and evidence boundary
+
+Remote main: 1283bc13e07c3cd47d04886166de3dfc595422c0. Existing PR #3, branch feature/h2-agent-reliability-ar-000. Source snapshot 4b2c3d138352191d4668a23df72f7b7d489d6820 came from read-only CI artifact 10682536313; hash and clean identity verified before local edits. Container has no .NET/PowerShell or direct GitHub DNS. Windows CI is required; local diff validation is not E1/E2.
+
+E3 native Office/provider/model and E4 real H2 UI/model/tools: NOT_RUN / AWAITING_ENVIRONMENT. AR-083: DEFERRED_BY_USER, physical E5 not certified. MB-124–127 and remaining AR tasks are unchanged. No merge into main is authorized.

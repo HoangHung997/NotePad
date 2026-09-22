@@ -182,7 +182,10 @@ public sealed record H2AgentProgress(
     DateTime AtUtc,
     string Kind,
     string Code,
-    string Message);
+    string Message)
+{
+    public H2AgentToolOutcome? ToolOutcome { get; init; }
+}
 
 public sealed record H2AgentApproval(
     Guid ApprovalId,

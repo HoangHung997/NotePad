@@ -67,8 +67,22 @@ internal sealed class H2OfficeRuntimeTools(Func<bool> authorized, string outputR
                     parameters = new { type = "object", properties, required, additionalProperties = false } } }),
                 new DelegatingToolExecutor("h2-office-host", ExecuteAsync), resourceScope: new(capability.ResourceScope, "observed-session"),
                 serializationKey: "office-host", canProvideVerificationEvidence: true,
-                preference: new("active-content", ToolInteractionFidelity.Structured)));
+                preference: new("active-content", ToolInteractionFidelity.Structured),
+                readiness: new(!OperatingSystem.IsWindows() ? ToolReadinessState.Unsupported
+                    : H2HelperLocator.IsPackaged("H2AgentLab.OfficeHost") ? ToolReadinessState.Degraded : ToolReadinessState.Unavailable),
+                limits: new(MaxBatchItems: name is "excel.write_range" or "excel.set_formula" or "excel.apply_format" ? ExcelPatchLimits.MaxCells : null),
+                dependencies: ["office-host"], resultFormat: ToolResultFormat.Json, preflight: CountPreflight));
         }
+    }
+
+    private static ToolExecutionOutput? CountPreflight(ToolCall call)
+    {
+        if (call.Name is not ("excel.write_range" or "excel.set_formula" or "excel.apply_format")) return null;
+        var count = call.Arguments.TryGetProperty("cells", out var batch) && batch.ValueKind == JsonValueKind.Array ? batch.GetArrayLength() : -1;
+        return ExcelPatchLimits.ValidationError(count) is { } problem
+            ? ToolOutcomeBridge.Failure(call, null, ExcelPatchLimits.ErrorCode, ToolErrorPhase.Preflight, ToolMutationEffect.None,
+                JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode, message = problem, mutationApplied = false }))
+            : null;
     }
 
     private async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken ct)

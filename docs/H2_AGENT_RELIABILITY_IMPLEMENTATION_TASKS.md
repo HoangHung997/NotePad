@@ -75,7 +75,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
 | AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | DONE |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | DONE |
-| AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | NOT_STARTED |
+| AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | ACTIVE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | NOT_STARTED |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
@@ -149,7 +149,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-010 acceptance - 2026-09-22:** IMPLEMENTED / E2_PASS / DONE on `14767f0fdaf3ead109867c41caf34111adb8c02a`; full CI `35698496546` and packaged-helper IPC/publish PASS; AR-010 11/11 x3, AR-001 13/13 and 74/74 Agent suites on exact code in `35698479792`, repeated on read-only workflow head in `35698742558`. [Evidence](agent-reliability/AR-010/acceptance.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER; no other task closed.
 
-### [ ] AR-011 — Hợp đồng kết quả, lỗi, readiness và giới hạn
+### [~] AR-011 — Hợp đồng kết quả, lỗi, readiness và giới hạn
 
 **Sửa/reuse:** ToolDescriptor/ToolRegistry, production tool wrappers, provider metadata và error mapping. Xây envelope nhỏ theo SPEC §6; adapter cho kết quả cũ khi cần.
 
@@ -467,32 +467,24 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-010_ACCEPTED_NEXT_AR-011",
+  "phase": "AR-011_ACTIVE",
   "active_task": "AR-011",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar010-2026-09-22",
-  "last_code_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+  "owner_session": "chatgpt-ar011-2026-09-22",
+  "last_code_commit": "PENDING_DELIVERY_SEE_GIT_COMMIT",
   "last_validated_code_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
   "last_validation_result": "FULL_REQUIRED_CI_AND_E2_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "CI test checkouts verified CLEAN. Documentation finalization stages only three declared docs and verifies non-force push/remote HEAD. Offline source review is committed as a non-authoritative local snapshot; no unpublished runtime diff remains. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Isolated offline review snapshot from exact source 4b2c3d138352191d4668a23df72f7b7d489d6820; source patch pending push/Windows CI. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T07:27:50.094989+00:00",
-  "completed_this_session": [
-    {
-      "id": "AR-010",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "E2_PASS",
-      "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-      "full_ci_run": 35698496546
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T08:00:00.513598+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-011 has not started. Existing runtime hooks are ready; outcome/error/readiness semantics still require implementation and tests."
+    "Run exact-source AR-011 tests, preserved AR-010/001 regression, all required Agent suites, full Avalonia CI and publish/helper smoke; fix actual failures before acceptance."
   ],
   "last_test_commands": [
     {
@@ -709,11 +701,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-010/implementation.md"
   ],
   "known_failures": [
-    "No failure remains observed in AR-010/AR-001 and all required suites at accepted code SHA.",
-    "E3 native Office/provider/model and E4 H2 UI+model+real tools remain NOT_RUN / AWAITING_ENVIRONMENT.",
-    "AR-083 remains DEFERRED_BY_USER; NAS package and local harness are not physical E5.",
-    "Checkpoint hooks are in-memory boundaries except a referenced existing Lab CompactionManager durable checkpoint. AR-031/041/050/051 and B04-B10 are not implemented or closed by AR-010.",
-    "MB-124-127, H2M-133 and historical native acceptance debts are not re-awarded."
+    "New C# implementation has not been compiled or executed yet."
   ],
   "external_blockers": [
     "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
@@ -729,7 +717,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On feature/h2-agent-reliability-ar-000 and PR #3, reconcile current main, checkpoint, working tree and checks. Start only AR-011: read SPEC section 6 and task acceptance; extend existing ToolDescriptor/registry and production wrappers with status/effect/verification/completeness and bounded error/readiness metadata, preserve existing domain payloads and permission gates, and add concrete executor-to-runtime-to-UI tests. Retain AR-010 and AR-001 corpora. Do not create a second engine/store, change NAS protocol, or call E3/E4/E5 complete.",
+  "next_exact_action": "Continue AR-011 only on the existing branch/PR #3. Inspect exact delivery SHA and Windows CI outcome; fix actual compilation/runtime/regression failures and retain their evidence. Do not advance AR-012 before AR-011 acceptance.",
   "next_task_if_active_done": "AR-012",
   "last_runtime_source_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
   "previous_saved_checkpoint_commit": "89a4964d57a8fa5a129b76cb341f23ac1d471262",

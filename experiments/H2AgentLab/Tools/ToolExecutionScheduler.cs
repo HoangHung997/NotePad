@@ -10,7 +10,10 @@ public sealed record ToolExecutionRequest(
 public sealed record ToolExecutionResult(
     int Index,
     string ToolName,
-    string Output);
+    string Output)
+{
+    public ToolOutcome? Outcome { get; init; }
+}
 
 /// <summary>
 /// Executes independent parallel-safe reads concurrently. A mutation must identify its resource and
@@ -23,6 +26,7 @@ public sealed class ToolExecutionScheduler : IDisposable
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _resourceGates =
         new(StringComparer.Ordinal);
     private bool _disposed;
+    private readonly ConcurrentDictionary<string, byte> _uncertainResources = new(StringComparer.Ordinal);
 
     public async Task<IReadOnlyList<ToolExecutionResult>> ExecuteBatchAsync(
         IReadOnlyList<ToolExecutionRequest> requests,
@@ -76,10 +80,13 @@ public sealed class ToolExecutionScheduler : IDisposable
                 resourceTaken = true;
             }
 
-            var output = await request.Descriptor.Executor.ExecuteAsync(
-                request.Call,
-                cancellationToken).ConfigureAwait(false);
-            results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output);
+            var call = request.Call with { Invocation = ToolInvocation.Bind(request.Call) };
+            var output = request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!)
+                ? ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None)
+                : await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+            if (request.Descriptor.IsMutating && output.Outcome.IsPending) _uncertainResources.TryAdd(resourceKey!, 0);
+            results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output.DomainPayload)
+            { Outcome = output.Outcome };
         }
         finally
         {

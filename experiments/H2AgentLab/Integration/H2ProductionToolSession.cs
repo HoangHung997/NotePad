@@ -49,51 +49,62 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             commands.Register(registry, tools.Workspace); verifiers.Add(commands);
         }
         var wrapped = new ToolRegistry();
+        foreach (var notice in registry.CapabilityNotices) wrapped.RegisterCapabilityNotice(notice);
         foreach (var descriptor in registry.Tools)
         {
             if (descriptor.Namespace.Name == "desktop" && tools.Desktop is null) continue;
             if (descriptor.Name == "open_file" && _scope?.ScopeKind == H2AgentResourceScopeKind.Workspace) continue;
-            var executor = new DelegatingToolExecutor("h2-authorized-tool", async (call, ct) =>
+            var executor = new DelegatingOutcomeToolExecutor("h2-authorized-tool", async (call, ct) =>
             {
                 var permission = Check(descriptor, call);
-                if (!permission.Allowed) return Denied(permission);
+                if (!permission.Allowed) return Rejected(call, descriptor, permission);
                 var key = permission.ResourceKey ?? descriptor.Name;
                 if (descriptor.IsMutating)
                 {
                     await _approvalGate.WaitAsync(ct).ConfigureAwait(false);
                     try
                     {
-                        if (_declined.Contains(key)) return Denied(permission with { Allowed = false, Code = "denied", Message = "This resource was declined for this task." });
+                        if (_declined.Contains(key)) return Rejected(call, descriptor, permission with { Allowed = false, Code = "denied", Message = "This resource was declined for this task." });
                         if (!MayAutoApprove(descriptor, call)
                             && !await _approve("Cho phép " + descriptor.Name + "?",
                                 "Phạm vi: " + key + "\nThay đổi đề xuất:\n" + call.Arguments.GetRawText(), ct).ConfigureAwait(false))
                         {
                             _declined.Add(key);
-                            return Denied(permission with { Allowed = false, Code = "denied", Message = "Người dùng đã từ chối thay đổi." });
+                            return Rejected(call, descriptor, permission with { Allowed = false, Code = "denied", Message = "Người dùng đã từ chối thay đổi." });
                         }
                         permission = Check(descriptor, call);
-                        if (!permission.Allowed) return Denied(permission);
+                        if (!permission.Allowed) return Rejected(call, descriptor, permission);
                     }
                     finally { _approvalGate.Release(); }
                 }
                 ct.ThrowIfCancellationRequested();
                 _executingAuthorizedCall.Value = true;
-                try { return await descriptor.Executor.ExecuteAsync(call, ct).ConfigureAwait(false); }
-                catch (Exception ex) when (ex is IOException or HttpRequestException or FormatException
-                    or ArgumentException or InvalidOperationException or TimeoutException or KeyNotFoundException)
+                try
                 {
-                    return JsonSerializer.Serialize(new { ok = false,
-                          error = ex is H2AgentLab.Office.OfficeHostClientException officeError ? officeError.Code
-                              : ex is ArgumentException or FormatException ? "invalid_arguments" : "tool_failed",
-                        message = ex.Message.Length <= 1500 ? ex.Message : ex.Message[..1500],
-                        next = "Inspect the error and current resource state, correct the arguments, then retry the discovered tool. Do not claim success." });
+                    // Common metadata stays out-of-band; the domain verifier sees exact old bytes.
+                    // Typed executors preserve their effect/job/completeness across this wrapper.
+                    var output = descriptor.Executor is IAgentToolOutcomeExecutor typed
+                        ? await typed.ExecuteOutcomeAsync(call, ct).ConfigureAwait(false)
+                        : ToolOutcomeBridge.FromLegacy(call, descriptor,
+                            await descriptor.Executor.ExecuteAsync(call, ct).ConfigureAwait(false));
+                    return ToolOutcomeBridge.Validate(output, call, descriptor);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) when (ex is IOException or HttpRequestException or FormatException
+                    or ArgumentException or InvalidOperationException or TimeoutException or KeyNotFoundException
+                    or UnauthorizedAccessException or NotSupportedException)
+                {
+                    return ToolOutcomeBridge.FromException(call, descriptor, ex,
+                        ex is H2AgentLab.Office.OfficeHostClientException office ? office.Code : null);
                 }
                 finally { _executingAuthorizedCall.Value = false; }
             });
             wrapped.Register(new ToolDescriptor(descriptor.Name, descriptor.Namespace, descriptor.Description,
                 descriptor.Risk, descriptor.Access, descriptor.SupportsParallel, descriptor.SchemaVersion,
                 descriptor.CallableSchema, executor, descriptor.Provenance, descriptor.ResourceScope,
-                descriptor.SerializationKey, descriptor.CanProvideVerificationEvidence, descriptor.Preference));
+                descriptor.SerializationKey, descriptor.CanProvideVerificationEvidence, descriptor.Preference,
+                descriptor.Readiness, descriptor.Limits, descriptor.Dependencies, descriptor.SupportedOperations, descriptor.ResultFormat,
+                descriptor.Preflight, descriptor.ReadinessSnapshot));
         }
         return wrapped;
     }
@@ -173,6 +184,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
 
     internal static string? Arg(ToolCall call, string name)
         => call.Arguments.TryGetProperty(name, out var node) && node.ValueKind == JsonValueKind.String ? node.GetString() : null;
+    private static ToolExecutionOutput Rejected(ToolCall call, ToolDescriptor descriptor, AgentRuntimePermissionDecision decision)
+        => ToolOutcomeBridge.Failure(call, descriptor, decision.Code, ToolErrorPhase.Preflight,
+            ToolMutationEffect.None, Denied(decision));
     private static string Denied(AgentRuntimePermissionDecision decision)
         => JsonSerializer.Serialize(new { ok = false, error = decision.Code, message = decision.Message, scope = decision.ResourceKey });
 

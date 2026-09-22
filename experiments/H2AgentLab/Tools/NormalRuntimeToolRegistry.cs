@@ -325,7 +325,9 @@ public static class NormalRuntimeToolRegistry
             serializationKey: mutationScope ?? card.Namespace,
             canProvideVerificationEvidence:
                 card.Evidence || card.Access == AgentToolAccess.Mutating,
-            preference: card.Preference));
+            preference: card.Preference,
+            limits: new(SupportsPagination: card.Name is "read_file" or "read_tool_output"),
+            resultFormat: ToolResultFormat.Json));
     }
 
     private static JsonElement Schema(Card card)
@@ -537,13 +539,19 @@ public static class NormalRuntimeToolRegistry
             var fault = global::H2AgentLab.RecoveryPolicy.Classify(
                 exception,
                 call.Name);
+            fault = fault with { Message = ToolOutcomeBridge.SafeMessage(fault.Code) };
             var result = new JsonObject
             {
-                ["error"] = exception.Message,
+                ["error"] = fault.Message,
                 ["success"] = false,
                 ["recovery"] =
                     global::H2AgentLab.RecoveryPolicy.ToJson(fault)
             };
+            // Only typed, documented preflight rejection establishes that no mutation ran.
+            // IOException text is not evidence that a file operation was atomic.
+            if (exception is global::H2AgentLab.AgentFaultException known
+                && known.Code is "stale_state" or "invalid_arguments" or "denied" or "boundary" or "permission_required")
+                result["mutationApplied"] = false;
 
             if (fault.Code == "not_found"
                 && call.Arguments.TryGetProperty("path", out var missing)

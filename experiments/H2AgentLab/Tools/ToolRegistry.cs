@@ -154,7 +154,14 @@ public sealed record ToolDescriptor
         ToolResourceScope? resourceScope = null,
         string? serializationKey = null,
         bool canProvideVerificationEvidence = false,
-        ToolPreferenceMetadata? preference = null)
+        ToolPreferenceMetadata? preference = null,
+        ToolReadiness? readiness = null,
+        ToolContractLimits? limits = null,
+        IReadOnlyList<string>? dependencies = null,
+        IReadOnlyList<string>? supportedOperations = null,
+        ToolResultFormat resultFormat = ToolResultFormat.Auto,
+        Func<global::H2AgentLab.ToolCall, ToolExecutionOutput?>? preflight = null,
+        Func<ToolReadiness>? readinessSnapshot = null)
     {
         Name = ToolNamespace.NormalizeId(name, nameof(name));
         Namespace = toolNamespace ?? throw new ArgumentNullException(nameof(toolNamespace));
@@ -176,6 +183,17 @@ public sealed record ToolDescriptor
             : ToolNamespace.NormalizeId(serializationKey, nameof(serializationKey));
         CanProvideVerificationEvidence = canProvideVerificationEvidence;
         Preference = preference;
+        Readiness = readiness ?? new(ToolReadinessState.Ready);
+        Limits = limits ?? new();
+        if (!Enum.IsDefined(Readiness.State) || !Enum.IsDefined(resultFormat)
+            || Limits.MaxOutputCharacters is < 1_024 or > ToolOutcomeBridge.MaxModelOutputCharacters
+            || Limits.MaxBatchItems is < 1)
+            throw new ArgumentException("Invalid tool readiness or limits.");
+        Dependencies = Array.AsReadOnly((dependencies ?? []).Select(d => ToolNamespace.NormalizeId(d, nameof(dependencies))).Distinct().ToArray());
+        SupportedOperations = Array.AsReadOnly((supportedOperations ?? [Name]).Select(o => ToolNamespace.NormalizeId(o, nameof(supportedOperations))).Distinct().ToArray());
+        ResultFormat = resultFormat;
+        Preflight = preflight;
+        ReadinessSnapshot = readinessSnapshot;
     }
 
     public string Name { get; }
@@ -192,6 +210,33 @@ public sealed record ToolDescriptor
     public string? SerializationKey { get; }
     public bool CanProvideVerificationEvidence { get; }
     public ToolPreferenceMetadata? Preference { get; }
+    public ToolReadiness Readiness { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<global::H2AgentLab.ToolCall, ToolExecutionOutput?>? Preflight { get; }
+    // Host-owned, cheap cached/in-memory readiness only. Never connect or launch apps here.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<ToolReadiness>? ReadinessSnapshot { get; }
+    public ToolReadiness CurrentReadiness
+    {
+        get
+        {
+            if (ReadinessSnapshot is null) return Readiness;
+            try
+            {
+                var snapshot = ReadinessSnapshot();
+                return snapshot is not null && Enum.IsDefined(snapshot.State) ? snapshot : new(ToolReadinessState.Unavailable);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            { return new(ToolReadinessState.Unavailable); }
+        }
+    }
+    public string EffectClass => IsMutating ? "may_change_resource" : "observational";
+    public ToolContractLimits Limits { get; }
+    public IReadOnlyList<string> Dependencies { get; }
+    public IReadOnlyList<string> SupportedOperations { get; }
+    public ToolResultFormat ResultFormat { get; }
+    public string OutputSchemaVersion => "h2-outcome-v1";
     public bool IsMutating => Access == AgentToolAccess.Mutating;
 }
 
@@ -200,6 +245,26 @@ public sealed class ToolRegistry
     private readonly Dictionary<string, ToolNamespace> _namespaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ToolDescriptor> _tools = new(StringComparer.Ordinal);
     private long _version;
+    // Non-callable readiness notices belong to the same registry. No phantom executor/schema.
+    private readonly Dictionary<string, ToolCapabilityNotice> _notices = new(StringComparer.Ordinal);
+    public IReadOnlyList<ToolCapabilityNotice> CapabilityNotices => _notices.Values.OrderBy(n => n.Name, StringComparer.Ordinal).ToArray();
+    public void RegisterCapabilityNotice(ToolCapabilityNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        var name = ToolNamespace.NormalizeId(notice.Name, nameof(notice));
+        if (notice.Readiness is null || !Enum.IsDefined(notice.Readiness.State) || notice.Readiness.CanExecute)
+            throw new ArgumentException("A capability notice cannot advertise an executable tool.");
+        _notices[name] = notice with { Name = name,
+            Description = ToolNamespace.NormalizeText(notice.Description, nameof(notice), 512) };
+        _version++;
+    }
+    public void SetReadiness(string name, ToolReadiness readiness)
+    {
+        if (!Enum.IsDefined(readiness.State)) throw new ArgumentException("Invalid readiness.");
+        if (!TryGet(name, out var descriptor)) throw new KeyNotFoundException("Tool is not registered.");
+        _tools[descriptor.Name] = descriptor with { Readiness = readiness };
+        _version++;
+    }
 
     public long Version => _version;
     public IReadOnlyList<ToolNamespace> Namespaces => _namespaces.Values.OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();

@@ -411,9 +411,10 @@ public sealed partial class H2ProductionAgentAdapter :
                 {
                     // Persist names/outcomes only, not tool arguments or document content.
                     var code = result.IsError ? "tool-error" : "tool-ok";
-                    AddProgress(live, "tool", code, result.ToolName);
+                    var outcome = result.Outcome is null ? null : H2ToolOutcomeProjection.ToProduct(result.Outcome);
+                    lock (live.Gate) AddProgressLocked(live, "tool", code, result.ToolName, outcome);
                     var record = JsonSerializer.Serialize(new { atUtc = DateTime.UtcNow,
-                        tool = result.ToolName, failed = result.IsError });
+                        tool = BoundCode(result.ToolName), failed = result.IsError, outcome });
                     File.AppendAllText(Path.Combine(taskStateRoot, "tool-outcomes.jsonl"), record + Environment.NewLine);
                 });
 
@@ -632,14 +633,15 @@ public sealed partial class H2ProductionAgentAdapter :
         LiveTask live,
         string kind,
         string code,
-        string message)
+        string message,
+        H2AgentToolOutcome? outcome = null)
     {
         live.Progress.Add(new(
             live.Progress.Count,
             DateTime.UtcNow,
             BoundCode(kind),
             BoundCode(code),
-            Bound(message, 2_000)));
+            Bound(message, 2_000)) { ToolOutcome = outcome });
         live.UpdatedUtc = DateTime.UtcNow;
         PersistProgress(live.TaskId, live.Progress[^1]);
     }

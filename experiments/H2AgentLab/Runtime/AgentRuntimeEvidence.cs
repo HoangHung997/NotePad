@@ -37,7 +37,7 @@ public sealed class AgentRuntimeEvidenceProjector
 
         var requiresEvidence = descriptor.IsMutating
             || descriptor.CanProvideVerificationEvidence
-            || output.Length > MaxInlineToolOutputCharacters;
+            || output.Length > Math.Min(MaxInlineToolOutputCharacters, descriptor.Limits.MaxOutputCharacters);
         if (!requiresEvidence)
             return null;
 
@@ -56,7 +56,7 @@ public sealed class AgentRuntimeEvidenceProjector
             projection.Handle.Sha256,
             summary);
 
-        if (output.Length > MaxInlineToolOutputCharacters)
+        if (output.Length > Math.Min(MaxInlineToolOutputCharacters, descriptor.Limits.MaxOutputCharacters))
         {
             return new AgentRuntimeEvidenceProjection(
                 evidence,
