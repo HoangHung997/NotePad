@@ -21,3 +21,11 @@ Excel.Application and Word.Application were both unregistered on that runner. Th
 Review adds a borrowed-view re-probe after selection capture and around snapshot reads, preserving NoEffect=false when an identity error occurs after a possible mutation.
 The opt-in native marker helper/runbook reads only exact user-supplied small test resources; it never starts/closes Office, never modifies documents, and never automatically awards E3.
 Its fake backend tests prove harness logic only. Native view enumeration/marker/reopen/modal behavior remains AWAITING_ENVIRONMENT until the full native matrix is executed.
+
+## Resumed cache-lifetime review (awaiting repaired-source validation)
+
+Downloaded run 35730353508 evidence confirms code 0827e036264bd4884f17a778e36b63b15d10f35c: AR-020 26/26 x3, AR-012 44/44, AR-011 25/25, AR-010 11/11, AR-001 13/13 and 74/74 independent Agent suites. Windows registration checks found neither Excel.Application nor Word.Application; E3 remains NOT_RUN. PR runs triggered by the bot are separately action_required, not PASS.
+
+Review found that the per-scan view cap did not bound references retained across repeated targeted captures of different roots. A shared helper-lifetime bound now rejects over-capacity probes before changing existing bindings and disposes temporary leases; replacing the same root is not double-counted. Full discovery may reclaim closed roots. An exhausted capture helper is retired without touching Office, retrying the request or silently rebinding an old session; a later explicit capture creates a new helper. Two registered regressions exercise this lifecycle with controlled native-object leases. The manual native probe wrapper's post-kill wait is also bounded at two seconds.
+
+Normal AR-020 validation is now read-only; source changes are committed atomically through the authorized connector, not an in-CI patch writer. No human-approval gate is disabled. New regression results must be inspected on their own exact SHA. AR-020 cannot be DONE until real native E3 marker/multi-instance/view tests pass.

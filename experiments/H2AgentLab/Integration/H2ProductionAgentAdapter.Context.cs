@@ -56,6 +56,13 @@ public sealed partial class H2ProductionAgentAdapter
                 using var deadline=new CancellationTokenSource(TimeSpan.FromMilliseconds(OfficeProtocol.OfficeDiscoveryLimits.CaptureDeadlineMilliseconds));
                 var capture=targeted.CaptureAsync(new(foregroundContext.ApplicationKind==H2ApplicationKind.Excel?"excel":"word",
                     foregroundContext.NativeWindowHandle,foregroundContext.ProcessId,foregroundContext.ProcessStartUtcTicks),deadline.Token).GetAwaiter().GetResult();
+                if (capture.Code == "session_capacity")
+                {
+                    // Only this adapter's capture helper is retired. No Office application
+                    // is closed, and no old live handle is silently rebound or retried.
+                    _captureClient.Dispose(); _captureClient=null;
+                    return Fault("session_capacity");
+                }
                 if(capture.Identity is { } identity && (identity.ProcessId!=foregroundContext.ProcessId
                     || identity.ProcessStartUtcTicks!=foregroundContext.ProcessStartUtcTicks || identity.RootWindowHandle!=foregroundContext.NativeWindowHandle))
                     return Fault("stale_resource");

@@ -89,6 +89,36 @@ internal static class H2OfficeDiscoveryTests
             using(var b=new ComOfficeBackend(p)){var d=b.DiscoverExcel();Check(d.Workbooks.Count==OfficeDiscoveryLimits.MaxViews && d.Report is {Complete:false},"Unbounded/complete capped catalog.");}
             Check(p.Releases==p.Opens.Count,"Native probe ownership leak.");
         });
+        test("AR-020 retained view cap spans targeted roots and both Office kinds without evicting live identity",()=>{
+            var p=new Probe();
+            using(var catalog=new OfficeWindowCatalog(p))
+            {
+                OfficeViewLease? last=null; Probe.Item? lastItem=null;
+                for(var i=1;i<=OfficeDiscoveryLimits.MaxRetainedViews;i++)
+                {
+                    p.Views.Clear();
+                    lastItem=p.Add(11,101,1000+i,"Document"+i,application:i%2==0?"word":"excel");
+                    last=catalog.Refresh(lastItem.Candidate.Application,lastItem.Candidate.RootHandle).Single();
+                }
+                var lastId=last!.SessionId;
+                // Replacing an existing root at capacity must not count its old lease twice.
+                last=catalog.Refresh("word",lastItem!.Candidate.RootHandle).Single();
+                Check(last.SessionId==lastId,"Replacing a live root exhausted the budget or changed its session.");
+                var overflow=p.Add(12,102,9000,"Overflow",application:"word");
+                Fault(()=>catalog.Refresh("word",overflow.Candidate.RootHandle),"session_capacity");
+                Check(catalog.LastReport is {Complete:false} && catalog.LastReport.Issues.Single().Code=="session_capacity",
+                    "Capacity rejection left a complete discovery report.");
+                catalog.ValidateCurrent(last,true);
+                Check(p.Opens.Count-p.Releases==OfficeDiscoveryLimits.MaxRetainedViews,"Rejected probe leaked a lease or evicted an accepted binding.");
+                // Explicit full refresh, not quota eviction, retires the closed old roots.
+                p.Views.Clear();p.Views.Add(lastItem);
+                Check(catalog.Refresh("excel").Count==0,"Full refresh retained closed Excel roots.");
+                Check(catalog.Refresh("word").Single().SessionId==lastId,"Reclaiming closed views changed the surviving session.");
+                p.Views.Add(overflow);
+                Check(catalog.Refresh("word",overflow.Candidate.RootHandle).Single().Name=="Overflow","Quota never recovered after safe full refresh.");
+            }
+            Check(p.Releases==p.Opens.Count && p.SelectionReads==0,"Catalog quota control leaked leases or read content.");
+        });
         test("AR-020 native COM failure classes distinguish busy and stale",()=>{
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x8001010A)))=="provider_busy","Busy flattened.");
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x80010108)))=="stale_resource","Disconnected object accepted.");
@@ -139,6 +169,16 @@ internal static class H2OfficeDiscoveryTests
         test("AR-020 production capture rejects a response for another native process",()=>Temp(root=>{
             var client=new CaptureClient{WrongProcess=true};using var a=new H2ProductionAgentAdapter(root,()=>new(new AiProfile(),""),officeClientFactory:()=>client);
             var c=a.CaptureActiveWorkContext(Context());Check(c!.ErrorCode=="stale_resource" && c.DocumentSessionId is null,"Wrong-process response became active target.");
+        }));
+        test("AR-020 exhausted capture cache retires only its helper without retrying old identity",()=>Temp(root=>{
+            var exhausted=new CaptureClient{Error="session_capacity"};var fresh=new CaptureClient{Session="new-helper-session"};var created=0;
+            using var adapter=new H2ProductionAgentAdapter(root,()=>new(new AiProfile(),""),officeClientFactory:()=>++created==1?exhausted:fresh);
+            var first=adapter.CaptureActiveWorkContext(Context());
+            Check(first!.ErrorCode=="session_capacity" && exhausted.Disposed && created==1 && exhausted.Captures==1,
+                "Capacity error leaked its owned helper or retried automatically.");
+            var second=adapter.CaptureActiveWorkContext(Context());
+            Check(created==2 && second!.DocumentSessionId=="new-helper-session" && fresh.Captures==1,
+                "A later explicit capture reused an exhausted helper or old session.");
         }));
         test("AR-020 capture timeout retires only the owned helper and reports deadline",()=>Temp(root=>{
             var client=new CaptureClient{Timeout=true};using var a=new H2ProductionAgentAdapter(root,()=>new(new AiProfile(),""),officeClientFactory:()=>client);

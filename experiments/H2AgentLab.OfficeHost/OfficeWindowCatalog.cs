@@ -99,8 +99,21 @@ public sealed class OfficeWindowCatalog : IDisposable
                 catch(Exception ex) when(OfficeNativeWindowProbe.IsProbeFailure(ex))
                 { view?.Dispose(); issues.Add(new(OfficeNativeWindowProbe.FaultCode(ex),candidate.RootHandle,candidate.ProcessId)); }
             }
-            foreach(var pair in _views.Where(p=>p.Value.Candidate.Application==application
-                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)).ToArray())
+            var replaced = _views.Where(p=>p.Value.Candidate.Application==application
+                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)).ToArray();
+            // A targeted refresh replaces only one root. Without a lifetime-wide bound,
+            // closed roots from successive captures would retain COM references forever.
+            // Reject BEFORE mutating the accepted cache; the finally block releases the
+            // new probe leases. Full discovery can reclaim closed roots, or the capture
+            // owner can retire just its helper. Never evict identity/tombstone history.
+            if (_views.Count - replaced.Length + next.Count > OfficeDiscoveryLimits.MaxRetainedViews)
+            {
+                LastReport=new(false,OfficeDiscoveryLimits.Coverage,clock.ElapsedMilliseconds,
+                    scan.RootsVisited,probed,[new("session_capacity",rootHandle)]);
+                throw new OfficeHostFaultException("session_capacity",
+                    "The native view cache reached its bound. Rediscover or rebind through a new owned helper.",true);
+            }
+            foreach(var pair in replaced)
             {
                 if (!next.TryGetValue(pair.Key,out var replacement) || replacement.SessionId!=pair.Value.SessionId)
                 {

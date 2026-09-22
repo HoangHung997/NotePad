@@ -20,6 +20,8 @@ public static class OfficeDiscoveryLimits
 {
     public const int MaxWindows = 128;
     public const int MaxViews = 256;
+    // Shared across Excel/Word and targeted captures for one helper lifetime.
+    public const int MaxRetainedViews = 2 * MaxViews;
     public const int MaxRetiredSessions = 2048;
     // Soft enumeration budget, not an interrupt guarantee for COM. Client/helper isolation is
     // the hard deadline boundary. Latencies are measured; no native timing SLA is claimed.

@@ -27,7 +27,7 @@ $owned=[Diagnostics.Process]::Start($psi)
 try {
     if (-not $owned.WaitForExit($DeadlineSeconds*1000)) {
         # Kill ONLY the helper process created above, never Word/Excel or another H2 helper.
-        try {$owned.Kill();$owned.WaitForExit()} catch {}
+        try {$owned.Kill();[void]$owned.WaitForExit(2000)} catch {}
         throw 'Native probe timed out. No marker PASS is recorded; leave Office open and inspect its modal/busy state.'
     }
     if ($owned.ExitCode -ne 0) { throw ('Native probe failed or is incomplete; helper exit '+$owned.ExitCode+'. Inspect the local output when present.') }
