@@ -81,9 +81,21 @@ public sealed class ToolExecutionScheduler : IDisposable
             }
 
             var call = request.Call with { Invocation = ToolInvocation.Bind(request.Call) };
-            var output = request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!)
-                ? ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None)
-                : await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+            ToolExecutionOutput output;
+            try
+            {
+                output = request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!)
+                    ? ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None)
+                    : await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ToolInvocationCancelledException cancelled)
+            {
+                // Provider-local cancellation need not cancel the batch token. Fence the resource
+                // before releasing its gate, so queued writes cannot repeat an uncertain effect.
+                if (request.Descriptor.IsMutating && cancelled.Observed.Outcome.IsPending)
+                    _uncertainResources.TryAdd(resourceKey!, 0);
+                throw;
+            }
             if (request.Descriptor.IsMutating && output.Outcome.IsPending) _uncertainResources.TryAdd(resourceKey!, 0);
             results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output.DomainPayload)
             { Outcome = output.Outcome };

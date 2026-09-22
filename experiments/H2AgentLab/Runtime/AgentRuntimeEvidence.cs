@@ -29,13 +29,14 @@ public sealed class AgentRuntimeEvidenceProjector
         ToolDescriptor descriptor,
         string sourceId,
         long sequence,
-        string output)
+        string output,
+        bool forceEvidence = false)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceId);
         output ??= "";
 
-        var requiresEvidence = descriptor.IsMutating
+        var requiresEvidence = forceEvidence || descriptor.IsMutating
             || descriptor.CanProvideVerificationEvidence
             || output.Length > Math.Min(MaxInlineToolOutputCharacters, descriptor.Limits.MaxOutputCharacters);
         if (!requiresEvidence)

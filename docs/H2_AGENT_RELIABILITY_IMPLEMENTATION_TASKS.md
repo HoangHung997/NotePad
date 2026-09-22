@@ -473,18 +473,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "acceptance_status": "REPAIR_REQUIRED",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar011-2026-09-22",
-  "last_code_commit": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
-  "last_validated_code_commit": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
-  "last_validation_result": "AR011_18x3_PASS_AGENT72of74_REPAIR_REQUIRED",
+  "owner_session": "chatgpt-ar011-resume-2026-09-22",
+  "last_code_commit": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
+  "last_validated_code_commit": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
+  "last_validation_result": "PRE_REVIEW_AR011_22x3_AGENT74_PASS_NEW_REVIEW_REPAIR_REQUIRED",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Guarded source delivery committed and pushed actual code4459; local offline review changes are delivered only with exact preimage checks. User-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Source snapshot 49660c82 verified against Git blobs; this checkpoint accompanies guarded in-scope runtime/test delivery. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T08:00:00.513598+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T09:16:46.539970+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Review repair staged with code/phase preservation, ticker parity and timeout advice; run exact-source AR-011 and retained AR-010/001 plus all required CI and publish."
+    "New review repair: fence provider-local cancelled mutations before gate release; preserve model-visible exact cursor/job/effect metadata within whole output limit using existing evidence store. Exact-source tests and full CI pending."
   ],
   "last_test_commands": [
     {
@@ -696,6 +696,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "independent_Agent": "72/74",
       "result": "REPAIR_REQUIRED",
       "artifact_id": 10683975729
+    },
+    {
+      "id": 35704689725,
+      "tested_code_sha": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
+      "AR011": "22/22 x3",
+      "AR010": "11/11",
+      "AR001": "13/13",
+      "Agent_suites": "74/74",
+      "artifact_id": 10684530320,
+      "artifact_sha256": "6e6a3ab4e09a97d405d01b5a5ee914dc41c9ee55c2ad6fd5040430efd98e349b",
+      "qualification": "Existing subset passed before additional review; not acceptance of newly repaired code"
     }
   ],
   "evidence_locations": [
@@ -709,9 +720,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-010/implementation.md"
   ],
   "known_failures": [
-    "MB-40 denial code was lost in pending effect completion reason; same root cause fails MB-104 umbrella. Repair must preserve all existing permission assertions.",
-    "Review: desktop ticker generic tool-ok could claim completion for Running/unverified outcomes.",
-    "Review: command deadline raw advice contradicted typed reconciliation metadata."
+    "Pre-review 4eef source passes existing suites, but new review identified provider-local cancellation fence and model-wire cursor/bound gaps. Newly added regression must demonstrate old failures and final repair.",
+    "E3/E4 NOT_RUN / AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER."
   ],
   "external_blockers": [
     "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
@@ -727,7 +737,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue AR-011 on this branch/PR; inspect exact latest CI outcomes after review repair, repair any remaining regressions without weakening permission/completion gates, then save evidence and acceptance. Do not start AR-012 yet.",
+  "next_exact_action": "Keep AR-011 ACTIVE. Review the exact-source negative-control and positive CI for cancellation fencing and model-visible bounded cursor/control projection. Run retained AR-010/001 and 74 Agent suites, full CI/publish/helper smoke; save acceptance only when actual results pass. Do not start AR-012 or merge main.",
   "next_task_if_active_done": "AR-012",
   "last_runtime_source_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
   "previous_saved_checkpoint_commit": "89a4964d57a8fa5a129b76cb341f23ac1d471262",

@@ -721,20 +721,51 @@ public sealed class AgentRuntime : IAsyncDisposable
                     EvidenceRefs = projection is null ? outcome.EvidenceRefs : [projection.Evidence.ReferenceId] };
                 var outputLimit = scheduled[i].Request.Descriptor.Limits.MaxOutputCharacters;
                 if (projection is not null && rawOutput.Length > Math.Min(AgentRuntimeEvidenceProjector.MaxInlineToolOutputCharacters, outputLimit))
-                    outcome = outcome with { Completeness = new(false, Reason: "artifact_projection"),
+                    outcome = outcome with { Completeness = outcome.Completeness with { Complete = false, Reason = "artifact_projection" },
                         ArtifactRefs = [projection.Evidence.ReferenceId] };
                 var modelContent = projection?.ModelContent ?? rawOutput;
                 if (modelContent.Length > outputLimit)
                 {
                     // Never silently claim an excerpt is complete. Production always supplies
                     // the existing artifact projector; an unconfigured test host has no cursor.
-                    outcome = outcome with { Completeness = new(false, Reason: projection is null ? "bounded_excerpt_without_artifact" : "artifact_projection") };
+                    outcome = outcome with { Completeness = outcome.Completeness with { Complete = false, Reason = projection is null ? "bounded_excerpt_without_artifact" : "artifact_projection" } };
                     modelContent = projection is null ? modelContent[..Math.Max(0, outputLimit - 32)] + "…[truncated]"
                         : JsonSerializer.Serialize(new { complete = false, artifactRef = projection.Evidence.ReferenceId, reason = "read_existing_artifact" });
                 }
-                // Legacy payload shape stays available to existing consumers/verifiers. A pending
-                // or uncertain operation additionally tells the model not to treat it as completion.
-                if (outcome.IsPending) modelContent += "\n[HOST TOOL OUTCOME] " + JsonSerializer.Serialize(outcome);
+                // Transports serialize Content, not the out-of-band Outcome. Keep cursor/job/effect
+                // control data on the actual wire and reserve its space BEFORE bounding the body.
+                // Raw domain bytes remain untouched in RawToolOutputs/the existing artifact store.
+                if (outcome.IsPending || outcome.Completeness.NextCursor is not null)
+                {
+                    const string marker = "\n[HOST TOOL OUTCOME] ";
+                    var metadata = JsonSerializer.Serialize(outcome);
+                    var suffix = marker + metadata;
+                    if (suffix.Length > outputLimit - 256)
+                    {
+                        // A legal escaped cursor may exceed a small tool's whole wire budget.
+                        // Preserve exact metadata in the SAME store, not a lossy summary/new store.
+                        var stored = _evidenceProjector?.Project(scheduled[i].Request.Descriptor,
+                            $"tool-outcome:{turnId:N}:{toolRound}:{original}",
+                            ((long)toolRound * 1_000L) + original, metadata, forceEvidence: true)
+                            ?? throw new AgentVerificationRequiredException(
+                                "Tool outcome metadata exceeds the output budget and no evidence store is configured. Do not repeat the operation.");
+                        evidence.Add(stored.Evidence);
+                        suffix = marker + JsonSerializer.Serialize(new { status = outcome.Status,
+                            effect = outcome.Effect, complete = false, controlMetadataRef = stored.Evidence.ReferenceId,
+                            next = "Read exact control metadata with read_tool_output before continuing." });
+                    }
+                    var room = outputLimit - suffix.Length;
+                    if (modelContent.Length > room)
+                    {
+                        modelContent = projection is null
+                            ? modelContent[..Math.Max(0, room - 32)] + "…[domain excerpt truncated]"
+                            : JsonSerializer.Serialize(new { complete = false, artifactRef = projection.Evidence.ReferenceId,
+                                reason = "read_existing_artifact" });
+                    }
+                    if (modelContent.Length + suffix.Length > outputLimit)
+                        throw new AgentVerificationRequiredException("Tool control projection exceeds its advertised bound.");
+                    modelContent += suffix;
+                }
                 results[original] = new AgentToolResult(calls[original].Id, transportCalls[original].Name,
                     BoundToolOutput(modelContent), IsError: deniedBeforeExecution || outcome.IsError) { Outcome = outcome };
             }

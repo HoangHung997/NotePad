@@ -33,3 +33,13 @@ First downloaded fixture evidence artifact 10683975729: SHA256 00b6256e5d4497569
 ## Additional negative-control compatibility review
 
 The existing MCP fixtures return top-level isError, whose true value is a tool execution failure (official MCP tools specification 2026-07-28, https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/server/tools.mdx). The common legacy adapter must normalize this inverted boolean alongside ok/success, reject wrong types or conflicting flags, preserve original content blocks and prevent false completion. Three concrete production-runtime cases exercise those negative results; no external MCP server or network is contacted. This narrow error-flag compatibility does not certify the entire current MCP protocol or native lifecycle.
+
+## Resumed review: cancellation fence and model-visible controls
+
+Pre-review source `4eef57a1a6fc4c0014516c1215fd1d5fd22945b3` passed the existing 22 AR-011 tests x3, 11 AR-010, 13 AR-001 and all 74 Agent suites in run 35704689725. The evidence archive was downloaded and its hash/CRC/identity/results verified; it does not certify the following new changes.
+
+Provider-local cancellation after a mutation may leave the batch token live. The scheduler now fences the resource while still holding its gate, before rethrowing the typed cancellation. A queued/future same-resource write must not execute; an unrelated resource is not globally fenced.
+
+Concrete transports send `AgentToolResult.Content`, not out-of-band Outcome. Cursor-bearing results now include model-visible control metadata, reserve its space within the advertised per-tool limit, and retain the exact cursor when raw output is moved to an artifact. Oversized escaped metadata is stored in the existing ArtifactStore with an explicit bounded reference; no second store or restart/job semantics are added. Raw domain bytes remain unchanged for verifier/evidence. Tests feed actual production observations through Ollama and Chat Completions serialization with an injected no-network HTTP handler.
+
+Three additional cases and a strengthened paging case are registered in the existing runner. A Windows negative control will run these tests against the three pre-repair runtime files, then restore the exact patched source and require clean-tree positive tests. No PASS is claimed until those runs are inspected. Native E3/E4 and AR-083 deferral remain unchanged.

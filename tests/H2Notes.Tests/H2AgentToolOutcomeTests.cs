@@ -123,7 +123,12 @@ internal static class H2AgentToolOutcomeTests
             var wire = new Wire(Discover(descriptor.Name), Batch("page", descriptor.Name, new { }));
             var observation = Run(root, descriptor, wire, true);
             var result = wire.Results.Last();
-            Check(result.Content == payload, "Non-evidence domain payload was flattened or reserialized.");
+            var marker = result.Content.IndexOf("\n[HOST TOOL OUTCOME] ", StringComparison.Ordinal);
+            Check(marker == payload.Length && result.Content[..marker] == payload, "Domain payload was flattened or reserialized.");
+            using var control = JsonDocument.Parse(result.Content[(marker + "\n[HOST TOOL OUTCOME] ".Length)..]);
+            Check(control.RootElement.GetProperty("Completeness").GetProperty("NextCursor").GetString() == "opaque-page-2",
+                "Exact cursor is missing from the model-visible control data.");
+            AssertActualWire(result);
             Check(result.Outcome!.Completeness == new ToolCompleteness(false, "opaque-page-2", "paged"), "Paging was represented as complete.");
             Check(Activity(observation).ToolOutcome is { Complete: false, NextCursor: "opaque-page-2" }
                 && H2AgentActivity.Label(Activity(observation)).Contains("giới hạn"), "UI lost completeness.");
@@ -289,6 +294,83 @@ internal static class H2AgentToolOutcomeTests
                 && observed.Outcome.ArtifactRefs.Count == 1, "Bounded output lost its artifact or pretended complete.");
         }));
 
+
+        test("AR-011 provider-local cancellation fences queued and future same-resource writes", () => InWorkspace(root =>
+            Task.Run(async () =>
+            {
+                using var scheduler = new ToolExecutionScheduler();
+                using var providerCancellation = new CancellationTokenSource();
+                providerCancellation.Cancel();
+                var calls = 0;
+                var descriptor = Tool("fixture.localcancel", true, new DelegatingToolExecutor("fixture", async (call, ct) => {
+                    var number = Interlocked.Increment(ref calls);
+                    File.AppendAllText(Path.Combine(root, "effects.txt"), "WRITE\n");
+                    await Task.Yield();
+                    if (number == 1) throw new OperationCanceledException(providerCancellation.Token);
+                    return "{\"ok\":true}";
+                }));
+                ToolExecutionRequest Request(string id, string key) => new(descriptor,
+                    new ToolCall(id, descriptor.Name, JsonSerializer.SerializeToElement(new { })), key);
+                ToolInvocationCancelledException? cancelled = null;
+                try { await scheduler.ExecuteBatchAsync([Request("first", "same"), Request("queued", "same")], CancellationToken.None); }
+                catch (ToolInvocationCancelledException ex) { cancelled = ex; }
+                Check(cancelled?.Observed.Outcome is { Status: ToolOutcomeStatus.Cancelled, Effect: ToolMutationEffect.Unknown }
+                    && cancelled.Observed.Outcome.Error?.RetryClass == ToolRetryClass.ReconcileRequired,
+                    "Provider-local cancellation lost its effect or propagated as an ordinary retry.");
+                Check(calls == 1 && File.ReadAllText(Path.Combine(root, "effects.txt")) == "WRITE\n",
+                    "Queued write executed after provider-local cancellation with an uncertain effect.");
+                var future = await scheduler.ExecuteBatchAsync([Request("future", "same")], CancellationToken.None);
+                Check(calls == 1 && future.Single().Outcome is { Status: ToolOutcomeStatus.Rejected, Effect: ToolMutationEffect.None },
+                    "Future write bypassed the uncertain-resource fence.");
+                var unrelated = await scheduler.ExecuteBatchAsync([Request("other", "different")], CancellationToken.None);
+                Check(calls == 2 && unrelated.Single().Outcome?.Status == ToolOutcomeStatus.Succeeded,
+                    "Local cancellation incorrectly fenced an unrelated resource.");
+            }).GetAwaiter().GetResult()));
+
+        test("AR-011 pending control metadata stays complete inside the advertised output bound", () => InWorkspace(root =>
+        {
+            var payload = JsonSerializer.Serialize(new { progress = new string('x', 780) });
+            var original = Tool("fixture.pendingbound", true, new DelegatingOutcomeToolExecutor("fixture", (call, ct) =>
+                ValueTask.FromResult(new ToolExecutionOutput(payload,
+                    ToolOutcome.Success(call, ToolMutationEffect.None, new(false, Reason: "awaiting_job")) with {
+                        Status = ToolOutcomeStatus.Running, Job = new("bounded-job") }))));
+            var descriptor = new ToolDescriptor(original.Name, original.Namespace, original.Description, original.Risk, original.Access,
+                false, "v1", original.CallableSchema, original.Executor, resourceScope: original.ResourceScope,
+                limits: new(MaxOutputCharacters: 1_024), resultFormat: ToolResultFormat.Json);
+            var wire = new Wire(Discover(descriptor.Name), Batch("pending", descriptor.Name, new { }));
+            var observation = Run(root, descriptor, wire, false);
+            var result = wire.Results.Single(r => r.ToolName == descriptor.Name);
+            Check(result.Content.Length <= 1_024 && observation.Summary.Status != H2AgentTaskStatus.Completed,
+                "Pending control metadata exceeded its bound or the job completed without verification.");
+            using var metadata = ReadControl(root, result);
+            Check(metadata.RootElement.GetProperty("Status").GetString() == "Running"
+                && metadata.RootElement.GetProperty("Job").GetProperty("JobId").GetString() == "bounded-job",
+                "Output bounding clipped job identity or running state.");
+            AssertActualWire(result);
+        }));
+
+        test("AR-011 large paged result retains exact escaped cursor through the existing evidence store", () => InWorkspace(root =>
+        {
+            var cursor = new string('ấ', 512);
+            var payload = JsonSerializer.Serialize(new { rows = new string('x', 5_000), originalField = "retain-me" });
+            var original = Tool("fixture.cursorbound", false, new DelegatingOutcomeToolExecutor("fixture", (call, ct) =>
+                ValueTask.FromResult(new ToolExecutionOutput(payload, ToolOutcome.Success(call, ToolMutationEffect.None,
+                    new(false, cursor, "paged"))))));
+            var descriptor = new ToolDescriptor(original.Name, original.Namespace, original.Description, original.Risk, original.Access,
+                true, "v1", original.CallableSchema, original.Executor, limits: new(MaxOutputCharacters: 1_024), resultFormat: ToolResultFormat.Json);
+            var wire = new Wire(Discover(descriptor.Name), Batch("cursor", descriptor.Name, new { }));
+            var observation = Run(root, descriptor, wire, true);
+            var result = wire.Results.Single(r => r.ToolName == descriptor.Name);
+            Check(result.Content.Length <= 1_024 && result.Outcome?.Completeness.NextCursor == cursor,
+                "Large-output projection discarded the exact cursor or exceeded its bound.");
+            using var metadata = ReadControl(root, result);
+            Check(metadata.RootElement.GetProperty("Completeness").GetProperty("NextCursor").GetString() == cursor,
+                "Control artifact lost or approximated the escaped cursor.");
+            Check(ReadArtifact(root, result.Outcome!.ArtifactRefs.Single()) == payload, "Raw domain bytes changed.");
+            Check(Activity(observation).ToolOutcome?.NextCursor == cursor, "UI and model cursor disagree.");
+            AssertActualWire(result);
+        }));
+
         test("AR-011 provider cached health changes discovery without reconnect and forwards host identity", () =>
         {
             var provider = new CachedProvider(); var registry = new ToolRegistry();
@@ -394,6 +476,68 @@ internal static class H2AgentToolOutcomeTests
         public void Cancel() => Cancelled = true;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    private static string ReadArtifact(string root, string id)
+    {
+        var path = Directory.EnumerateFiles(root, id + ".txt", SearchOption.AllDirectories).Single();
+        // ArtifactStore validates both the handle manifest and complete content hash on read.
+        var state = Directory.GetParent(Path.GetDirectoryName(path)!)!.Parent!.FullName;
+        return new ArtifactStore(state).ReadText(id);
+    }
+    private static JsonDocument ReadControl(string root, AgentToolResult result)
+    {
+        const string marker = "\n[HOST TOOL OUTCOME] ";
+        var index = result.Content.LastIndexOf(marker, StringComparison.Ordinal);
+        Check(index >= 0, "Model-visible control marker missing.");
+        using var control = JsonDocument.Parse(result.Content[(index + marker.Length)..]);
+        return control.RootElement.TryGetProperty("controlMetadataRef", out var reference)
+            ? JsonDocument.Parse(ReadArtifact(root, reference.GetString()!))
+            : JsonDocument.Parse(control.RootElement.GetRawText());
+    }
+    private static void AssertActualWire(AgentToolResult result) => Task.Run(async () =>
+    {
+        foreach (var kind in new[] { "ollama", "chat" })
+        {
+            using var handler = new ControlWireHandler(kind, result.ToolName);
+            var profile = new AiProfile { Model = "fixture-no-network", Protocol = kind == "ollama" ? AiProtocol.Ollama : AiProtocol.OpenAiChat,
+                BaseUrl = kind == "ollama" ? "http://localhost:11434" : "https://example.test/v1" };
+            await using IAgentTransport transport = kind == "ollama"
+                ? new OllamaTransport(profile, handler) : new ChatCompletionsTransport(profile, "", handler);
+            var task = Guid.NewGuid(); var turn = Guid.NewGuid(); AgentTransportToolCall? call = null;
+            await foreach (var e in transport.StartAsync(new(task, turn, [new(AgentTransportMessageRole.User, "Fixture")],
+                [new(result.ToolName, "Controlled fixture", JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }))])))
+                if (e.ToolCall is not null) call = e.ToolCall;
+            Check(call is not null, "Actual transport did not parse the synthetic tool call.");
+            await foreach (var _ in transport.ContinueAsync(new(task, turn, [result with { ToolCallId = call!.Id }]))) { }
+            using var body = JsonDocument.Parse(handler.Bodies.Last());
+            var tool = body.RootElement.GetProperty("messages").EnumerateArray().Single(m => m.GetProperty("role").GetString() == "tool");
+            Check(tool.GetProperty("content").GetString() == result.Content, "Actual serialized transport lost outcome control metadata: " + kind);
+            Check(handler.Bodies.Count == 2, "Unexpected provider requests or retry.");
+        }
+    }).GetAwaiter().GetResult();
+
+    private sealed class ControlWireHandler(string kind, string toolName) : HttpMessageHandler
+    {
+        public List<string> Bodies { get; } = [];
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Bodies.Add(await request.Content!.ReadAsStringAsync(ct));
+            string body;
+            if (kind == "ollama")
+                body = Bodies.Count == 1
+                    ? JsonSerializer.Serialize(new { message = new { role = "assistant", tool_calls = new[] {
+                        new { function = new { name = toolName, arguments = new { } } } } }, done = true }) + "\n"
+                    : "{\"message\":{\"role\":\"assistant\",\"content\":\"OK\"},\"done\":true}\n";
+            else
+                body = "data: " + (Bodies.Count == 1
+                    ? JsonSerializer.Serialize(new { choices = new[] { new { delta = new { tool_calls = new[] {
+                        new { index = 0, id = "wire-call", type = "function", function = new { name = toolName, arguments = "{}" } } } }, finish_reason = "tool_calls" } } })
+                    : "{\"choices\":[{\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}") + "\n\ndata: [DONE]\n\n";
+            return new(System.Net.HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8,
+                kind == "ollama" ? "application/x-ndjson" : "text/event-stream") };
+        }
+    }
+
     private sealed class CachedProvider : IInvocationAwareCapabilityProvider
     {
         public ProviderHealthStatus Status { get; set; } = ProviderHealthStatus.Ready;
