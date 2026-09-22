@@ -63,7 +63,7 @@ internal static class H2WorkAssistantRepairTests
                 new("read", "read_file", JsonSerializer.Serialize(new { path = destination, offset = "0" }))]);
             using var adapter = Adapter(root, script);
             var context = new H2AgentTaskContext(workspace, "", PermissionScope: WorkAssistantPermissionScopeMapper.ForWorkspace(H2AgentPermissionMode.FullAccess, workspace, DateTime.UtcNow).PermissionScope);
-            var done = Wait(adapter, adapter.StartTaskAsync(null, "Write and verify file outside workspace", context, false).Result);
+            var done = Wait(adapter, adapter.StartTaskAsync(null, "Write and verify exactly \"" + destination + "\"", context, false).Result);
             Check(done.Status == H2AgentTaskStatus.Completed && H2AgentVerification.IsVerified(done), done.Error ?? done.Status.ToString());
             Check(File.ReadAllText(destination) == "full access evidence" && script.Results.All(r => !r.IsError), "Full access did not execute outside workspace");
         }));

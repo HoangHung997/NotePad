@@ -84,6 +84,7 @@ public sealed partial class H2ProductionAgentAdapter :
 
         var workspace = ResolveWorkspace(context?.WorkspaceRoot);
         context = (context ?? new H2AgentTaskContext(workspace, null)) with {
+            WorkspaceRoot = workspace,
             TargetPaths = (context?.TargetPaths ?? []).Concat(H2AgentTargetScope.FromUserRequest(goal))
                 .DistinctBy(t => t.Path, StringComparer.OrdinalIgnoreCase).ToArray() };
         if (context?.ThreadId is { } threadId && GetThread(threadId) is { } thread && thread.ProjectId != projectId)
@@ -319,13 +320,15 @@ public sealed partial class H2ProductionAgentAdapter :
                 throw new InvalidOperationException("Select an Agent model in H2 AI settings before starting work.");
 
             var fullAccess = !live.ReadOnly && live.PermissionScope?.Mode == H2AgentPermissionMode.FullAccess;
+            var targetPolicy = new H2AgentTargetBindingPolicy(live.ExecutionProjectId, live.WorkspaceRoot,
+                live.RequestContext?.TargetPaths, live.RequestContext?.ActiveWorkContext);
             var safeWorkspace = new global::H2AgentLab.SafeWorkspace(live.WorkspaceRoot,
                 fullAccess ? () => !live.Cancellation.IsCancellationRequested && live.PermissionScope!.HasFullAccessAt(DateTime.UtcNow) : null,
-                path => H2AgentTargetScope.Contains(live.RequestContext?.TargetPaths, path));
+                path => H2AgentTargetScope.Contains(live.RequestContext?.TargetPaths, path), targetPolicy.AllowsPath);
             var taskStateRoot = Path.Combine(_stateRoot, "tasks", live.TaskId.ToString("N"));
             Directory.CreateDirectory(taskStateRoot);
 
-            using var toolSession = new H2ProductionToolSession(live.TaskId, live.ProjectId, live.ReadOnly,
+            using var toolSession = new H2ProductionToolSession(live.TaskId, live.ExecutionProjectId, live.ReadOnly,
                 live.RequestContext, _projectTools,
                 (title, details, ct) => RequestApprovalAsync(live, title, details, ct));
             using var tools = new global::H2AgentLab.AgentTools(
@@ -355,14 +358,14 @@ public sealed partial class H2ProductionAgentAdapter :
             var contextInput = new AgentContextInput(
                 TaskContract: live.Goal,
                 CurrentState: "Host-selected workspace: " + live.WorkspaceRoot
-                    + (fullAccess ? "\nFull access: file tools accept absolute paths anywhere this Windows account can access, or paths relative to this directory. exec_command runs PowerShell without a workspace/network sandbox and without per-action approval. Never claim success without checking results.\n"
+                    + (fullAccess ? "\nFull access grants execution permission, NOT automatic target selection. File tools still require this workspace or an exact host-listed external target. exec_command runs PowerShell without a workspace/network sandbox; it is not a way around a denied target. Never claim success without checking results.\n"
                         : "\nFile tools accept relative workspace paths, plus exact host-listed external targets.\n")
                     + "\nTask targets: " + JsonSerializer.Serialize(live.RequestContext?.TargetPaths ?? [])
                     + "\nSelected attachments (read with read_attachment using the exact attachment_id): "
                     + JsonSerializer.Serialize((live.RequestContext?.Attachments ?? []).Select(a => new {
                         attachment_id = a.Id, name = a.Name, characters = a.Text.Length, source_name = a.SourceName,
                         ocr_engine = a.PdfEngine, notice = a.Notice }))
-                    + (live.ProjectId.HasValue ? "\nProject task: never select an unrelated foreground document. Ask for the intended target when ambiguous.\n" : "\n")
+                    + (live.ExecutionProjectId.HasValue ? "\nProject task: never select an unrelated foreground document. Ask for the intended target when ambiguous.\n" : "\n")
                     + live.ContextSummary,
                 RecentTurns: live.RequestContext?.RecentTurns?.Select((turn, index) => new AgentContextTurn(
                     turn.SourceId,
@@ -377,7 +380,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 PromptCacheKey: null,
                 MaxToolRounds: 64,
                 MaxRepairRounds: 8,
-                Invocation: new(live.ProjectId.HasValue ? AgentRuntimeEntryPoint.Project : AgentRuntimeEntryPoint.Global, live.ProjectId),
+                Invocation: new(live.ExecutionProjectId.HasValue ? AgentRuntimeEntryPoint.Project : AgentRuntimeEntryPoint.Global, live.ExecutionProjectId),
                 Images: live.RequestContext?.Images,
                 Files: live.RequestContext?.Files,
                 TakeSupplementalInput: closing => TakeSupplementalInput(live, closing),
@@ -547,7 +550,7 @@ public sealed partial class H2ProductionAgentAdapter :
             live.TaskId,
             live.Goal,
             "workspace:" + live.WorkspaceRoot,
-            live.ProjectId is null ? null : ["h2-project:" + live.ProjectId.Value.ToString("N")],
+            live.ExecutionProjectId is null ? null : ["h2-project:" + live.ExecutionProjectId.Value.ToString("N")],
             null,
             ["preserve unrelated user state"],
             ["concise final answer"],
@@ -761,6 +764,7 @@ public sealed partial class H2ProductionAgentAdapter :
         {
             TaskId = taskId;
             ProjectId = projectId;
+            ExecutionProjectId = projectId;
             Goal = goal;
             WorkspaceRoot = workspaceRoot;
             ContextSummary = contextSummary;
@@ -773,7 +777,8 @@ public sealed partial class H2ProductionAgentAdapter :
 
         public object Gate { get; } = new();
         public Guid TaskId { get; }
-        public Guid? ProjectId { get; set; }
+        public Guid? ProjectId { get; set; } // UI/history correlation only.
+        public Guid? ExecutionProjectId { get; } // Frozen before queueing; never changed by AttachProject.
         public string Goal { get; }
         public string WorkspaceRoot { get; }
         public string ContextSummary { get; }

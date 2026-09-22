@@ -173,7 +173,8 @@ public sealed record H2AgentTaskContext(
     Guid? ThreadId = null,
     Guid? TurnId = null,
     Guid? AfterTaskId = null,
-    IReadOnlyList<H2AgentTargetPath>? TargetPaths = null);
+    IReadOnlyList<H2AgentTargetPath>? TargetPaths = null,
+    H2ActiveWorkContext? ActiveWorkContext = null);
 
 public sealed record H2AgentChatTurn(string SourceId, string Role, string Content);
 

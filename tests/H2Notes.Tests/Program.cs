@@ -692,6 +692,7 @@ H2AgentCapabilityRepairTests.Run(Test);
 H2AgentReliabilityContractTests.Run(Test);
 H2AgentRuntimeHookTests.Run(Test);
 H2AgentToolOutcomeTests.Run(Test);
+H2AgentResourceBindingTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);

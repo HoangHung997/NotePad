@@ -20,6 +20,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly H2AgentTaskContext? _context;
     private readonly IH2ProjectToolHost? _projects;
     private readonly Guid _taskId;
+    private SafeWorkspace? _fileTargets;
 
     public H2ProductionToolSession(Guid taskId, Guid? projectId, bool readOnly,
         H2AgentTaskContext? context, IH2ProjectToolHost? projects,
@@ -34,6 +35,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     public ToolRegistry Configure(AgentTools tools, ToolRegistry registry,
         List<IAgentRuntimeDomainVerifier> verifiers)
     {
+        _fileTargets = tools.Workspace;
         if (_projects is not null && _projectId is { } projectId && _context?.IncludeProjectContent != false)
         {
             var projectTools = new H2ProjectRuntimeTools(_projects, projectId, _taskId,
@@ -122,6 +124,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         var key = ResourceKey(descriptor, call);
         if (_scope?.Mode == H2AgentPermissionMode.FullAccess && !_scope.HasFullAccessAt(DateTime.UtcNow))
             return AgentRuntimePermissionDecision.Deny("expired_permission", "Quyền toàn máy đã hết hạn; chọn lại quyền và gửi yêu cầu mới.", key);
+        var grounding = CheckFileGrounding(descriptor, call, key);
+        if (grounding is not null) return grounding;
         if (!descriptor.IsMutating) return AgentRuntimePermissionDecision.Allow(key);
         if (_readOnly) return AgentRuntimePermissionDecision.Deny("permission_required", "Chế độ Chỉ đọc không cho phép thay đổi.", key);
         if (_scope is null) return AgentRuntimePermissionDecision.Allow(key); // exact call still needs approval
@@ -132,6 +136,34 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         return AgentRuntimePermissionDecision.Allow(key);
     }
 
+
+    // Only ordinary filesystem arguments are resolved here. Artifact-relative paths and source
+    // code are not file grants; their existing domain executors keep their own validation.
+    private AgentRuntimePermissionDecision? CheckFileGrounding(ToolDescriptor descriptor, ToolCall call, string key)
+    {
+        if (_fileTargets is null) return null;
+        var targets = new List<(string Path, bool Directory)>();
+        if (descriptor.Namespace.Name is "files" or "autocad")
+        {
+            if (Arg(call, "path") is { } path) targets.Add((path, call.Name is "list_files" or "find_files"));
+            if (Arg(call, "destination") is { } destination) targets.Add((destination, false));
+        }
+        else if (call.Name == "publish_artifact" && Arg(call, "destination") is { } publishDestination)
+            targets.Add((publishDestination, false));
+        else if (call.Name == "run_python" && Arg(call, "inputs") is { } inputs)
+            targets.AddRange(inputs.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(path => (path.Trim(), false)));
+        try
+        {
+            foreach (var target in targets) _ = _fileTargets.Resolve(target.Path, target.Directory);
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return AgentRuntimePermissionDecision.Deny("outside_resource_scope",
+                "Chỉ chọn workspace hoặc đúng tệp được chỉ định. Quyền Full Access không tự chọn đích ngoài phạm vi.", key);
+        }
+    }
 
     private bool MatchesScope(ToolDescriptor descriptor, ToolCall call)
     {

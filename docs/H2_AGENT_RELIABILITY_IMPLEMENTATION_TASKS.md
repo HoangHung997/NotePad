@@ -76,7 +76,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | DONE |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | DONE |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
-| AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
+| AR-012 | Scope + resource binding nền | 011 | E1/E2 | ACTIVE |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | NOT_STARTED |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
@@ -162,7 +162,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-011 accepted 2026-09-22:** IMPLEMENTED / E2_PASS on `38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7`; full CI `35709818021`, H2 639/0, AR-011 25/25 x3, AR-010 11/11, AR-001 13/13 and Agent 74/74. Four old-runtime failures reproduced and repaired. [Evidence](agent-reliability/AR-011/acceptance.json). E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER. No other task closed.
 
-### [ ] AR-012 — Resource binding và hai chính sách chọn đích
+### [~] AR-012 — Resource binding và hai chính sách chọn đích
 
 **Sửa/reuse:** H2 invocation/target context, `H2AgentTargetScope`, `SafeWorkspace`, production binding và permissions. Không lấy ProjectRoot làm toàn bộ policy bảo mật.
 
@@ -470,32 +470,27 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-011_ACCEPTED_NEXT_AR-012",
+  "phase": "AR-012_ACTIVE_RESUMED_DRAFT",
   "active_task": "AR-012",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar011-resume-2026-09-22",
+  "owner_session": "chatgpt-ar012-resume-2026-09-22",
   "last_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
   "last_validated_code_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
   "last_validation_result": "FULL_REQUIRED_CI_E2_AND_NEGATIVE_CONTROLS_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact-source positive CI restored and verified CLEAN after negative control. This checkpoint writes only three declared docs and verifies non-force push/remote HEAD. Offline text review matches delivered source; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Resumed local draft applied in a clean GitHub checkout with exact preimages. Candidate is untested until Windows CI finishes; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T09:32:04.069843+00:00",
-  "completed_this_session": [
-    {
-      "id": "AR-011",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "E2_PASS",
-      "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-      "full_ci_run": 35709818021
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T10:24:55.918579+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-012 has not started. Resource binding/target grounding remains a separate scope from permissions."
+    "Compile and execute the 19 resumed AR-012 cases; none previously ran.",
+    "Wire resolver into production Office and desktop; keep native discovery support gaps explicit.",
+    "Expose external binding in existing activity/chips and test path aliases/reparse behavior.",
+    "Review exact-source full CI/publish/helper evidence before acceptance."
   ],
   "last_test_commands": [
     {
@@ -778,7 +773,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On existing feature/h2-agent-reliability-ar-000 and PR #3, reconcile main/ref/working tree and SESSION HANDOFF. Execute AR-012 only: read SPEC section 5 and AR-012 acceptance, bind exact resource/target identity independently of permission, test Global explicit targets and Project implicit/explicit boundaries, ambiguous and stale active targets, path-prefix/junction/alias fail-closed cases. Retain AR-011/010/001 and all required suites. No second engine/store, new model endpoint or NAS certification.",
+  "next_exact_action": "Continue AR-012 only. Inspect actual build/focused results; finish ResolveOpen Office/desktop integration and real external-target UI projection. Add path/provider regressions and full required CI. Do not close AR-012 based on the untested local draft.",
   "next_task_if_active_done": "AR-020",
   "last_runtime_source_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
   "previous_saved_checkpoint_commit": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
@@ -805,7 +800,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "acceptance_status": "E2_PASS",
     "code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
     "full_ci_run": 35698496546
-  }
+  },
+  "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs"
 }
 ```
 
