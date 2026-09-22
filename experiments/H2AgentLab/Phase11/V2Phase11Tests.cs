@@ -223,7 +223,10 @@ public static class V2Phase11Tests
 
         await Test("1108 WebResearchHost exposes structured search fetch download extract metadata browser fallback lazily", async () =>
         {
-            await using var host = new WebResearchHost(new FixtureWebBackend());
+            // AR-001 feed callback is bound at construction, as the provider contract requires.
+            WebFeedPage? observedFeed = null;
+            await using var host = new WebResearchHost(new FixtureWebBackend())
+            { FeedObserved = page => observedFeed = page };
             await host.ConnectAsync(CancellationToken.None);
             var summaries = await host.ListToolSummariesAsync(CancellationToken.None);
             var expected = new[]
@@ -247,8 +250,6 @@ public static class V2Phase11Tests
                 && feedDefinitions[0].Summary.SupportsParallel
                 && feedDefinitions[0].Summary.ResourceScope == "web:public",
                 "Feed schema was eagerly mixed with other tools or changed permission metadata.");
-            WebFeedPage? observedFeed = null;
-            host.FeedObserved = page => observedFeed = page;
             using var feed = JsonDocument.Parse(await host.ExecuteToolAsync("web.read_feed",
                 JsonSerializer.SerializeToElement(new { url = "https://feed.example.test/ar001.xml", max_items = 1 }),
                 CancellationToken.None));

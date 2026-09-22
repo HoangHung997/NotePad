@@ -469,14 +469,14 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar001-2026-09-22",
-  "last_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
-  "last_validated_code_commit": "c62851a76351028906d495ba3c00b4401e8f4831",
-  "last_validation_result": "CI_RED_H2_PROCESS_FIXTURE_CLEANUP_FAILURE",
+  "last_code_commit": "82af106655358fa4f27d60f3da2a53e35341f1cb",
+  "last_validated_code_commit": "82af106655358fa4f27d60f3da2a53e35341f1cb",
+  "last_validation_result": "BUILD_FAILED_CS8852_TEST_FIX_PENDING_VALIDATION",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
   "working_tree": "Offline source snapshot verified by hash; guarded source changes applied to isolated CI checkout. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T05:42:50.712895+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T06:02:45.755014+00:00",
   "completed_this_session": [
     {
       "task": "AR-001",
@@ -491,7 +491,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "remaining_in_active_task": [
-    "Run RC-02 and teardown corpus 3x and full required CI on committed patch; repair all failures before closing AR-001."
+    "Run repeated AR-001 corpus and all full CI suites/publish after the test-only init-property fix; do not close from the earlier c26 13/13 result."
   ],
   "last_test_commands": [
     {
@@ -535,12 +535,79 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "h2_tests": "589 passed / 1 failed",
       "architecture_guard": "SKIPPED",
       "owner": "AR-001"
+    },
+    {
+      "run_id": 35691748431,
+      "code_sha": "88cc6241d9488e26e0652751a7c14c26df4aecb3",
+      "kind": "focused",
+      "passed": 9,
+      "failed": 4,
+      "artifact_id": 10679446309,
+      "artifact_sha256": "a96c330edf9746d1a36f9f3cd662f973c058ba2a7dc1ac263c05e307d1ffa2bd",
+      "issues": [
+        "UI-context-dependent executor/provider disposal",
+        "Test parsed evidence footer as raw JSON"
+      ]
+    },
+    {
+      "run_id": 35692162013,
+      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
+      "kind": "focused",
+      "repetitions": [
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        }
+      ],
+      "artifact_id": 10679422208,
+      "artifact_sha256": "b26040954154ed315355978edcad3e09e8267c85be2855a7cb863f8735cf79f8"
+    },
+    {
+      "run_id": 35692347728,
+      "job_id": 106631823690,
+      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
+      "kind": "full",
+      "conclusion": "failure",
+      "h2_tests": {
+        "passed": 603,
+        "failed": 0
+      },
+      "architecture": {
+        "passed": 35,
+        "failed": 0
+      },
+      "phase11": {
+        "passed": 14,
+        "failed": 1
+      },
+      "failure": "1108 exact WebResearchHost tool set omitted existing web.read_feed",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35692802913,
+      "code_sha": "82af106655358fa4f27d60f3da2a53e35341f1cb",
+      "kind": "focused-build",
+      "conclusion": "failure",
+      "error": "CS8852 at V2Phase11Tests.cs:251: FeedObserved is init-only; test assigned it after construction",
+      "tests": "NOT_RUN",
+      "artifact_id": 10678948191,
+      "artifact_sha256": "e5264e73d4f255e9afa06e3e04b0e5e88d24ba7e862b22b827ad785ec07c7b74"
     }
   ],
   "evidence_locations": [
     "docs/agent-reliability/AR-000/baseline.json",
     "docs/agent-reliability/AR-000/baseline.md",
-    "docs/agent-reliability/AR-000/ci-final-review.json"
+    "docs/agent-reliability/AR-000/ci-final-review.json",
+    "docs/agent-reliability/AR-001/implementation.md",
+    "docs/agent-reliability/AR-001/ci-attempts.json"
   ],
   "known_failures": [
     "B01 skill-name drift",
@@ -563,12 +630,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Run full Avalonia CI on the committed AR-001 source, inspect exact SHA and all suites/artifacts; repair AR-001 regressions on this same branch/PR #3. Do not advance AR-010 yet.",
+  "next_exact_action": "Check actual newest branch SHA and its dispatched full Avalonia CI plus focused AR-001 logs. Repair remaining failures on AR-001, preserve exact-set/safety assertions, require nonempty publish and helper IPC smoke. AR-010 is not started.",
   "next_task_if_active_done": "AR-010",
   "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
   "finalization_checked_head": "4e06bcd6c54c1eea3ecc93c288c0cf2f452d74d6",
-  "additional_ci_after_recorded_run": "Any CI triggered by this docs/workflow finalization is not the completed run recorded above; inspect the PR checks on resume. No full CI PASS is claimed."
+  "additional_ci_after_recorded_run": "Any CI triggered by this docs/workflow finalization is not the completed run recorded above; inspect the PR checks on resume. No full CI PASS is claimed.",
+  "pending_code_change": "Init-only observer test correction in this checkpoint commit; exact new SHA is recorded by the CI checkout, not inferred from the previous tested SHA."
 }
 ```
 

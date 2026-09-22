@@ -19,3 +19,8 @@ Focused run 35691748431 tested source 88cc6241d9488e26e0652751a7c14c26df4aecb3: 
 ## Full CI uncovered another pre-existing exact-inventory mismatch
 
 Source c26b3521ce4b7d60e69f3942dda123c23fd53cf3 passed the AR-001 corpus 13/13 in all three focused repetitions (run 35692162013; artifact digest b26040954154ed315355978edcad3e09e8267c85be2855a7cb863f8735cf79f8). Full run 35692347728 passed H2 603/603, architecture 35/35 and all preceding suites, then Phase-11 case 1108 failed: its exact WebResearchHost list omitted the already-implemented web.read_feed. Phase-11 was 14 passed / 1 failed; downstream MB suites and publish were NOT_RUN. The corrected test retains exact ordering and selected-only schema checks, adds read-only/scope assertions, and executes the existing feed backend/parser/observation path using a synthetic feed. No actual search/browser connection is installed or claimed. Native/fixture Excel null preflight is made explicit to remove the two new nullable warnings without changing its rejection contract. This repair remains AR-001 CI restoration; AR-060 live Web acceptance stays open.
+
+
+## Test-only compile correction
+
+Run 35692802913 on 82af106655358fa4f27d60f3da2a53e35341f1cb failed compilation (CS8852) because the added Phase-11 test assigned the init-only FeedObserved property after construction. The fixture now binds that callback in an object initializer, preserving the provider contract and all feed assertions. The failed build is not counted as a test pass. Detailed failed/passing attempts are retained in ci-attempts.json. Full CI still requires a clean run on the corrected source.
