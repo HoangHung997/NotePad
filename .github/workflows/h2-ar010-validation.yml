@@ -1,0 +1,58 @@
+name: AR-010 shared runtime validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar010-validation.yml'
+      - 'tools/agent-reliability/ar010_*'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar010-validation
+  cancel-in-progress: false
+jobs:
+  source:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Export bounded tracked text and exact identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess, zipfile
+          from pathlib import Path
+          dest = Path(os.environ['RUNNER_TEMP']) / 'ar010-source'
+          dest.mkdir()
+          manifest = {'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'working_tree': 'CLEAN', 'files': {}}
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          suffixes = {'.cs', '.csproj', '.slnx', '.sln', '.props', '.targets', '.axaml', '.json', '.md', '.yml', '.yaml', '.py', '.ps1', '.sh', '.cmd', '.txt', '.config'}
+          with zipfile.ZipFile(dest / 'source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in paths:
+                  if not name: continue
+                  path = Path(name)
+                  if path.is_symlink() or not path.is_file() or path.stat().st_size > 2000000: continue
+                  if any(p in {'bin', 'obj', '.git', '.artifacts', 'audit-evidence'} for p in path.parts): continue
+                  if path.suffix.lower() not in suffixes and name != '.gitignore': continue
+                  data = path.read_bytes()
+                  try: data.decode('utf-8-sig')
+                  except UnicodeDecodeError: continue
+                  archive.writestr(name, data)
+                  manifest['files'][name] = {'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}
+              archive.writestr('AR010_SOURCE_MANIFEST.json', json.dumps(manifest, indent=2))
+          (dest / 'identity.json').write_text(json.dumps({k: v for k, v in manifest.items() if k != 'files'}, indent=2))
+          print('Source checkpoint:', manifest['head'], 'tracked text files:', len(manifest['files']))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AR010-Exact-Source
+          path: ${{ runner.temp }}/ar010-source/
+          if-no-files-found: error
+          retention-days: 7
