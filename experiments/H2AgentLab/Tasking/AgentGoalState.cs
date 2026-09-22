@@ -134,13 +134,15 @@ public sealed class AgentGoalState
     {
         var source=Revisions.SingleOrDefault(x=>x.SourceId==sourceId)
             ?? throw new InvalidOperationException("Proposal has no user source in this task.");
+        if(source.Id != RevisionId)
+            throw new InvalidOperationException("A proposal must quote the current user revision, not revive superseded or waived work.");
         if(string.IsNullOrWhiteSpace(exactRequirement) || !source.SourceText.Contains(exactRequirement,StringComparison.Ordinal))
             throw new InvalidOperationException("Proposed requirement is not an exact user-source quotation.");
         if(Active.Any(x=>x.Requirement==exactRequirement))return this;
         if(Obligations.Count>=MaxObligations || Active.Sum(x=>x.Requirement.Length)+exactRequirement.Length>8_000)
             throw new InvalidOperationException("Proposal exceeds the bounded contract.");
         return new(TaskId,Scope,Revisions,Obligations.Append(new AgentOutcomeObligation(
-            Id("goal",TaskId.ToString("N"),sourceId+":"+exactRequirement),exactRequirement,sourceId,RevisionId,Scope)),MutationRevisions);
+            Id("goal",TaskId.ToString("N"),"proposal:"+sourceId+":"+exactRequirement),exactRequirement,sourceId,RevisionId,Scope)),MutationRevisions);
     }
     public AgentGoalState RecordMutation(string dispatchedRevision)
     {

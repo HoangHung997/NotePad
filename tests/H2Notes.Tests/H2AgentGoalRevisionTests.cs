@@ -27,6 +27,7 @@ internal static class H2AgentGoalRevisionTests
         => new("fixture-criterion-verifier",[new(id,VerificationCriterionStatus.Passed,[evidence])]);
     public static void Run(Action<string,Action> test)
     {
+        H2AgentGoalProposalBoundaryTests.Run(test);
         test("AR-030 explicit work clauses retain all four source backed outcomes",()=>{
             var task=Guid.NewGuid();var source=Guid.NewGuid();var s=State(task:task,message:source);
             Check(s.Active.Count==4 && s.Active.All(x=>x.Status==AgentObligationStatus.Pending),"Missing or pre-verified outcomes.");
