@@ -73,7 +73,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | ID | Task | Dependency chính | Evidence yêu cầu | Status |
 |---|---|---|---|---|
 | AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
-| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | NOT_STARTED |
+| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | ACTIVE |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | NOT_STARTED |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | NOT_STARTED |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
@@ -124,7 +124,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-000 evidence — 2026-09-22:** [baseline and source owners](agent-reliability/AR-000/baseline.md) and [machine-readable manifest](agent-reliability/AR-000/baseline.json). E0 baseline accepted with existing CI RED; no runtime repair or E3/E4/E5 PASS is claimed. Only AR-000 is closed. AR-001 is next, NOT_STARTED; MB-124–127 and all old acceptance debts remain unchanged.
 
-### [ ] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI
+### [~] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI
 
 **Sửa/reuse:** `H2ProductionAgentAdapter.StablePrefix`, `Tools/SkillRuntimeTools.cs`, `NormalRuntimeToolRegistry`, `V2ArchitectureTests`, `H2OfficeRuntimeTools`, `OfficeProtocol/ComOfficeBackend`, workflow hiện tại nếu cần.
 
@@ -462,13 +462,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-000_BASELINE_ACCEPTED_NEXT_AR-001",
+  "phase": "AR-001_IMPLEMENTATION",
   "active_task": "AR-001",
-  "implementation_status": "NOT_STARTED",
-  "acceptance_status": "NOT_RUN",
+  "implementation_status": "ACTIVE",
+  "acceptance_status": "REPAIR_REQUIRED",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar000-2026-09-22",
+  "owner_session": "chatgpt-ar001-2026-09-22",
   "last_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
   "last_validated_code_commit": "c62851a76351028906d495ba3c00b4401e8f4831",
   "last_validation_result": "CI_RED_H2_PROCESS_FIXTURE_CLEANUP_FAILURE",
@@ -476,17 +476,10 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
   "working_tree": "CI checkout verified clean before finalization; finalization push requires clean tree and matching remote HEAD; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T05:20:16.762364+00:00",
-  "completed_this_session": [
-    {
-      "task": "AR-000",
-      "implementation_status": "IMPLEMENTED",
-      "evidence": "E0 + execution inventory",
-      "baseline_acceptance": "ACCEPTED_WITH_CI_RED"
-    }
-  ],
+  "checkpoint_saved_at_utc": "2026-09-22T05:25:51.995280+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-001 has not been implemented; fix B01/B02/B03 and run its required corpus/full CI."
+    "Reproduce B11 process/fixture cleanup; repair B01 skill name, B02 Excel batch parity, B03 canonical registry guards; RC-02 and full required CI/publish smoke."
   ],
   "last_test_commands": [
     {
@@ -545,8 +538,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions."
   ],
   "external_blockers": [
-    "No local checkout/.NET/PowerShell in assistant container; GitHub CI is the executable environment",
-    "User model/Office/CAD/session not accessible: E3/E4 NOT_RUN / AWAITING_ENVIRONMENT; one-PC tests still required"
+    "Assistant container has no checkout/.NET/PowerShell and GitHub DNS is unavailable; source transfer and Windows tests use the existing authorized GitHub Actions environment.",
+    "Real Office/model/H2 UI still NOT_RUN; AR-083 DEFERRED_BY_USER."
   ],
   "deferred_acceptance": [
     {
@@ -558,7 +551,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On existing branch feature/h2-agent-reliability-ar-000, inspect git status and current main/PR before editing. Reproduce the H2WorkAssistantRepairTests local-command cleanup failure B11 (test line 71, InWorkspace line 285); then execute AR-001 B01/B02/B03 fixes, RC-02, all required CI and nonempty publish smoke. Do not disable assertions, label the failure flaky without evidence, start another AR, or create a duplicate branch.",
+  "next_exact_action": "Inspect isolated AR-001 source workspace, reproduce B11 with bounded Windows fixture tests, implement only AR-001 and run all required CI. Keep this branch and PR #3; do not reset/force-push/merge.",
   "next_task_if_active_done": "AR-010",
   "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
