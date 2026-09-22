@@ -119,3 +119,10 @@ MB-124–127 stay open. AR-083 stays DEFERRED_BY_USER and blocks certified multi
 - `H2CoordinatorSqliteStore.cs`: `src/H2Notes.Coordinator/H2CoordinatorSqliteStore.cs`
 
 This report records one baseline; the AR tracker alone is the active execution checkpoint.
+
+
+## Final session CI observation
+
+The initial main baseline above is preserved. A new PR run **35689629766** tested merge checkout `c62851a76351028906d495ba3c00b4401e8f4831` (head `0ed36c1b56ffeeb78cfe1447db2eacee545a4294`, runtime unchanged from `1283bc13e07c3cd47d04886166de3dfc595422c0`). Build succeeds, but H2 tests are **589 passed / 1 failed**. B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions.
+
+The architecture guard and later suites/publish were skipped in this run; no artifact exists. This is not the prior 590/590 result. The canonical SESSION HANDOFF now includes this failure and AR-001 reproduction priority. [Structured final CI review](ci-final-review.json). AR-000 capture run **35689629807** succeeded and saved checkpoint `98b93dcc3b525bea98ac3378854b7e1651ff4654`; neither capture success nor this docs-only finalization is product acceptance.

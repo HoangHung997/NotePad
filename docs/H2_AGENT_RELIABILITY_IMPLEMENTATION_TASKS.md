@@ -470,13 +470,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "active_pr": 3,
   "owner_session": "chatgpt-ar000-2026-09-22",
   "last_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
-  "last_validated_code_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
-  "last_validation_result": "CI_RED_BASELINE_NOT_FULL_PASS",
+  "last_validated_code_commit": "c62851a76351028906d495ba3c00b4401e8f4831",
+  "last_validation_result": "CI_RED_H2_PROCESS_FIXTURE_CLEANUP_FAILURE",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "CI checkout clean before capture; docs-only commit/push step must finish clean; user-PC tree NOT_ACCESSIBLE",
+  "working_tree": "CI checkout verified clean before finalization; finalization push requires clean tree and matching remote HEAD; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T05:10:21.907322+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T05:20:16.762364+00:00",
   "completed_this_session": [
     {
       "task": "AR-000",
@@ -501,6 +501,12 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     {
       "command": "python3 tools/agent-reliability/capture_baseline.py",
       "execution": "E0_SOURCE_CI_INVENTORY_ONLY"
+    },
+    {
+      "command": "dotnet run --project .\\tests\\H2Notes.Tests\\H2Notes.Tests.csproj -c Release --no-build",
+      "run": 35689629766,
+      "tested_checkout_sha": "c62851a76351028906d495ba3c00b4401e8f4831",
+      "result": "589 passed / 1 failed"
     }
   ],
   "ci_runs": [
@@ -514,18 +520,29 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "url": "https://github.com/HoangHung997/NotePad/actions/runs/35689629807",
       "checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
       "source_checks": "E0_CAPTURED",
-      "job_final_status": "Consult run; checkpoint written before commit/push"
+      "job_final_status": "SUCCESS_VERIFIED"
+    },
+    {
+      "id": 35689629766,
+      "head_sha": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
+      "tested_checkout_sha": "c62851a76351028906d495ba3c00b4401e8f4831",
+      "result": "FAILURE",
+      "h2_tests": "589 passed / 1 failed",
+      "architecture_guard": "SKIPPED",
+      "owner": "AR-001"
     }
   ],
   "evidence_locations": [
     "docs/agent-reliability/AR-000/baseline.json",
-    "docs/agent-reliability/AR-000/baseline.md"
+    "docs/agent-reliability/AR-000/baseline.md",
+    "docs/agent-reliability/AR-000/ci-final-review.json"
   ],
   "known_failures": [
     "B01 skill-name drift",
     "B02 200/128 Excel contract drift",
     "B03 architecture guard failure; downstream suites and publish did not run",
-    "B04-B10 remain open source-observed limitations/risks; see baseline"
+    "B04-B10 remain open source-observed limitations/risks; see baseline",
+    "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions."
   ],
   "external_blockers": [
     "No local checkout/.NET/PowerShell in assistant container; GitHub CI is the executable environment",
@@ -541,8 +558,12 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On existing branch feature/h2-agent-reliability-ar-000, first inspect git status --short --branch and fetch origin without reset; reconcile newer main/checkpoint/PR work, then run the v2 guard command recorded in this manifest to reproduce B03. Execute AR-001 only: canonical skill name, read_tool_output exact-set guard, shared Excel 128/129/200 verdict, RC-02 and full CI/publish smoke. Do not start paging/memory or create a duplicate branch.",
-  "next_task_if_active_done": "AR-010"
+  "next_exact_action": "On existing branch feature/h2-agent-reliability-ar-000, inspect git status and current main/PR before editing. Reproduce the H2WorkAssistantRepairTests local-command cleanup failure B11 (test line 71, InWorkspace line 285); then execute AR-001 B01/B02/B03 fixes, RC-02, all required CI and nonempty publish smoke. Do not disable assertions, label the failure flaky without evidence, start another AR, or create a duplicate branch.",
+  "next_task_if_active_done": "AR-010",
+  "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
+  "finalization_checked_head": "4e06bcd6c54c1eea3ecc93c288c0cf2f452d74d6",
+  "additional_ci_after_recorded_run": "Any CI triggered by this docs/workflow finalization is not the completed run recorded above; inspect the PR checks on resume. No full CI PASS is claimed."
 }
 ```
 
