@@ -102,8 +102,9 @@ public sealed record H2AgentResourceBinding(
            && (!requireUiState || UiStateToken is not null && UiStateToken == current.UiStateToken);
 
     public static string? SelectionToken(string? value)
-        => string.IsNullOrEmpty(value) ? null : value.Length <= 512 && !value.Any(char.IsControl)
-            ? value : "selection-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+        // Selection may contain Word text; identity metadata must not copy its plaintext.
+        => string.IsNullOrEmpty(value) ? null
+            : "selection-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private static bool Token(string? value) => value is { Length: > 0 and <= 512 } && !value.Any(char.IsControl);
     private static bool Optional(string? value) => value is null || Token(value);

@@ -16,7 +16,7 @@ internal sealed partial class H2ProductionToolSession
         // foreground. A machine-wide FullAccess grant alone identifies no desktop target.
         var captured = _targetPolicy?.CapturedContext;
         if (captured is null) { _desktopBindingFailure = "needs_configuration"; return; }
-        if (!(_captureValidator ?? H2CapturedWindowIdentity.IsCurrent)(captured))
+        if (!H2CapturedWindowIdentity.IsCurrent(captured))
         { _desktopBindingFailure = "stale_resource"; return; }
         DesktopHostClient? client = null;
         try

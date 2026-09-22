@@ -118,6 +118,26 @@ internal static class H2AgentLiveBindingTests
             Check(result.Progress.Any(p=>p.ToolOutcome is {Effect:H2ToolMutationEffect.Unknown}),"Post-write change was mislabeled no effect.");
             Check(!result.Summary.Evidence.Any(e=>e.VerificationPassed==true),"Wrong readback awarded host verification.");
         }));
+        test("AR-012 matching captured selection performs and verifies the exact permitted write", () => Temp(root =>
+        {
+            var office=new OfficeFixture(root);var path=Path.Combine(root,"A.xlsx");office.AddExcel("a",path,"BEFORE");
+            var context=new H2AgentTaskContext(root,null,PermissionScope:Full(),ActiveWorkContext:Capture("a",path) with {Selection="Data!A1"});
+            var wire=new Wire(Search("excel.write_range"),Write("write","a"));
+            var result=Execute(root,null,"Update current selection",context,office,wire,readOnly:false);
+            Check(office.Writes==1 && office.Books["a"].Sheets.Single().Cells.Single().Value=="AFTER","Valid bound selection did not execute exactly once.");
+            Check(result.Summary.Status==H2AgentTaskStatus.Completed && result.Summary.Evidence.Any(e=>e.VerificationPassed==true),
+                "Correctly bound and independently read-back fixture write was not verified: "+result.Summary.Error);
+        }));
+        test("AR-012 captured selection identity never exposes plaintext", () =>
+        {
+            const string privateText="SYNTHETIC-PRIVATE-SELECTION";
+            var capture=Capture("unsaved","Document1") with {Selection=privateText,ApplicationKind=H2ApplicationKind.Word};
+            var bound=H2AgentResourceBinding.FromCaptured(capture);
+            Check(bound.UiStateToken==H2AgentResourceBinding.SelectionToken(privateText)
+                && !JsonSerializer.Serialize(bound).Contains(privateText),"Selection plaintext leaked into identity metadata.");
+            var other=H2AgentResourceBinding.FromCaptured(capture with {Selection=privateText+" changed"});
+            Check(!bound.MatchesObservation(other,requireContentVersion:false,requireUiState:true),"Different selections share a state token.");
+        });
         test("AR-012 RC-07 changed captured selection cannot redirect a production write", () => Temp(root =>
         {
             var office=new OfficeFixture(root);var path=Path.Combine(root,"A.xlsx");office.AddExcel("a",path,"BEFORE");
@@ -150,6 +170,26 @@ internal static class H2AgentLiveBindingTests
             Check(SelectedDesktopWindowController.SameTarget(bound,bound with {Foreground=false,Title="Changed title"}),"Foreground/title movement invalidated identity.");
             foreach(var changed in new[]{bound with {Handle=102},bound with {ProcessId=124},bound with{ProcessStartedUtcTicks=789},bound with{SessionId="other"}})
                 Check(!SelectedDesktopWindowController.SameTarget(bound,changed),"Native window identity drift accepted.");
+        });
+        test("AR-012 selected desktop controller exercises exact identity through helper IPC", () =>
+        {
+            using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var directory=new DirectoryInfo(AppContext.BaseDirectory);
+            while(directory is not null && !File.Exists(Path.Combine(directory.FullName,"H2Notes.Avalonia.slnx")))directory=directory.Parent;
+            Check(directory is not null,"Full repository checkout is required for fixture helper evidence.");
+            var helper=Path.Combine(directory!.FullName,"experiments","H2AgentLab.DesktopHost","bin","Release","net10.0-windows","H2AgentLab.DesktopHost.exe");
+            using var client=new DesktopHostClient(helper,fixtureMode:true,defaultTimeout:TimeSpan.FromSeconds(10));
+            var target=client.ListWindowsAsync(timeout.Token).GetAwaiter().GetResult().Single();
+            using var correct=new SelectedDesktopWindowController(client,target);
+            var observed=JsonSerializer.SerializeToElement(correct.Inspect((_,_)=>Task.FromResult(true),timeout.Token).GetAwaiter().GetResult());
+            var token=observed.GetProperty("controls").EnumerateArray().Single(c=>c.GetProperty("name").GetString()=="Fixture text").GetProperty("Token").GetString()!;
+            var acted=JsonSerializer.SerializeToElement(correct.Act("type_control",token,"BOUND-FIXTURE",(_,_)=>Task.FromResult(true),timeout.Token).GetAwaiter().GetResult());
+            Check(acted.GetProperty("valueObserved").GetBoolean(),"Valid selected helper window failed its actual readback.");
+            using var wrong=new SelectedDesktopWindowController(client,target with {Handle=target.Handle+1});
+            try{wrong.Inspect((_,_)=>Task.FromResult(true),timeout.Token).GetAwaiter().GetResult();throw new InvalidOperationException("Wrong HWND accepted through actual IPC.");}
+            catch(H2AgentLab.Tools.ToolPreflightException ex){Check(ex.Code=="stale_resource","Wrong identity classification.");}
+            var after=client.ObserveAsync(target.SessionId,timeout.Token).GetAwaiter().GetResult();
+            Check(after.Elements.Single(e=>e.Name=="Fixture text").Value=="BOUND-FIXTURE","Rejected target changed the fixture window.");
         });
         test("AR-012 Windows junction escape rejected before file effects", () => Temp(root =>
         {

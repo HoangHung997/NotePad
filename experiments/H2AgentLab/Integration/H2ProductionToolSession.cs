@@ -93,7 +93,6 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                     finally { _approvalGate.Release(); }
                 }
                 ct.ThrowIfCancellationRequested();
-                _executingAuthorizedCall.Value = true;
                 if (_targetPolicy is not null && _fileTargets is not null && descriptor.Namespace.Name is "files" or "autocad")
                 {
                     var path = Arg(call, "path") ?? Arg(call, "destination");
@@ -107,6 +106,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                             "resolved", _targetPolicy.IsExternal(canonical), "host-file-target"));
                     }
                 }
+                _executingAuthorizedCall.Value = true;
                 try
                 {
                     // Common metadata stays out-of-band; the domain verifier sees exact old bytes.
