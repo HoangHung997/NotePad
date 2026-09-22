@@ -83,7 +83,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
-| AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | ACTIVE |
+| AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | NOT_STARTED |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | NOT_STARTED |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | NOT_STARTED |
@@ -239,7 +239,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** không gắn mọi task ReadOnly mãi sau mutation; không cho model tự đóng outcome bằng final text; requirements hiện hành và lịch sử truy vết rõ. Không đưa internal steps vào H2 TaskRecord.
 
-### [~] AR-031 — Journal/checkpoint trong Agent store
+### [x] AR-031 — Journal/checkpoint trong Agent store
 
 **Sửa/reuse:** AgentIntegrationTaskArchive, task/thread durable records, ArtifactStore và transaction primitives hiện hữu phù hợp local storage.
 
@@ -477,43 +477,99 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-031_ACTIVE_IMPLEMENTATION_VALIDATION",
-  "active_task": "AR-031",
-  "implementation_status": "ACTIVE",
+  "phase": "AR-031_ACCEPTED_NEXT_AR-032",
+  "active_task": "AR-032",
+  "implementation_status": "NOT_STARTED",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar031-local-journal",
-  "last_code_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-  "last_validated_code_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-  "last_validation_result": "AR030_39_PASS_X3; EVIDENCE_6_PASS; FULL_CI_758_PASS; E2_ACCEPTED",
+  "owner_session": "chatgpt-ar031-cancellation-final",
+  "last_code_commit": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+  "last_validated_code_commit": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+  "last_validation_result": "AR031_E1_E2_AND_FULL_CI_PASS; CANCELLATION_VERIFIED; NATIVE_DEBT_REMAINS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact focused CI checkout CLEAN; docs writer requires three allowed documents, unchanged refs and a verified non-force push. Local mirror is an offline snapshot; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Exact Windows CI checkout CLEAN; final docs-only commit verifies unchanged refs and non-force push. Local review snapshot is not a full clone; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T20:05:36.382684+00:00",
-  "completed_this_session": [],
+  "checkpoint_saved_at_utc": "2026-09-22T21:32:05.181324+00:00",
+  "completed_this_session": [
+    {
+      "task": "AR-031",
+      "implementation": "IMPLEMENTED",
+      "acceptance": "E2_PASS",
+      "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4"
+    }
+  ],
   "remaining_in_active_task": [
-    "Compile and execute AR-031 on the new implementation commit; repair every regression and inspect full CI before acceptance."
+    "AR-032 NOT_STARTED; scoped retrieval implementation and RC-15/16/26/34 evidence remain."
   ],
   "last_test_commands": [
     {
-      "command": "H2Notes.Tests --filter AR-030 x3 plus retained AR corpora",
-      "code_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-      "run_id": 35776861064,
-      "result": "39/39 each; evidence 6/6; policy 3/3"
+      "command": "H2Notes.Tests --filter AR-031 x3 and retained corpora",
+      "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "run_id": 35785572999,
+      "results": {
+        "AR-031-1": {
+          "passed": 39,
+          "failed": 0,
+          "sha256": "5618e22f99525669a86f84896739a6b11230a7c184853fa1d45785b47630e274"
+        },
+        "AR-031-2": {
+          "passed": 39,
+          "failed": 0,
+          "sha256": "a7844df5942ada10d68d314e94b92864700ea1a48b9925d9465ae5cfad71d46a"
+        },
+        "AR-031-3": {
+          "passed": 39,
+          "failed": 0,
+          "sha256": "1916b9b87ec7574fc6ebb0925a20b17f325e3d90ffedac8a34d8cb8e923b54ec"
+        },
+        "AR-030": {
+          "passed": 39,
+          "failed": 0,
+          "sha256": "c136df9cea60bbe067d74c1c2b0e17915a8b5261ed1a59e45d1bd324a967c42c"
+        },
+        "AR-020": {
+          "passed": 36,
+          "failed": 0,
+          "sha256": "b3bdee284db16a19d17b1fb1dc5018c32bcf815f412e84a891c7ef34b6ad78da"
+        },
+        "AR-012": {
+          "passed": 44,
+          "failed": 0,
+          "sha256": "bdf71e499b8e025084b59dffab60b06273adcd8b86f0d77a9e56e5e5ba34152d"
+        },
+        "AR-011": {
+          "passed": 25,
+          "failed": 0,
+          "sha256": "a05ad9755db44a81987cc664b39710554311b4390c819b50ba0582145ea7b7e7"
+        },
+        "AR-010": {
+          "passed": 11,
+          "failed": 0,
+          "sha256": "70ab5e891f63bd35e1df383f9492e84a9bc03dad6bb170304df816270626c0f4"
+        },
+        "AR-001": {
+          "passed": 13,
+          "failed": 0,
+          "sha256": "8354ba23b696abde1b43f312793c52350616dc2799ff42f7ba5d899d8c54c6e1"
+        }
+      }
     },
     {
       "command": "run_agent_suites.ps1",
-      "code_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-      "run_id": 35776861064,
+      "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "run_id": 35785572999,
       "result": "74/74"
     },
     {
-      "command": "Full Avalonia CI with publish/helper IPC",
-      "code_sha": "b0ee07b467988f44e5f80af10da3f70df5ed914a",
-      "run_id": 35776861177,
-      "result": "758 passed / 0 failed; all required steps success"
+      "command": "Full Avalonia CI, Windows publish and packaged helper IPC",
+      "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "run_id": 35785633670,
+      "result": {
+        "passed": 797,
+        "failed": 0
+      }
     }
   ],
   "ci_runs": [
@@ -849,6 +905,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "job_id": 106912171543,
       "head_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
       "result": "SUCCESS"
+    },
+    {
+      "id": 35785572999,
+      "job_id": 106941639193,
+      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "result": "SUCCESS"
+    },
+    {
+      "id": 35785633670,
+      "job_id": 106941632110,
+      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "result": "SUCCESS"
     }
   ],
   "evidence_locations": [
@@ -878,11 +946,12 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-030/evidence-regression-observation.md",
     "docs/agent-reliability/AR-030/acceptance.json",
     "docs/agent-reliability/AR-030/implementation.md",
-    "docs/agent-reliability/AR-031/implementation.md"
+    "docs/agent-reliability/AR-031/implementation.md",
+    "docs/agent-reliability/AR-031/acceptance.json"
   ],
   "known_failures": [],
   "external_blockers": [
-    "Local .NET/PowerShell unavailable; use existing Windows CI. Native Office/model not used by this slice."
+    "Native Office/model/UI E3/E4 environment remains unavailable; unrelated to AR-031 E2 acceptance."
   ],
   "deferred_acceptance": [
     {
@@ -894,8 +963,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On the existing branch/PR, inspect AR-031 delivery and exact checkout identity; run registered archive/crash/production tests, retained AR regressions and all mandatory Agent/full-CI suites. Repair failures before marking AR-031 complete. Preserve AR-020 E3 pending and AR-083 deferred.",
-  "next_task_if_active_done": "AR-032",
+  "next_exact_action": "On the same branch and PR #3, reconcile latest refs, working tree and SESSION HANDOFF. Start only AR-032: scoped TaskId/ThreadId history and evidence retrieval with source IDs, pagination and current unfinished work. Reuse the existing Agent archive and registry; do not add a parallel store or replay unknown writes. Keep AR-020 native E3 pending, AR-083 deferred and retained AR-031/030/020/012/011/010/001 regressions.",
+  "next_task_if_active_done": "AR-033",
   "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
   "finalization_checked_head": "852c07e9b480231d3a4585be3f0900fc0c537686",
@@ -923,7 +992,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "full_ci_run": 35709818021
   },
   "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs",
-  "last_full_ci_checkout_sha": "b0ee07b467988f44e5f80af10da3f70df5ed914a",
+  "last_full_ci_checkout_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
   "implemented_this_session": [
     "Integrated the reviewed single-file evidence resolver repair; existing failing tests were not changed."
   ],
@@ -953,7 +1022,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "An existing mutation criterion keeps exact meaning/evidence without duplicate insertion.",
     "Strengthened mutation contract passes existing orchestrator guard."
   ],
-  "last_test_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083"
+  "last_test_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
+  "last_native_acceptance": "E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER"
 }
 ```
 
