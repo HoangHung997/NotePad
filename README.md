@@ -1,95 +1,46 @@
-# Nodepad
+# H2 Notes
 
-## Approved H2 Notes direction (2026-09-15)
+`main` là nhánh chính thức của bản H2 Notes hiện tại, đã hợp nhất mã nguồn, đặc tả và lịch sử các nhánh cũ ngày 22/09/2026.
 
-The ten responsive hybrid mockups are now the approved UI baseline. Future UI
-work must compare actual app screenshots against them at each implementation
-stage. This approval also records per-project files, configurable data folders,
-and Ollama/multi-provider AI settings. A first functional implementation is now
-available, with 77 passing tests. It is not fully accepted against the baseline;
-see [implementation status and remaining gaps](docs/RESPONSIVE_IMPLEMENTATION.md).
+H2 Notes là ứng dụng Windows quản lý dự án, công việc, ghi chú, tài liệu và hội thoại AI. Bản hiện tại sử dụng Avalonia, tích hợp H2 Agent Lab với các công cụ tài liệu, Office/desktop, OCR và web.
 
-See [approved product requirements](docs/APPROVED_PRODUCT_SPEC.md),
-[acceptance checklist](docs/UI_ACCEPTANCE.md), and
-[approved image gallery](docs/ui-concepts/2026-09-15-responsive-hybrid/README.md).
-The sections below describe the earlier implemented prototypes.
+## Bản hiện tại
 
-## Repository layout
+- Giao diện dự án và Agent theo thiết kế `2026-09-21-agent-documents-demo`, có lịch sử hội thoại, ô soạn phía dưới, quyền theo tác vụ và xem tài liệu.
+- Assistant nổi: hình tròn khi rảnh hoặc chat đang mở; một dòng hoạt động cuộn ngang khi đang làm và chat bị ẩn. Khung chat đi theo bong bóng.
+- Bổ sung và sửa các luồng Word/Excel/PDF, AutoCAD, OCR, đọc tin; báo kết quả theo bằng chứng kiểm tra.
+- Kiểm tra ứng dụng gần nhất: **590/590 đạt**. Xem [kiểm thử chức năng và giới hạn](docs/H2_AGENT_CAPABILITY_ACCEPTANCE_2026-09-22.md), [sửa Word/CV](docs/H2_WORD_CV_REPAIR_2026-09-22.md) và [kiểm chứng bong bóng](docs/H2_BUBBLE_COMPACT_2026-09-22.md).
 
-- `src/H2Notes.Core/` — shared H2 Notes data, storage, AI and document logic.
-- `src/H2Notes.Avalonia/` — current Avalonia H2 Notes application.
-- `src/Nodepad.Desktop/` — original WPF desktop app kept for compatibility/reference.
-- `tests/` — H2 Notes automated tests and OCR probe.
-- `tools/ocr/` — local OCR/layout bridge tooling.
-- `docs/` — approved product requirements, UI baseline and verification evidence.
-- `experiments/H2AgentLab/` — isolated AI-agent research lab; not automatically integrated into H2 Notes.
-- `_ver2/` — older WinForms source retained as legacy reference.
+Kết quả này không chứng nhận mọi khả năng của model, độ chính xác OCR trên mọi tài liệu hay đồng bộ trên hai máy thật. Các vấn đề còn mở được ghi trong biên bản nghiệm thu.
 
-## H2 Notes Project Sheet (Avalonia branch)
+## Chạy và kiểm tra mã nguồn
 
-The new lightweight project-table app lives in `H2Notes.Avalonia.slnx`.
-It uses selected NeraSpreadSheet scrolling/grid source, not the full spreadsheet
-engine. The original WPF solution and user data remain unchanged.
+Cần Windows và .NET 10 SDK:
 
 ```powershell
-dotnet build .\H2Notes.Avalonia.slnx -c Release
+dotnet restore .\H2Notes.Avalonia.slnx
+dotnet build .\H2Notes.Avalonia.slnx -c Release --no-restore
+dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-build
 dotnet run --project .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release
-dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release
 ```
 
-New data is isolated at `%LOCALAPPDATA%\H2Notes\project-sheet-v1.json`, with an
-initial backup of the legacy data. Add `-- --demo` to run a separate sample board.
-See [implementation and known limits](docs/PROJECT_SHEET_IMPLEMENTATION.md).
+## Bản portable
 
-## Original WPF App
+[GitHub Actions](https://github.com/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml) tạo bản ứng dụng Windows x64 self-contained theo commit trên `main`. Chọn lượt chạy thành công mới nhất và tải artifact `H2Notes-Avalonia-Portable-win-x64`. Gói ứng dụng này khác gói đầy đủ nhiều GB có Python/model OCR.
 
-Nodepad is now a C# WPF desktop sticky-notes app built around a Simple Sticky Notes style workflow:
+Thông tin gói đầy đủ đã kiểm tra, thành phần đi kèm và cách chuyển sang máy khác nằm trong [biên bản portable 22/09](docs/H2_PORTABLE_BUILD_2026-09-22.md). Gói đầy đủ hiện được bàn giao trên máy cục bộ; không lưu ZIP nhiều GB trong Git. [Workflow OCR](https://github.com/HoangHung997/NotePad/actions/workflows/avalonia-portable-ocr.yml) phục vụ đóng gói runtime OCR riêng.
 
-- tray-first behavior
-- small detached note windows
-- project notes with checklist tracking
-- one shared project manager view for expanding and collapsing each project
+Giải nén toàn bộ gói trước khi chạy. Cấu hình AI và API key thuộc máy/tài khoản của người dùng. Microsoft Office, AutoCAD, dịch vụ Ollama hoặc nhà cung cấp AI cần được cài/kết nối riêng theo chức năng sử dụng.
 
-## What this build supports
+## Mã nguồn và tài liệu
 
-- `General notes` for normal sticky-note usage
-- `Project notes` where each project gets one note with its own checklist
-- `Project Manager` in the explorer for reviewing all projects in one expandable view
-- per-note color, font, size, opacity, star, and always-on-top
-- show/hide notes on the desktop
-- autosave to `%LOCALAPPDATA%\Nodepad\state.json`
-- tray menu for new notes, show all, hide all, open explorer, and exit
+- `src/H2Notes.Avalonia/`: ứng dụng hiện tại.
+- `src/H2Notes.Core/`, `src/H2Notes.Coordinator/`: dữ liệu và đồng bộ.
+- `experiments/H2AgentLab/`: Agent core và phần tích hợp đang được ứng dụng sử dụng.
+- `experiments/H2AgentLab.OfficeHost/`, `experiments/H2AgentLab.DesktopHost/`: bộ kết nối ứng dụng Windows.
+- `tests/`, `tools/`: kiểm tra, công cụ đóng gói, OCR và kiểm thử NAS.
+- [Đặc tả sản phẩm](docs/H2_PRODUCT_MASTER_SPEC.md), [đặc tả Agent](docs/H2_AGENT_MASTER_SPEC.md), [đặc tả chat](docs/H2_AGENT_CHAT_SURFACE_SPEC.md).
+- [Thiết kế được duyệt](docs/ui-concepts/2026-09-21-agent-documents-demo/README.md), [nghiệm thu giao diện](docs/UI_ACCEPTANCE.md).
+- [Hợp nhất và dọn các bản cũ](docs/H2_MAIN_CONSOLIDATION_2026-09-22.md).
 
-## Project structure
-
-```text
-Nodepad.slnx
-src/
-  Nodepad.Desktop/
-    MainWindow.xaml                 # Explorer + project manager
-    Windows/NoteWindow.xaml         # Sticky note window
-    Models/                         # Notes, checklist items, app settings
-    Services/                       # Persistence, note palettes, note kinds
-    Converters/                     # UI value converters
-    Infrastructure/                 # Observable base class
-```
-
-## Run
-
-```powershell
-dotnet run --project .\src\Nodepad.Desktop\Nodepad.Desktop.csproj
-```
-
-## Build
-
-```powershell
-dotnet build .\Nodepad.slnx
-```
-
-## Current product direction
-
-The app now follows this structure:
-
-- `Desktop-first`: sticky notes are the main experience
-- `Explorer-second`: the explorer is for browsing, filtering, and project oversight
-- `Projects as notes`: each project has one note, one checklist, and one place to expand/collapse its details
+`src/Nodepad.Desktop/`, `Nodepad.slnx` và `_ver2/` giữ mã WPF/WinForms lịch sử để đối chiếu. Đây không phải bản ứng dụng hiện tại; không xóa dữ liệu hoặc sửa ảnh baseline gốc khi dọn bản build.

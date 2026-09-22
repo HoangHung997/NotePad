@@ -12,10 +12,7 @@ obj/
 *.pdb
 *.ilk
 
-# Root release folder is intentionally versioned so the latest portable build
-# can be downloaded directly from GitHub. Project-level bin/ folders stay ignored.
-!/bin/
-!/bin/**
+# Portable binaries belong in release packages / Actions artifacts, not source history.
 
 # Python cache
 __pycache__/

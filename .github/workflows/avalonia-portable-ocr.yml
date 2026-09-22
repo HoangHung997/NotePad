@@ -3,7 +3,7 @@ name: Avalonia Full Portable OCR
 on:
   push:
     branches:
-      - feature/nas-multi-device-sync
+      - main
     paths:
       - '.github/workflows/avalonia-portable-ocr.yml'
       - 'tools/ocr/**'

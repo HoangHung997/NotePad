@@ -3,7 +3,7 @@ name: H2 NAS Acceptance Package
 on:
   push:
     branches:
-      - feature/nas-multi-device-sync
+      - main
     paths:
       - 'src/H2Notes.Core/**'
       - 'src/H2Notes.Coordinator/**'
