@@ -1,6 +1,6 @@
 # AR-030 — outcome obligations and user-sourced goal revisions
 
-Status: ACTIVE / NOT_RUN. This is implementation scope, not acceptance. Uses the existing branch and PR #3. AR-020 remains IMPLEMENTED / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER.
+Status: IMPLEMENTED / E2_PASS / DONE for AR-030 only. See the verified checkpoint below. AR-020 remains IMPLEMENTED / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER.
 
 ## Source and ownership
 
@@ -27,3 +27,14 @@ H2AgentGoalRevisionTests runs from the existing H2 test runner. It covers RC-11/
 The read-only AR-030 workflow builds, runs an extraction-only mutation control (not an original-code checkout), restores exact checkout bytes, repeats the actual positive corpus three times, and retains AR-020/012/011/010/001 and all mandatory Agent suites. Full required Avalonia CI/publish/helper IPC remains separate and unchanged. Do not claim a count or PASS until the exact SHA's logs/artifacts have been read.
 
 E3/E4 remain NOT_RUN; AR-083 DEFERRED_BY_USER. Only AR-030 is actively implemented. MB-124–127 are not closed by this slice.
+
+
+## Verified final AR-030 checkpoint
+
+Code `cc6ce2e80afafc25a48c4bed5b9045be5df96083`; focused run **35776861064**, full run **35776861177**, actual full-CI checkout `b0ee07b467988f44e5f80af10da3f70df5ed914a` (PR test merge, not main merge). **39/39 AR-030 in each of three repetitions**, including **6/6 evidence and 3/3 policy cases**; retained AR-020/012/011/010/001 **36/44/25/11/13**; **74/74 Agent suites**; **758 H2 tests, zero failures**; all required steps, publish and packaged-helper startup/IPC pass. [Exact acceptance manifest](acceptance.json).
+
+The final runtime delta is only AgentGoalState.Observe (10 lines added, 2 removed). All cited IDs must resolve uniquely by kind/hash before Verified; missing/ambiguous references remain AppliedUnverified. Identical repeated delivery remains valid. The six tests are unchanged from failing source `44959a...`, where 4 passed and 2 failed; those historical failures remain recorded, not relabelled as PASS. Earlier policy preservation and source/criterion isolation fixes remain.
+
+The reviewed source write was accepted directly this session and the resulting blob matched the handed-off postimage. The old blocked/LOCAL_ONLY reports are historical and must not trigger reapplication of stale multi-file patches. E1/E2 here use fixture evidence, scripted model transport and a labelled injected criterion verifier for the positive file case. This does not establish unrestricted semantic verification, native Office/model/UI acceptance, AR-031 journal/restart or AR-033 alternate recovery. No UI layout, permission grant, ProjectRecord or parallel store was introduced. E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER.
+
+Use the existing branch and PR #3. Reconcile refs, working tree and SESSION HANDOFF without reset. AR-030 is E2 accepted; do not reapply old local patches. Start only AR-031 after reading the current bug ledger and Coordinator specification before storage work. Extend the existing Agent archive/store with versioned journal/checkpoints, validated recovery and rebuildable indexes; run RC-22/34 and retained regression. No parallel truth store, ProjectRecord Agent state or automatic uncertain-write replay (AR-041 owns resume). Keep AR-020 native E3 pending and AR-083 deferred.
