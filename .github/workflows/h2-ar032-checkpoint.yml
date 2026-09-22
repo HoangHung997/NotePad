@@ -1,0 +1,45 @@
+name: AR-032 verified documentation checkpoint
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: ['.github/workflows/h2-ar032-checkpoint.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar032-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Independently verify source and completed CI before writing three documents
+        shell: python
+        run: |
+          import base64,hashlib,json,subprocess
+          expected='5ebe26bf262e9d9059cf804579fde5ee02a2ccfd'
+          response=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/'+expected],timeout=60))
+          content=base64.b64decode(response['content'])
+          actual=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
+          if len(content)!=18789 or actual!=expected or hashlib.sha256(content).hexdigest()!='4f0274657aea4b42159c5d159a0032ab9f9eea2cd80c803f9728c11d4de3b034':
+              raise RuntimeError('Reviewed documentation script differs')
+          # Pinned reviewed documentation-only code. Runtime/tests/workflows are never edited.
+          exec(compile(content,'reviewed-ar032-checkpoint.py','exec'))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR032-Verified-Checkpoint
+          path: ${{ runner.temp }}/ar032-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
