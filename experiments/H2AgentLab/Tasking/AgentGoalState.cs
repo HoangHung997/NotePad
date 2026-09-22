@@ -154,14 +154,22 @@ public sealed class AgentGoalState
     {
         ArgumentNullException.ThrowIfNull(report);ArgumentNullException.ThrowIfNull(observedEvidence);
         if(dispatchedRevision!=RevisionId)throw new InvalidOperationException("Stale verification cannot satisfy a revised goal.");
+        // A report must resolve EVERY cited reference to one observed material identity.
+        // An ID with two different hashes/kinds is ambiguous, not proof. Repeated delivery
+        // of the same object is harmless; presentation summaries are not identity fields.
+        var resolved=observedEvidence.GroupBy(e=>e.ReferenceId,StringComparer.Ordinal)
+            .Where(group=>group.Select(e=>(e.Kind,e.Sha256)).Distinct().Count()==1)
+            .ToDictionary(group=>group.Key,group=>group.First(),StringComparer.Ordinal);
         var items=Obligations.ToArray();
         foreach(var result in report.Criteria)
         {
             var index=Array.FindIndex(items,x=>x.Id==result.CriterionId && x.Active);
             if(index<0)continue; // generic tool success never claims semantic coverage of all goals
-            var references=observedEvidence.Where(e=>result.EvidenceIds.Contains(e.ReferenceId,StringComparer.Ordinal)).ToArray();
+            var ids=result.EvidenceIds.Distinct(StringComparer.Ordinal).ToArray();
+            var references=ids.Where(resolved.ContainsKey).Select(id=>resolved[id]).ToArray();
+            var completeProof=ids.Length>0 && references.Length==ids.Length;
             var status=result.Status==VerificationCriterionStatus.Failed?AgentObligationStatus.Failed
-                : result.Status==VerificationCriterionStatus.Passed && references.Length>0
+                : result.Status==VerificationCriterionStatus.Passed && completeProof
                     ? AgentObligationStatus.Verified : AgentObligationStatus.AppliedUnverified;
             items[index]=items[index].Change(status,references);
         }
