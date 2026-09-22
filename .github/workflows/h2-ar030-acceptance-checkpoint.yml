@@ -1,0 +1,45 @@
+name: AR-030 verified E2 documentation checkpoint
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar030-acceptance-checkpoint.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar030-acceptance-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact passing CI and save only three documentation files
+        shell: python
+        run: |
+          import base64,hashlib,json,subprocess
+          expected='e2733a22ac9a2f63cd820ce9d6a7bc69228606f0'
+          response=json.loads(subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/git/blobs/'+expected],timeout=60))
+          content=base64.b64decode(response['content'])
+          actual=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
+          if actual!=expected or len(content)!=17598:
+              raise RuntimeError('Reviewed documentation script identity differs')
+          # Pinned docs-only script: checks refs/source/test evidence and cannot edit runtime.
+          exec(compile(content,'reviewed-ar030-acceptance.py','exec'))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR030-Verified-E2-Checkpoint
+          path: ${{ runner.temp }}/ar030-accepted/
+          if-no-files-found: error
+          retention-days: 14
