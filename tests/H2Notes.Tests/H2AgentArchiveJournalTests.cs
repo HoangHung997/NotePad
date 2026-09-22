@@ -14,10 +14,11 @@ using H2Notes.Core;
 
 /// <summary>AR-031 E1 + concrete local archive/runtime/process fixtures. No Office, model or NAS.
 /// Crash probes terminate only this runner's dedicated child. All paths are newly allocated temp roots.</summary>
-internal static class H2AgentArchiveJournalTests
+internal static partial class H2AgentArchiveJournalTests
 {
     internal static void Run(Action<string, Action> test)
     {
+        RunBoundaryTests(test);
         test("AR-031 source journal preserves revisions progress and exact evidence after restart", () => Fixture(root =>
         {
             var task = Summary(); var thread = new H2AgentThread(task.ThreadId!.Value, null, "history", task.CreatedUtc, task.CreatedUtc, "draft");

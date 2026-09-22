@@ -33,7 +33,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
     private readonly AgentArchiveOptions _options;
     private readonly Action<string>? _fault;
     private FileStream? _lease;
-    private bool _disposed, _readOnly;
+    private bool _disposed, _readOnly, _capacityRequired;
     private Guid _storeId;
     private long _sequence, _bytes;
     private string _head = Zero;
@@ -43,7 +43,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
     private readonly Dictionary<Guid, long> _taskHeads = [], _threadHeads = [];
     private readonly Dictionary<Guid, List<(long JournalSequence, H2AgentProgress Progress)>> _progress = [];
     private readonly Dictionary<(Guid TaskId, Guid InvocationId), H2AgentOperationRecord> _operations = [];
-    private readonly HashSet<Guid> _interrupted = [];
+    private readonly HashSet<Guid> _interrupted = [], _eventIds = [];
 
     internal AgentIntegrationTaskArchive(string root, AgentArchiveOptions? options = null, Action<string>? fault = null)
     {
@@ -79,19 +79,22 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
         }
         catch { _lease.Dispose(); _lease = null; throw; }
         foreach (var item in _tasks.Values.Where(t => !IsTerminal(t.Status))) _interrupted.Add(item.TaskId);
+        if (!_readOnly && (_sequence >= _options.MaxEvents || _bytes >= _options.MaxJournalBytes))
+            RequireCapacity();
     }
 
     private string FormatPath => Path.Combine(_root, "archive-format.json");
     public H2AgentArchiveStatus Status
     {
-        get { lock (_gate) return new(!_disposed && !_readOnly,
-            _readOnly ? "RecoveryRequired" : _diagnostics.Count > 0 ? "RecoveredWithDiagnostics" : "Healthy",
+        get { lock (_gate) return new(!_disposed && !_readOnly && !_capacityRequired,
+            _readOnly ? "RecoveryRequired" : _capacityRequired ? "CapacityRequired" : _diagnostics.Count > 0 ? "RecoveredWithDiagnostics" : "Healthy",
             _sequence, Array.AsReadOnly(_diagnostics.ToArray())); }
     }
     public void EnsureWritable()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_readOnly) throw new IOException("Agent archive cần phục hồi; chưa gửi công cụ hoặc khôi phục quyền cũ.");
+        if (_capacityRequired) throw new IOException("Agent archive đã tới giới hạn lưu trữ; dữ liệu cũ vẫn được giữ nguyên.");
     }
     public void Upsert(H2AgentTaskSummary summary)
     {
@@ -122,8 +125,9 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
             var pending = _readOnly || operations.Any(o => o.State == "Dispatched" || o.Effect is "Unknown" or "PartiallyApplied" || o.Status == "Running");
             var copy = Clone(item) with { PendingApproval = null,
                 Recovery = new(interrupted, pending, _sequence, Array.AsReadOnly(operations)) };
-            return interrupted ? copy with { Status = H2AgentTaskStatus.Blocked,
-                Error = pending ? "Interrupted / ReconcileRequired: tác động cần đối soát; không tự lặp lệnh ghi."
+            return interrupted || pending ? copy with { Status = H2AgentTaskStatus.Blocked,
+                Error = _readOnly ? "RecoveryRequired: chỉ đọc được phần lịch sử đã xác thực; chưa đủ nguồn để xác nhận trạng thái mới nhất."
+                    : pending ? "Interrupted / ReconcileRequired: tác động cần đối soát; không tự lặp lệnh ghi."
                     : "Interrupted: công việc còn dở; quyền cũ không được khôi phục và chưa tự chạy tiếp." } : copy;
         }
     }
@@ -179,8 +183,12 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
             DateTime.UtcNow, kind, "Host", "H2AgentLab.Integration", data, Hash(JsonSerializer.SerializeToUtf8Bytes(data)), _head, "");
         record = record with { Sha256 = Hash(JsonSerializer.SerializeToUtf8Bytes(record)) };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(record);
-        if (_sequence >= _options.MaxEvents || bytes.Length > MaxRecordBytes || _bytes + bytes.Length > _options.MaxJournalBytes)
+        if (bytes.Length > MaxRecordBytes) throw new InvalidDataException("record-size");
+        if (_sequence >= _options.MaxEvents || _bytes + bytes.Length > _options.MaxJournalBytes)
+        {
+            RequireCapacity();
             throw new IOException("Agent archive quota reached; no journal or referenced evidence was deleted.");
+        }
         ValidateEntry(record, _sequence + 1, _head);
         ValidateTransition(record);
         var path = Path.Combine(_store, $"event-{record.Sequence:D12}.json");
@@ -193,6 +201,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
             ProjectWorkspaceStore.AtomicWrite(Path.Combine(_store, "head.json"), JsonSerializer.SerializeToUtf8Bytes(
                 new HeadReceipt(Version, _storeId, record.Sequence, record.Sha256)));
             Apply(record); _sequence = record.Sequence; _head = record.Sha256; _bytes += bytes.Length;
+            if (_sequence >= _options.MaxEvents || _bytes >= _options.MaxJournalBytes) RequireCapacity();
             if (_sequence % _options.CheckpointEvery == 0) TryCheckpoint();
         }
         catch
@@ -201,6 +210,9 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
             _readOnly = true; Issue("journal-write-uncertain"); throw;
         }
     }
+
+    private void RequireCapacity()
+    { _capacityRequired = true; Issue("quota-reached-source-retained"); }
 
     private void LoadJournal()
     {
@@ -259,6 +271,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
     }
     private void ValidateTransition(JournalEntry e)
     {
+        if (_eventIds.Contains(e.EventId)) throw new InvalidDataException("journal-event-identity");
         if (e.Kind == "progress")
         {
             var item = e.Payload.Deserialize<H2AgentProgress>()!;
@@ -280,6 +293,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
     }
     private void Apply(JournalEntry e)
     {
+        _eventIds.Add(e.EventId);
         switch (e.Kind)
         {
             case "task-state": case "revision": _tasks[e.StreamId] = e.Payload.Deserialize<H2AgentTaskSummary>()!; _taskHeads[e.StreamId] = e.Sequence; break;
@@ -358,9 +372,15 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
     {
         var legacy = new List<(Guid Id, string Kind, object Payload)>();
         var sources = new List<LegacySource>();
+        long sourceBytes = 0;
         byte[] SourceBytes(string path)
         {
+            // Bound total legacy material before reading/retaining another source. A huge
+            // recent cache cannot bypass the import budget merely because task files exist.
+            if (new FileInfo(path).Length > _options.MaxJournalBytes - sourceBytes)
+                throw new InvalidDataException("migration-quota");
             var bytes = ReadBytes(path);
+            sourceBytes += bytes.Length;
             sources.Add(new(Path.GetRelativePath(_root, path), Hash(bytes)));
             return bytes;
         }
@@ -376,6 +396,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
                 {
                     var task = Source<H2AgentTaskSummary>(path); ValidateSummary(task);
                     if (Path.GetFileNameWithoutExtension(path) != task.TaskId.ToString("N")) throw new InvalidDataException("legacy-task-identity");
+                    if (summaries.Count >= _options.MaxEvents) throw new InvalidDataException("migration-quota");
                     summaries.Add(task.TaskId, task);
                 }
                 catch (Exception ex) when (StorageFailure(ex)) { PreserveCorrupt(path); throw new InvalidDataException("legacy-task-invalid", ex); }
@@ -386,12 +407,18 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
             {
                 var index = Source<LegacyIndex>(legacyIndex);
                 if (index.Schema != 1 || index.Tasks is null) throw new InvalidDataException("unsupported-legacy-schema");
-                foreach (var task in index.Tasks) { ValidateSummary(task); summaries.TryAdd(task.TaskId, task); }
+                foreach (var task in index.Tasks)
+                {
+                    ValidateSummary(task);
+                    if (!summaries.ContainsKey(task.TaskId) && summaries.Count >= _options.MaxEvents)
+                        throw new InvalidDataException("migration-quota");
+                    summaries.TryAdd(task.TaskId, task);
+                }
             }
             catch (Exception ex) when (StorageFailure(ex))
             {
                 PreserveCorrupt(legacyIndex);
-                if (ex is InvalidDataException && ex.Message == "unsupported-legacy-schema" || summaries.Count == 0) throw;
+                if (ex is InvalidDataException && ex.Message is "unsupported-legacy-schema" or "migration-quota" || summaries.Count == 0) throw;
                 Issue("legacy-index-rebuilt-from-task-records");
             }
         }
@@ -404,6 +431,7 @@ internal sealed class AgentIntegrationTaskArchive : IDisposable
                 {
                     var thread = Source<H2AgentThread>(path); ValidateThread(thread);
                     if (Path.GetFileNameWithoutExtension(path) != thread.ThreadId.ToString("N")) throw new InvalidDataException("legacy-thread-identity");
+                    if (legacy.Count >= _options.MaxEvents) throw new InvalidDataException("migration-quota");
                     legacy.Add((thread.ThreadId, "thread", thread));
                 }
                 catch (Exception ex) when (StorageFailure(ex)) { PreserveCorrupt(path); throw new InvalidDataException("legacy-thread-invalid", ex); }
