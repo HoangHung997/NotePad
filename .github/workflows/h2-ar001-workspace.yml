@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/h2-ar001-workspace.yml'
       - 'tools/agent-reliability/repair_ar001.py'
+      - 'tools/agent-reliability/run_agent_suites.ps1'
       - 'tests/H2Notes.Tests/H2AgentReliabilityContractTests.cs'
       - 'tests/H2Notes.Tests/H2WorkAssistantRepairTests.cs'
       - 'experiments/H2AgentLab/Integration/**'
@@ -49,7 +50,7 @@ jobs:
             test "$(git diff --cached --name-only | wc -l)" -eq 4
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(AR-001): remove UI context dependency from executor and provider teardown'
+            git commit -m 'fix(AR-001): apply observed contract regression repair with evidence'
             git push origin "HEAD:refs/heads/$AR_BRANCH"
             test -z "$(git status --porcelain)"
             test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
@@ -91,7 +92,7 @@ jobs:
   focused-tests:
     needs: workspace
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,6 +118,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "AR-001 iteration $iteration failed." }
             if (-not (Select-String -Path $log -Pattern 'RESULT: [1-9][0-9]* passed, 0 failed')) { throw 'No nonempty passing corpus.' }
           }
+      - name: Run every required Agent suite and aggregate actual failures
+        shell: pwsh
+        run: ./tools/agent-reliability/run_agent_suites.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
