@@ -1,6 +1,6 @@
 {
   "task": "AR-001",
-  "status": "REPAIR_REQUIRED",
+  "status": "AR-001_ACCEPTED_AFTER_REPAIR",
   "recorded_at_utc": "2026-09-22T06:02:45.755014+00:00",
   "attempts": [
     {
@@ -67,8 +67,76 @@
       "tests": "NOT_RUN",
       "artifact_id": 10678948191,
       "artifact_sha256": "e5264e73d4f255e9afa06e3e04b0e5e88d24ba7e862b22b827ad785ec07c7b74"
+    },
+    {
+      "run_id": 35693115516,
+      "code_sha": "f023b611b0d03d55c11c257babcfa5529893f5bb",
+      "kind": "full",
+      "conclusion": "failure",
+      "failure": "MB-33 serialized mutation fixture lacked verifier; 3 passed / 1 failed",
+      "h2_tests": "603/603",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35693829220,
+      "code_sha": "efe274cf8aaea1af870aea18c81b8c180f01f4c0",
+      "kind": "full",
+      "conclusion": "failure",
+      "failure": "MB-74 mutation fixture lacked verifier",
+      "earlier_required_steps": "PASS through MB-73",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35693929260,
+      "code_sha": "74418bee6c3b12c2be6fffa68a121a4ce36aa294",
+      "kind": "all-agent-diagnostic",
+      "suites": 74,
+      "passed_suites": 66,
+      "failed_suites": 8,
+      "actual_fixture_failures": [
+        "MB-74 missing verifier",
+        "MBA-04 unrelated unknown operation stayed unresolved"
+      ],
+      "harness_invocation_errors": 6,
+      "artifact_id": 10679995582,
+      "artifact_sha256": "9a83822aab1f870d2bafd25842787abc76ea79ce00ac6dc0022318b90859cce7"
+    },
+    {
+      "run_id": 35694729061,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "kind": "focused-plus-all-Agent",
+      "repetitions": [
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        }
+      ],
+      "passed_suites": 74,
+      "failed_suites": 0,
+      "artifact_id": 10680096876,
+      "conclusion": "success"
+    },
+    {
+      "run_id": 35694774117,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "kind": "full-including-publish-helper-smoke",
+      "conclusion": "success",
+      "artifact_ids": [
+        10680490207,
+        10679742893
+      ]
     }
   ],
   "evidence_level": "E1/E2 fixtures and disposable process only; E3/E4 Office-model NOT_RUN; AR-083 DEFERRED_BY_USER",
-  "next_action": "Validate the init-only test correction with repeated focused corpus and all mandatory full CI/publish smoke on its actual new code SHA."
+  "next_action": "Validate the init-only test correction with repeated focused corpus and all mandatory full CI/publish smoke on its actual new code SHA.",
+  "final_accepted_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+  "final_acceptance": "acceptance.json"
 }

@@ -29,3 +29,16 @@ Run 35692802913 on 82af106655358fa4f27d60f3da2a53e35341f1cb failed compilation (
 ## MB-33 completion-contract drift exposed by full CI
 
 Full run 35693115516 / job 106634126497 on f023b611b0d03d55c11c257babcfa5529893f5bb passed H2 603/603, architecture 35/35, Phase-11 15/15 and all suites through MB-32, then MB-33 was 3 passed / 1 failed: the serialized-mutation fixture had no verifier report. The completion gate correctly refused it. The fixture now writes both call IDs to its own temporary file, independently reads exact ordered effects, requires the readback verifier in the task contract, checks max concurrency stays one, and rejects missing/partial side effects. No runtime completion rule is weakened. An independent diagnostic runner reuses every Agent suite flag from the existing full workflow and aggregates failures without hiding later failures behind an early guard; its final exit is nonzero when any required suite fails. Full CI/publish still remain required. Latest focused AR-001 on f023 passed 13/13 in each of three repetitions (artifact 10679343679, SHA256 60abc903fd33a6354646770a2826f61adc63592d0e18a3edbd6e9a482f2a4407).
+
+
+## AR-001 accepted on f3ebc4d336b8d6752436412840675fb2e7204e1d
+
+Full Avalonia CI [35694774117](https://github.com/HoangHung997/NotePad/actions/runs/35694774117) passed **every required build/test/Agent/helper/publish step**. The independently executed **74/74 Agent suites** and **13/13 AR-001 cases repeated three times** passed on the same exact code in run 35694729061. Downloaded evidence archive SHA256: `5d08cd125ad6163e9bf491f36281794d0a14840284a8ff1cd8f9f8aa7fb7c66a`. Detailed machine-readable steps, artifact identities and limitations: [acceptance.json](acceptance.json).
+
+The full-CI follow-up repairs retain strict completion rules: MB-74 independently checks active version, exact installed bytes and registry/skill contributions, and rejects a tampered payload; MB-100 proves recovery only through a host-selected candidate and preserves the original completely invented tool as a fail-closed negative. Six independent-runner invocation failures were corrected by preserving the required DesktopHost/OfficeHost arguments; they were harness errors, not native Office certification.
+
+Portable Windows archive: 109,941,950 bytes, SHA256 `fac6f92f42fbdb4da55c1e8fb92ea40e57177e8350211ac72f356fc7dfcb640c`. It was downloaded, hash-verified and inspected for the nonempty application and both helpers plus runtime/dependency files. The full CI actually executed packaged-helper IPC smoke. NAS probe archive exists (39,380,124 bytes); this is only a package, not physical E5 acceptance.
+
+**AR-001 = IMPLEMENTED / E2_PASS / DONE.** Native Office/model and real H2 UI acceptance remain NOT_RUN / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER. MB-124–127 and other historical task acceptance are not re-awarded. Remaining baseline B04–B10 are not declared fixed. The exact cause of the historical masked B11 failure is not invented.
+
+Next: **AR-010 NOT_STARTED on the same branch and PR**. The canonical SESSION HANDOFF contains the exact next action. This finalization is documentation-only relative to the tested source; any CI triggered by the documentation commit must be distinguished from the completed source run above.

@@ -73,7 +73,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | ID | Task | Dependency chính | Evidence yêu cầu | Status |
 |---|---|---|---|---|
 | AR-000 | Chốt baseline, ownership và traceability | Không | E0 + execution inventory | DONE |
-| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | ACTIVE |
+| AR-001 | Sửa contract drift và khôi phục full CI | 000 | E1/E2 + CI | DONE |
 | AR-010 | Chung production context/runtime hooks | 001 | E2 | NOT_STARTED |
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | NOT_STARTED |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | NOT_STARTED |
@@ -124,7 +124,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-000 evidence — 2026-09-22:** [baseline and source owners](agent-reliability/AR-000/baseline.md) and [machine-readable manifest](agent-reliability/AR-000/baseline.json). E0 baseline accepted with existing CI RED; no runtime repair or E3/E4/E5 PASS is claimed. Only AR-000 is closed. AR-001 is next, NOT_STARTED; MB-124–127 and all old acceptance debts remain unchanged.
 
-### [~] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI
+### [x] AR-001 — Đồng bộ tên/giới hạn công cụ và full CI
 
 **Sửa/reuse:** `H2ProductionAgentAdapter.StablePrefix`, `Tools/SkillRuntimeTools.cs`, `NormalRuntimeToolRegistry`, `V2ArchitectureTests`, `H2OfficeRuntimeTools`, `OfficeProtocol/ComOfficeBackend`, workflow hiện tại nếu cần.
 
@@ -133,6 +133,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test:** RC-02; phát hiện tên tool trong hướng dẫn không khớp registry; đọc evidence quá dài/foreign handle; 128/129/200 cells phải có cùng verdict ở schema/adapter/backend, không silently truncate; tests cũ không bị bỏ. Sửa các lỗi CI khác **cần thiết để xác định baseline**, ghi rõ phần ngoài ba lỗi đã biết.
 
 **Acceptance:** full required CI build/tests/Agent suites/publish smoke chạy qua trên code SHA; không gắn artifact upload rỗng là publish thành công. Nếu không có runner phù hợp, IMPLEMENTED + AWAITING_ENVIRONMENT, chưa DONE. Cập nhật danh sách bất nhất đã sửa/còn lại.
+
+**AR-001 acceptance — 2026-09-22:** code `f3ebc4d336b8d6752436412840675fb2e7204e1d`; full CI `35694774117` SUCCESS including nonempty publish/helper IPC; focused `35694729061` 13/13 x3 and 74/74 Agent suites. [Exact evidence](agent-reliability/AR-001/acceptance.json). E1/E2 only; E3/E4 NOT_RUN and AR-083 DEFERRED_BY_USER. No other AR task or old native gate is closed.
 
 ### [ ] AR-010 — Chung điểm nối production context và runtime
 
@@ -462,56 +464,63 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-001_IMPLEMENTATION",
-  "active_task": "AR-001",
-  "implementation_status": "ACTIVE",
-  "acceptance_status": "REPAIR_REQUIRED",
+  "phase": "AR-001_ACCEPTED_NEXT_AR-010",
+  "active_task": "AR-010",
+  "implementation_status": "NOT_STARTED",
+  "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar001-2026-09-22",
-  "last_code_commit": "74418bee6c3b12c2be6fffa68a121a4ce36aa294",
-  "last_validated_code_commit": "74418bee6c3b12c2be6fffa68a121a4ce36aa294",
-  "last_validation_result": "74_SUITE_DIAGNOSTIC_TWO_FIXTURE_FAILURES_AND_SIX_HELPER_ARGUMENT_ERRORS",
+  "last_code_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+  "last_validated_code_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+  "last_validation_result": "FULL_REQUIRED_CI_AND_E2_PASS",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Offline source snapshot verified by hash; guarded source changes applied to isolated CI checkout. User-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Exact-source CI checkout and repair-delivery artifact verified clean. This finalization stages only four documentation files, and the save step verifies non-force push/remote HEAD. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T06:25:32.759890+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T06:36:39.684311+00:00",
   "completed_this_session": [
     {
-      "task": "AR-001",
-      "implementation_status": "ACTIVE",
-      "changes": [
-        "canonical skill prompt constants",
-        "shared Excel 128-cell preflight through schema adapter client server backends",
-        "exact-set evidence-reader guards with historical measurements preserved",
-        "awaited adapter teardown and timeout/error-preservation regression"
-      ],
-      "acceptance_status": "NOT_RUN"
+      "id": "AR-001",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "E2_PASS",
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "full_ci_run": 35694774117
     }
   ],
   "remaining_in_active_task": [
-    "Validate independent installed-package payload verifier and candidate-bound positive/negative recovery fixtures; rerun all 74 suites with helper arguments, full CI and real publish/helper smoke."
+    "AR-010 has not started: shared production/Lab context/runtime hooks and concrete Global/Project execution trace coverage."
   ],
   "last_test_commands": [
     {
-      "source": ".github/workflows/avalonia-ci.yml at 1283bc13e07c3cd47d04886166de3dfc595422c0",
-      "run": 35687637186,
-      "note": "Exact executed commands live in that workflow and job log; commands_for_AR001 are proposed reproduction commands, not newly executed .NET commands."
+      "command": "dotnet restore H2Notes.Avalonia.slnx; dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
+      "run": 35694774117,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "PASS"
     },
     {
-      "command": "python3 tools/agent-reliability/capture_baseline.py --self-test",
-      "execution": "AR000_DOCUMENTATION_TESTS_ONLY"
+      "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build",
+      "run": 35694774117,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "PASS"
     },
     {
-      "command": "python3 tools/agent-reliability/capture_baseline.py",
-      "execution": "E0_SOURCE_CI_INVENTORY_ONLY"
+      "command": "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001",
+      "run": 35694729061,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "13/13 x3"
     },
     {
-      "command": "dotnet run --project .\\tests\\H2Notes.Tests\\H2Notes.Tests.csproj -c Release --no-build",
-      "run": 35689629766,
-      "tested_checkout_sha": "c62851a76351028906d495ba3c00b4401e8f4831",
-      "result": "589 passed / 1 failed"
+      "command": "tools/agent-reliability/run_agent_suites.ps1",
+      "run": 35694729061,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "74/74; helper arguments preserved"
+    },
+    {
+      "command": "Existing .github/workflows/avalonia-ci.yml: all required suite, publish and packaged-helper smoke commands",
+      "run": 35694774117,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "PASS"
     }
   ],
   "ci_runs": [
@@ -624,6 +633,21 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "harness_missing_helper_flags": 6,
       "artifact_id": 10679995582,
       "artifact_sha256": "9a83822aab1f870d2bafd25842787abc76ea79ce00ac6dc0022318b90859cce7"
+    },
+    {
+      "id": 35694729061,
+      "tested_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "SUCCESS",
+      "AR001": "13/13 x3",
+      "Agent_suites": "74/74"
+    },
+    {
+      "id": 35694774117,
+      "tested_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "result": "SUCCESS",
+      "all_required_steps": "PASS",
+      "packaged_helper_IPC": "PASS",
+      "nonempty_artifacts": 2
     }
   ],
   "evidence_locations": [
@@ -631,18 +655,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-000/baseline.md",
     "docs/agent-reliability/AR-000/ci-final-review.json",
     "docs/agent-reliability/AR-001/implementation.md",
-    "docs/agent-reliability/AR-001/ci-attempts.json"
+    "docs/agent-reliability/AR-001/ci-attempts.json",
+    "docs/agent-reliability/AR-001/acceptance.json"
   ],
   "known_failures": [
-    "B01 skill-name drift",
-    "B02 200/128 Excel contract drift",
-    "B03 architecture guard failure; downstream suites and publish did not run",
-    "B04-B10 remain open source-observed limitations/risks; see baseline",
-    "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions."
+    "No remaining failure observed in the AR-001 required corpus/full CI at the accepted SHA.",
+    "B04-B10 remain open source-observed debts owned by later AR tasks.",
+    "Native E3/E4 and physical E5 are not certified by these fixtures."
   ],
   "external_blockers": [
-    "Assistant container has no checkout/.NET/PowerShell and GitHub DNS is unavailable; source transfer and Windows tests use the existing authorized GitHub Actions environment.",
-    "Real Office/model/H2 UI still NOT_RUN; AR-083 DEFERRED_BY_USER."
+    "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
+    "AR-083 physical two-PC/NAS is DEFERRED_BY_USER, not waived or passed."
   ],
   "deferred_acceptance": [
     {
@@ -654,13 +677,26 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Inspect exact new SHA full CI and 74-suite diagnostic. Do not weaken completion or unrelated-error recovery guards. Native Office/model E3/E4 remain NOT_RUN; AR-083 deferred.",
-  "next_task_if_active_done": "AR-010",
-  "last_runtime_source_commit": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "next_exact_action": "Keep this branch and PR #3. Reconcile current main/checkpoint/working tree; read AR-010 and current production/Lab context composition; implement shared runtime/context hooks with concrete Global/Project execution traces, preserving the AR-001 regression corpus. Do not create a new engine or branch.",
+  "next_task_if_active_done": "AR-011",
+  "last_runtime_source_commit": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
   "previous_saved_checkpoint_commit": "98b93dcc3b525bea98ac3378854b7e1651ff4654",
   "finalization_checked_head": "4e06bcd6c54c1eea3ecc93c288c0cf2f452d74d6",
-  "additional_ci_after_recorded_run": "Any CI triggered by this docs/workflow finalization is not the completed run recorded above; inspect the PR checks on resume. No full CI PASS is claimed.",
-  "pending_code_change": "Init-only observer test correction in this checkpoint commit; exact new SHA is recorded by the CI checkout, not inferred from the previous tested SHA."
+  "additional_ci_after_recorded_run": "Final docs/delivery-script commits may trigger further CI; no result is claimed for those unobserved runs. The accepted code and package are pinned above.",
+  "last_completed_task": {
+    "id": "AR-001",
+    "implementation_status": "IMPLEMENTED",
+    "acceptance_status": "E2_PASS",
+    "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+    "full_ci_run": 35694774117
+  },
+  "historical_failure_notes_retained": [
+    "B01 skill-name drift",
+    "B02 200/128 Excel contract drift",
+    "B03 architecture guard failure; downstream suites and publish did not run",
+    "B04-B10 remain open source-observed limitations/risks; see baseline",
+    "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions."
+  ]
 }
 ```
 
