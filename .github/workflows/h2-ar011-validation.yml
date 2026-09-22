@@ -13,6 +13,33 @@ concurrency:
   group: h2-ar011-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 jobs:
+  source-review:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Preserve exact tracked source only, without credentials or build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          mkdir -p "$RUNNER_TEMP/ar011-source"
+          git rev-parse HEAD > "$RUNNER_TEMP/ar011-source/code-sha.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/ar011-source/tree-sha.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/ar011-source/tree.txt"
+          git archive --format=tar.gz -o "$RUNNER_TEMP/ar011-source/source.tar.gz" HEAD
+          test "$(stat -c %s "$RUNNER_TEMP/ar011-source/source.tar.gz")" -lt 20000000
+          sha256sum "$RUNNER_TEMP/ar011-source/source.tar.gz" > "$RUNNER_TEMP/ar011-source/sha256.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AR011-Exact-Source
+          path: ${{ runner.temp }}/ar011-source/
+          if-no-files-found: error
+          retention-days: 7
   outcomes:
     if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
     runs-on: windows-latest
