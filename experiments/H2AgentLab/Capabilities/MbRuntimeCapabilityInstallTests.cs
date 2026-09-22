@@ -11,6 +11,8 @@ using H2AgentLab.Skills;
 using H2AgentLab.Tasking;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
+using H2AgentLab.Verification;
+using System.Security.Cryptography;
 
 namespace H2AgentLab.Capabilities;
 
@@ -134,11 +136,15 @@ public static class MbRuntimeCapabilityInstallTests
                     .Contains("approved", StringComparison.OrdinalIgnoreCase),
                 "Model-callable install schema exposed host approval as a tool argument.");
 
+            var verifier = new InstalledPackageReadbackVerifier(pluginManager, registry, skills,
+                [toolOnly, skillOnly, providerTool]);
+            Check(!verifier.IsInstalled(toolOnly.Manifest.Id), "Missing package was falsely verified.");
             var transport = new InstallAndContinueTransport();
             await using var runtime = new AgentRuntime(
                 transport,
                 new AgentContextManager(),
-                registry);
+                registry,
+                verifier: verifier);
 
             var request = Request(
                 "Install and use the missing tool-only, skill-only and provider-backed fixture capabilities without asking me to restate this task.");
@@ -170,6 +176,16 @@ public static class MbRuntimeCapabilityInstallTests
                     "fixture.native_diagnostics",
                     StringComparer.Ordinal),
                 "Same-task deferred discovery did not load tools registered after install.");
+            Check(verifier.ObservedInstallCount == 3 && result.VerificationHistory.Count == 3
+                && result.VerificationHistory.All(report => report.Passed),
+                "Each actual install must have a separate independent activation/payload readback.");
+            var active = pluginManager.GetActive(providerTool.Manifest.Id)!.Value;
+            var payload = Path.Combine(active.VersionRoot, "tools.json");
+            var acceptedBytes = File.ReadAllBytes(payload);
+            File.WriteAllText(payload, "tampered fixture bytes");
+            Check(!verifier.IsInstalled(providerTool.Manifest.Id), "Tampered installed payload was falsely verified.");
+            File.WriteAllBytes(payload, acceptedBytes);
+            Check(verifier.IsInstalled(providerTool.Manifest.Id), "Restored exact payload failed readback.");
         });
 
         await Test("MB-74 retired one-off continuation source is absent", () =>
@@ -220,9 +236,10 @@ public static class MbRuntimeCapabilityInstallTests
             ["install selected extension packages"],
             ["host policy and approval remain authoritative"],
             ["continue the original task after install"],
-            [],
+            [new AgentAcceptanceCriterion("mb74.activation-readback", "Requested package bytes and callable registrations match the selected fixture.")],
             AgentTaskRiskClass.Medium,
-            new AgentVerificationPolicy(requireVerification: false));
+            new AgentVerificationPolicy(requireVerification: true,
+                requiredVerifierIds: ["mb74-package-readback"]));
 
         return new AgentRuntimeRequest(
             contract,
@@ -510,6 +527,63 @@ public static class MbRuntimeCapabilityInstallTests
         string? ToolName,
         string? SkillId,
         string? SkillDescription);
+
+    private sealed class InstalledPackageReadbackVerifier : IAgentRuntimeVerifier
+    {
+        private readonly PluginManager _plugins;
+        private readonly ToolRegistry _registry;
+        private readonly H2AgentLab.Skills.SkillCatalog _skills;
+        private readonly Dictionary<string, (BuiltPluginPackage Package, Dictionary<string, string> Hashes)> _expected = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _observed = new(StringComparer.Ordinal);
+        public int ObservedInstallCount => _observed.Count;
+        public InstalledPackageReadbackVerifier(PluginManager plugins, ToolRegistry registry,
+            H2AgentLab.Skills.SkillCatalog skills, BuiltPluginPackage[] packages)
+        {
+            _plugins = plugins; _registry = registry; _skills = skills;
+            foreach (var package in packages)
+            {
+                using var zip = ZipFile.OpenRead(package.Path);
+                var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var entry in zip.Entries.Where(entry => !entry.FullName.EndsWith('/')))
+                {
+                    using var stream = entry.Open();
+                    hashes.Add(entry.FullName, Convert.ToHexString(SHA256.HashData(stream)));
+                }
+                _expected.Add(package.Manifest.Id, (package, hashes));
+            }
+        }
+        public bool IsInstalled(string id)
+        {
+            if (!_expected.TryGetValue(id, out var expected)) return false;
+            var active = _plugins.GetActive(id);
+            if (active is null || active.Value.Manifest.Version != expected.Package.Manifest.Version) return false;
+            foreach (var entry in expected.Hashes)
+            {
+                var file = Path.Combine(active.Value.VersionRoot, entry.Key.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(file) || Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file))) != entry.Value) return false;
+            }
+            if (expected.Package.ToolName is { } tool && (!_registry.TryGet(tool, out var descriptor)
+                || descriptor.Provenance?.ProviderId != "plugin." + id || descriptor.IsMutating)) return false;
+            if (expected.Package.SkillId is { } skill && !_skills.Search("", 20)
+                .Any(item => item.Identity.PluginId == id && item.Identity.SkillId == skill)) return false;
+            return true;
+        }
+        public Task<VerificationReport?> VerifyAsync(AgentRuntimeVerificationContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var calls = context.Calls.Where(call => call.Name == CatalogRuntimeToolExecutor.InstallToolName).ToArray();
+            if (calls.Length == 0) return Task.FromResult<VerificationReport?>(null);
+            foreach (var call in calls) _observed.Add(call.Arguments.GetProperty("plugin_id").GetString()!);
+            var passed = _observed.All(IsInstalled);
+            const string criterion = "mb74.activation-readback";
+            string[] evidence = ["fixture:installed-package-bytes-and-registry"];
+            return Task.FromResult<VerificationReport?>(new VerificationReport("mb74-package-readback",
+                [new VerificationCriterionResult(criterion,
+                    passed ? VerificationCriterionStatus.Passed : VerificationCriterionStatus.Failed,
+                    evidence, passed ? null : new VerificationFailure(criterion,
+                        "Active package payload, version or registry/skill contribution differs from selected fixture.", evidence))]));
+        }
+    }
 
     private sealed class FixturePluginResolver : IPluginToolExecutorResolver
     {
