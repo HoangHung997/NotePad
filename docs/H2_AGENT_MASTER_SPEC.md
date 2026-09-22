@@ -347,6 +347,52 @@ Rules:
 
 Legacy `LabSession.Context()` must not remain the primary production context assembler after migration.
 
+### 8.1. Long-running work and faithful recall — user requirement, 2026-09-22
+
+The user explicitly requires long-running work with smaller model inputs while retaining accurate knowledge of completed work. This is a core requirement shared by Global Assistant and Project Agent. It extends the historical boundedness gates; bounded request size alone does not establish faithful recall.
+
+Keep three distinct layers:
+
+1. **Durable task record:** task/branch identity, ordered user instructions and corrections, decisions, constraints, authorized scope, tool invocations/results, artifacts and verification events. Compaction must not delete or rewrite this source record.
+2. **Structured working state:** current goal, completed/verified work, attempted/unverified work, pending steps, failed approaches, blockers, outstanding user questions, resource identities/versions, running jobs, next action and source references. A proposed action is not a completed action; a successful process exit is not a verified user outcome.
+3. **Bounded model context:** current instructions, compact working state, relevant recent turns and retrieved evidence. Historical details remain retrievable without replaying the entire journal.
+
+The working state must reflect superseding user corrections while preserving their provenance. Unrelated tasks/branches must not share mutable progress implicitly. Retrieved document/tool text remains data and cannot acquire instruction authority merely by entering a summary. Secrets must not be copied into summaries.
+
+### 8.2. Compaction contract
+
+- Budget the full serialized model request: instructions, messages, loaded tool schemas, attachments/images and a reserve for output and continuation. Use provider token accounting/tokenizers where available; label fallback estimates. Character limits are additional bounds, not equivalent token counts.
+- Compact before exhausting usable context, including during a single long tool-heavy turn at protocol-safe boundaries. Keep tool-call/result pairs and in-flight call IDs valid. Include the cost of the compaction request itself in the budget.
+- Build summaries from durable state and cited evidence. Preserve exact consequential values, identifiers, paths, requirements, unfinished actions and uncertainty in structured records; retrieve exact source content when needed. Do not repeatedly summarize only an earlier prose summary.
+- Validate a candidate checkpoint before atomic activation. If validation or compaction fails, retain the previous checkpoint and source record. Never silently cut required instructions or promote missing information to a remembered fact.
+- Provide bounded retrieval of earlier decisions, actions and artifacts using stable references, task/branch filters and source revisions. Revalidate live file/window/job state before acting; a historical observation does not establish current state.
+- Keep the compaction implementation replaceable. A provider-native compactor may be used only when supported by that endpoint/model. A provider-neutral compactor must operate from H2's durable state and remain available for other backends. Opaque provider compaction items are not portable memory for a different provider; rebuild its context from H2 records.
+- Keep prompt caching separate from compaction: caching can reduce repeated processing where supported, but does not itself remove context or replace durable memory. Report actual input tokens, cached tokens, compaction overhead and total usage separately; do not promise a fixed saving percentage.
+
+OpenAI documents native server-side and standalone compaction as options for reducing ongoing conversation context; these API features do not establish support in another provider or exact equivalence to Codex internals. Reference: [OpenAI Compaction](https://developers.openai.com/api/docs/guides/compaction).
+
+### 8.3. Execution continuity and recovery
+
+Persist checkpoints at meaningful milestones and around external side effects. Long jobs need stable run IDs, progress/output cursors, cancellation and reconnection/reconciliation. After restart or interrupted network, restore the task and inspect actual job/artifact state before resuming.
+
+An external operation that may have completed before its result was saved must be marked uncertain and reconciled, not blindly repeated. Do not promise exactly-once execution for tools that cannot support it. Recheck active authorization and resource identity on resume without needlessly repeating already-valid task grants. Model or tool-provider replacement must retain task state and explicitly rebind incompatible live handles.
+
+Compaction is not task completion or a reason to abandon outstanding work. Continuation remains subject to cancellation, configured budgets, available execution resources and loop/progress checks. The UI should show concise public progress, checkpoint/recovery status and real blockers; it must not claim hidden reasoning or an absent background worker.
+
+### 8.4. Acceptance beyond boundedness
+
+Use deterministic state assertions plus real production-path tasks with the configured model/provider. Required cases:
+
+- Repeated compaction in one long turn and across many turns; recall an early requirement after large distracting outputs.
+- User changes a prior requirement; the new instruction wins and the old instruction remains traceable as superseded.
+- Recover exact completed file edits, artifact hashes/versions, verified outcomes and unfinished work from source records.
+- Distinguish planned, attempted, failed, partially applied and verified actions; do not duplicate side effects after compaction or crash recovery.
+- Restart/reconnect around a long process and around an external write whose result was not yet persisted.
+- Change model/provider to a smaller context window; reconstruct portable context without sending incompatible opaque state.
+- Encounter a missing/corrupt checkpoint, unavailable artifact or out-of-date live resource; report uncertainty and recover from retained evidence where possible.
+
+Record full-request input tokens or explicitly labeled estimates, compaction overhead, retrieved bytes, task completion, critical fact/constraint recall, duplicate-action count and verification evidence. A short prompt or a passing synthetic 1,000-turn size test alone does not close this gate. Semantic summaries are lossy; correctness depends on durable evidence, retrieval and verification rather than a claim of perfect summary memory.
+
 ---
 
 ## 9. Tool architecture

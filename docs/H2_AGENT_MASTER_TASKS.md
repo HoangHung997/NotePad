@@ -1350,3 +1350,25 @@ artifact preview and bottom composer. Evidence and explicit remaining gates:
 passed (Ollama, Chat Completions, Responses stateless/stored). Real Gemma 4 Cloud
 created DOCX/CSV/PDF and consumed supplemental user input inside one task.
 This checkpoint does not close all 109 chat-spec items or NAS two-PC acceptance.
+
+### Long-running work and faithful recall — 22/09/2026
+
+User-requested requirements are defined in sections 8.1–8.4 of [the Agent Master](H2_AGENT_MASTER_SPEC.md). The following gates remain open. Existing MB-21/MB-102 evidence proves checkpoint/boundedness behavior within its recorded scope; it does not prove semantic recall or uninterrupted production work.
+
+## [ ] MB-124 — Durable working state and evidence retrieval
+
+Preserve task/branch identity, latest user corrections, exact constraints, resource versions, verified/attempted/pending work, failed approaches, running jobs and next actions in source-backed structured state. Provide bounded retrieval of earlier records and artifacts. Verify supersession, task isolation and distinction between attempted and completed work.
+
+## [ ] MB-125 — Replaceable compaction with full-request budgeting
+
+Use the actual request budget, including tools/media and output reserve; compact safely within long turns as well as across turns. Validate/activate checkpoints atomically and retain recoverable evidence. Support provider-neutral state and optional native compaction without treating opaque provider state as portable. Measure token/estimate, cache and compaction overhead separately.
+
+## [ ] MB-126 — Durable execution continuation and reconciliation
+
+Track long process sessions and side effects by stable IDs; restore/reconcile after restart, network loss or backend change. Preserve unfinished goals and valid authorization. Test interruption between external mutation and recording its result; do not blindly repeat uncertain writes or claim a dead process continued running.
+
+## [ ] MB-127 — Production long-work / recall acceptance
+
+Exercise repeated compaction, early-fact recall, changed requirements, exact file versions, pending/failed actions, smaller-context provider switching and restart recovery through real H2 flows. Run each boundary case at least three times and retain raw evidence. Compare request usage and task correctness; neither smaller prompts nor fixture-only passes close this gate. Record untested model/provider/platform combinations explicitly.
+
+Read-only audit note: `RuntimeCompactionCoordinator.BuildSummary` currently summarizes covered history using counts of user/assistant/tool events plus source references. `AgentContextBudget` currently uses character limits. These are useful foundations, but this review does not establish faithful semantic recall. No implementation or new runtime test execution accompanies these requirement additions.
