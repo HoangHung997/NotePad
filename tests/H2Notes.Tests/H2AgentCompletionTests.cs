@@ -20,6 +20,42 @@ internal static class H2AgentCompletionTests
 {
     public static void Run(Action<string, Action> test)
     {
+        foreach (var mutation in new[] { false, true })
+        foreach (var status in new[] { VerificationCriterionStatus.Failed, VerificationCriterionStatus.NotVerified })
+            test("AR-033 verdict consistency rejects " + status + " with successful detail mutation=" + mutation, () =>
+            {
+                var c = Context(Contract(), "A", "one", mutation: mutation);
+                var a = new AgentCompletionAssessment(true); a.Register(c);
+                var detail = Covered("verify-a", "criterion-a", true, c, "A", "desired");
+                var report = new VerificationReport(detail.VerifierId,
+                    [new("criterion-a", status, c.Evidence.Select(e => e.ReferenceId),
+                        status == VerificationCriterionStatus.Failed ? new("criterion-a", "Whole criterion failed") : null)])
+                    { CallCoverage = detail.CallCoverage };
+                Reject(() => a.Observe(c, report), "summary contradicts");
+                Check(!a.ProofIds.Any() && a.UnverifiedMutations == (mutation ? 1 : 0),
+                    "Contradictory summary changed accepted proof or mutation state.");
+            });
+        test("AR-033 verdict consistency preserves a valid mixed-target batch and later exact correction", () =>
+        {
+            var contract = Contract(); var a = new AgentCompletionAssessment(true);
+            var first = Context(contract, "A", "first", mutation: true);
+            var second = Context(contract, "B", "second", mutation: true);
+            var batch = first with { Calls = first.Calls.Concat(second.Calls).ToArray(),
+                Results = first.Results.Concat(second.Results).ToArray(),
+                Evidence = first.Evidence.Concat(second.Evidence).ToArray(),
+                MutationCallIds = first.MutationCallIds.Concat(second.MutationCallIds).ToArray() };
+            a.Register(batch);
+            var report = new VerificationReport("verify-a",
+                [new("criterion-a", VerificationCriterionStatus.Failed, batch.Evidence.Select(e => e.ReferenceId),
+                    new("criterion-a", "B still needs correction"))])
+                { CallCoverage = Covered("verify-a", "criterion-a", true, first, "A", "desired").CallCoverage
+                    .Concat(Covered("verify-a", "criterion-a", false, second, "B", "desired").CallCoverage).ToArray() };
+            Check(!a.Observe(batch, report).Passed && a.UnverifiedMutations == 1,
+                "Mixed verdict lost its failed target or rejected its successful target.");
+            var correction = Context(contract, "B", "second", mutation: true); a.Register(correction);
+            Check(a.Observe(correction, Covered("verify-a", "criterion-a", true, correction, "B", "desired")).Passed
+                && a.UnverifiedMutations == 0, "Valid same-target correction remained blocked.");
+        });
         test("AR-033 native verifier receipt is retained without manufacturing completion proof", () =>
         {
             var c=Context(Contract(),"A","one",mutation:true);var a=new AgentCompletionAssessment(true);a.Register(c);
@@ -187,7 +223,7 @@ internal static class H2AgentCompletionTests
             test("AR-033 RC-14 concrete " + (project ? "Project" : "Global") + " unrelated file cannot erase earlier failure", () =>
                 Fixture(root => RunProduction(root, project, Mode.Unrelated)));
         }
-        foreach (var mode in new[] { Mode.WrongTarget, Mode.MissingOutput, Mode.MissingVerifier, Mode.ModelClaims, Mode.LostProof, Mode.Unverified, Mode.Contradictory })
+        foreach (var mode in new[] { Mode.WrongTarget, Mode.MissingOutput, Mode.MissingVerifier, Mode.ModelClaims, Mode.LostProof, Mode.Unverified, Mode.Contradictory, Mode.FailedSummary, Mode.PendingSummary })
             test("AR-033 concrete completion remains blocked for " + mode, () => Fixture(root => RunProduction(root, false, mode)));
         test("AR-033 simple conversation is completed unverified not fabricated content verification", () => Fixture(root =>
         {
@@ -197,7 +233,7 @@ internal static class H2AgentCompletionTests
         }));
     }
 
-    private enum Mode { Alternate, Unrelated, WrongTarget, MissingOutput, MissingVerifier, ModelClaims, LostProof, Unverified, Contradictory }
+    private enum Mode { Alternate, Unrelated, WrongTarget, MissingOutput, MissingVerifier, ModelClaims, LostProof, Unverified, Contradictory, FailedSummary, PendingSummary }
     private static void RunProduction(string root, bool project, Mode mode)
     {
         var failureFirst = mode is Mode.Alternate or Mode.Unrelated or Mode.WrongTarget or Mode.ModelClaims;
@@ -224,8 +260,13 @@ internal static class H2AgentCompletionTests
         {
             Check(result.Status==H2AgentTaskStatus.Blocked, "False completion: "+mode+" / "+result.Status+" / "+result.Error);
             Check(result.Completion is null || result.Completion.State!="CompletedVerified", "Blocked result has a verified completion label.");
-            if(mode==Mode.Contradictory) Check(result.GoalState!.Outcomes.First().Status != "Verified",
-                "Contradictory raw report marked an outcome verified before target-aware validation.");
+            if(mode is Mode.Contradictory or Mode.FailedSummary or Mode.PendingSummary)
+                Check(result.GoalState!.Outcomes.First().Status != "Verified",
+                    "Contradictory raw report marked an outcome verified before target-aware validation.");
+            if(mode is Mode.FailedSummary or Mode.PendingSummary)
+                Check(File.ReadAllText(Path.Combine(root, "A.txt")) == "ONE"
+                    && result.Error?.Contains("summary contradicts", StringComparison.Ordinal) == true,
+                    "Contradiction fixture did not execute the real write and then block its proof.");
             if(mode==Mode.MissingOutput)Check(result.GoalState!.Outcomes.Count(o=>o.Status=="Verified")==1 && result.Completion!.OpenOutcomes==2,"Partial goal count lost.");
         }
         using var reopened=new H2ProductionAgentAdapter(Path.Combine(root,"state"),()=>new(Profile(),""),transportFactory:new Wire([]));
@@ -279,6 +320,10 @@ internal static class H2AgentCompletionTests
             var coverage=report.CallCoverage.Concat(binding).ToArray();
             if(mode==Mode.Contradictory) coverage=coverage.Select(x=>x.CriterionId==criterion
                 ? x with {Status=VerificationCriterionStatus.Failed} : x).ToArray();
+            if (mode is Mode.FailedSummary or Mode.PendingSummary)
+                extra = extra.Select(x => new VerificationCriterionResult(x.CriterionId,
+                    mode == Mode.FailedSummary ? VerificationCriterionStatus.Failed : VerificationCriterionStatus.NotVerified,
+                    x.EvidenceIds, mode == Mode.FailedSummary ? new(x.CriterionId, "Controlled summary failure") : null)).ToArray();
             return new(report.VerifierId,report.Criteria.Concat(extra),report.ReportEvidenceIds)
             {CallCoverage=coverage,AlternateResolutions= failed is {} old && mode is Mode.Alternate or Mode.WrongTarget
                 ? [new(old,call.Invocation!.InvocationId,criterion,target,"contents=ONE")] : []};

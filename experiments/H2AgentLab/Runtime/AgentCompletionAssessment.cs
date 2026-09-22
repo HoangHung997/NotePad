@@ -107,6 +107,20 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
         }
         if (coverage.GroupBy(c => (c.InvocationId, c.CriterionId)).Any(g => g.Count() > 1))
             throw new AgentVerificationRequiredException("Duplicate verifier coverage identity.");
+        foreach (var result in report.Criteria)
+        {
+            var bound = coverage.Where(c => c.CriterionId == result.CriterionId).ToArray();
+            // Coverage refines a batch verdict; it cannot erase a reported failure or
+            // missing verification. Mixed-target batches remain valid when their details
+            // account for the aggregate verdict. Check before mutating any proof state.
+            if (bound.Length > 0
+                && (result.Status == VerificationCriterionStatus.Failed
+                        && bound.All(c => c.Status != VerificationCriterionStatus.Failed)
+                    || result.Status == VerificationCriterionStatus.NotVerified
+                        && bound.All(c => c.Status == VerificationCriterionStatus.Passed)))
+                throw new AgentVerificationRequiredException(
+                    "Verifier summary contradicts its per-call coverage; no completion proof was accepted.");
+        }
         foreach (var c in coverage)
         {
             if (!current.ContainsKey(c.InvocationId) || !_attempts.TryGetValue(c.InvocationId, out var attempt)
