@@ -1,0 +1,107 @@
+name: AR-012 review controls
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/h2-ar012-review.yml']
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar012-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      sha: ${{ steps.apply.outputs.sha }}
+    env:
+      AR_HEAD: ${{ github.event.pull_request.head.sha }}
+      AR_BRANCH: feature/h2-agent-reliability-ar-000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Apply only three exact reviewed files
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,gzip,hashlib,os,subprocess
+          from pathlib import Path
+          def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
+          def require(value,message):
+              if not value:raise RuntimeError(message)
+          head=os.environ['AR_HEAD'];branch=os.environ['AR_BRANCH'];base='3f9694abed4e8066544e98075f1e748dc432a02c'
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Unexpected/dirty tree')
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent branch update')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0','Main advanced')
+          require(not git('diff','--name-only',base,'HEAD','--','src','experiments','tests','docs'),'Source changed; reconcile first')
+          data='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'
+          patch=gzip.decompress(base64.b64decode(data));require(hashlib.sha256(patch).hexdigest()=='4ef35557e81468b9bc313d5c66dedcb72a286ba75fdf2219ae9f4cb6e83178cb','Patch hash mismatch')
+          paths=['experiments/H2AgentLab/Integration/H2ProductionToolSession.cs','src/H2Notes.Core/H2AgentResourceBinding.cs','tests/H2Notes.Tests/H2AgentLiveBindingTests.cs']
+          require({line.split(' b/',1)[1] for line in patch.decode().splitlines() if line.startswith('diff --git ')}==set(paths),'Patch scope changed')
+          subprocess.run(['git','apply','--check'],input=patch,check=True);subprocess.run(['git','apply'],input=patch,check=True)
+          subprocess.run(['git','add','--',*paths],check=True);subprocess.run(['git','diff','--cached','--check'],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())==set(paths),'Unexpected staged files')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          git('commit','-m','test(AR-012): verify permitted selection and desktop IPC with private identity tokens')
+          require(git('ls-remote','origin','refs/heads/'+branch).split()[0]==head,'Concurrent update; keep local diff')
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
+          saved=git('rev-parse','HEAD');require(not git('status','--porcelain'),'Dirty final tree')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('sha='+saved+'\n')
+          print('Saved reviewed candidate:',saved)
+          PY
+      - name: Dispatch existing full required CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run avalonia-ci.yml --ref "$AR_BRANCH"
+  tests:
+    needs: delivery
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.delivery.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build exact source and record identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar012-review | Out-Null
+          if(git status --porcelain){throw 'Dirty checkout'}
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';level='E1/E2 controlled fixtures only; desktop IPC is fixture mode, no native Office/model'} | ConvertTo-Json | Set-Content artifacts/ar012-review/identity.json
+          dotnet restore H2Notes.Avalonia.slnx
+          if($LASTEXITCODE){throw 'Restore failed'}
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar012-review/build.log
+          if($LASTEXITCODE){throw 'Build failed'}
+      - name: Repeat AR-012 and retained regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $fail=@()
+          foreach($name in 'AR-012-1','AR-012-2','AR-012-3','AR-011','AR-010','AR-001'){
+            $task=$name.Substring(0,6);$log="artifacts/ar012-review/$name.log"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $task 2>&1 | Tee-Object $log
+            if($LASTEXITCODE -ne 0 -or (Get-Content $log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed'){$fail+=$name}
+          }
+          if($fail.Count){throw ('Failed corpus: '+($fail -join ', '))}
+      - name: All mandatory Agent suites
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar012-review/all-agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR012-Review-E1-E2-Evidence
+          path: artifacts/ar012-review/
+          if-no-files-found: error
+          retention-days: 14
