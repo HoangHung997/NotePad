@@ -1,6 +1,6 @@
 # AR-032 — scoped source-backed history retrieval
 
-Status: ACTIVE / NOT_RUN. Source must compile and pass E2 and full CI on its actual commit before acceptance.
+Status: IMPLEMENTED / E2_PASS / DONE for AR-032 only. Exact verified evidence follows below.
 
 The existing AgentIntegrationTaskArchive owns all journal source data. An in-memory sequence/hash locator index is rebuilt by the existing Apply/replay path; it stores no duplicate payloads and changes no journal schema. The production adapter registers search_history/read_history through its existing ToolSession/ToolRegistry. Both Global and Project use that same path.
 
@@ -13,3 +13,14 @@ Read returns exact bounded text chunks with journal/version/content hashes. Exis
 Planned tests: RC-15 old unfinished work beyond six/200, literal Unicode formula/path retrieval, stable paging and invalid/foreign tokens, task/thread/project isolation, reclassified Global history, late source corruption, exact archived text and proof mismatch, ten real component checkpoint/reopen cycles, and concrete Global/Project registry runs with a scripted transport including historical-injection denial. The checkpoint test is not a semantic model summarizer or E4. Until logs are inspected, these are definitions, not PASS.
 
 Remaining limits: local startup/index scans scale with retained bounded history; lexical search is not semantic search; model quality/native Office is not tested. Retrieval never resumes tool actions or uncertain writes (AR-041), and cannot close obligations from historical evidence. No engine/store/ProjectRecord ownership or UI layout redesign. AR-020 E3 pending, E4 NOT_RUN, AR-083 DEFERRED_BY_USER.
+
+
+## Verified AR-032 checkpoint
+
+Tested application/test source `044bc7c0e6481e8e4f54b477616b42a0870721c0`. [Acceptance manifest](acceptance.json). Focused run **35790136052** checked out this exact saved commit despite the workflow trigger being its parent. Full run **35790200054** ran the same SHA directly through workflow_dispatch. **19/19 AR-032 in three repetitions**, retained AR-031/030/020/012/011/010/001 **39/39/36/44/25/11/13**, **74/74 Agent suites**, **816 H2 tests / zero failed**. All mandatory steps, publish and packaged-helper IPC pass. Build has **35 warnings**, not claimed fixed.
+
+The concrete Global/Project fixtures each traverse two real search pages and read the old source through the actual registry/runtime. Their current read-only task completes; the earlier work remains Blocked, not replayed or silently completed. The historical injection fixture remains Blocked after an outside-target read is denied. No real model is used. Direct archive tests cover retention beyond 220 newer records, literal Unicode formula/path data, exact source rediscovery after reopening, scope revocation, invalid cursors, and source mutation/deletion after query. All 19 cases and current-source payload bounds were read from logs, not inferred from source test names.
+
+The ten-checkpoint test uses the existing CompactionManager with deliberately small supplied summaries and reopening; it establishes source reachability, not production model-driven semantic compaction. Reading is bounded by 4096 ephemeral locators plus existing finite tool-round budget; it is not an unlimited scan promise. Global cross-thread browsing and binary file body retrieval are not implicitly granted. Exact prior state is source data, not an authorization or a completion proof for new work. No UI layout, ProjectRecord, permission, parallel engine/store, native one-PC waiver or E5 claim is introduced. E3/E4 remain NOT_RUN; AR-020 awaits native E3; AR-083 DEFERRED_BY_USER.
+
+On the existing branch/PR #3, reconcile latest refs, working tree and SESSION HANDOFF. Verify AR-032 source/acceptance writers are retired and its retained validation workflow is read-only; do not replay the one-use bootstrap. Start only AR-033: whole-goal completion and verified alternate recovery using the existing contract, verifier router, unresolved-operation and obligation state. Run RC-11/13/14 and retain AR-032/031/030/020/012/011/010/001 regressions. Historical memory never grants permission or verifies current work. Keep AR-020 native E3 pending, E4 NOT_RUN and AR-083 DEFERRED_BY_USER.
