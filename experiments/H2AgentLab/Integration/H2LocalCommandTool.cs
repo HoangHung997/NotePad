@@ -93,6 +93,7 @@ internal sealed class H2LocalCommandTool : IAgentRuntimeDomainVerifier
             truncated = output.Truncated || error.Truncated,
             verification_scope = "process exit only; inspect files/application state to verify the requested outcome",
             next = passed ? "Verify the requested output and preservation."
+                : timedOut ? "Read actual effects before any further write. The deadline does not prove no changes occurred; do not repeat the command."
                 : "Correct the command and retry in the same working directory with retry_of='" + call.Id + "'. Do not repeat unchanged or claim completion." });
         _observed[call.Id] = (result, passed);
         return result;

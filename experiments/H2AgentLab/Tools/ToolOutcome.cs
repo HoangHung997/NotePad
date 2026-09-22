@@ -252,7 +252,7 @@ public static class ToolOutcomeBridge
                                 mutating ? ToolMutationEffect.Unknown : ToolMutationEffect.None, payload);
                         ok = flag.GetBoolean();
                     }
-                var code = String(root, "error") ?? "tool_failed";
+                var code = String(root, "code") ?? String(root, "error") ?? "tool_failed";
                 if (root.TryGetProperty("recovery", out var recovery) && recovery.ValueKind == JsonValueKind.Object)
                     code = String(recovery, "code") ?? code;
                 if (root.TryGetProperty("timed_out", out var timed) && timed.ValueKind == JsonValueKind.True) code = "deadline_exceeded";

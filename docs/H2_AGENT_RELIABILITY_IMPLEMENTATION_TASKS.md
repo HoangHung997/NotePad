@@ -470,21 +470,21 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "phase": "AR-011_ACTIVE",
   "active_task": "AR-011",
   "implementation_status": "ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "acceptance_status": "REPAIR_REQUIRED",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar011-2026-09-22",
-  "last_code_commit": "PENDING_DELIVERY_SEE_GIT_COMMIT",
-  "last_validated_code_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-  "last_validation_result": "FULL_REQUIRED_CI_AND_E2_PASS",
+  "last_code_commit": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
+  "last_validated_code_commit": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
+  "last_validation_result": "AR011_18x3_PASS_AGENT72of74_REPAIR_REQUIRED",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Isolated offline review snapshot from exact source 4b2c3d138352191d4668a23df72f7b7d489d6820; source patch pending push/Windows CI. User-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Guarded source delivery committed and pushed actual code4459; local offline review changes are delivered only with exact preimage checks. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
   "checkpoint_saved_at_utc": "2026-09-22T08:00:00.513598+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Run exact-source AR-011 tests, preserved AR-010/001 regression, all required Agent suites, full Avalonia CI and publish/helper smoke; fix actual failures before acceptance."
+    "Review repair staged with code/phase preservation, ticker parity and timeout advice; run exact-source AR-011 and retained AR-010/001 plus all required CI and publish."
   ],
   "last_test_commands": [
     {
@@ -688,6 +688,14 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "AR001_regression": "13/13",
       "required_Agent_suites": "74/74",
       "verification": "Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization."
+    },
+    {
+      "id": 35703236866,
+      "code_sha": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
+      "AR011": "18/18 x3",
+      "independent_Agent": "72/74",
+      "result": "REPAIR_REQUIRED",
+      "artifact_id": 10683975729
     }
   ],
   "evidence_locations": [
@@ -701,7 +709,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-010/implementation.md"
   ],
   "known_failures": [
-    "New C# implementation has not been compiled or executed yet."
+    "MB-40 denial code was lost in pending effect completion reason; same root cause fails MB-104 umbrella. Repair must preserve all existing permission assertions.",
+    "Review: desktop ticker generic tool-ok could claim completion for Running/unverified outcomes.",
+    "Review: command deadline raw advice contradicted typed reconciliation metadata."
   ],
   "external_blockers": [
     "User-PC working tree and configured real Office/model/UI are not accessible; E3/E4 remain NOT_RUN.",
@@ -717,7 +727,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue AR-011 only on the existing branch/PR #3. Inspect exact delivery SHA and Windows CI outcome; fix actual compilation/runtime/regression failures and retain their evidence. Do not advance AR-012 before AR-011 acceptance.",
+  "next_exact_action": "Continue AR-011 on this branch/PR; inspect exact latest CI outcomes after review repair, repair any remaining regressions without weakening permission/completion gates, then save evidence and acceptance. Do not start AR-012 yet.",
   "next_task_if_active_done": "AR-012",
   "last_runtime_source_commit": "14767f0fdaf3ead109867c41caf34111adb8c02a",
   "previous_saved_checkpoint_commit": "89a4964d57a8fa5a129b76cb341f23ac1d471262",

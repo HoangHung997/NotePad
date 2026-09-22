@@ -150,7 +150,14 @@ internal static class H2WorkAssistantRepairTests
                 var context = new H2AgentTaskContext(root, "", PermissionScope: WorkAssistantPermissionScopeMapper.ForWorkspace(H2AgentPermissionMode.FullAccess, root, DateTime.UtcNow).PermissionScope);
                 var done = Wait(adapter, adapter.StartTaskAsync(null, "Run local command", context, false).Result);
                 Check(done.Status == H2AgentTaskStatus.Blocked && script.Results.Any(r => r.ToolName == "exec_command" && r.IsError), "Failed command reported completion");
-                if (command.StartsWith("Start-Sleep")) Check(script.Results.Any(r => r.Content.Contains("\"timed_out\":true")), "Timeout not reported");
+                if (command.StartsWith("Start-Sleep"))
+                {
+                    var result = script.Results.Single(r => r.ToolName == "exec_command");
+                    Check(result.Content.Contains("\"timed_out\":true"), "Timeout not reported");
+                    Check(result.Outcome?.Effect == H2AgentLab.Tools.ToolMutationEffect.Unknown
+                        && result.Outcome.Error?.RetryClass == H2AgentLab.Tools.ToolRetryClass.ReconcileRequired
+                        && !result.Content.Contains("Correct the command and retry"), "Deadline suggested an unsafe retry.");
+                }
             }
         }));
 

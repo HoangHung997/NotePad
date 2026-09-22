@@ -250,7 +250,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                     cancellationToken.ThrowIfCancellationRequested();
                     if (pendingOperations.Count > 0)
                         throw new AgentVerificationRequiredException("Chưa thể hoàn tất: còn công việc đang chạy hoặc tác động cần đối soát. "
-                            + string.Join("; ", pendingOperations.Values.Take(8).Select(o => o.Status + (o.Job is null ? "" : " job=" + o.Job.JobId)))
+                            + string.Join("; ", pendingOperations.Values.Take(8).Select(o => o.Status + (o.Error is null ? "" : " (" + o.Error.Code + ")")
+                                + (o.Job is null ? "" : " job=" + o.Job.JobId)))
                             + ". Không tự lặp thao tác ghi.");
                     if (unresolvedCalls.Count > 0)
                         throw new AgentVerificationRequiredException(

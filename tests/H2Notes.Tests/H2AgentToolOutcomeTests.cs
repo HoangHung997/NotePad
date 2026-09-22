@@ -201,6 +201,19 @@ internal static class H2AgentToolOutcomeTests
             finally { Drain(adapter); }
         }));
 
+        test("AR-011 legacy denial retains its code without inventing proof of no effect", () =>
+        {
+            var call = new ToolCall("denial", "fixture.denial", JsonSerializer.SerializeToElement(new { }));
+            var descriptor = Tool(call.Name, true, new DelegatingToolExecutor("fixture", (_, _) => ValueTask.FromResult("{}")));
+            const string denial = "{\"success\":false,\"code\":\"denied\",\"error\":\"User declined shared fixture mutation.\"}";
+            var unknown = ToolOutcomeBridge.FromLegacy(call, descriptor, denial).Outcome;
+            Check(unknown.Error?.Code == "permission_denied" && unknown.Effect == ToolMutationEffect.Unknown,
+                "Legacy error message replaced typed code or claimed an unproven no-effect.");
+            var preflight = ToolOutcomeBridge.FromLegacy(call, descriptor, denial[..^1] + ",\"mutationApplied\":false}").Outcome;
+            Check(preflight is { Status: ToolOutcomeStatus.Rejected, Effect: ToolMutationEffect.None }
+                && preflight.Error?.Code == "permission_denied", "Explicit no-effect denial lost preflight semantics.");
+        });
+
         test("AR-011 typed preflight busy stale and execution deadlines have distinct retry semantics", () =>
         {
             var call = new ToolCall("taxonomy", "fixture.taxonomy", JsonSerializer.SerializeToElement(new { }));
@@ -295,7 +308,13 @@ internal static class H2AgentToolOutcomeTests
         }
         finally { Drain(adapter); }
     }
-    private static H2AgentProgress Activity(H2AgentTaskObservation o) => o.Progress.Last(p => p.ToolOutcome is not null && p.Message != "tool_search");
+    private static H2AgentProgress Activity(H2AgentTaskObservation o)
+    {
+        var activity = o.Progress.Last(p => p.ToolOutcome is not null && p.Message != "tool_search");
+        Check(WorkAssistantActivityText.FromProgress(activity) == H2AgentActivity.Label(activity),
+            "Desktop ticker disagreed with typed chat activity.");
+        return activity;
+    }
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     private static void Drain(H2ProductionAgentAdapter adapter) => adapter.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
     private static H2AgentTaskSummary Wait(IH2AgentAdapter adapter, Guid id)

@@ -21,3 +21,11 @@ H2AgentToolOutcomeTests is wired into the existing H2Notes.Tests runner. Concret
 Remote main: 1283bc13e07c3cd47d04886166de3dfc595422c0. Existing PR #3, branch feature/h2-agent-reliability-ar-000. Source snapshot 4b2c3d138352191d4668a23df72f7b7d489d6820 came from read-only CI artifact 10682536313; hash and clean identity verified before local edits. Container has no .NET/PowerShell or direct GitHub DNS. Windows CI is required; local diff validation is not E1/E2.
 
 E3 native Office/provider/model and E4 real H2 UI/model/tools: NOT_RUN / AWAITING_ENVIRONMENT. AR-083: DEFERRED_BY_USER, physical E5 not certified. MB-124–127 and remaining AR tasks are unchanged. No merge into main is authorized.
+
+## First executed evidence and review repair (not final acceptance)
+
+Run 35703236866 tested application source 4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5: build PASS; AR-011 18/18 in each of three iterations, retained AR-010/001 PASS; independent required Agent suites 72/74. Both failures trace to the unchanged MB-40 denial regression: the new conservative pending-effect completion message dropped the original denial code, and the legacy adapter prioritized human error text instead of the explicit code field. Preserve the code through the typed metadata and final blocked reason; do not weaken the permission test or infer no-effect from a denial word alone. Only explicit preflight proof supports None.
+
+Review additionally found the Work Assistant desktop ticker still rendered generic tool-ok as completed for Running/unknown/unverified metadata. It now uses the same typed projection as chat; concrete AR-011 tests compare both on actual observations. Local command timeout advice no longer recommends retry; existing process regression additionally asserts Unknown/ReconcileRequired and no contradictory retry text. These repairs need their own exact-source tests; no prior PASS transfers to the changed code.
+
+First downloaded fixture evidence artifact 10683975729: SHA256 00b6256e5d44975697d78ef7cb1d937b0e53b775807f0f10058170176bb2161e, ZIP CRC verified, identity and all result logs read. This remains failed full-corpus evidence, not acceptance.
