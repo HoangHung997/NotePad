@@ -29,3 +29,7 @@ Run 35703236866 tested application source 4459be5d0e2a0c22e466c1b5a52785a64ce2a2
 Review additionally found the Work Assistant desktop ticker still rendered generic tool-ok as completed for Running/unknown/unverified metadata. It now uses the same typed projection as chat; concrete AR-011 tests compare both on actual observations. Local command timeout advice no longer recommends retry; existing process regression additionally asserts Unknown/ReconcileRequired and no contradictory retry text. These repairs need their own exact-source tests; no prior PASS transfers to the changed code.
 
 First downloaded fixture evidence artifact 10683975729: SHA256 00b6256e5d44975697d78ef7cb1d937b0e53b775807f0f10058170176bb2161e, ZIP CRC verified, identity and all result logs read. This remains failed full-corpus evidence, not acceptance.
+
+## Additional negative-control compatibility review
+
+The existing MCP fixtures return top-level isError, whose true value is a tool execution failure (official MCP tools specification 2026-07-28, https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/server/tools.mdx). The common legacy adapter must normalize this inverted boolean alongside ok/success, reject wrong types or conflicting flags, preserve original content blocks and prevent false completion. Three concrete production-runtime cases exercise those negative results; no external MCP server or network is contacted. This narrow error-flag compatibility does not certify the entire current MCP protocol or native lifecycle.

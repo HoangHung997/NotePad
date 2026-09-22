@@ -138,6 +138,27 @@ internal static class H2AgentToolOutcomeTests
                 Check(observation.Summary.Status != H2AgentTaskStatus.Completed, "Malformed structured output completed.");
             }));
 
+        foreach (var malformed in new[] { "{\"isError\":\"true\"}", "{\"ok\":true,\"isError\":true}" })
+            test("AR-011 malformed negative control flag rejects " + malformed, () => InWorkspace(root =>
+            {
+                var descriptor = Tool("fixture.mcpbad", false, new DelegatingToolExecutor("fixture", (_, _) => ValueTask.FromResult(malformed)));
+                var observation = Run(root, descriptor, new Wire(Discover(descriptor.Name), Batch("badflag", descriptor.Name, new { })), true);
+                Check(Activity(observation).ToolOutcome!.ErrorCode == "invalid_result"
+                    && observation.Summary.Status != H2AgentTaskStatus.Completed, "Malformed MCP control flag was accepted.");
+            }));
+
+        test("AR-011 MCP tool error keeps domain blocks and cannot complete the production task", () => InWorkspace(root =>
+        {
+            const string payload = "{\"content\":[{\"type\":\"text\",\"text\":\"Controlled provider failure\"}],\"isError\":true}";
+            var descriptor = Tool("fixture.mcperror", false, new DelegatingToolExecutor("fixture", (_, _) => ValueTask.FromResult(payload)));
+            var wire = new Wire(Discover(descriptor.Name), Batch("mcperror", descriptor.Name, new { }));
+            var observation = Run(root, descriptor, wire, true);
+            Check(wire.Results.Last().Content == payload && wire.Results.Last().IsError,
+                "MCP failure blocks were flattened or converted to success.");
+            Check(Activity(observation).ToolOutcome is { Status: H2ToolRunStatus.Failed, Effect: H2ToolMutationEffect.None }
+                && observation.Summary.Status != H2AgentTaskStatus.Completed, "MCP tool error allowed false completion.");
+        }));
+
         test("AR-011 malformed typed Running without JobId is rejected", () => InWorkspace(root =>
         {
             var descriptor = Tool("fixture.badjob", false, new DelegatingOutcomeToolExecutor("fixture", (call, ct) =>

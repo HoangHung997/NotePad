@@ -241,16 +241,17 @@ public static class ToolOutcomeBridge
             {
                 // Wrong scalar types and conflicting success flags are malformed control data.
                 bool? ok = null;
-                foreach (var key in new[] { "ok", "success" })
+                foreach (var key in new[] { "ok", "success", "isError" })
                     if (root.TryGetProperty(key, out var flag))
                     {
                         if (flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                             return Failure(call, descriptor, "invalid_result", ToolErrorPhase.Execution,
                                 mutating ? ToolMutationEffect.Unknown : ToolMutationEffect.None, payload);
-                        if (ok.HasValue && ok.Value != flag.GetBoolean())
+                        var succeeded = key == "isError" ? !flag.GetBoolean() : flag.GetBoolean();
+                        if (ok.HasValue && ok.Value != succeeded)
                             return Failure(call, descriptor, "invalid_result", ToolErrorPhase.Execution,
                                 mutating ? ToolMutationEffect.Unknown : ToolMutationEffect.None, payload);
-                        ok = flag.GetBoolean();
+                        ok = succeeded;
                     }
                 var code = String(root, "code") ?? String(root, "error") ?? "tool_failed";
                 if (root.TryGetProperty("recovery", out var recovery) && recovery.ValueKind == JsonValueKind.Object)
