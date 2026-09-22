@@ -50,9 +50,12 @@ jobs:
               require(jobs['total_count']==len(jobs['jobs'])==1 and jobs['jobs'][0]['id']==job_id,'Incomplete job inventory')
               require(all(s['conclusion']=='success' for s in jobs['jobs'][0]['steps']),'A skipped step is not PASS')
               runs.append({'id':run_id,'job_id':job_id,'head_sha':BASE,'result':'SUCCESS','applies_to':'PRE_REPAIR_SOURCE_ONLY'})
-          raw=subprocess.check_output(['gh','api','repos/HoangHung997/NotePad/actions/jobs/106876620469/logs'])
+          # Raw log bytes are captured, never written to a terminal or executed.
+          # Strip ANSI formatting for parsing while preserving a hashed source file.
+          raw=subprocess.check_output(['gh','api','--allow-escape-sequences','repos/HoangHung997/NotePad/actions/jobs/106876620469/logs'])
           (OUT/'pre-repair-full-ci.log').write_bytes(raw)
-          lines=raw.decode('utf-8-sig').splitlines();checkout=None
+          text=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',raw.decode('utf-8-sig'))
+          lines=text.splitlines();checkout=None
           for i,line in enumerate(lines):
               if '[command]' in line and 'log -1 --format=%H' in line:
                   for nxt in lines[i+1:i+5]:
@@ -62,7 +65,7 @@ jobs:
           require(checkout is not None,'Actual CI checkout not found in log')
           subprocess.run(['git','fetch','--no-tags','--depth=1','origin',checkout],check=True)
           require(not git('diff','--name-only',BASE,checkout,'--','src','experiments','tests','.github/workflows/avalonia-ci.yml'),'Full-CI source differs')
-          results=re.findall(r'RESULT: (\d+) passed, (\d+) failed',raw.decode('utf-8-sig'))
+          results=re.findall(r'RESULT: (\d+) passed, (\d+) failed',text)
           require(results and results[0][1]=='0','Full baseline H2 results missing')
           runs[-1].update({'actual_checkout_sha':checkout,'H2_passed':int(results[0][0]),'H2_failed':0,'log_sha256':hashlib.sha256(raw).hexdigest()})
           original=pathlib.Path(TRACKER).read_text(encoding='utf-8')
@@ -85,6 +88,7 @@ jobs:
             'next_exact_action':'Keep AR-030 as sole active task. Reconcile current refs, tracker and working tree; review the local H2_AR030_Integrity_Repair handoff and publish its source changes only through an authorized available write path. Do not bypass a tool safety decision. Then build Windows/.NET 10, run the nine integrity cases, expected old-class controls, RC-11/12, retained AR regressions, all mandatory Agent suites and full CI/publish/helper IPC on the new SHA. Do not mark AR-030 DONE from pre-repair green CI. Preserve AR-020 native E3 pending and AR-083 DEFERRED_BY_USER.',
             'next_task_if_active_done':'AR-031'})
           state.setdefault('ci_runs',[]).extend(runs)
+          state['ci_runs'].append({'id':35767850106,'result':'FAILURE','scope':'DOCUMENTATION_ONLY','reason':'gh refused raw terminal escape sequences before any tracker write; capture-only log reader corrected'})
           state['evidence_locations']=list(dict.fromkeys(state.get('evidence_locations',[])+[NOTE,'conversation artifact: H2_AR030_Integrity_Repair.zip (LOCAL_ONLY, source patch NOT_PUSHED)']))
           revised=original[:start]+json.dumps(state,ensure_ascii=False,indent=2)+original[end:]
           require('### [x] AR-030' not in revised and '| E5 | DEFERRED_BY_USER |' in revised,'Acceptance boundary changed')
