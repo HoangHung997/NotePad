@@ -1,84 +1,90 @@
 #!/usr/bin/env python3
-"""One-time delivery of the reviewed AR-010 text patch, not an application subsystem.
-Never reset or overwrite drifted source. Runtime acceptance is a separate Windows job.
-"""
-import base64
-import gzip
+"""Deliver the reviewed AR-010 factory ownership repair; no resets or unbounded retries."""
+from pathlib import Path
 import hashlib
-import io
 import json
 import os
-from pathlib import Path
 import subprocess
 
 BRANCH = 'feature/h2-agent-reliability-ar-000'
 MAIN = '1283bc13e07c3cd47d04886166de3dfc595422c0'
-PATCH_HASH = 'ad7b67bb05aacaf467bff37689e38b033d80c0b42361f89fb95b4870049f2ed3'
 FILES = {
- 'docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md': ('fa32ea3cc2cfba5e10d824a365fcde477c1519fd69cd93ee0badce54bc002816', '88a4f2ff35f07f41d5669d8f4bb814cb0dc67c7edcd29602dd19503b176b527d'),
- 'docs/agent-reliability/AR-010/implementation.md': (None, '3de99f812b0e7faa4da558f28e8f18853e2c8b56a038730e703af905b451fbf8'),
- 'experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs': ('91a6d1f3ed5b26d83d12e84954f71a358e751fef3b920aaa159f618a81bb8e2d', '70360921098202f8c245d35667710e8dfb0b6e3e8658782a291831156667ff7d'),
- 'experiments/H2AgentLab/Metrics/AgentTrace.cs': ('e00cf25b0cbf718dee7b251949e45c49bf1440536b32fbde7895e10bab331044', 'd758ce49555fa2f92f03e1cb8c69c12aa443ba7776c518f9ea9521803809b6ab'),
- 'experiments/H2AgentLab/Runtime/AgentRuntime.cs': ('d11e91c6e5be7314958365b26d26f71c787246679a6cfcff46e3bacc12d7508e', '189e69787e70ea2a42d8319c3ca402de57163042119e6703902578d0edd56ff8'),
- 'experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs': ('858428a1764ce7073052431da6d030da55d3fbed29bc763256fd233a1381a6fd', '6fd06e975dd6a1aaa29d3870f26f4b9d744071b6b820061b25dc34580ab331f5'),
- 'experiments/H2AgentLab/Runtime/AgentRuntimeHooks.cs': (None, 'f963b48128f8e2774e06b46ea590bfdea391276e80a93d01568d37446be4a6e0'),
- 'experiments/H2AgentLab/Tasking/AgentOrchestratedRun.cs': ('a9d8de8616de153e9e9f3ffe200bf77f466da73171fa529554dbd35b9169e1e8', '4f43b9ae6f172dfcc75e6bbd198fa6f1ed1132d6dd2e1d382aed97a3f1954a8b'),
- 'tests/H2Notes.Tests/H2AgentRuntimeHookTests.cs': (None, '71296a63da0eb5afa05e9ffef298f5f7aad2e97f82c63022389fe390347c405d'),
- 'tests/H2Notes.Tests/Program.cs': ('a159064b8836a7d4e44ff86f391a2b9243fd866ff2c2fae25b5d57407f4a84c2', '276099415d1e9998f14130e5c149f96f656f48ac87dee96411eb4785516f2f89')
+ 'experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs': ('6fd06e975dd6a1aaa29d3870f26f4b9d744071b6b820061b25dc34580ab331f5', '0f81a87f10efdd4429f911d8a43c93a6414d153f262aa9be7e9188e99dd54b03'),
+ 'tests/H2Notes.Tests/H2AgentRuntimeHookTests.cs': ('71296a63da0eb5afa05e9ffef298f5f7aad2e97f82c63022389fe390347c405d', 'f772d2e0daca5ab4484a0a8145fa7a840766334e81fa21d6bf8c016ab472fb99'),
+ 'docs/agent-reliability/AR-010/implementation.md': ('3de99f812b0e7faa4da558f28e8f18853e2c8b56a038730e703af905b451fbf8', 'fecdac8f129c10a634efbbacde1e295fa046e9ab1d04430effec35272ba1ad44')
 }
-
-def git(*args):
-    return subprocess.check_output(['git', *args], text=True).strip()
-
-def require(condition, message):
-    if not condition:
-        raise RuntimeError(message)
-
-def digest(name):
-    path = Path(name)
-    require(not any(p.is_symlink() for p in (path, *path.parents)), 'Symlink in source path: ' + name)
-    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+def require(value, message):
+    if not value: raise RuntimeError(message)
+def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+def replace(path, old, new):
+    file = Path(path); text = file.read_text()
+    require(text.count(old) == 1, 'Source anchor drifted: ' + path)
+    file.write_text(text.replace(old, new, 1))
 
 def main():
-    require(os.environ['AR_BRANCH'] == BRANCH, 'Wrong implementation branch')
     head = git('rev-parse', 'HEAD')
-    require(head == os.environ['AR_HEAD'], 'Unexpected checkout SHA')
-    require(not git('status', '--porcelain'), 'Dirty checkout: preserve uncommitted work')
-    require(git('ls-remote', 'origin', 'refs/heads/main').split()[0] == MAIN, 'Main advanced: reconcile first')
-    current = {name: digest(name) for name in FILES}
-    if all(current[name] == pair[1] for name, pair in FILES.items()):
-        print('Exact AR-010 implementation already present; do not replay delivery.')
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-            out.write('changed=false\ncode_sha=' + head + '\n')
+    require(os.environ['AR_BRANCH'] == BRANCH and os.environ['AR_HEAD'] == head, 'Wrong branch/checkout')
+    require(not git('status', '--porcelain'), 'Dirty checkout: preserve work')
+    require(git('ls-remote', 'origin', 'refs/heads/main').split()[0] == MAIN, 'Main advanced: reconcile')
+    if all(digest(path) == pair[1] for path, pair in FILES.items()):
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as out: out.write('changed=false\ncode_sha=' + head + '\n')
+        print('Exact factory repair already present; no replay.')
         return
-    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == head, 'Branch advanced: reconcile first')
-    require(all(current[name] == pair[0] for name, pair in FILES.items()), 'Source/checkpoint drift: refusing to replace work')
-    encoded = ''.join(Path('tools/agent-reliability/ar010_patch.b64').read_text().split())
-    require(len(encoded) == 19044, 'Text patch transport length mismatch')
-    with gzip.GzipFile(fileobj=io.BytesIO(base64.b64decode(encoded, validate=True))) as archive:
-        patch = archive.read(200001)
-    require(len(patch) == 57943 and hashlib.sha256(patch).hexdigest() == PATCH_HASH, 'Text patch integrity mismatch')
-    evidence = Path(os.environ['RUNNER_TEMP']) / 'ar010-delivery'
-    evidence.mkdir(exist_ok=True)
-    patch_path = evidence / 'implementation.patch'
-    patch_path.write_bytes(patch)
-    subprocess.run(['git', 'apply', '--check', str(patch_path)], check=True)
-    subprocess.run(['git', 'apply', '--index', str(patch_path)], check=True)
-    require(set(git('diff', '--cached', '--name-only').splitlines()) == set(FILES), 'Unexpected staged paths')
-    require(all(digest(name) == pair[1] for name, pair in FILES.items()), 'Applied source differs from reviewed patch')
+    require(all(digest(path) == pair[0] for path, pair in FILES.items()), 'Source changed: refusing overwrite')
+    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == head, 'Branch advanced')
+    factory = 'experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs'
+    replace(factory, '        var registry = NormalRuntimeToolRegistry.Create(tools);', '        // Validate the host hook factory before allocating a transport or provider resources.\n        var hooks = _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null.");\n        var registry = NormalRuntimeToolRegistry.Create(tools);')
+    replace(factory, '            hooks: _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null."));', '            hooks: hooks);')
+    test = 'tests/H2Notes.Tests/H2AgentRuntimeHookTests.cs'
+    anchor = '        foreach (var kind in Enum.GetValues<AgentRuntimeHookKind>())'
+    inserted = '''        foreach (var returnNull in new[] { false, true })
+        {
+            var nullHook = returnNull;
+            test("AR-010 invalid hook factory allocates no transport: " + (nullHook ? "null" : "exception"), () => InWorkspace(root =>
+            {
+                var traces = new ConcurrentQueue<AgentRuntimeHookEvent>();
+                var transport = new ScriptFactory([], traces);
+                var factory = new AgentRuntimeFactory(transport, _ => nullHook ? null! : throw new InvalidOperationException("hook-factory-failure"));
+                using var tools = new AgentTools(new SafeWorkspace(root), Path.Combine(root, "lab-state"),
+                    (_, _) => Task.FromResult(false), (_, _) => { }) { ReadOnly = true };
+                try
+                {
+                    _ = factory.Create(Profile(), "", tools, new H2AgentLab.Context.AgentContextManager(), new());
+                    throw new Exception("Invalid hook factory was accepted.");
+                }
+                catch (InvalidOperationException error)
+                {
+                    Check(error.Message.Contains(nullHook ? "returned null" : "hook-factory-failure"), "The original hook factory error was hidden.");
+                }
+                Check(transport.Sessions.Count == 0, "Hook factory failure leaked a newly allocated transport.");
+            }));
+        }
+
+'''
+    replace(test, anchor, inserted + anchor)
+    doc = Path('docs/agent-reliability/AR-010/implementation.md')
+    doc.write_text(doc.read_text() + '''
+## Review repair before acceptance
+
+The initial exact-source build and three focused iterations passed. Further code review found that a throwing/null host-hook factory could leave a newly constructed transport without an owner. Hook construction/validation now precedes registry/provider/transport allocation. Two registered regressions require the original hook error and zero transport allocations for exception/null cases. This change needs its own exact-source test results; no earlier PASS is transferred to it.
+''')
+    require(all(digest(path) == pair[1] for path, pair in FILES.items()), 'Repair output differs from reviewed source')
+    require(set(git('diff', '--name-only').splitlines()) == set(FILES), 'Unexpected files changed')
+    evidence = Path(os.environ['RUNNER_TEMP']) / 'ar010-delivery'; evidence.mkdir(exist_ok=True)
+    (evidence / 'factory-repair.patch').write_bytes(subprocess.check_output(['git', 'diff', '--binary']))
+    subprocess.run(['git', 'add', '--', *FILES], check=True)
     subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
-    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == head, 'Concurrent branch update; preserve patch instead')
+    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == head, 'Concurrent branch update')
     git('config', 'user.name', 'github-actions[bot]')
     git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
-    subprocess.run(['git', 'commit', '-m', 'feat(AR-010): share awaited runtime hooks across Global Project and Lab'], check=True)
+    subprocess.run(['git', 'commit', '-m', 'fix(AR-010): reject invalid hooks before transport allocation'], check=True)
     subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/' + BRANCH], check=True)
     saved = git('rev-parse', 'HEAD')
-    require(not git('status', '--porcelain'), 'Delivery tree is not clean')
-    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == saved, 'Remote head was not verified')
-    (evidence / 'identity.json').write_text(json.dumps({'source_sha': saved, 'parent': head, 'branch': BRANCH, 'working_tree': 'CLEAN', 'patch_sha256': PATCH_HASH, 'files': list(FILES), 'acceptance': 'NOT_RUN'}, indent=2))
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-        out.write('changed=true\ncode_sha=' + saved + '\n')
-    print('Saved source:', saved, 'Acceptance NOT_RUN until Windows tests finish.')
+    require(not git('status', '--porcelain'), 'Dirty delivery after save')
+    require(git('ls-remote', 'origin', 'refs/heads/' + BRANCH).split()[0] == saved, 'Remote checkpoint not verified')
+    (evidence / 'identity.json').write_text(json.dumps({'code_sha': saved, 'working_tree': 'CLEAN', 'files': list(FILES), 'acceptance': 'NOT_RUN'}, indent=2))
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as out: out.write('changed=true\ncode_sha=' + saved + '\n')
+    print('Factory repair pushed:', saved, '; exact-source validation required.')
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()
