@@ -417,11 +417,13 @@ public sealed partial class H2ProductionAgentAdapter :
                 });
 
             var telemetry = new AgentRunTelemetry();
-            await using var runtime = orchestrator.CreateRuntime(
+            var runtime = orchestrator.CreateRuntime(
                 selected.Profile,
                 selected.ApiKey ?? "",
                 tools,
                 telemetry);
+            // Provider teardown is engine work, not a continuation on the caller's UI loop.
+            await using var runtimeDisposal = runtime.ConfigureAwait(false);
 
             var result = await orchestrator.RunRuntimeAsync(
                 session,

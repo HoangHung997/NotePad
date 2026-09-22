@@ -150,7 +150,11 @@ internal static class H2AgentReliabilityContractTests
                     var summary = Wait(adapter, id);
                     Check(summary.Status is H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Failed, "Rejected operation was declared completed.");
                     var output = script.Results.First(result => result.ToolName == "excel.write_range");
-                    using var result = JsonDocument.Parse(output.Content);
+                    // Runtime projects a JSON body plus an evidence footer; verify both,
+                    // rather than pretending the complete model projection is raw JSON.
+                    var marker = output.Content.IndexOf("\n[evidence:", StringComparison.Ordinal);
+                    Check(marker > 0, "Rejected mutating call lost its evidence footer.");
+                    using var result = JsonDocument.Parse(output.Content[..marker]);
                     Check(output.IsError && result.RootElement.GetProperty("error").GetString() == ExcelPatchLimits.ErrorCode, "Real production runtime lost the count rejection.");
                     Check(!result.RootElement.GetProperty("mutationApplied").GetBoolean(), "Rejected effect provenance was lost.");
                 }

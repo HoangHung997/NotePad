@@ -35,7 +35,7 @@ public sealed class ToolExecutionScheduler : IDisposable
         var results = new ToolExecutionResult[requests.Count];
         var tasks = requests.Select((request, index) =>
             ExecuteOneAsync(request, index, results, cancellationToken)).ToArray();
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks).ConfigureAwait(false);
         return results;
     }
 
@@ -65,20 +65,20 @@ public sealed class ToolExecutionScheduler : IDisposable
         {
             if (!request.Descriptor.SupportsParallel)
             {
-                await _serialGate.WaitAsync(cancellationToken);
+                await _serialGate.WaitAsync(cancellationToken).ConfigureAwait(false);
                 serialTaken = true;
             }
 
             if (request.Descriptor.IsMutating)
             {
                 resourceGate = _resourceGates.GetOrAdd(resourceKey!, _ => new SemaphoreSlim(1, 1));
-                await resourceGate.WaitAsync(cancellationToken);
+                await resourceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
                 resourceTaken = true;
             }
 
             var output = await request.Descriptor.Executor.ExecuteAsync(
                 request.Call,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
             results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output);
         }
         finally

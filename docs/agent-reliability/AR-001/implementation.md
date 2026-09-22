@@ -9,3 +9,8 @@ B11: the old fixture had a 10-second wait but a default 60-second command timeou
 ## Acceptance pending
 
 Focused AR-001 CI runs `dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001` three times; the unchanged full Avalonia CI runs every existing suite and publish/helper smoke separately. The proposed main-workflow edits were not applied because the CI token cannot write workflow files. E1/E2 use scripted transport, fixture backend and disposable local command. Invalid native count preflight does not access COM. E3/E4 Office/model/UI are NOT_RUN. AR-083 remains DEFERRED_BY_USER. Record actual CI before claiming completion.
+
+
+## First actual CI repair — not yet accepted
+
+Focused run 35691748431 tested source 88cc6241d9488e26e0652751a7c14c26df4aecb3: build succeeds; 9 RC-02 cases pass and 4 fail. The two oversized production-runtime cases already reject correctly but their tests incorrectly parse the evidence-footer projection as raw JSON; the assertions now explicitly require the footer and parse the preceding JSON body. The forced-timeout and held-transport-disposal tests expose UI synchronization-context capture in ToolExecutionScheduler awaits and implicit await-using disposal. Engine continuations now use ConfigureAwait(false), preserving gate/cancellation semantics while no longer depending on the caller pumping UI during shutdown. Both deterministic regression cases remain mandatory; no pass is claimed until rerun. Original primary errors and failed-run evidence remain preserved. This does not prove the exact cause of the earlier AR-000 sporadic cleanup failure.
