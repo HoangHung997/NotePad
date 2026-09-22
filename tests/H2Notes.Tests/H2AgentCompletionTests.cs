@@ -20,6 +20,35 @@ internal static class H2AgentCompletionTests
 {
     public static void Run(Action<string, Action> test)
     {
+        test("AR-033 native verifier receipt is retained without manufacturing completion proof", () =>
+        {
+            var c=Context(Contract(),"A","one",mutation:true);var a=new AgentCompletionAssessment(true);a.Register(c);
+            var input=Covered("verify-a","criterion-a",true,c,"A","desired");
+            var report=a.Observe(c,new VerificationReport(input.VerifierId,input.Criteria,["native-run:readback-01"])
+                {CallCoverage=input.CallCoverage});
+            Check(report.ReportEvidenceIds.Contains("native-run:readback-01") && !a.ProofIds.Contains("native-run:readback-01"),
+                "Native receipt was dropped or promoted to independent completion proof.");
+        });
+        test("AR-033 generic read-only verification still needs observed proof", () =>
+        {
+            var c = Context(Contract(), "A", "one"); var a = new AgentCompletionAssessment(true); a.Register(c);
+            var r = new VerificationReport("fixture", [new(AgentRuntimeDomainVerifierRouter.MutationCriterionId,
+                VerificationCriterionStatus.Passed, ["missing-proof"])]);
+            Check(!a.Observe(c,r).Passed, "Generic criterion bypassed actual proof resolution.");
+        });
+        test("AR-033 corrective write must recheck previously passed same-target preservation", () =>
+        {
+            var contract=Contract(); var a=new AgentCompletionAssessment(true);
+            var before=Context(contract,"A","before",mutation:true); a.Register(before);
+            var first=Covered("verify-a","criterion-a",true,before,"A","preserve");
+            var second=Covered("verify-a","criterion-b",false,before,"A","fix");
+            _=a.Observe(before,new VerificationReport("verify-a",first.Criteria.Concat(second.Criteria))
+                { CallCoverage=first.CallCoverage.Concat(second.CallCoverage).ToArray() });
+            var after=Context(contract,"A","after",mutation:true); a.Register(after);
+            var r=Covered("verify-b","criterion-b",true,after,"A","fix") with
+                { AlternateResolutions=[new(before.Calls[0].Invocation!.InvocationId,after.Calls[0].Invocation!.InvocationId,"criterion-b","A","fix")] };
+            Reject(()=>a.Observe(after,r),"Alternate recovery");
+        });
         test("AR-033 same verifier cannot erase a nonmutating failure on another resource", () =>
         {
             var a = new AgentCompletionAssessment(true); var contract = Contract();
@@ -158,7 +187,7 @@ internal static class H2AgentCompletionTests
             test("AR-033 RC-14 concrete " + (project ? "Project" : "Global") + " unrelated file cannot erase earlier failure", () =>
                 Fixture(root => RunProduction(root, project, Mode.Unrelated)));
         }
-        foreach (var mode in new[] { Mode.WrongTarget, Mode.MissingOutput, Mode.MissingVerifier, Mode.ModelClaims, Mode.LostProof, Mode.Unverified })
+        foreach (var mode in new[] { Mode.WrongTarget, Mode.MissingOutput, Mode.MissingVerifier, Mode.ModelClaims, Mode.LostProof, Mode.Unverified, Mode.Contradictory })
             test("AR-033 concrete completion remains blocked for " + mode, () => Fixture(root => RunProduction(root, false, mode)));
         test("AR-033 simple conversation is completed unverified not fabricated content verification", () => Fixture(root =>
         {
@@ -168,7 +197,7 @@ internal static class H2AgentCompletionTests
         }));
     }
 
-    private enum Mode { Alternate, Unrelated, WrongTarget, MissingOutput, MissingVerifier, ModelClaims, LostProof, Unverified }
+    private enum Mode { Alternate, Unrelated, WrongTarget, MissingOutput, MissingVerifier, ModelClaims, LostProof, Unverified, Contradictory }
     private static void RunProduction(string root, bool project, Mode mode)
     {
         var failureFirst = mode is Mode.Alternate or Mode.Unrelated or Mode.WrongTarget or Mode.ModelClaims;
@@ -195,6 +224,8 @@ internal static class H2AgentCompletionTests
         {
             Check(result.Status==H2AgentTaskStatus.Blocked, "False completion: "+mode+" / "+result.Status+" / "+result.Error);
             Check(result.Completion is null || result.Completion.State!="CompletedVerified", "Blocked result has a verified completion label.");
+            if(mode==Mode.Contradictory) Check(result.GoalState!.Outcomes.First().Status != "Verified",
+                "Contradictory raw report marked an outcome verified before target-aware validation.");
             if(mode==Mode.MissingOutput)Check(result.GoalState!.Outcomes.Count(o=>o.Status=="Verified")==1 && result.Completion!.OpenOutcomes==2,"Partial goal count lost.");
         }
         using var reopened=new H2ProductionAgentAdapter(Path.Combine(root,"state"),()=>new(Profile(),""),transportFactory:new Wire([]));
@@ -245,8 +276,11 @@ internal static class H2AgentCompletionTests
             if(mode==Mode.WrongTarget)matched=[c.Contract.Goals.Active.First()];
             var extra=matched.Select(o=>new VerificationCriterionResult(o.Id,VerificationCriterionStatus.Passed,proof)).ToArray();
             var binding=matched.Select(o=>new VerificationCallCoverage(call.Invocation!.InvocationId,o.Id,"file:"+workspace.Resolve(path),"contents=ONE",VerificationCriterionStatus.Passed,proof));
+            var coverage=report.CallCoverage.Concat(binding).ToArray();
+            if(mode==Mode.Contradictory) coverage=coverage.Select(x=>x.CriterionId==criterion
+                ? x with {Status=VerificationCriterionStatus.Failed} : x).ToArray();
             return new(report.VerifierId,report.Criteria.Concat(extra),report.ReportEvidenceIds)
-            {CallCoverage=report.CallCoverage.Concat(binding).ToArray(),AlternateResolutions= failed is {} old && mode is Mode.Alternate or Mode.WrongTarget
+            {CallCoverage=coverage,AlternateResolutions= failed is {} old && mode is Mode.Alternate or Mode.WrongTarget
                 ? [new(old,call.Invocation!.InvocationId,criterion,target,"contents=ONE")] : []};
         }
     }

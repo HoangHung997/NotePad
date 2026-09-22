@@ -463,10 +463,12 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                     if (report is not null)
                     {
-                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
-                            observation.Contract.Goals!.RevisionId, report, execution.Evidence));
-                        request.ContractObserver?.Invoke(effectiveContract);
                         var effectiveReport = assessment.Observe(observation, report);
+                        // The normalized target-aware report, not a contradictory raw claim,
+                        // updates outcomes. All evidence is from this run, never retrieved memory.
+                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
+                            observation.Contract.Goals!.RevisionId, effectiveReport, evidenceHistory.ToArray()));
+                        request.ContractObserver?.Invoke(effectiveContract);
                         mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                         latestVerification = effectiveReport;
                         verificationHistory.Add(effectiveReport);

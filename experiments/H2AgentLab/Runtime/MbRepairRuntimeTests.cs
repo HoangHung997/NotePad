@@ -474,6 +474,9 @@ public static class MbRepairRuntimeTests
             return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                 "mb43-verifier",
                 [
+                    // The repair prompt remains failed-only; post-repair verification also
+                    // reasserts preservation of A on this same affected fixture resource.
+                    new VerificationCriterionResult("criterion-a", VerificationCriterionStatus.Passed, ["evidence:a:preserved"]),
                     new VerificationCriterionResult(
                         "criterion-b",
                         VerificationCriterionStatus.Passed,

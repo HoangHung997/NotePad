@@ -39,6 +39,8 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
     private readonly Dictionary<Guid, Attempt> _attempts = [];
     private readonly Dictionary<(string Verifier, string Criterion, string Target), VerificationCriterionResult> _criteria = [];
     private readonly List<H2AgentAlternateResolution> _resolutions = [];
+    // Native verifier receipts remain trace metadata, distinct from resolvable completion proof.
+    private readonly HashSet<string> _reportEvidence = new(StringComparer.Ordinal);
     public int UnverifiedMutations => _attempts.Values.Count(a => a.Value.Mutation && !a.Verified && a.ResolvedBy is null);
     public int OutstandingProofs => _attempts.Values.Count(a => !a.Verified && a.ResolvedBy is null
         && a.Coverage.Values.Any(c => c.Status != VerificationCriterionStatus.Passed));
@@ -76,13 +78,18 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
 
     public VerificationReport Observe(AgentRuntimeVerificationContext context, VerificationReport report)
     {
+        foreach (var id in report.ReportEvidenceIds)
+        {
+            if (!_reportEvidence.Contains(id) && _reportEvidence.Count >= 8192)
+                throw new AgentVerificationRequiredException("Verifier receipt budget reached; history is retained.");
+            _reportEvidence.Add(id);
+        }
         var current = context.Calls.Where(c => c.Invocation is not null).ToDictionary(c => c.Invocation!.InvocationId);
         var acceptedResults = new Dictionary<string, VerificationCriterionResult>(StringComparer.Ordinal);
         foreach (var result in report.Criteria)
         {
             var accepted = result;
             if (requireObservedProof && result.Status == VerificationCriterionStatus.Passed
-                && result.CriterionId != AgentRuntimeDomainVerifierRouter.MutationCriterionId
                 && !Proof(context.Evidence, result.EvidenceIds))
                 accepted = new(result.CriterionId, VerificationCriterionStatus.NotVerified, result.EvidenceIds);
             acceptedResults[result.CriterionId] = accepted;
@@ -174,13 +181,11 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
         && old.Value.Status != ToolOutcomeStatus.Running
         && old.Value.Effect is not (ToolMutationEffect.Unknown or ToolMutationEffect.PartiallyApplied);
     private static bool SameCoverage(Attempt old, Attempt current) => old.Coverage.Count > 0
-        && old.Coverage.Keys.Any(current.Coverage.ContainsKey)
         && old.Coverage.All(p => current.Coverage.TryGetValue(p.Key, out var next)
-            ? next.Status == VerificationCriterionStatus.Passed && next.TargetId == p.Value.TargetId
-                && next.PostconditionId == p.Value.PostconditionId
-            : p.Value.Status == VerificationCriterionStatus.Passed);
-    // A failed-only correction may preserve already passed criteria on the predecessor;
-    // their target-bound reports and proof IDs remain active and are rechecked at completion.
+            && next.Status == VerificationCriterionStatus.Passed && next.TargetId == p.Value.TargetId
+            && next.PostconditionId == p.Value.PostconditionId);
+    // A corrective mutation must recheck preservation on its own affected target.
+    // Previously passed criteria on OTHER targets remain in the aggregated reports.
     private void Resolve(Attempt old, Attempt current, string reason)
     {
         old.ResolvedBy = current.Value.InvocationId;
@@ -231,7 +236,7 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
             return new VerificationCriterionResult(group.Key, VerificationCriterionStatus.Passed,
                 values.SelectMany(c => c.EvidenceIds));
         }).OrderBy(c => c.CriterionId, StringComparer.Ordinal).ToArray();
-        return new(lastVerifier, criteria, criteria.SelectMany(c => c.EvidenceIds))
+        return new(lastVerifier, criteria, criteria.SelectMany(c => c.EvidenceIds).Concat(_reportEvidence))
         { ContributingVerifierIds = _criteria.Keys.Select(k => k.Verifier).Distinct(StringComparer.Ordinal).ToArray() };
     }
     public H2AgentCompletionAssessment Snapshot(AgentTaskContract contract, int unresolved, int pending, VerificationReport? aggregate)
