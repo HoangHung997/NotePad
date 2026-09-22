@@ -22,18 +22,34 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Preserve exact tracked source only, without credentials or build output
+      - name: Preserve bounded tracked text source with explicit omissions
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain)"
-          mkdir -p "$RUNNER_TEMP/ar011-source"
-          git rev-parse HEAD > "$RUNNER_TEMP/ar011-source/code-sha.txt"
-          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/ar011-source/tree-sha.txt"
-          git ls-tree -r HEAD > "$RUNNER_TEMP/ar011-source/tree.txt"
-          git archive --format=tar.gz -o "$RUNNER_TEMP/ar011-source/source.tar.gz" HEAD
-          test "$(stat -c %s "$RUNNER_TEMP/ar011-source/source.tar.gz")" -lt 20000000
-          sha256sum "$RUNNER_TEMP/ar011-source/source.tar.gz" > "$RUNNER_TEMP/ar011-source/sha256.txt"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess, zipfile
+          from pathlib import Path
+          out = Path(os.environ['RUNNER_TEMP']) / 'ar011-source'
+          out.mkdir()
+          git = lambda *a: subprocess.check_output(['git', *a])
+          omitted = []
+          extensions = {'.cs', '.csproj', '.md', '.yml', '.yaml', '.props', '.targets', '.slnx', '.sln', '.axaml', '.py', '.ps1', '.json', '.txt', '.config', '.xml', '.cmd', '.resx'}
+          with zipfile.ZipFile(out / 'source.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for raw in git('ls-files', '-z').split(b'\0'):
+                  if not raw: continue
+                  path = Path(raw.decode('utf-8'))
+                  if path.suffix.lower() not in extensions or path.is_symlink() or path.stat().st_size > 2000000:
+                      omitted.append(str(path)); continue
+                  data = path.read_bytes()
+                  try: data.decode('utf-8-sig')
+                  except UnicodeDecodeError:
+                      omitted.append(str(path)); continue
+                  archive.writestr(str(path), data)
+          assert (out / 'source.zip').stat().st_size < 20000000, 'Text-only source snapshot exceeded budget'
+          (out / 'tree.txt').write_bytes(git('ls-tree', '-r', 'HEAD'))
+          (out / 'identity.json').write_text(json.dumps({'code_sha': git('rev-parse', 'HEAD').decode().strip(), 'tree_sha': git('rev-parse', 'HEAD^{tree}').decode().strip(), 'working_tree': 'CLEAN', 'scope': 'Tracked UTF-8 text only; not a complete build checkout', 'omitted': omitted, 'sha256': hashlib.sha256((out / 'source.zip').read_bytes()).hexdigest()}, indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: AR011-Exact-Source
