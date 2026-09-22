@@ -33,7 +33,8 @@ public sealed record AgentRuntimeRequest(
     RuntimeCompactionResult? ContextCheckpoint = null,
     Func<bool, IReadOnlyList<AgentGoalInput>>? TakeGoalInput = null,
     Action<AgentTaskContract>? ContractObserver = null,
-    Action<H2AgentOperationRecord>? JournalObserver = null);
+    Action<H2AgentOperationRecord>? JournalObserver = null,
+    Action<H2AgentCompletionAssessment>? CompletionObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -56,6 +57,7 @@ public sealed record AgentRuntimeResult(
     public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
         = Array.Empty<AgentEvidenceReference>();
     public AgentTaskContract? EffectiveContract { get; init; }
+    public H2AgentCompletionAssessment? Completion { get; init; }
 }
 
 public sealed record AgentRuntimeVerificationContext(
@@ -70,6 +72,7 @@ public sealed record AgentRuntimeVerificationContext(
     public IReadOnlyDictionary<string, string> RawToolOutputs { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
     public IReadOnlyList<string> MutationCallIds { get; init; } = [];
+    public IReadOnlyList<AgentVerificationAttempt> Attempts { get; init; } = [];
 }
 
 public interface IAgentRuntimeVerifier
@@ -81,6 +84,7 @@ public interface IAgentRuntimeVerifier
 
 public sealed class AgentVerificationRequiredException : InvalidOperationException
 {
+    public H2AgentCompletionAssessment? Completion { get; init; }
     public AgentVerificationRequiredException(string message)
         : base(message)
     {
@@ -223,7 +227,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 {
                     var retired = effectiveContract.Goals!.Obligations.Where(x => !x.Active).Select(x => x.Id).ToHashSet();
                     latestVerification = new(latestVerification.VerifierId,
-                        latestVerification.Criteria.Where(x => !retired.Contains(x.CriterionId)), latestVerification.ReportEvidenceIds);
+                        latestVerification.Criteria.Where(x => !retired.Contains(x.CriterionId)), latestVerification.ReportEvidenceIds)
+                        { ContributingVerifierIds = latestVerification.ContributingVerifierIds };
                 }
                 request.ContractObserver?.Invoke(effectiveContract);
             }
@@ -238,8 +243,10 @@ public sealed class AgentRuntime : IAsyncDisposable
             var messages = TakeInput(true);
             return before == effectiveContract.Goals!.RevisionId ? [] : messages;
         }
+        var assessment = new AgentCompletionAssessment(_evidenceProjector is not null);
+        H2AgentCompletionAssessment? completion = null;
         var mutationAwaitingVerification = false;
-        var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId)>();
+        var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId, Guid InvocationId)>();
         var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
         var completionRepairRequested = false;
         var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
@@ -282,6 +289,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                             usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
                         continue;
                     }
+                    completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+                    request.CompletionObserver?.Invoke(completion with { State = "Verifying" });
                     await _hooks.BeforeCompletionAsync(new(hookScope, effectiveContract, round.Text,
                         latestVerification, unresolvedCalls.Count, mutationAwaitingVerification), cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
@@ -300,9 +309,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                     try { effectiveContract.Goals?.EnsureComplete(); }
                     catch (InvalidOperationException ex) { throw new AgentVerificationRequiredException(ex.Message, ex); }
                     EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
+                    if (_evidenceProjector is not null)
+                        _evidenceProjector.EnsureReachable(evidenceHistory.Where(e => assessment.ProofIds.Contains(e.ReferenceId)
+                            || effectiveContract.Goals!.Active.SelectMany(o => o.Evidence).Any(p => p.ReferenceId == e.ReferenceId)));
                     await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.CompletionValidated,
                         contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
+                    request.CompletionObserver?.Invoke(completion);
                     return new AgentRuntimeResult(
                         round.Text,
                         toolRounds,
@@ -315,7 +328,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                         promptCacheIdentity)
                     {
                         Evidence = evidenceHistory.ToArray(),
-                        EffectiveContract = effectiveContract
+                        EffectiveContract = effectiveContract,
+                        Completion = completion
                     };
                 }
 
@@ -349,6 +363,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                         && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
                         .Select(call => call.Id).ToArray()
                 };
+                assessment.Register(observation);
+                observation = observation with { Attempts = assessment.Attempts };
+                var retryCandidates = new List<(Guid Failed, Guid Replacement)>();
                 await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -391,7 +408,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                         // A prevented duplicate has no additional side effect. Its original
                         // failed verification remains authoritative until a verified correction.
                         if (code != "repeated_failed_mutation")
-                            unresolvedCalls.Add((executedName, code, recovery, executedCall.Arguments.Clone(), failureId));
+                            unresolvedCalls.Add((executedName, code, recovery, executedCall.Arguments.Clone(), failureId, executedCall.Invocation!.InvocationId));
                         var failedSignature = MutationSignature(executedCall) + ":" + code;
                         repeatedFailures.TryGetValue(failedSignature, out var repeated);
                         repeatedFailures[failedSignature] = repeated + 1;
@@ -404,10 +421,11 @@ public sealed class AgentRuntime : IAsyncDisposable
                     {
                         // Recovery must match a discovered candidate and the original supplied
                         // arguments. A successful unrelated operation cannot clear earlier errors.
-                        unresolvedCalls.RemoveAll(f => f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
+                        foreach (var failure in unresolvedCalls.Where(f => f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
                             && (CompatibleRetryArguments(f.Arguments, executedCall.Arguments,
                                 f.Code is "unknown_tool" or "tool_not_loaded")
-                                || f.Code == "stale_state" && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments)));
+                                || f.Code == "stale_state" && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments))))
+                            retryCandidates.Add((failure.InvocationId, executedCall.Invocation!.InvocationId));
                         // Recovery references come from the executor after checking its recorded
                         // failed attempt and resource identity, not from the model's final text.
                         try
@@ -418,7 +436,11 @@ public sealed class AgentRuntime : IAsyncDisposable
                                 && resolved.ValueKind == JsonValueKind.Array)
                             {
                                 var ids = resolved.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).ToHashSet();
-                                unresolvedCalls.RemoveAll(f => f.Name == executedName && f.FailureId is not null && ids.Contains(f.FailureId));
+                                // A provider string is not an alternate-verifier verdict. It can
+                                // nominate an exact retry only; the assessment below checks proof.
+                                foreach (var failure in unresolvedCalls.Where(f => f.Name == executedName && f.FailureId is not null
+                                    && ids.Contains(f.FailureId) && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments)))
+                                    retryCandidates.Add((failure.InvocationId, executedCall.Invocation!.InvocationId));
                             }
                         }
                         catch (JsonException) { }
@@ -441,18 +463,17 @@ public sealed class AgentRuntime : IAsyncDisposable
                         effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
                             observation.Contract.Goals!.RevisionId, report, execution.Evidence));
                         request.ContractObserver?.Invoke(effectiveContract);
-                        mutationAwaitingVerification = false;
-                        var effectiveReport = MergeVerificationReports(
-                            latestVerification,
-                            report);
+                        var effectiveReport = assessment.Observe(observation, report);
+                        mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                         latestVerification = effectiveReport;
                         verificationHistory.Add(effectiveReport);
                         request.VerificationObserver?.Invoke(effectiveReport, verificationHistory.Count - 1);
                         if (!effectiveReport.Passed)
                         {
                             if (effectiveReport.Failures.Count == 0)
-                                throw new InvalidOperationException(
-                                    "Verifier returned non-passing state without actionable failures.");
+                                throw new AgentVerificationRequiredException(
+                                    "Result remains mechanically unverified; no successful completion is certified.")
+                                { Completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, effectiveReport) };
                             if (++repairRounds > request.MaxRepairRounds)
                                 throw new InvalidOperationException(
                                     $"AgentRuntime exceeded the {request.MaxRepairRounds}-round repair budget.");
@@ -485,6 +506,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                     }
                 }
 
+                unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId)
+                    || retryCandidates.Any(c => c.Failed == f.InvocationId && assessment.CanResolveExactRetry(c.Failed, c.Replacement)));
+                mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
+                completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+                request.CompletionObserver?.Invoke(completion);
+
                 await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
                     contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
                 round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
@@ -493,6 +520,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                         TakeInput(false)),
                     usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
             }
+        }
+        catch (AgentVerificationRequiredException ex) when (ex.Completion is null)
+        {
+            var blocked = completion ?? assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+            throw new AgentVerificationRequiredException(ex.Message, ex)
+            { Completion = blocked with { State = blocked.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" } };
         }
         catch (ToolInvocationCancelledException cancelled)
         {
@@ -915,35 +948,6 @@ public sealed class AgentRuntime : IAsyncDisposable
         }
         catch (JsonException) { }
         return false;
-    }
-
-    private static VerificationReport MergeVerificationReports(
-        VerificationReport? previous,
-        VerificationReport current)
-    {
-        ArgumentNullException.ThrowIfNull(current);
-        if (previous is null
-            || !string.Equals(
-                previous.VerifierId,
-                current.VerifierId,
-                StringComparison.Ordinal))
-            return current;
-
-        var criteria = previous.Criteria
-            .ToDictionary(x => x.CriterionId, StringComparer.Ordinal);
-        foreach (var result in current.Criteria)
-            criteria[result.CriterionId] = result;
-
-        return new VerificationReport(
-            current.VerifierId,
-            criteria.Values
-                .OrderBy(x => x.CriterionId, StringComparer.Ordinal)
-                .ToArray(),
-            previous.ReportEvidenceIds
-                .Concat(current.ReportEvidenceIds)
-                .Distinct(StringComparer.Ordinal)
-                .Take(256)
-                .ToArray());
     }
 
     private int FirstRepairFeedbackIndex(

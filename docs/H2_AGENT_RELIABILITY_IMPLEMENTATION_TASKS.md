@@ -85,7 +85,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | DONE |
-| AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | NOT_STARTED |
+| AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | ACTIVE |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | NOT_STARTED |
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
@@ -259,7 +259,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** “tiếp tục” lấy đúng phần dở, có nguồn đọc lại; không lộ project khác do Global mode; không chỉ thêm history token vô hạn.
 
-### [ ] AR-033 — Completion gate theo toàn nhiệm vụ, không theo tool cuối
+### [~] AR-033 — Completion gate theo toàn nhiệm vụ, không theo tool cuối
 
 **Sửa:** effective contract, verifier router/report aggregation, unresolved calls/obligation resolution, final UI projection.
 
@@ -477,13 +477,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-032_ACCEPTED_NEXT_AR-033",
+  "phase": "AR-033_ACTIVE_COMPLETION_VALIDATION",
   "active_task": "AR-033",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar032-scoped-history-2026-09-23",
+  "owner_session": "chatgpt-ar033-completion-2026-09-23",
   "last_code_commit": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
   "last_validated_code_commit": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
   "last_validation_result": "AR032_19_PASS_X3; AGENT_SUITES_74_PASS; FULL_CI_816_PASS; E2_ACCEPTED",
@@ -492,16 +492,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "working_tree": "Focused CI exact checkout CLEAN. Checkpoint writer restricts changes to three docs and verifies normal push/remote match. Local review is an offline source snapshot, not a clone; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
   "checkpoint_saved_at_utc": "2026-09-22T22:17:50.066771+00:00",
-  "completed_this_session": [
-    {
-      "task": "AR-032",
-      "implementation": "IMPLEMENTED",
-      "acceptance": "E2_PASS",
-      "code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0"
-    }
-  ],
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-033 NOT_STARTED; evaluate every active obligation, unknown effect, pending job and verified alternate recovery without erasing unrelated failures."
+    "Compile and run current completion/alternate-recovery implementation and regressions. Do not claim E3 from fixture tests."
   ],
   "last_test_commands": [
     {
@@ -929,7 +922,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On the existing branch/PR #3, reconcile latest refs, working tree and SESSION HANDOFF. Verify AR-032 source/acceptance writers are retired and its retained validation workflow is read-only; do not replay the one-use bootstrap. Start only AR-033: whole-goal completion and verified alternate recovery using the existing contract, verifier router, unresolved-operation and obligation state. Run RC-11/13/14 and retain AR-032/031/030/020/012/011/010/001 regressions. Historical memory never grants permission or verifies current work. Keep AR-020 native E3 pending, E4 NOT_RUN and AR-083 DEFERRED_BY_USER.",
+  "next_exact_action": "Validate AR-033 current source with the registered completion corpus, retained AR-032/031/030/020/012/011/010/001, all Agent suites and unchanged full CI. Repair failures before marking E2 accepted; native E3 remains separate.",
   "next_task_if_active_done": "AR-040",
   "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",

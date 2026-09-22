@@ -223,6 +223,7 @@ public sealed record H2AgentTaskSummary(
     // Read-only Agent archive projection; never added to ProjectRecord or H2 TaskRecord.
     public H2AgentGoalSnapshot? GoalState { get; init; }
     public H2AgentRecoverySnapshot? Recovery { get; init; }
+    public H2AgentCompletionAssessment? Completion { get; init; }
 }
 
 public sealed record H2AgentOutcomeSnapshot(string Id, string Requirement, string SourceId,

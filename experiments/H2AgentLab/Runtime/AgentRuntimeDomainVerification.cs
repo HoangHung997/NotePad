@@ -55,6 +55,7 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
         ArgumentNullException.ThrowIfNull(context);
 
         var outcomes = new List<AgentRuntimeDomainVerification>();
+        var coverage = new List<VerificationCallCoverage>();
         foreach (var call in context.Calls)
         {
             if (!context.RawToolOutputs.TryGetValue(call.Id, out var raw))
@@ -67,6 +68,7 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
                 continue;
             }
 
+            var beforeCount = outcomes.Count;
             var selected = _verifiers
                 .Where(x => x.CanVerify(call, raw))
                 .ToArray();
@@ -81,6 +83,23 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
                     call,
                     raw,
                     cancellationToken).ConfigureAwait(false));
+            }
+            if (outcomes.Count > beforeCount && call.Invocation is not null)
+            {
+                var observed = context.Results.Single(r => r.ToolCallId == call.Id).Outcome;
+                // Exact target and requested postcondition. Freshness tokens are not desired
+                // output; other arguments stay part of the proof identity.
+                var postcondition = JsonSerializer.Serialize(call.Arguments.EnumerateObject()
+                    .Where(p => p.Name is not ("state_token" or "expectedHash" or "expected_hash"))
+                    .OrderBy(p => p.Name, StringComparer.Ordinal).ToDictionary(p => p.Name, p => p.Value));
+                var postId = "post-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(call.Name + "\n" + postcondition))).ToLowerInvariant();
+                var evidenceIds = observed?.EvidenceRefs.Count > 0 ? observed.EvidenceRefs
+                    : context.Evidence.Select(e => e.ReferenceId).ToArray();
+                coverage.Add(new(call.Invocation.InvocationId, MutationCriterionId,
+                    AgentCompletionAssessment.Target(call, observed?.Resource?.Id), postId,
+                    outcomes.Skip(beforeCount).All(o => o.Passed) ? VerificationCriterionStatus.Passed : VerificationCriterionStatus.Failed,
+                    evidenceIds));
             }
         }
 
@@ -117,7 +136,7 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
         return new VerificationReport(
             VerifierId,
             [result],
-            evidence);
+            evidence) { CallCoverage = coverage.ToArray() };
     }
 }
 

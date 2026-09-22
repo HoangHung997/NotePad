@@ -73,6 +73,23 @@ public sealed class AgentRuntimeEvidenceProjector
         return new AgentRuntimeEvidenceProjection(evidence, modelContent);
     }
 
+    public void EnsureReachable(IEnumerable<AgentEvidenceReference> references)
+    {
+        foreach (var item in references.Distinct())
+        {
+            // Only this store's typed handles, never an arbitrary evidence URI or path.
+            if (!item.ReferenceId.StartsWith("h2a1_", StringComparison.Ordinal)) continue;
+            try
+            {
+                var actual = _store.LoadHandle(item.ReferenceId);
+                if (actual.Sha256 != item.Sha256)
+                    throw new IOException("Completion evidence identity changed.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { throw new AgentVerificationRequiredException("Completion evidence is no longer retrievable with its recorded hash.", ex); }
+        }
+    }
+
     private static string BuildSummary(string toolName, string output)
     {
         var normalized = (output ?? "")

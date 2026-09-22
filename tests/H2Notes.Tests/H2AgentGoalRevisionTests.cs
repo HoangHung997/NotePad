@@ -217,7 +217,8 @@ internal static class H2AgentGoalRevisionTests
                 foreach(var o in c.Contract.Goals!.Active.Where(x=>x.Requirement=="Write "+path))
                     extra.Add(new(o.Id,VerificationCriterionStatus.Passed,c.Evidence.Select(e=>e.ReferenceId)));
             }
-            return new(report.VerifierId,report.Criteria.Concat(extra),report.ReportEvidenceIds);
+            return new(report.VerifierId,report.Criteria.Concat(extra),report.ReportEvidenceIds)
+            { CallCoverage = report.CallCoverage };
         }
     }
 }

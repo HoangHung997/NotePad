@@ -438,6 +438,11 @@ public sealed partial class H2ProductionAgentAdapter :
                 Files: live.RequestContext?.Files,
                 TakeGoalInput: closing => TakeSupplementalInput(live, closing),
                 JournalObserver: receipt => _archive.RecordOperation(live.TaskId, receipt),
+                CompletionObserver: assessment =>
+                {
+                    lock (live.Gate) live.Completion = assessment;
+                    _archive.Upsert(live.Snapshot());
+                },
                 ContractObserver: current =>
                 {
                     lock (live.Gate)
@@ -473,7 +478,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 {
                     _archive.RecordVerification(live.TaskId, new { GoalRevisionId = live.GoalState?.RevisionId,
                         report.VerifierId, Criteria = report.Criteria.Select(c => new { c.CriterionId, c.Status, c.EvidenceIds }),
-                        report.ReportEvidenceIds });
+                        report.ReportEvidenceIds, report.ContributingVerifierIds, report.CallCoverage, report.AlternateResolutions });
                     lock (live.Gate)
                     {
                         live.Evidence.Add(new("verification:" + live.TaskId.ToString("N") + ":" + index,
@@ -559,6 +564,7 @@ public sealed partial class H2ProductionAgentAdapter :
         }
         catch (AgentVerificationRequiredException ex)
         {
+            lock (live.Gate) live.Completion = ex.Completion;
             Complete(live, H2AgentTaskStatus.Blocked, null, Bound(ex.Message, 2_000));
         }
         catch (Exception ex)
@@ -679,6 +685,9 @@ public sealed partial class H2ProductionAgentAdapter :
                 return;
 
             live.Status = status;
+            if (status != H2AgentTaskStatus.Completed && live.Completion is { } assessment
+                && assessment.State.StartsWith("Completed", StringComparison.Ordinal))
+                live.Completion = assessment with { State = status == H2AgentTaskStatus.Blocked ? "Blocked" : "Interrupted" };
             live.FinalText = string.IsNullOrWhiteSpace(finalText) ? null : finalText;
             live.Error = BoundOrNull(error, 2_000);
             live.PendingApproval = null;
@@ -689,7 +698,10 @@ public sealed partial class H2ProductionAgentAdapter :
                 live,
                 "final",
                 status.ToString().ToLowerInvariant(),
-                "Agent task reached terminal host state " + status + ".");
+                "Agent task reached terminal host state " + status + "."
+                    + (live.Completion is null ? "" : " " + live.Completion.State
+                        + " · outcomes " + live.Completion.VerifiedOutcomes + "/" + live.Completion.RequiredOutcomes
+                        + " · pending " + live.Completion.PendingOperations + "."));
             try { _archive.Upsert(live.SnapshotLocked()); }
             catch
             {
@@ -889,6 +901,7 @@ public sealed partial class H2ProductionAgentAdapter :
         public Queue<AgentGoalInput> SupplementalInput { get; } = new();
         public Dictionary<Guid, string> SupplementalIds { get; } = [];
         public H2AgentGoalSnapshot? GoalState { get; set; }
+        public H2AgentCompletionAssessment? Completion { get; set; }
         public bool AcceptingInput { get; set; } = true;
         public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -911,6 +924,6 @@ public sealed partial class H2ProductionAgentAdapter :
                 CreatedUtc,
                 UpdatedUtc,
                 ThreadId,
-                TurnId) { GoalState = GoalState };
+                TurnId) { GoalState = GoalState, Completion = Completion };
     }
 }
