@@ -40,7 +40,7 @@ jobs:
           def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
           head=os.environ['CHECKED_HEAD']
           require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong/dirty checkout')
-          require(git('rev-parse','HEAD^')==BASE and git('diff','--name-only',BASE,head)==WORKFLOW,'Other work appeared; reconcile')
+          require(git('rev-parse','HEAD^')=='e33158327f2aa7c5a41f319599cd281608af52c7' and git('diff','--name-only',BASE,head)==WORKFLOW,'Other work appeared; reconcile')
           require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main advanced')
           require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Branch advanced')
           chunks=[]
@@ -48,8 +48,6 @@ jobs:
               response=json.loads(subprocess.check_output(['gh','api','repos/'+REPO+'/git/blobs/'+sha],timeout=60))
               b=base64.b64decode(response['content']);require(blob(b)==sha and len(b)<=8401,'Transfer chunk hash/size mismatch')
               chunks.append(b)
-          # One extra character was caught in the third transport chunk. Normalize only
-          # that exact typo and verify the original reviewed chunk BEFORE decompression.
           require(chunks[2].count(b'DCLPi04e/cxoR7')==1,'Transport correction drift')
           chunks[2]=chunks[2].replace(b'DCLPi04e/cxoR7',b'DCLPi04e/xoR7')
           require(blob(chunks[2])=='05c8d888f8eaf659524c15c33bef2228c8eea774','Corrected transfer hash differs')
@@ -79,8 +77,14 @@ jobs:
           subprocess.run(['git','apply','--index','--check',str(patchfile)],check=True)
           subprocess.run(['git','apply','--index',str(patchfile)],check=True)
           for path,old,new in entries: require(blob(pathlib.Path(path).read_bytes())==new,'Postimage differs: '+path)
+          # Keep the whitespace gate. The first delivery identified one trailing empty line.
+          adapter=pathlib.Path('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs')
+          original=adapter.read_bytes();require(original.endswith(b'\n}\n\n'),'Trailing-line fix no longer applies')
+          normalized=original[:-1];require(blob(normalized)=='3b250246ef95ac91a0939ae5a468e5814f927d35','Normalized adapter differs')
+          adapter.write_bytes(normalized);subprocess.run(['git','add','--',str(adapter)],check=True)
           require(set(git('diff','--cached','--name-only').splitlines())=={e[0] for e in entries},'Unexpected stage')
           subprocess.run(['git','diff','--cached','--check'],check=True)
+          (out/'applied.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary']))
           require(git('ls-remote','origin','refs/heads/'+BRANCH).split()[0]==head,'Concurrent branch work')
           git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
           subprocess.run(['git','commit','-m','feat(AR-031): journal Agent state with validated local recovery and crash tests'],check=True)
