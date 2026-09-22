@@ -19,6 +19,8 @@ jobs:
     permissions:
       contents: write
       actions: write
+    outputs:
+      code_sha: ${{ steps.apply.outputs.code_sha }}
     env:
       AR_BRANCH: feature/h2-agent-reliability-ar-000
       AR_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -36,12 +38,29 @@ jobs:
           set -euo pipefail
           python3 tools/agent-reliability/apply_ar001.py
           if test -f "$RUNNER_TEMP/ar001-outputs.txt"; then
+            python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          workflow=Path('.github/workflows/avalonia-ci.yml')
+          # Preserve the proposed workflow patch but do not ask the CI token to write workflows.
+          original=subprocess.check_output(['git','show','HEAD:'+str(workflow)])
+          (Path(os.environ['RUNNER_TEMP'])/'ar001-proposed-avalonia-ci.yml').write_bytes(workflow.read_bytes())
+          workflow.write_bytes(original)
+          outputs=Path(os.environ['RUNNER_TEMP'])/'ar001-outputs.txt'
+          files=outputs.read_text().splitlines()
+          assert files.count(str(workflow))==1
+          files.remove(str(workflow))
+          outputs.write_text('\n'.join(files)+'\n')
+          report=Path('docs/agent-reliability/AR-001/implementation.md')
+          text=report.read_text().replace('Full CI runs `dotnet run', 'Focused AR-001 CI runs `dotnet run').replace('three times, then every existing suite and publish/helper smoke.', 'three times; the unchanged full Avalonia CI runs every existing suite and publish/helper smoke separately. The proposed main-workflow edits were not applied because the CI token cannot write workflow files.')
+          report.write_text(text,encoding='utf-8')
+          PY
             test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$AR_HEAD"
             mapfile -t outputs < "$RUNNER_TEMP/ar001-outputs.txt"
-            test "${#outputs[@]}" -eq 19
+            test "${#outputs[@]}" -eq 18
             git add -- "${outputs[@]}"
             git diff --cached --check
-            test "$(git diff --cached --name-only | wc -l)" -eq 19
+            test "$(git diff --cached --name-only | wc -l)" -eq 18
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git commit -m 'fix(AR-001): unify tool contracts and drain owned tasks before fixture cleanup'
@@ -49,10 +68,11 @@ jobs:
             test -z "$(git status --porcelain)"
             test "$(git ls-remote origin "refs/heads/$AR_BRANCH" | cut -f1)" = "$(git rev-parse HEAD)"
             echo 'changed=true' >> "$GITHUB_OUTPUT"
-            echo "Committed source: $(git rev-parse HEAD)"
           else
             echo 'changed=false' >> "$GITHUB_OUTPUT"
           fi
+          echo "code_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Saved source: $(git rev-parse HEAD)"
       - name: Dispatch existing full Avalonia CI on the saved branch
         if: steps.apply.outputs.changed == 'true'
         env:
@@ -93,7 +113,7 @@ jobs:
                   archive.writestr(name,data)
                   manifest['files'][name]={'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)}
               archive.writestr('AR001_SOURCE_MANIFEST.json',json.dumps(manifest,indent=2))
-          patch=subprocess.check_output(['git','diff','--binary','e573394963ea44398217721ed5f200f899234d31','--','src','experiments','tests','docs','.github/workflows/avalonia-ci.yml'])
+          patch=subprocess.check_output(['git','diff','--binary','e573394963ea44398217721ed5f200f899234d31','--','src','experiments','tests','docs'])
           (root/'implementation.patch').write_bytes(patch)
           print('Exact checkout:',manifest['head'],'; source files:',len(manifest['files']))
           PY
@@ -104,3 +124,38 @@ jobs:
           path: ${{ runner.temp }}/ar001-workspace/
           if-no-files-found: error
           retention-days: 7
+  focused-tests:
+    needs: workspace
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.workspace.outputs.code_sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Record source and build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/ar001 | Out-Null
+          git rev-parse HEAD | Set-Content artifacts/ar001/code-sha.txt
+          dotnet restore H2Notes.Avalonia.slnx
+          if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar001/build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+      - name: Repeat RC-02 and teardown regression three times
+        shell: pwsh
+        run: |
+          foreach ($iteration in 1..3) {
+            $log = "artifacts/ar001/rc02-$iteration.txt"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001 2>&1 | Tee-Object $log
+            if ($LASTEXITCODE -ne 0) { throw "AR-001 iteration $iteration failed." }
+            if (-not (Select-String -Path $log -Pattern 'RESULT: [1-9][0-9]* passed, 0 failed')) { throw 'No nonempty passing corpus.' }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR001-Focused-E1-E2-Evidence
+          path: artifacts/ar001/
+          if-no-files-found: error
