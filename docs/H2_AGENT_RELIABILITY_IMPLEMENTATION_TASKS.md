@@ -477,58 +477,40 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-030_ACTIVE_POLICY_REPAIRED_EVIDENCE_PENDING",
+  "phase": "AR-030_EVIDENCE_FAILURES_REPRODUCED_SOURCE_WRITE_BLOCKED",
   "active_task": "AR-030",
   "implementation_status": "ACTIVE",
   "acceptance_status": "REPAIR_REQUIRED",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar030-policy-continuation-2026-09-23",
+  "owner_session": "chatgpt-ar030-evidence-diagnostic-2026-09-23",
   "last_code_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-  "last_validated_code_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-  "last_validation_result": "POLICY_SUBFIX_AND_CURRENT_REGRESSIONS_PASS; EVIDENCE_RESOLVER_REPAIR_NOT_RUN",
+  "last_validated_code_commit": "44959a651d08fa363ab8adf65196d54269432a26",
+  "last_validation_result": "BUILD_PASS; EVIDENCE_4_PASS_2_FAIL_X3; FULL_CI_756_PASS_2_FAIL; NOT_ACCEPTED",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact Windows CI checkout clean and restored after controls; source receipt checked. Independent four-file remainder is LOCAL_ONLY, not committed. User-PC working tree NOT_ACCESSIBLE. Documentation commit stages only three approved docs.",
+  "working_tree": "Diagnostic CI clean on exact source. Docs checkpoint checks concurrent refs, three allowed docs and non-force push. Local snapshot is not a clone; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [
-    "LOCAL_ONLY: experiments/H2AgentLab/Tasking/AgentGoalState.cs",
-    "LOCAL_ONLY: tests/H2Notes.Tests/H2AgentGoalProposalBoundaryTests.cs",
-    "LOCAL_ONLY: tests/H2Notes.Tests/H2AgentGoalProofIntegrityTests.cs",
-    "LOCAL_ONLY: .github/workflows/h2-ar030-validation.yml"
+    "LOCAL_ONLY: experiments/H2AgentLab/Tasking/AgentGoalState.cs"
   ],
-  "checkpoint_saved_at_utc": "2026-09-22T19:19:02.991170+00:00",
+  "checkpoint_saved_at_utc": "2026-09-22T19:44:59.035552+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Publish and test complete/unambiguous evidence resolution only after the outstanding source-write restriction is resolved.",
-    "Six remaining CSharp evidence cases are NOT_RUN; original nine-case aggregate is superseded by three policy cases tested here plus six pending cases.",
-    "Review RC-11/12 and full acceptance on the final repaired SHA; AR-031 not started."
+    "Resolve source-write restriction and apply reviewed resolver repair; it has not been integrated.",
+    "Rerun the registered evidence cases and full CI; current failures are genuine unmet requirements."
   ],
   "last_test_commands": [
     {
-      "command": "H2Notes.Tests --filter AR-030 (3 repetitions)",
-      "run_id": 35771775587,
-      "code_sha": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-      "result": "33/33 x3 including three new policy tests"
+      "command": "H2Notes.Tests --filter AR-030 (x3)",
+      "code_sha": "44959a651d08fa363ab8adf65196d54269432a26",
+      "run_id": 35774591898,
+      "result": "37 passed / 2 failed each; evidence subset 4/2"
     },
     {
-      "command": "Prior AgentTaskContract control with AR-030 policy tests",
-      "run_id": 35771775587,
-      "result": "0 pass / 3 expected failures; positive source restored clean"
-    },
-    {
-      "command": "Retained AR-020/012/011/010/001 and all independent Agent suites",
-      "run_id": 35771775587,
-      "result": "36/44/25/11/13 and 74/74 suites PASS"
-    },
-    {
-      "command": "Full Avalonia CI build/test/publish/helper IPC",
-      "run_id": 35771775450,
-      "actual_checkout_sha": "5953e9172139f03c955c55c11ef1d026edeef055",
-      "result": "752/752 H2; all mandatory steps PASS"
-    },
-    {
-      "command": "Remaining six evidence integrity tests",
-      "result": "NOT_RUN / source not pushed"
+      "command": "H2Notes.Tests full runner",
+      "code_sha": "85000d327f6cb0e0053b1301253317fe6faff070",
+      "run_id": 35774591845,
+      "result": "756 passed / 2 failed; downstream/publish skipped"
     }
   ],
   "ci_runs": [
@@ -840,6 +822,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "head_sha": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
       "result": "SUCCESS",
       "applies_to": "POLICY_SUBFIX_ONLY_EVIDENCE_REPAIR_PENDING"
+    },
+    {
+      "id": 35774591898,
+      "job_id": 106904461163,
+      "head_sha": "44959a651d08fa363ab8adf65196d54269432a26",
+      "result": "FAILURE"
+    },
+    {
+      "id": 35774591845,
+      "job_id": 106904460006,
+      "head_sha": "44959a651d08fa363ab8adf65196d54269432a26",
+      "result": "FAILURE"
     }
   ],
   "evidence_locations": [
@@ -864,15 +858,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "conversation artifact: H2_AR030_Integrity_Repair.zip (LOCAL_ONLY, source patch NOT_PUSHED)",
     "docs/agent-reliability/AR-030/mutation-policy-review.md",
     "docs/agent-reliability/AR-030/mutation-policy-evidence.json",
-    "conversation: H2_AR030_Remaining_Evidence_Repair.zip (LOCAL_ONLY)"
+    "conversation: H2_AR030_Remaining_Evidence_Repair.zip (LOCAL_ONLY)",
+    "docs/agent-reliability/AR-030/evidence-regression-observation.json",
+    "docs/agent-reliability/AR-030/evidence-regression-observation.md"
   ],
   "known_failures": [
-    "PENDING: partial evidence-ID resolution may still become Verified.",
-    "PENDING: conflicting material identities sharing an evidence ID are not yet rejected by the current goal-state resolver."
+    "Missing referenced evidence was accepted as Verified.",
+    "Conflicting evidence identities were accepted as Verified."
   ],
   "external_blockers": [
-    "Previous tool-safety denial for evidence source update remains unresolved; that blocked file was not retried or routed through a writer.",
-    "Local container has no SDK/PowerShell and DNS unavailable; Windows CI is the tested environment for the independent allowed fix."
+    "Direct UTF-8 GitHub.create_blob for reviewed AgentGoalState repair was denied by tool safety layer. No alternate route wrote that runtime file.",
+    "Local .NET/PowerShell unavailable; CI supplied CSharp execution."
   ],
   "deferred_acceptance": [
     {
@@ -883,8 +879,10 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "blocks_claim_of_certified_multi_pc": true
     }
   ],
-  "pending_user_decisions": [],
-  "next_exact_action": "Keep AR-030 ACTIVE/REPAIR_REQUIRED on the existing branch and PR #3. The mutation-policy fix is committed and tested; do not reapply the original five-file ZIP. Review the four-file H2_AR030_Remaining_Evidence_Repair patch against c9162ad7422b58dc8475d711e9b6fc3b2c3a1980. Resolve the outstanding source-write restriction before publishing the evidence-resolver change; do not bypass it via encoding, another endpoint or an in-CI source writer. Then compile, run the six evidence cases and prior-goal-state counterexamples, retain the three policy tests/RC-11/12/regressions and full CI on the actual new SHA. The current green CI is not evidence that missing/ambiguous references are fixed. Do not advance AR-031 or close AR-020/E3 or AR-083/E5.",
+  "pending_user_decisions": [
+    "Resolve authorized source-write restriction; no product-design or NAS decision is required."
+  ],
+  "next_exact_action": "Keep AR-030 active. Resolve the source-write safety restriction, then review the source-only AgentGoalState patch. Six evidence tests are now committed and executed; do not reapply the stale four-file package. Run the six cases, full AR-030/RC-11/12, retained regressions, all mandatory Agent suites and full CI on the repaired SHA. Do not weaken assertions, convert the two real failures to expected PASS, mark AR-030 DONE or advance AR-031.",
   "next_task_if_active_done": "AR-031",
   "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
@@ -913,14 +911,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "full_ci_run": 35709818021
   },
   "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs",
-  "last_full_ci_checkout_sha": "5953e9172139f03c955c55c11ef1d026edeef055",
+  "last_full_ci_checkout_sha": "85000d327f6cb0e0053b1301253317fe6faff070",
   "implemented_this_session": [
-    {
-      "part": "AR-030 first-mutation verifier/criterion preservation",
-      "code_sha": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-      "validation": "3 policy tests plus 33/33 AR030 x3 and full CI",
-      "task_done": false
-    }
+    "Registered the six existing evidence regressions without changing application runtime."
   ],
   "next_ready_independent_task": "AR-030",
   "independent_dependency_assessment": {
@@ -947,7 +940,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "First mutation no longer drops host-required verifiers.",
     "An existing mutation criterion keeps exact meaning/evidence without duplicate insertion.",
     "Strengthened mutation contract passes existing orchestrator guard."
-  ]
+  ],
+  "last_test_commit": "44959a651d08fa363ab8adf65196d54269432a26"
 }
 ```
 
