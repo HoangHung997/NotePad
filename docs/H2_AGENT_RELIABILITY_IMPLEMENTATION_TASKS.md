@@ -100,7 +100,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
-| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | PARTIAL — E1/E2 PASS; mixed-source consent follow-up; E3/E4 AWAITING_ENVIRONMENT |
+| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | IMPLEMENTED (exact-bound source roles) / E1-E2_PASS / E3-E4_AWAITING_ENVIRONMENT — NOT_DONE |
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
@@ -483,7 +483,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task remains AR-066 PARTIAL: core source/native identity, completion and trusted-revision foundation passed E1/E2/full CI; mixed-source consent follow-up and real native E3/H2 E4 remain open. AR-065 E4, AR-064 PARTIAL and all prior debts are retained.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+**Current task remains AR-066: exact-bound mixed live/disk source roles and same-task source approval are now implemented with E1/E2/full CI. Real native E3/H2 E4 remain AWAITING_ENVIRONMENT; AR-066 is NOT DONE. AR-065 E4, AR-064 PARTIAL and all prior debts remain unchanged.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
 
 Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
@@ -498,43 +498,43 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-066_PARTIAL_E2_SOURCE_REVISIONS_PASS_NATIVE_AND_CONSENT_PENDING",
+  "phase": "AR-066_SOURCE_CONSENT_E2_PASS_AWAITING_NATIVE_E3_REAL_H2_E4",
   "active_task": "AR-066",
-  "implementation_status": "PARTIAL",
+  "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar066-live-resource-2026-09-23",
-  "last_code_commit": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-  "last_validated_code_commit": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-  "last_validation_result": "AR066_76_PASS_X3; TRUSTED_SOURCE_REVISION12_PASS; FULL1208_PASS; AGENT74_PASS; 200_E2_RECEIPTS; OLD_SOURCE_CONTROL_NOT_RUN_TOOL_SAFETY_BLOCKED; NATIVE_E3_E4_AWAITING; NOT_DONE",
-  "capture_checked_head": "5a8bce6f4901ef2cac8416b4e252ad1ccfc6be41",
+  "owner_session": "chatgpt-ar066-source-consent-2026-09-24",
+  "last_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+  "last_validated_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+  "last_validation_result": "AR066134_PASS_X3; NEW_CONSENT58; FULL1266_PASS; AGENT74_PASS; CONSENT232_AND_TOTAL432_E2_RECEIPTS; ALL_EXACT_SHA_CI_PASS; NATIVE_E3_E4_AWAITING; NOT_DONE",
+  "capture_checked_head": "7df767dc1b50d24e97e5906be457cde90a216d10",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact focused CI checkout CLEAN; source manifest matches Git blobs; full test-merge source equal. User-PC working tree NOT_ACCESSIBLE. This checkpoint writes reviewed documentation only.",
+  "working_tree": "Exact focused CI clean start/end and every source Git blob verified; full test-merge tree identical. GitHub code normal-pushed. User-PC working tree NOT_ACCESSIBLE. This checkpoint changes documentation only.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T17:44:40.928327+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T19:34:44.751780+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Review/complete per-resource mixed live/disk source roles and explicit same-task approval of semantic source changes using existing goal/session/approval contracts. Current policy preserves restrictions and requires a new task for disk semantics; no hidden waiver. Trusted source revision tightening and queued-batch provenance are already implemented/tested.",
-    "Execute real native Word unsaved/Excel selection/multiple-view/transient-reconnect/no-disk-fallback corpus and real H2 UI/model cases only in an authorized isolated environment. E3/E4 remain AWAITING_ENVIRONMENT."
+    "Execute authorized real native E3 and real H2/model/UI E4 corpus including source-approval rendering and live/disk differing content. No real environment available in this session.",
+    "Retain conservative exact-resource limitations; unknown/multiple ambiguous live sources are not guessed. Any observed native/production regression stays in AR-066."
   ],
   "last_test_commands": [
     {
       "command": "tools/agent-reliability/validate_ar066.ps1",
-      "sha": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-      "run_id": 35895544765,
-      "job_id": 107301134460,
+      "sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+      "run_id": 35908748336,
+      "job_id": 107342940138,
       "attempt": 1,
-      "result": "AR06676/76 x3; trusted-revision12 included; retained pass; full1208/1208; Agent74/74;200declaredE2receipts"
+      "result": "134/134 x3; retained44/36/55; full1266/1266; Agent74/74;432E2 receipts including232 consent"
     },
     {
-      "command": "Avalonia CI: build/full H2/all mandatory suites/win-x64 publish/packaged helper IPC",
-      "sha": "b20deecb9c80e6e5882e4d994b0b0a8d06f2496d",
-      "head_sha": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-      "run_id": 35895550449,
-      "job_id": 107298458366,
+      "command": "Avalonia CI: full build/test/independent gates/win-x64 publish/packaged helper IPC",
+      "sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
+      "head_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+      "run_id": 35908755287,
+      "job_id": 107342963072,
       "attempt": 1,
-      "result": "Every mandatory step success; full1208/1208; test merge NOT main merge"
+      "result": "All mandatory stages SUCCESS; full1266/1266; test-merge tree equals focused; not main merge"
     }
   ],
   "ci_runs": [
@@ -1087,6 +1087,19 @@ Do not claim these defects were already covered by historical Office/transport/U
       "result": "Retained MB94 DesktopHost timeout; separate same-SHA Agent74 corpus passed; no timeout/assertion weakened",
       "artifact": 10764367112,
       "artifact_sha256": "d123e31c226e3764344ce3012ab93772b4fda2f352d9a414bd0f8e678e0188d3"
+    },
+    {
+      "id": 35908748336,
+      "code_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+      "result": "SUCCESS_VERIFIED",
+      "owner": "AR-066 source consent"
+    },
+    {
+      "id": 35908755287,
+      "code_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+      "tested_checkout_sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
+      "result": "SUCCESS_VERIFIED",
+      "owner": "AR-066 full regression"
     }
   ],
   "evidence_locations": [
@@ -1133,7 +1146,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-065/evidence.json",
     "docs/agent-reliability/AR-065/implementation-review.md",
     "docs/agent-reliability/AR-065/real-h2-acceptance.md",
-    "Actions run 35881691347 artifact 10761303971 SHA256 c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2"
+    "Actions run 35881691347 artifact 10761303971 SHA256 c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2",
+    "docs/agent-reliability/AR-066/source-consent-evidence.json"
   ],
   "known_failures": [],
   "external_blockers": [
@@ -1176,7 +1190,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-066",
       "issue": "Live app resource/native Word-Excel-AutoCAD-Browser semantics",
-      "status": "PARTIAL / E1-E2_PASS / MIXED_SOURCE_CONSENT_CORE_FOLLOWUP / E3-E4_AWAITING_ENVIRONMENT"
+      "status": "IMPLEMENTED_EXACT_BOUND_SOURCE_ROLES / E1-E2_PASS / E3-E4_AWAITING_ENVIRONMENT / NOT_DONE"
     },
     {
       "id": "AR-067",
@@ -1196,13 +1210,13 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [
-    "Provide an authorized isolated Windows/H2 test environment and a finite live-model test budget; keep credentials on that machine, never paste keys into chat."
+    "Provide/connect an authorized isolated Windows/H2/Office test environment and finite permitted model-test budget. Credentials remain on that machine."
   ],
-  "next_exact_action": "Reconcile latest refs and this handoff. Continue ONLY AR066: complete/review per-resource mixed-source consent and the explicit semantic-change approval route using the existing goal/session/approval contract; keep the tested monotonic trusted-revision guard, exact native identity and no-replay behavior. Then run exact-SHA regression. Real native/H2 gates require the authorized environment; no acceptance waiver or uncertain mutation replay. Do not start AR067.",
-  "next_task_if_active_done": "AR-066 after AR-065 gates/checkpoint and explicit independent dependency assessment; then AR-067/068 and AR-069",
-  "last_runtime_source_commit": "f55f466537deda7fe49cbe8f12b1663d555291ad",
-  "previous_saved_checkpoint_commit": "9691e2092ee0f1783df4fe0b2640c2acbd0e94f2",
-  "finalization_checked_head": "ac3f986c65f2d05b661aac13235a5bb988a08b6b",
+  "next_exact_action": "Reconcile refs/checkpoint and continue ONLY AR-066 native E3 and real H2 E4 using real-native-acceptance.md: Word unsaved, Excel selection/multiple views, same-object reconnect, no silent disk fallback, and real source approval allow/deny/reference/output/replacement/reselection on both surfaces. Use an authorized isolated Windows/H2/Office environment and existing authorized model with a finite operator budget; never paste keys into chat. Inspect journal/postconditions before repeating uncertain work. Repair any observed regression in AR-066 and rerun exact-SHA CI. Do not start AR-067 in this continuation.",
+  "next_task_if_active_done": "AR-067 after AR-066 acceptance or a separately recorded section 2.2 independent-core dependency decision; no AR-067 implementation this turn.",
+  "last_runtime_source_commit": "4c6a96ee39116c431dcd7d69a620c6c4f5bb94e2",
+  "previous_saved_checkpoint_commit": "3b3a2f31c7e353faef6187c194f0eeb4d6eee296",
+  "finalization_checked_head": "7df767dc1b50d24e97e5906be457cde90a216d10",
   "additional_ci_after_recorded_run": "Not used as acceptance; later documentation/workflow runs need independent inspection.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
@@ -1233,15 +1247,66 @@ Do not claim these defects were already covered by historical Office/transport/U
       "full_passed": 911,
       "full_failed": 1,
       "cause": "Exact-output fixture also received native PowerShell progress; production stderr was not stripped"
+    },
+    {
+      "sha": "6ac81cb8cd18b6d8124bdd97fc3b9bc541e7b78a",
+      "focused_run": 35903219588,
+      "full_run": 35903224947,
+      "focused_each": {
+        "passed": 132,
+        "failed": 2,
+        "repetitions": 3
+      },
+      "full": {
+        "passed": 1264,
+        "failed": 2
+      },
+      "artifact_id": 10770393061,
+      "artifact_sha256": "982ae4ce14870e21691050f9ef89e9f30b4d7938cff231fac9185161373c6241",
+      "cause": "Two new fixtures demanded unchanged error text after unknown effect; existing archive projects ReconcileRequired. Test-only repair retains and strengthens exact receipt/no-replay checks. Historical run remains FAILURE."
+    },
+    {
+      "sha": "2f2dda5f6207f948ed56e30ca5cd2c50cb811948",
+      "focused_run": 35904844689,
+      "focused_result": "134/134 x3; full1266; Agent74 PASS",
+      "full_run": 35904851797,
+      "full_result": "SUCCESS",
+      "focused_artifact": {
+        "id": 10771238823,
+        "bytes": 3744736,
+        "sha256": "850edd77e59935d3474484a1ec9b043ac9d54fb8df116b0b047ff71c0a30deaa"
+      },
+      "failed_peer_runs": [
+        {
+          "id": 35904844588,
+          "artifact_id": 10770523381,
+          "artifact_sha256": "2dd9f9ce3e7a4add426adf76cd9bfad0ed89a1c0767e27f49ee908ce882f5d00",
+          "reason": "Historical AR033 control pinned an obsolete current-assessment hash and stopped before source substitution. All current AR03342 x3 and Agent74 passed. Original executed control artifact10725382259 was independently CRC/hash checked and preserved read-only; identical six contradiction regression sources still run in every current42 corpus. No new negative-control execution claimed."
+        },
+        {
+          "id": 35904844594,
+          "artifact_id": 10770753527,
+          "artifact_sha256": "895c42e286a39ec0faa460252abe23735e2e3e4c44ab8c444a066855fd553318",
+          "reason": "Resilience cancellation assumed a dispatch before a prearmed40ms timer; actual count was not logged. Replaced timing assumption with a bounded observed-dispatch handshake and four separate precancel-zero-send tests; exact one-send/no-fallback assertions retained. Runtime transport unchanged."
+        }
+      ],
+      "failed_checkpoint": {
+        "id": 35906863619,
+        "sha": "9e1dddd1cf9f957b6a29e90a974bbd112a0e984c",
+        "result": "FAILURE_BEFORE_DOCUMENT_WRITE_OR_COMMIT_OR_PUSH",
+        "reason": "Refused to checkpoint while exact-SHA peer workflows were red."
+      },
+      "repair_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+      "classification": "AR066 regression maintenance only; all historical failures remain failures"
     }
   ],
   "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs experiments/H2AgentLab/Integration/H2ProductionToolSession.cs",
   "previous_completed_task": "AR-040",
-  "last_full_ci_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
+  "last_full_ci_checkout_sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
   "implemented_this_session": [
-    "AR-066 core foundation"
+    "AR-066 exact-bound source-consent core only"
   ],
-  "next_ready_independent_task": "AR067 NOT_STARTED; do not advance while AR066 core follow-up remains.",
+  "next_ready_independent_task": "AR-067 NOT_STARTED; assess separately under tracker 2.2 after this checkpoint. Native AR-066 debt is not waived.",
   "independent_dependency_assessment": {
     "id": "AR-066",
     "rule": "Tracker section 2.2: independent core may proceed with implemented dependencies and passed regressions while real E3/E4 gates await environment.",
@@ -1293,13 +1358,13 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "resolved_in_this_session": [
-    "Wrong write_file fixture replaced with canonical write_text without relaxed assertions",
-    "Disk Office namespace admission gap guarded with valid DOCX paired tests",
-    "Metadata/prose-only live completion now blocked through existing hooks",
-    "Incomplete native post-observation catalog now refused before read body exposure",
-    "Trusted user source revision batches now tighten admission and completion without promoting tool data or replaying work"
+    "Exact-file reference/output/replacement/live-reselection via existing approval and journal, with no execution permission expansion.",
+    "Current source decisions invalidated by queued/accepted user revision, expiry, cancellation, stale capture or changed pending file.",
+    "Fresh actual content/hash observation required after source selection; metadata, earlier pages and old native proof do not complete the source gate.",
+    "Unknown-effect restart fixture follows existing ReconcileRequired authority and proves exact effect/receipt/no replay; archive runtime unchanged.",
+    "AR066 retained-CI maintenance: bounded dispatch cancellation with four precancel regressions; read-only original AR033 control provenance plus unchanged current42 x3, no historical source replacement."
   ],
-  "last_test_commit": "2aadf0c1d06aaa928529f8986192a2f2798ebdc4",
+  "last_test_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
   "last_native_acceptance": "AR-020/033 E3 and AR-065 E4 AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER",
   "parked_ar064": {
     "implementation": "PARTIAL",
@@ -1313,16 +1378,17 @@ Do not claim these defects were already covered by historical Office/transport/U
     "historical_foundation_source_parent": "f939cc510c29e655775f973bfb5030758d49ba44"
   },
   "ar065_reconciled_base": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
-  "core_followup_status": "MIXED_SOURCE_CONSENT_NOT_IMPLEMENTED",
+  "core_followup_status": "EXACT_BOUND_MIXED_SOURCE_CONSENT_IMPLEMENTED_E2_PASS",
   "native_acceptance_status": "AWAITING_ENVIRONMENT",
   "user_pc_working_tree": "NOT_ACCESSIBLE",
   "ar066_evidence": "docs/agent-reliability/AR-066/evidence.json",
   "ar066_core_limits": [
-    "Trusted source revisions are now enforced, including complete queued batches; per-resource mixed-source consent and same-task approval of a live-to-disk semantic change remain unimplemented conservative restrictions, not environment-only debt.",
-    "Native Office original attach incident and real unsaved/reconnect/view-selection behavior not certified by scripted E2.",
-    "Native CAD/browser/UIA equivalence is not implemented here; unavailable proof remains blocked.",
-    "Source observation does not award semantic goal or mutation verification. No user-PC working tree access."
-  ]
+    "No real native Office/H2/model acceptance; no new provider, credentials or personal-document test.",
+    "Source consent changes meaning only, not file grounding, mutation permission, goal verification or unknown-effect fences.",
+    "Unknown/ambiguous original live resources remain blocked; source approvals are exact-file, task-local, revision-bound and never restored as grants.",
+    "AR064 PARTIAL, AR020/033 E3, AR051/065 E4, MB124-127 and AR083 DEFERRED_BY_USER remain unchanged."
+  ],
+  "ar066_source_consent_evidence": "docs/agent-reliability/AR-066/source-consent-evidence.json"
 }
 ```
 

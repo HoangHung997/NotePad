@@ -1,4 +1,6 @@
 # AR-066 — live resource source semantics and native identity retention
+> Historical foundation at `95d9aa2d0566a8e93d2b2be17a052fbb1182014f` is retained below. Its statements that same-task source consent was unimplemented describe that older SHA, not the current implementation. The source-consent follow-up is now recorded in [source-consent-review.md](source-consent-review.md) and [source-consent-evidence.json](source-consent-evidence.json). Native E3/real H2 E4 still remain unexecuted.
+
 
 Status: core foundation integrated; acceptance values belong to the exact executed SHA in `evidence.json`. This document is not native/model acceptance. The canonical tracker remains the sole task/decision source.
 

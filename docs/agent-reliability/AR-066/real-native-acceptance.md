@@ -32,6 +32,21 @@ Exercise the corpus in both Global and disposable Project surfaces. A helper pin
 
 Keep source and control hashes, exact expected/observed native markers, provider/session/PID/process-start/root/view/document identity, source kind, selection and content version, dispatched invocation IDs, mutation effect and readback verdict in the existing local journal/artifact convention. Record whether the data came from live native state, a disk file, or partial accessibility. Screenshot only the isolated fixture, never credentials/personal content. A safe error with `live_resource_required` is a refusal, not successful completion of the original live edit.
 
-The core implementation deliberately does not add a second provider/store, unrestricted command fallback, or same-task semantic-consent workflow. Natural-language source admission is conservative, not a complete per-resource role resolver. Native save-copy is an output, not permission to substitute the input. Trusted user revisions can add restrictions through the existing source journal; they cannot silently waive a live requirement. Per-resource mixed-source consent and same-task live-to-disk approval are still not implemented. Keep these limitations and any in-turn target change explicit instead of silently broadening scope.
+The exact-bound source-consent implementation now reuses resource_sources, request_source_change, the existing pending approval card and Agent journal. Read source-consent-review.md and source-consent-evidence.json for scope and executed E2. A known original live input may have separately approved disk reference/output roles, or explicitly switch to DiskSnapshot and back to the same live input in one task. Consent grants no file scope or mutation permission and cannot clear unknown effects. New user input/expiry/restart invalidate active decisions; history remains. Unknown/ambiguous live identities and unsupported CAD/browser providers stay blocked. Native save-copy is an output, not an input substitute.
 
 AR-066 stays open until implementation gaps and the required native E3/real H2 E4 corpus are resolved with exact-SHA evidence. AR-020 E3 and AR-065 E4 remain open independently; AR-064 remains PARTIAL; AR-083 remains DEFERRED_BY_USER.
+
+## Additional same-task source-consent cases — real UI/model NOT EXECUTED
+
+In the same isolated task, use real tool discovery and host approval, not a direct test API call. Record exact pending approval ID, task/revision, source ID, original live identity, selected path, role, response and final observed source. Use fixtures whose live and saved content differ.
+
+| Case | Required observation |
+| --- | --- |
+| Reference beside live input | Approve one exact DOCX/reference read; read its saved marker and the original unsaved live marker. The reference alone must not satisfy the live goal. Repeat with two explicitly distinct reference files. |
+| Output beside live input | Approve a new exact output, separately obey normal mutation permission, create once and read back. Existing files and later overwrite attempts remain protected. The live input is unchanged. |
+| Replace live with saved snapshot | The card must clearly warn about missing unsaved changes and name the original/selected inputs. After Allow, read the exact saved marker without silently saving/changing live state. No read or metadata-only output must not complete. Deny/Cancel must not grant the route. |
+| Return to live | A second explicit source decision selects the same original live identity. A fresh live observation is required; prior native/disk proof is insufficient. |
+| Invalidated decision | New user input, expiry, changed pending file/capture or wrong approval/task/source ID must not activate stale authority. Reapproval does not expand file scope. |
+| Restart and uncertain effects | Reopen without provider/file/native replay. Source decisions remain historical only. Unknown effects must retain exact operation receipts and ReconcileRequired; source approval cannot erase or replay them. |
+
+These are new E3/E4 execution requirements, not passes inferred from the scripted E2 corpus. Do not deliberately cause an unsafe native failure; record unrun cases when a safe isolated condition is unavailable.
