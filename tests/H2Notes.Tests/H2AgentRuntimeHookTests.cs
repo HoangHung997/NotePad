@@ -120,7 +120,7 @@ internal static class H2AgentRuntimeHookTests
             finally { transport.Sessions.Single().Release.TrySetResult(); Drain(adapter); }
         }));
 
-        test("AR-010 completion-repair continuation is hooked and cannot erase an unresolved failure", () => InWorkspace(root =>
+        test("AR-010 recovery-state continuation is hooked and cannot erase an unresolved failure", () => InWorkspace(root =>
         {
             var traces = new ConcurrentQueue<AgentRuntimeHookEvent>();
             var calls = new[] { new AgentTransportToolCall("search", "tool_search", "{\"query\":\"exec_command\"}"),
@@ -134,8 +134,12 @@ internal static class H2AgentRuntimeHookTests
                 var done = Wait(adapter, id);
                 Check(done.Status is H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Failed, "Hook accepted an unresolved failure.");
                 var wire = transport.Sessions.Single();
-                Check(wire.Continuations.Any(c => c.ToolResults.Count == 0 && c.SupplementalUserMessages?.Any(s => s.Contains("unresolved failed attempts")) == true), "Completion repair path was not exercised.");
-                Check(traces.Count(e => e.Kind == AgentRuntimeHookKind.BeforeModelRequest) == wire.Sends, "Completion repair bypassed pre-request hook.");
+                Check(wire.Continuations.Any(c => c.ToolResults.Count == 0
+                    && c.SupplementalUserMessages?.Any(s => s.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
+                        && s.Contains("\"unresolvedToolFailures\":1", StringComparison.Ordinal)) == true),
+                    "Structured recovery-state continuation was not exercised.");
+                Check(traces.Count(e => e.Kind == AgentRuntimeHookKind.BeforeModelRequest) == wire.Sends,
+                    "Recovery-state continuation bypassed pre-request hook.");
                 Check(!traces.Any(e => e.CheckpointKind == AgentRuntimeCheckpointKind.CompletionValidated), "Failed completion was recorded as validated.");
             }
             finally { Drain(adapter); }
