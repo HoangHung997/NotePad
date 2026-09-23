@@ -1,0 +1,64 @@
+name: AR-065 guarded fixture reconciliation delivery
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar065-reconcile-delivery.yml]
+permissions:
+  contents: write
+concurrency:
+  group: h2-ar065-reconcile-delivery
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Apply only exact reviewed preimages and normal-push
+        shell: python
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          import hashlib,json,os,pathlib,subprocess
+          branch='feature/h2-agent-reliability-ar-000'
+          def git(*a): return subprocess.check_output(['git',*a],text=True).strip()
+          expected=os.environ['EXPECTED_HEAD']
+          assert git('rev-parse','HEAD')==expected and not git('status','--porcelain'), 'Dirty or unexpected checkout'
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==expected, 'Branch advanced; reconcile first'
+          edits=[
+            ('tests/H2Notes.Tests/H2AgentRequestBudgetTests.cs','e142d11de806d94e9ead70b4d8dba0395085e850',
+             'var start = Start("first"); var events = await Collect(transport.StartAsync(start));',
+             '// This fixture returns lookup: advertise it before testing retained-context rejection.\n                var start = Start("first") with { Tools = [new("lookup", "lookup fixture", Parameters())] };\n                var events = await Collect(transport.StartAsync(start));'),
+            ('tests/H2Notes.Tests/H2AgentSteeringWireTests.cs','d507e0e229922c95ad48a7e0bafcff92cb982c87',
+             '        H2AgentOpenAiWireTests.Run(test);',
+             '        H2AgentOpenAiWireTests.Run(test);\n        H2AgentOpenAiProductionTests.Run(test);'),
+            ('tools/agent-reliability/validate_ar065.ps1','d1ead1993e72ed6c98b66ccd72baa0e585a595b9',
+             '  $filter=if($case',
+             '  $env:H2_AR065_EVIDENCE_DIR = Join-Path (Resolve-Path artifacts/ar065) ("receipts-" + $case)\n  $filter=if($case')]
+          prepared=[]
+          for name,blob,old,new in edits:
+              data=pathlib.Path(name).read_bytes()
+              assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==blob, 'Source preimage changed: '+name
+              text=data.decode('utf-8'); assert text.count(old)==1, 'Ambiguous patch: '+name
+              prepared.append((name,text.replace(old,new)))
+          for name,text in prepared: pathlib.Path(name).write_bytes(text.encode('utf-8'))
+          assert set(git('diff','--name-only').splitlines())=={x[0] for x in prepared}
+          subprocess.run(['git','diff','--check'],check=True)
+          subprocess.run(['git','config','user.name','H2 AR-065 implementation'],check=True)
+          subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'],check=True)
+          subprocess.run(['git','add','--',*[x[0] for x in prepared]],check=True)
+          subprocess.run(['git','commit','-m','test(AR-065): reconcile declared budget tools and exercise production failure persistence'],check=True)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==expected, 'Branch advanced before push; preserve commit for reconcile'
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==git('rev-parse','HEAD'), 'Verify pushed ref'
+          pathlib.Path('delivery.json').write_text(json.dumps({'parent':expected,'code_sha':git('rev-parse','HEAD'),'branch':branch,'files':[x[0] for x in prepared],'tests':'NOT_RUN; next exact-SHA read-only validation required'},indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR065-Reconciled-Delivery
+          path: delivery.json
+          if-no-files-found: warn
+          retention-days: 14
