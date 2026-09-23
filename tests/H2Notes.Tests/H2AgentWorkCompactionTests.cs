@@ -437,7 +437,7 @@ internal static class H2AgentWorkCompactionTests
                     1 => JsonSerializer.SerializeToElement(new { query = "write_text" }),
                     2 => JsonSerializer.SerializeToElement(new { path = "once.txt", text = "WRITTEN-ONCE " + Formula, expectedHash = "" }),
                     3 => JsonSerializer.SerializeToElement(new { query = "read_file" }),
-                    _ => JsonSerializer.SerializeToElement(new { path = "once.txt" })
+                    _ => JsonSerializer.SerializeToElement(new { path = "once.txt", offset = "0" })
                 };
                 if (owner.Sends == 2) owner.Writes++;
                 return Response(new { message = new { role = "assistant", content = "", tool_calls = new[] { new { function = new { name, arguments = args } } } }, done = true });
