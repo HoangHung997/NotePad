@@ -85,7 +85,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | DONE |
-| AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | ACTIVE |
+| AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | NOT_STARTED |
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
@@ -477,43 +477,48 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-033_ACTIVE_COMPLETION_VALIDATION",
-  "active_task": "AR-033",
-  "implementation_status": "ACTIVE",
+  "phase": "AR-033_E2_IMPLEMENTED_NATIVE_PENDING_NEXT_AR-040",
+  "active_task": "AR-040",
+  "implementation_status": "NOT_STARTED",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar033-completion-2026-09-23",
-  "last_code_commit": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
-  "last_validated_code_commit": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
-  "last_validation_result": "AR032_19_PASS_X3; AGENT_SUITES_74_PASS; FULL_CI_816_PASS; E2_ACCEPTED",
+  "owner_session": "chatgpt-ar033-consistency-2026-09-23",
+  "last_code_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
+  "last_validated_code_commit": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
+  "last_validation_result": "AR033_42_PASS_X3; CONTROL_36_PASS_6_EXPECTED_FAILURES; AGENT74_PASS; FULL858_PASS; AR033_E3_PENDING",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Focused CI exact checkout CLEAN. Checkpoint writer restricts changes to three docs and verifies normal push/remote match. Local review is an offline source snapshot, not a clone; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Focused checkout CLEAN; docs checkpoint verifies expected refs and non-force push. Local review is an offline source snapshot; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-22T22:17:50.066771+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T00:03:40.847563+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Compile and run current completion/alternate-recovery implementation and regressions. Do not claim E3 from fixture tests."
+    "AR-040 NOT_STARTED; use existing process service and journal, not a new engine."
   ],
   "last_test_commands": [
     {
-      "command": "H2Notes.Tests --filter AR-032 x3 and retained AR corpora",
-      "run_id": 35790136052,
-      "code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
-      "result": "19/19 each; all retained corpora pass"
+      "command": "H2Notes.Tests --filter AR-033 x3 plus retained AR suites",
+      "run_id": 35799370449,
+      "sha": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
+      "result": "42/42 x3; all retained corpora pass"
     },
     {
-      "command": "tools/agent-reliability/run_agent_suites.ps1",
-      "run_id": 35790136052,
-      "code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
+      "command": "prior AgentCompletionAssessment with unchanged new tests",
+      "run_id": 35799370449,
+      "result": "36 passed / 6 expected failures; exact current bytes restored"
+    },
+    {
+      "command": "run_agent_suites.ps1",
+      "run_id": 35799370449,
+      "sha": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
       "result": "74/74"
     },
     {
-      "command": "Full Avalonia CI including publish/helper IPC",
-      "run_id": 35790200054,
-      "code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
-      "result": "816/816 and every required step success"
+      "command": "Full Avalonia CI + publish/helper IPC",
+      "run_id": 35799079473,
+      "sha": "7299e90178ad286082c4a5e0e5e334c9e63daaa8",
+      "result": "858/858; all steps success"
     }
   ],
   "ci_runs": [
@@ -874,6 +879,18 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "result": "SUCCESS",
       "h2_tests": "816/816",
       "publish_helper_IPC": "PASS"
+    },
+    {
+      "id": 35799370449,
+      "head_sha": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
+      "result": "SUCCESS",
+      "owner": "AR-033"
+    },
+    {
+      "id": 35799079473,
+      "head_sha": "c1825d615502f95c5ce3420611e3fd6a3fa51448",
+      "result": "SUCCESS",
+      "owner": "AR-033"
     }
   ],
   "evidence_locations": [
@@ -906,11 +923,13 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-031/implementation.md",
     "docs/agent-reliability/AR-031/acceptance.json",
     "docs/agent-reliability/AR-032/acceptance.json",
-    "docs/agent-reliability/AR-032/implementation.md"
+    "docs/agent-reliability/AR-032/implementation.md",
+    "docs/agent-reliability/AR-033/acceptance.json",
+    "docs/agent-reliability/AR-033/verdict-consistency-review.md"
   ],
   "known_failures": [],
   "external_blockers": [
-    "AR-020 native Office E3 and real model/H2 UI E4 remain unavailable; not waived by E2 retrieval tests."
+    "AR-033 and AR-020 real native E3 unavailable in this session; E4 NOT_RUN. Independent core AR-040 is not blocked."
   ],
   "deferred_acceptance": [
     {
@@ -919,21 +938,29 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "scope": "Physical two-PC/NAS acceptance",
       "blocks_independent_implementation": false,
       "blocks_claim_of_certified_multi_pc": true
+    },
+    {
+      "id": "AR-033",
+      "implementation": "IMPLEMENTED",
+      "status": "AWAITING_ENVIRONMENT",
+      "completed_evidence": "E1/E2",
+      "missing_evidence": "E3 real app/provider; E4 remains separate",
+      "blocks_independent_implementation": false
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Validate AR-033 current source with the registered completion corpus, retained AR-032/031/030/020/012/011/010/001, all Agent suites and unchanged full CI. Repair failures before marking E2 accepted; native E3 remains separate.",
-  "next_task_if_active_done": "AR-040",
-  "last_runtime_source_commit": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
+  "next_exact_action": "On the existing branch and PR #3, reconcile current refs, working tree and SESSION HANDOFF. AR-033 implementation has E2 evidence but remains AWAITING_ENVIRONMENT for native E3. Start only independent AR-040 (dependencies AR-011/031 accepted): extend the existing process service with stable job IDs, bounded poll/output/cancel and actual owned-process tests RC-19/20/21; do not add a second engine/store or replay uncertain writes. Keep AR-033/020 native gates and AR-083 deferred; retain AR-033/032/031/030/020/012/011/010/001 regression.",
+  "next_task_if_active_done": "Re-evaluate dependency readiness in tracker; do not bypass AR-041 native gates.",
+  "last_runtime_source_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
-  "finalization_checked_head": "852c07e9b480231d3a4585be3f0900fc0c537686",
+  "finalization_checked_head": "c56e545948cbe7d48e9c011f5e288ee665783b55",
   "additional_ci_after_recorded_run": "Later documentation/writer-removal commits are not the exact source tested above. Their runs are separate and not assumed PASS.",
   "last_completed_task": {
-    "id": "AR-012",
+    "id": "AR-032",
     "implementation_status": "IMPLEMENTED",
     "acceptance_status": "E2_PASS",
-    "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-    "full_ci_run": 35724401082
+    "code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
+    "note": "Historical accepted task, not re-awarded this session"
   },
   "historical_failure_notes_retained": [
     "B01 skill-name drift",
@@ -944,28 +971,36 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   ],
   "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs",
   "previous_completed_task": {
-    "id": "AR-011",
+    "id": "AR-031",
     "implementation_status": "IMPLEMENTED",
     "acceptance_status": "E2_PASS",
-    "code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-    "full_ci_run": 35709818021
+    "code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+    "note": "Historical accepted task, not re-awarded this session"
   },
   "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs",
-  "last_full_ci_checkout_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
+  "last_full_ci_checkout_sha": "7299e90178ad286082c4a5e0e5e334c9e63daaa8",
   "implemented_this_session": [
-    "Integrated the reviewed single-file evidence resolver repair; existing failing tests were not changed."
+    {
+      "task": "AR-033",
+      "status": "IMPLEMENTED",
+      "E1": "PASS",
+      "E2": "PASS",
+      "E3": "NOT_RUN",
+      "acceptance": "AWAITING_ENVIRONMENT",
+      "repair": "84acbc456026ace4f20d435aed294d7b5099b2c7"
+    }
   ],
-  "next_ready_independent_task": "AR-030",
+  "next_ready_independent_task": "AR-040",
   "independent_dependency_assessment": {
-    "id": "AR-030",
+    "id": "AR-040",
     "dependencies": [
-      "AR-010 DONE",
-      "AR-011 DONE"
+      "AR-011 implemented/accepted",
+      "AR-031 implemented/accepted"
     ],
-    "dependency_on_AR020_E3": false,
-    "basis": "Approved tracker section 2.2; no Office-native requirement is waived"
+    "dependency_on_AR033_E3": false,
+    "basis": "Tracker section 2.2; native acceptance is not waived"
   },
-  "candidate_base": "1e05be0d9a360975f960165ce6a0dc3c6101b4bb",
+  "candidate_base": "b44306681f13e5ae1919e022658e95c0574b2ef6",
   "candidate_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Tasking/AgentGoalState.cs",
   "parked_acceptance": [
     {
@@ -974,15 +1009,22 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "acceptance_status": "AWAITING_ENVIRONMENT",
       "required_level": "E3",
       "done": false
+    },
+    {
+      "id": "AR-033",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "AWAITING_ENVIRONMENT",
+      "completed_level": "E2",
+      "required_level": "E3",
+      "done": false
     }
   ],
   "resolved_in_this_session": [
-    "First mutation no longer drops host-required verifiers.",
-    "An existing mutation criterion keeps exact meaning/evidence without duplicate insertion.",
-    "Strengthened mutation contract passes existing orchestrator guard."
+    "Contradictory Failed/NotVerified summaries cannot become successful completion proof through all-Passed details.",
+    "Control harness distinguishes LF Git objects from exact CRLF checkout bytes without weakening runtime assertions."
   ],
-  "last_test_commit": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
-  "last_native_acceptance": "E3/E4 NOT_RUN; AR-083 DEFERRED_BY_USER"
+  "last_test_commit": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
+  "last_native_acceptance": "AR-033/020 E3 AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER"
 }
 ```
 
