@@ -1,0 +1,45 @@
+name: AR-064 reviewed typed outcome delivery
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar064-typed-delivery.yml]
+permissions:
+  contents: write
+concurrency:
+  group: h2-ar064-typed-delivery
+  cancel-in-progress: false
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/h2-agent-reliability-ar-000
+          fetch-depth: 0
+      - name: Validate exact reviewed program bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64,hashlib,json,os,pathlib,urllib.request
+          sha='e4d3ac26d20d4c542af33ba552258cae12cafda7'
+          req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as r: value=json.loads(r.read(100000))
+          b=base64.b64decode(value['content'])
+          assert value['sha']==sha and hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==sha
+          assert hashlib.sha256(b).hexdigest()=='a23a990b3e6562262f4496a85722f6a9c1d749e3c3b4d30da244f4a41a07bdc3'
+          pathlib.Path(os.environ['RUNNER_TEMP'],'ar064-delivery.py').write_bytes(b)
+          PY
+      - name: Apply reviewed source and save active handoff without force push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python "$RUNNER_TEMP/ar064-delivery.py"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR064-Typed-Delivery
+          path: artifacts/ar064-typed-delivery/
+          if-no-files-found: error
+          retention-days: 14
