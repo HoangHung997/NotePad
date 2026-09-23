@@ -18,25 +18,25 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
-      - name: Repair fixture callable without weakening completion or unknown-tool guards
+      - name: Keep reader schema strict and correct only the test request
         shell: python
         run: |
           import os,subprocess,pathlib,hashlib,json
           def git(*a):return subprocess.check_output(['git',*a],text=True).strip()
           branch='feature/h2-agent-reliability-ar-000';head=git('rev-parse','HEAD')
           assert os.environ['GITHUB_REF_NAME']==branch and head==os.environ['GITHUB_SHA']
-          assert git('rev-parse','HEAD^')=='a79e27f1121c6443e2910e656175a2cbfd5656d6'
+          assert git('rev-parse','HEAD^')=='0d2c230ae8bc4d3f6e0b70d56acc555bf29a499a'
           assert not git('status','--porcelain')
           path='tests/H2Notes.Tests/H2AgentWorkCompactionTests.cs'
-          b=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(b).hexdigest()=='36b92221938b22f433464665f3760e4158c706f41642f23fa9895d08593d624e'
-          text=b.decode('utf-8');assert text.count('"read_text"')==2
-          content=text.replace('"read_text"','"read_file"').encode('utf-8')
-          assert hashlib.sha256(content).hexdigest()=='b1cf5a1677757d2674e419a7c71a548fc566e782cd663560c2c24e4f528a3c51'
+          b=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(b).hexdigest()=='b1cf5a1677757d2674e419a7c71a548fc566e782cd663560c2c24e4f528a3c51'
+          text=b.decode('utf-8');old='_ => JsonSerializer.SerializeToElement(new { path = "once.txt" })';assert text.count(old)==1
+          content=text.replace(old,'_ => JsonSerializer.SerializeToElement(new { path = "once.txt", offset = "0" })').encode('utf-8')
+          assert hashlib.sha256(content).hexdigest()=='411419207ed6048ba40218bfc852f1acb0aecdeb62f69a9077638ae392b82937'
           pathlib.Path(path).write_bytes(content)
           subprocess.run(['git','diff','--check'],check=True);subprocess.run(['git','add','--',path],check=True)
           assert git('diff','--cached','--name-only')==path
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==head
-          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','test(AR-051): use canonical read_file in the concrete production compaction corpus'],check=True)
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','test(AR-051): send the required string offset to the concrete bounded reader'],check=True)
           code=git('rev-parse','HEAD');assert not git('status','--porcelain')
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
