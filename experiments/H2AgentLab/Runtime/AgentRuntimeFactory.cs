@@ -25,6 +25,8 @@ public interface IAgentRuntimeFactory
 /// </summary>
 public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 {
+    internal AgentCompactionOptions WorkCompactionOptions { get; init; } = new();
+    internal Func<string, string, AgentWorkSummary>? WorkSummarizer { get; init; }
     private readonly IAgentTransportFactory _transportFactory;
     private readonly Func<AgentRunTelemetry, IAgentRuntimeHooks> _hooksFactory;
 
@@ -70,6 +72,8 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
                 new ArtifactStore(tools.StateRoot)),
-            hooks: hooks);
+            hooks: hooks,
+            compactionCoordinator: new RuntimeCompactionCoordinator(tools.StateRoot, contextManager))
+        { WorkCompactionOptions = WorkCompactionOptions, WorkSummarizer = WorkSummarizer };
     }
 }

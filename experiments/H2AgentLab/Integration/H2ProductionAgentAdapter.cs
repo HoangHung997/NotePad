@@ -1,3 +1,4 @@
+using H2AgentLab.Session;
 using System.Text.Json;
 using H2AgentLab.Context;
 using H2AgentLab.Metrics;
@@ -441,6 +442,8 @@ public sealed partial class H2ProductionAgentAdapter :
                 TakeGoalInput: closing => TakeSupplementalInput(live, closing),
                 JournalObserver: receipt => _archive.RecordOperation(live.TaskId, receipt),
                 ObserveJobResults: toolSession.ObserveJobResults,
+                ContextCheckpointObserver: checkpoint => _archive.RecordContextCompaction(checkpoint),
+                ContextSourceObserver: source => _archive.RecordContextSource(source),
                 CompletionObserver: assessment =>
                 {
                     lock (live.Gate) live.Completion = assessment;
@@ -564,6 +567,10 @@ public sealed partial class H2ProductionAgentAdapter :
         catch (OperationCanceledException) when (live.Cancellation.IsCancellationRequested)
         {
             Complete(live, H2AgentTaskStatus.Cancelled, null, null);
+        }
+        catch (AgentContextCompactionException ex)
+        {
+            Complete(live, H2AgentTaskStatus.Blocked, null, Bound(ex.Message, 2_000));
         }
         catch (AgentRequestBudgetException ex)
         {

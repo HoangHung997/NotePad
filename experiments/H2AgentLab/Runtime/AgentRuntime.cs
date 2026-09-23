@@ -35,7 +35,9 @@ public sealed record AgentRuntimeRequest(
     Action<AgentTaskContract>? ContractObserver = null,
     Action<H2AgentOperationRecord>? JournalObserver = null,
     Action<H2AgentCompletionAssessment>? CompletionObserver = null,
-    Func<IReadOnlyList<AgentRuntimeJobObservation>>? ObserveJobResults = null);
+    Func<IReadOnlyList<AgentRuntimeJobObservation>>? ObserveJobResults = null,
+    Action<AgentContextCompactionRecord>? ContextCheckpointObserver = null,
+    Action<AgentContextSourceRecord>? ContextSourceObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -117,6 +119,9 @@ public sealed class AgentRuntime : IAsyncDisposable
     private readonly IAgentRuntimePermissionPolicy _permissionPolicy;
     private readonly AgentRuntimeEvidenceProjector? _evidenceProjector;
     private readonly IAgentRuntimeHooks _hooks;
+    private readonly RuntimeCompactionCoordinator? _workCompaction;
+    internal AgentCompactionOptions WorkCompactionOptions { get; init; } = new();
+    internal Func<string, string, AgentWorkSummary>? WorkSummarizer { get; init; }
     private bool _disposed;
 
     public AgentRuntime(
@@ -129,7 +134,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         IAgentRuntimeVerifier? verifier = null,
         IAgentRuntimePermissionPolicy? permissionPolicy = null,
         AgentRuntimeEvidenceProjector? evidenceProjector = null,
-        IAgentRuntimeHooks? hooks = null)
+        IAgentRuntimeHooks? hooks = null,
+        RuntimeCompactionCoordinator? compactionCoordinator = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
@@ -141,6 +147,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         _permissionPolicy = permissionPolicy ?? new ScopedAgentRuntimePermissionPolicy();
         _evidenceProjector = evidenceProjector;
         _hooks = hooks ?? new AgentRuntimeHooks();
+        _workCompaction = compactionCoordinator;
     }
 
     public async Task<AgentRuntimeResult> RunAsync(
@@ -160,6 +167,8 @@ public sealed class AgentRuntime : IAsyncDisposable
 
         if (request.TakeGoalInput is not null && request.TakeSupplementalInput is not null)
             throw new ArgumentException("Use one authoritative user-input source, not two queues.");
+        if ((request.ContextCheckpointObserver is null) != (request.ContextSourceObserver is null))
+            throw new ArgumentException("Context source and activation journals must be paired.");
         var initialContract = request.Contract.Goals is null
             ? request.Contract.WithUserInput(new(request.Contract.TaskId, request.UserInput)) : request.Contract;
         request.ContractObserver?.Invoke(initialContract);
@@ -306,14 +315,46 @@ public sealed class AgentRuntime : IAsyncDisposable
             }
         }
 
+        RuntimeContextCompactionTurn? compactedTurn = null;
+        RuntimeRound? previousRound = null;
+        async Task<RuntimeRound> SendModelAsync(AgentTransportStartRequest? start, AgentTransportContinuationRequest? next)
+        {
+            if (start is not null && request.ContextCheckpointObserver is not null)
+                compactedTurn = _workCompaction?.CreateWorkTurn(start, request.ContextCheckpointObserver, request.ContextSourceObserver!,
+                    WorkCompactionOptions, WorkSummarizer);
+            var requestIndex = ++modelRequests;
+            (AgentTransportStartRequest Context, string BodySha256)? rebase = null;
+            if (next is not null && compactedTurn is not null && previousRound is not null)
+            {
+                // This is a host snapshot, not a model proposal. Complete prior source and all
+                // current mandatory anchors are retained even if the new context cannot fit.
+                var anchors = JsonSerializer.SerializeToElement(new
+                {
+                    TaskId = taskId, TurnId = turnId, RevisionId = effectiveContract.Goals!.RevisionId,
+                    Invocation = invocation, Contract = effectiveContract,
+                    PendingOperations = pendingOperations.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => new { p.Key, p.Value }).ToArray(),
+                    UnresolvedCalls = unresolvedCalls.Select(f => new { f.Name, f.Code, f.FailureId, f.InvocationId, f.Arguments }).ToArray(),
+                    UncertainResources = uncertainResources.Order(StringComparer.Ordinal).ToArray(),
+                    ObservedEvidence = evidenceHistory.ToArray(), Verification = latestVerification,
+                    Completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification)
+                });
+                rebase = compactedTurn.Prepare(_transport, requestIndex, previousRound.Text,
+                    previousRound.ToolCalls, next, effectiveContract.Goals.RevisionId, anchors, cancellationToken);
+                if (rebase is not null)
+                    request.CommentaryObserver?.Invoke("Đã lưu checkpoint context có nguồn; giữ yêu cầu hiện hành, công việc còn dở và bằng chứng. Không chạy lại công cụ.");
+            }
+            previousRound = await SendRequestAsync(hookScope, contextSnapshot, requestIndex, start, next,
+                usage, cancellationToken, request.PublicTextObserver, rebase).ConfigureAwait(false);
+            return previousRound;
+        }
+
         try
         {
             await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ContextPrepared,
                 contextSnapshot, ContextCheckpoint: request.ContextCheckpoint), cancellationToken).ConfigureAwait(false);
-            var round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests,
+            var round = await SendModelAsync(
                 new AgentTransportStartRequest(taskId, turnId, messages, initialTools,
-                    promptCacheKey, _transport.Capabilities.ParallelToolCalls), null,
-                usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                    promptCacheKey, _transport.Capabilities.ParallelToolCalls), null).ConfigureAwait(false);
 
             while (true)
             {
@@ -327,9 +368,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                     {
                         if (++toolRounds > request.MaxToolRounds)
                             throw new InvalidOperationException("Đã tới giới hạn số lượt bổ sung; nội dung bổ sung được giữ trong lịch sử.");
-                        round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
-                            new(taskId, turnId, [], SupplementalUserMessages: supplements),
-                            usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        round = await SendModelAsync(null,
+                            new(taskId, turnId, [], SupplementalUserMessages: supplements)).ConfigureAwait(false);
                         continue;
                     }
                     latestVerification = assessment.ApplyRevision(effectiveContract);
@@ -342,9 +382,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                         var feedback = "The host still has unresolved failed attempts: " + string.Join("; ",
                             unresolvedCalls.Select(f => f.Name + " (failureId=" + f.FailureId + ")"))
                             + ". Follow the failed tool's recovery instructions and verify the requested output. Do not repeat an unrelated successful call or claim completion.";
-                        round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
-                            new(taskId, turnId, [], SupplementalUserMessages: [feedback]),
-                            usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        round = await SendModelAsync(null,
+                            new(taskId, turnId, [], SupplementalUserMessages: [feedback])).ConfigureAwait(false);
                         continue;
                     }
                     completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
@@ -576,11 +615,10 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
                     contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
-                round = await SendRequestAsync(hookScope, contextSnapshot, ++modelRequests, null,
+                round = await SendModelAsync(null,
                     new AgentTransportContinuationRequest(taskId, turnId, results,
                         execution.NewlyLoadedTools.Count == 0 ? null : execution.NewlyLoadedTools,
-                        TakeInput(false)),
-                    usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        TakeInput(false))).ConfigureAwait(false);
             }
         }
         catch (AgentVerificationRequiredException ex) when (ex.Completion is null)
@@ -609,14 +647,17 @@ public sealed class AgentRuntime : IAsyncDisposable
     private async Task<RuntimeRound> SendRequestAsync(AgentRuntimeHookScope scope,
         AgentContextSnapshot context, int requestIndex, AgentTransportStartRequest? start,
         AgentTransportContinuationRequest? continuation, MutableUsage usage,
-        CancellationToken cancellationToken, Action<string>? publicTextObserver)
+        CancellationToken cancellationToken, Action<string>? publicTextObserver,
+        (AgentTransportStartRequest Context, string BodySha256)? rebase = null)
     {
         var registeredNames = Array.AsReadOnly(_registry.Tools.Select(tool => tool.Name).ToArray());
         await _hooks.BeforeModelRequestAsync(new(scope, requestIndex, context, registeredNames,
             start, continuation), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return await ReadRoundAsync(start is not null
-                ? _transport.StartAsync(start, cancellationToken)
+        return await ReadRoundAsync(rebase is { } prepared
+                ? ((IAgentContextRebaseTransport)_transport).RebaseContextAsync(prepared.Context,
+                    continuation!, prepared.BodySha256, cancellationToken)
+                : start is not null ? _transport.StartAsync(start, cancellationToken)
                 : _transport.ContinueAsync(continuation!, cancellationToken),
             usage, cancellationToken, publicTextObserver).ConfigureAwait(false);
     }

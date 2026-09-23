@@ -24,7 +24,7 @@ public enum OpenAiResponsesStateMode
 /// is an explicit opt-in because OpenAI documents that store=true retains response data for later
 /// retrieval; it is never enabled silently and is restricted to the official OpenAI /v1 endpoint.
 /// </summary>
-public sealed class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBudgetSource
+public sealed partial class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
     private readonly AgentRequestBudgetGuard _requestBudget;
     public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;
@@ -318,24 +318,29 @@ public sealed class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBud
     }
 
     private JsonObject BuildPayload()
+        => BuildContextPayload(_requestInput, _tools.Values.ToArray(), _previousResponseId,
+            _allowParallelToolCalls, _promptCacheKey);
+
+    private JsonObject BuildContextPayload(JsonArray input, IReadOnlyList<AgentToolDefinition> tools,
+        string? previousResponseId, bool allowParallel, string? cacheKey)
     {
         var stored = _stateMode == OpenAiResponsesStateMode.StoredContinuation;
         var payload = new JsonObject
         {
             ["model"] = _profile.Model,
-            ["input"] = _requestInput.DeepClone(),
+            ["input"] = input.DeepClone(),
             ["stream"] = true,
             ["store"] = stored
         };
-        if (stored && _previousResponseId is { Length: > 0 })
-            payload["previous_response_id"] = _previousResponseId;
+        if (stored && previousResponseId is { Length: > 0 })
+            payload["previous_response_id"] = previousResponseId;
 
-        if (_tools.Count > 0)
+        if (tools.Count > 0)
         {
-            payload["tools"] = BuildTools();
-            payload["parallel_tool_calls"] = _allowParallelToolCalls;
+            payload["tools"] = BuildTools(tools);
+            payload["parallel_tool_calls"] = allowParallel;
         }
-        if (_promptCacheKey is { Length: > 0 }) payload["prompt_cache_key"] = _promptCacheKey;
+        if (cacheKey is { Length: > 0 }) payload["prompt_cache_key"] = cacheKey;
 
         var reasoning = new JsonObject();
         if (_profile.RequestReasoningSummary) reasoning["summary"] = "auto";
@@ -382,10 +387,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBud
         return new JsonObject { ["role"] = role, ["content"] = parts };
     }
 
-    private JsonArray BuildTools()
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
     {
         var result = new JsonArray();
-        foreach (var tool in _tools.Values)
+        foreach (var tool in candidates ?? _tools.Values)
         {
             result.Add(new JsonObject
             {

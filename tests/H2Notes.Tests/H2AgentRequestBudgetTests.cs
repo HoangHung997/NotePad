@@ -331,7 +331,7 @@ internal static class H2AgentRequestBudgetTests
             { owner.Sends++; throw new InvalidOperationException("Oversized fixture must not reach HTTP."); }
         }
     }
-    private sealed class WireFixture : IDisposable
+    internal sealed class WireFixture : IDisposable
     {
         internal readonly string Kind; private readonly AiProfile _profile;
         public List<string> Bodies { get; } = []; public bool EmitTools = true; public bool Prewarm; public long ReportedInput = 20;

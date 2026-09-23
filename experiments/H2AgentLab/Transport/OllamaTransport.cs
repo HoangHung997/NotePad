@@ -12,7 +12,7 @@ namespace H2AgentLab.Transport;
 /// message shapes. Tool outputs are supplied through ContinueAsync; the full message replay is an
 /// Ollama limitation and is advertised by IncrementalContinuation=false.
 /// </summary>
-public sealed class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource
+public sealed partial class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
     private sealed class ToolAccumulator(string id)
     {
@@ -154,17 +154,7 @@ public sealed class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource
         var token = linked.Token;
         var responseNumber = ++_responseSequence;
 
-        var payload = new JsonObject
-        {
-            ["model"] = _profile.Model,
-            ["messages"] = _messages.DeepClone(),
-            ["stream"] = true
-        };
-        if (_tools.Count > 0) payload["tools"] = BuildTools();
-        if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
-            payload["think"] = effort;
-        else if (_profile.OllamaThinking is bool thinking)
-            payload["think"] = thinking;
+        var payload = BuildContextPayload(_messages, _tools.Values.ToArray());
 
         var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "OllamaTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "api/chat"))
@@ -266,6 +256,23 @@ public sealed class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource
         yield return AgentTransportEvent.Complete(finishReason: resolvedCalls.Count > 0 ? "tool_calls" : doneReason ?? "stop");
     }
 
+    private JsonObject BuildContextPayload(JsonArray input, IReadOnlyList<AgentToolDefinition> tools)
+    {
+        var payload = new JsonObject
+        {
+            ["model"] = _profile.Model,
+            ["messages"] = input.DeepClone(),
+            ["stream"] = true
+        };
+        if (tools.Count > 0) payload["tools"] = BuildTools(tools);
+        if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
+            payload["think"] = effort;
+        else if (_profile.OllamaThinking is bool thinking)
+            payload["think"] = thinking;
+
+        return payload;
+    }
+
     private JsonObject ToOllamaMessage(AgentTransportMessage message)
     {
         if (message.Files is { Count: > 0 })
@@ -301,10 +308,10 @@ public sealed class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource
         return result;
     }
 
-    private JsonArray BuildTools()
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
     {
         var result = new JsonArray();
-        foreach (var tool in _tools.Values)
+        foreach (var tool in candidates ?? _tools.Values)
         {
             result.Add(new JsonObject
             {

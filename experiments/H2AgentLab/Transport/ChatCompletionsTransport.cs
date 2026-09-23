@@ -13,7 +13,7 @@ namespace H2AgentLab.Transport;
 /// out of the future orchestrator. Chat Completions has no provider-side incremental continuation in
 /// this harness, so each continuation replays the bounded active turn owned by this transport.
 /// </summary>
-public sealed class ChatCompletionsTransport : IAgentTransport, IAgentRequestBudgetSource
+public sealed partial class ChatCompletionsTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
     private sealed class ToolAccumulator(string fallbackId)
     {
@@ -161,15 +161,7 @@ public sealed class ChatCompletionsTransport : IAgentTransport, IAgentRequestBud
         var token = linked.Token;
         var responseNumber = ++_responseSequence;
 
-        var payload = new JsonObject
-        {
-            ["model"] = _profile.Model,
-            ["stream"] = true,
-            ["messages"] = _messages.DeepClone()
-        };
-        if (_tools.Count > 0) payload["tools"] = BuildTools();
-        if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
-            payload["reasoning_effort"] = effort;
+        var payload = BuildContextPayload(_messages, _tools.Values.ToArray());
 
         var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ChatCompletionsTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "chat/completions"))
@@ -284,6 +276,21 @@ public sealed class ChatCompletionsTransport : IAgentTransport, IAgentRequestBud
         yield return AgentTransportEvent.Complete(finishReason: resolvedCalls.Count > 0 ? "tool_calls" : finishReason ?? "stop");
     }
 
+    private JsonObject BuildContextPayload(JsonArray input, IReadOnlyList<AgentToolDefinition> tools)
+    {
+        var payload = new JsonObject
+        {
+            ["model"] = _profile.Model,
+            ["stream"] = true,
+            ["messages"] = input.DeepClone()
+        };
+        if (tools.Count > 0) payload["tools"] = BuildTools(tools);
+        if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
+            payload["reasoning_effort"] = effort;
+
+        return payload;
+    }
+
     private JsonObject ToChatMessage(AgentTransportMessage message)
     {
         var role = message.Role switch
@@ -345,10 +352,10 @@ public sealed class ChatCompletionsTransport : IAgentTransport, IAgentRequestBud
         return result;
     }
 
-    private JsonArray BuildTools()
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
     {
         var result = new JsonArray();
-        foreach (var tool in _tools.Values)
+        foreach (var tool in candidates ?? _tools.Values)
         {
             result.Add(new JsonObject
             {

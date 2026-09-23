@@ -1,0 +1,3 @@
+# AR-051 source-backed work compaction
+
+ACTIVE / NOT_RUN. Existing RuntimeCompactionCoordinator/CompactionManager, ArtifactStore and Agent journal own source, mandatory anchors and atomic activation. Actual same-provider serializers preview a candidate and revalidate its exact body before sending. Deterministic extractive summaries retain exact source spans, not counts-only memory or semantic model certification. New E1/E2 tests use intercepted concrete transports, real temporary files/journal and ten compaction cycles. E4 actual H2 UI/model/tools NOT_RUN. Native AR-020/033 remain awaiting environment; AR-083 DEFERRED_BY_USER. No automatic mutation replay, new provider credentials or main merge.

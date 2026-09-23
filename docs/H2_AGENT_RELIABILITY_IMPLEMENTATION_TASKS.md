@@ -481,26 +481,26 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-050_ACCEPTED_NEXT_AR-051",
+  "phase": "AR-051_ACTIVE_SOURCE_BACKED_COMPACTION",
   "active_task": "AR-051",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar050-2026-09-23",
+  "owner_session": "chatgpt-ar051-2026-09-23",
   "last_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
   "last_validated_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
   "last_validation_result": "AR050_50_PASS_X3; SETTINGS_OLD_CLASS_EXPECTED_FAILURE; ACTUAL_WIRE_205_X5_X3; POST_EFFECT_GLOBAL_PROJECT_PASS_X3; ALL_RETAINED_AR_PASS; AGENT74_PASS; FULL965_PASS",
-  "capture_checked_head": "65469ff7f456905f531c553e938148bf402efc45",
+  "capture_checked_head": "c1681e5ef410e73889fba259b2b9e3fcdb39cedd",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Focused CI exact source CLEAN; docs-only checkpoint validates refs and normal push. Local review is a verified offline snapshot, not user-PC checkout; user-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Reviewed source committed on existing branch. User-PC working tree NOT_ACCESSIBLE; local review is an offline exact-source snapshot.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T05:31:59.538755+00:00",
-  "completed_this_session": [
-    "AR-050"
-  ],
+  "checkpoint_saved_at_utc": "2026-09-23T06:26:58.642514+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-051 NOT_STARTED. Implement source-backed semantic compaction and atomic validated checkpoint through existing runtime, then deterministic and permitted native evidence."
+    "Build exact delivered source on Windows and run registered AR-051 10-cycle concrete serializer and production corpora; fix failures.",
+    "Validate journal/source integrity, candidate activation, scope, pending jobs and failure preservation; retain AR-050 and earlier regressions.",
+    "Real H2 UI/model/tool E4 subset remains NOT_RUN; deterministic E2 is not full acceptance."
   ],
   "last_test_commands": [
     {
@@ -1022,7 +1022,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue only AR-051 on the existing branch/PR. Read current refs, working tree and bug ledger/Coordinator spec before storage changes. Implement structured source-backed compaction in existing RuntimeCompactionCoordinator/CompactionManager and production hooks, atomic checkpoints and mandatory anchors. Retain roles, exact retrieval, user revisions, pending jobs and unknown effects; use AR-050 guards for every summarizer/rebase request. Run deterministic RC-16/17/26/34 and ten cycles; E4 real configured model remains AWAITING_ENVIRONMENT until actually run. No endpoint switch, auto-replayed mutation, parallel store or E5 certification.",
+  "next_exact_action": "Continue only AR-051. Read delivery saved.json code_sha and validation/full CI; repair then rerun. Preserve E3 native gates and AR-083 DEFERRED_BY_USER. No main merge, automatic replay, provider/endpoint switch or parallel state store.",
   "next_task_if_active_done": "Reconcile dependencies; do not waive native AR-020/033 or AR-051 E4.",
   "last_runtime_source_commit": "023b08989e9f1d59ade6b62112c9355fe2bcb0ca",
   "previous_saved_checkpoint_commit": "35f6fc3fbbd6ebc2dd06ee4e7493641950a21782",

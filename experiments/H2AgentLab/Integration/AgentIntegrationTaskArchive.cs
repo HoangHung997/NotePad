@@ -291,6 +291,8 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
                     || job.Status == "Succeeded" && (!job.RootExited || !job.AllProcessesExited || !job.StreamsDrained || job.ExitCode != 0)))
                     throw new InvalidDataException("job-shape");
                 break;
+            case "context-source": ValidateContextSourceRecord(e); break;
+            case "context-compaction": ValidateContextRecord(e); break;
             case "verification": if (e.Payload.ValueKind != JsonValueKind.Object) throw new InvalidDataException("verification-shape"); break;
             default: throw new InvalidDataException("unsupported-event-kind");
         }
@@ -298,6 +300,8 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
     private void ValidateTransition(JournalEntry e)
     {
         if (_eventIds.Contains(e.EventId)) throw new InvalidDataException("journal-event-identity");
+        if (e.Kind == "context-compaction") ValidateContextTransition(e);
+        if (e.Kind == "context-source") ValidateContextSourceTransition(e);
         if (e.Kind == "progress")
         {
             var item = e.Payload.Deserialize<H2AgentProgress>()!;
@@ -340,6 +344,16 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
                 if (e.Kind == "operation-intent" && _operations.ContainsKey(key)) throw new InvalidDataException("duplicate-intent");
                 if (e.Kind == "operation-dispatched" && (!_operations.TryGetValue(key, out var intent) || intent.State != "Prepared")) throw new InvalidDataException("missing-intent");
                 _operations[key] = operation; break;
+        }
+        if (e.Kind == "context-source")
+        {
+            var source = e.Payload.Deserialize<H2AgentLab.Session.AgentContextSourceRecord>()!;
+            _contextSources[(e.StreamId, source.TurnId, source.Cycle)] = source;
+        }
+        if (e.Kind == "context-compaction")
+        {
+            var context = e.Payload.Deserialize<H2AgentLab.Session.AgentContextCompactionRecord>()!;
+            _contextHeads[(e.StreamId, context.TurnId)] = context;
         }
         IndexHistory(e);
     }

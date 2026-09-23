@@ -96,7 +96,7 @@ internal sealed class ClientResponsesWebSocketConnection : IResponsesWebSocketCo
 /// before a real request is written, the transport may safely fall back to HTTP/SSE. After a real
 /// request write succeeds, disconnects are ambiguous and are never auto-replayed through HTTP.
 /// </summary>
-public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentRequestBudgetSource
+public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
     private readonly AgentRequestBudgetGuard _requestBudget;
     public AgentRequestBudgetReceipt? LastRequestBudget => (_fallback as IAgentRequestBudgetSource)?.LastRequestBudget ?? _requestBudget.LastReceipt;
@@ -497,6 +497,10 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentR
     }
 
     private JsonObject BuildPayload(JsonArray input, string? previousResponseId)
+        => BuildContextPayload(input, previousResponseId, _tools.Values.ToArray(), _allowParallelToolCalls, _promptCacheKey);
+
+    private JsonObject BuildContextPayload(JsonArray input, string? previousResponseId,
+        IReadOnlyList<AgentToolDefinition> tools, bool allowParallel, string? cacheKey)
     {
         var payload = new JsonObject
         {
@@ -506,12 +510,12 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentR
             ["store"] = false
         };
         if (!string.IsNullOrWhiteSpace(previousResponseId)) payload["previous_response_id"] = previousResponseId;
-        if (_tools.Count > 0)
+        if (tools.Count > 0)
         {
-            payload["tools"] = BuildTools();
-            payload["parallel_tool_calls"] = _allowParallelToolCalls;
+            payload["tools"] = BuildTools(tools);
+            payload["parallel_tool_calls"] = allowParallel;
         }
-        if (_promptCacheKey is { Length: > 0 }) payload["prompt_cache_key"] = _promptCacheKey;
+        if (cacheKey is { Length: > 0 }) payload["prompt_cache_key"] = cacheKey;
 
         var reasoning = new JsonObject();
         if (_profile.RequestReasoningSummary) reasoning["summary"] = "auto";
@@ -545,10 +549,10 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentR
         return new JsonObject { ["role"] = role, ["content"] = parts };
     }
 
-    private JsonArray BuildTools()
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
     {
         var result = new JsonArray();
-        foreach (var tool in _tools.Values)
+        foreach (var tool in candidates ?? _tools.Values)
             result.Add(new JsonObject
             {
                 ["type"] = "function",

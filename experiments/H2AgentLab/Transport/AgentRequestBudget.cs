@@ -16,7 +16,7 @@ public sealed record AgentRequestBudgetReceipt(
 {
     public string TokenAccounting => "EstimatedSerializedUtf8PlusMediaAndRetainedContext";
     public string ByteAccounting => "ExactUtf8SerializedBody";
-    public string DispatchState => "PreSendDecision";
+    public string DispatchState => Kind == "CompactionCandidate" ? "CandidateOnlyNotSent" : "PreSendDecision";
 }
 
 public interface IAgentRequestBudgetSource
@@ -116,6 +116,24 @@ public sealed class AgentRequestBudgetGuard
         if (error is not null) throw new AgentRequestBudgetException(error, receipt);
         if (!prewarm) _generationCount++;
         return serialized;
+    }
+
+    internal AgentRequestBudgetReceipt Preview(JsonObject payload, Guid taskId, Guid turnId,
+        string protocol, CancellationToken cancellationToken)
+    {
+        var copy = new AgentRequestBudgetGuard(new AiProfile
+        {
+            Protocol = _protocol,
+            RequestBudget = _settings with { ChatOutputLimitParameter = _chatLimitField }
+        })
+        {
+            _usageCorrection = _usageCorrection,
+            _accountingInvalid = _accountingInvalid,
+            _retainedContext = _retainedContext,
+            _retainedResponseId = _retainedResponseId
+        };
+        copy.Prepare((JsonObject)payload.DeepClone(), taskId, turnId, protocol, cancellationToken);
+        return copy.LastReceipt! with { Kind = "CompactionCandidate" };
     }
 
     public void ObserveCompleted(AgentTransportUsage? usage, string? responseId = null, bool prewarm = false)
