@@ -1,5 +1,4 @@
 name: AR-051 source-backed work compaction validation
-# Retain initial compile failure; validate repaired source without dropping assertions.
 on:
   push:
     branches: [feature/h2-agent-reliability-ar-000]
@@ -41,6 +40,13 @@ jobs:
           if ($LASTEXITCODE) { throw 'Restore failed' }
           dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar051/build.log
           if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Diagnose compaction boundaries on actual compiled source
+        id: diagnosis
+        shell: pwsh
+        run: |
+          $env:H2_AR051_EVIDENCE_DIR=Join-Path $PWD 'artifacts/ar051/diagnosis'
+          dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-051 2>&1 | Tee-Object artifacts/ar051/diagnosis.log
+          if ($LASTEXITCODE) { throw 'Compaction diagnosis failed; assertions and receipts retained' }
       - name: Repeat source-backed compaction corpus and retain every AR regression
         id: corpus
         shell: pwsh
