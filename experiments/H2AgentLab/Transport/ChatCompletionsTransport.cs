@@ -13,7 +13,7 @@ namespace H2AgentLab.Transport;
 /// out of the future orchestrator. Chat Completions has no provider-side incremental continuation in
 /// this harness, so each continuation replays the bounded active turn owned by this transport.
 /// </summary>
-public sealed class ChatCompletionsTransport : IAgentTransport
+public sealed class ChatCompletionsTransport : IAgentTransport, IAgentRequestBudgetSource
 {
     private sealed class ToolAccumulator(string fallbackId)
     {
@@ -22,6 +22,13 @@ public sealed class ChatCompletionsTransport : IAgentTransport
         public StringBuilder Arguments { get; } = new();
     }
 
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add => _requestBudget.Evaluated += value;
+        remove => _requestBudget.Evaluated -= value;
+    }
     private readonly AiProfile _profile;
     private readonly string _apiKey;
     private readonly HttpClient _http;
@@ -45,6 +52,7 @@ public sealed class ChatCompletionsTransport : IAgentTransport
             throw new ArgumentException("Chat Completions fallback không hỗ trợ yêu cầu reasoning summary công khai; dùng Responses nếu cần.", nameof(profile));
 
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.OpenAiChat;
         _profile.RequestReasoningSummary = false;
         _profile.OllamaThinking = null;
@@ -163,9 +171,10 @@ public sealed class ChatCompletionsTransport : IAgentTransport
         if (AiModelCapabilities.ResolveReasoningEffort(_profile) is { Length: > 0 } effort)
             payload["reasoning_effort"] = effort;
 
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ChatCompletionsTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "chat/completions"))
         {
-            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")
+            Content = new StringContent(serialized, Encoding.UTF8, "application/json")
         };
         if (!string.IsNullOrWhiteSpace(_apiKey))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
@@ -271,6 +280,7 @@ public sealed class ChatCompletionsTransport : IAgentTransport
         _pendingCalls = resolvedCalls;
 
         foreach (var call in resolvedCalls) yield return AgentTransportEvent.Tool(call);
+        _requestBudget.ObserveCompleted(null);
         yield return AgentTransportEvent.Complete(finishReason: resolvedCalls.Count > 0 ? "tool_calls" : finishReason ?? "stop");
     }
 

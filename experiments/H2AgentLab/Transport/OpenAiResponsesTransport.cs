@@ -24,8 +24,15 @@ public enum OpenAiResponsesStateMode
 /// is an explicit opt-in because OpenAI documents that store=true retains response data for later
 /// retrieval; it is never enabled silently and is restricted to the official OpenAI /v1 endpoint.
 /// </summary>
-public sealed class OpenAiResponsesTransport : IAgentTransport
+public sealed class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBudgetSource
 {
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add => _requestBudget.Evaluated += value;
+        remove => _requestBudget.Evaluated -= value;
+    }
     private readonly AiProfile _profile;
     private readonly string _apiKey;
     private readonly HttpClient _http;
@@ -57,6 +64,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         ValidateStateMode(profile, stateMode);
 
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.OpenAiResponses;
         _stateMode = stateMode;
         _apiKey = apiKey ?? "";
@@ -185,9 +193,10 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         var token = linked.Token;
         var payload = BuildPayload();
 
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "OpenAiResponsesTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "responses"))
         {
-            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")
+            Content = new StringContent(serialized, Encoding.UTF8, "application/json")
         };
         if (!string.IsNullOrWhiteSpace(_apiKey))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
@@ -302,6 +311,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
             _previousResponseId = responseId;
         _pendingCalls = calls;
 
+        _requestBudget.ObserveCompleted(usage, responseId);
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
         foreach (var call in calls) yield return AgentTransportEvent.Tool(call);
         yield return AgentTransportEvent.Complete(responseId, calls.Count > 0 ? "tool_calls" : "stop");

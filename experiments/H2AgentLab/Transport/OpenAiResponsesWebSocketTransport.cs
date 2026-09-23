@@ -96,8 +96,15 @@ internal sealed class ClientResponsesWebSocketConnection : IResponsesWebSocketCo
 /// before a real request is written, the transport may safely fall back to HTTP/SSE. After a real
 /// request write succeeds, disconnects are ambiguous and are never auto-replayed through HTTP.
 /// </summary>
-public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
+public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentRequestBudgetSource
 {
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => (_fallback as IAgentRequestBudgetSource)?.LastRequestBudget ?? _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add { _requestBudget.Evaluated += value; _fallbackBudgetObserver += value; }
+        remove { _requestBudget.Evaluated -= value; _fallbackBudgetObserver -= value; }
+    }
     private readonly AiProfile _profile;
     private readonly string _apiKey;
     private readonly Func<IResponsesWebSocketConnection> _connectionFactory;
@@ -139,6 +146,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             throw new ArgumentException("Chưa chọn model OpenAI Responses.", nameof(profile));
 
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.OpenAiResponses;
         _apiKey = apiKey ?? "";
         _connectionFactory = connectionFactory;
@@ -292,9 +300,15 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         if (_httpFallbackFactory is null)
             throw new IOException("Responses WebSocket không kết nối được và không có HTTP fallback.");
         _fallback = _httpFallbackFactory();
+        if (_fallback is IAgentRequestBudgetSource budgeted)
+            budgeted.RequestBudgetEvaluated += ForwardFallbackBudget;
         await foreach (var item in _fallback.StartAsync(request, cancellationToken).WithCancellation(cancellationToken))
             yield return item;
     }
+
+    private void ForwardFallbackBudget(AgentRequestBudgetReceipt receipt)
+        => _fallbackBudgetObserver?.Invoke(receipt);
+    private event Action<AgentRequestBudgetReceipt>? _fallbackBudgetObserver;
 
     private async Task EnsureConnected(CancellationToken cancellationToken)
     {
@@ -320,7 +334,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         {
             var payload = BuildPayload(_initialInput, previousResponseId: null);
             payload["generate"] = false;
-            await _connection.SendTextAsync(payload.ToJsonString(), token);
+            var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token, prewarm: true);
+            await _connection.SendTextAsync(serialized, token);
 
             string? responseId = null;
             var completed = false;
@@ -353,6 +368,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             if (!completed || string.IsNullOrWhiteSpace(responseId))
                 throw new IOException("Responses prewarm đóng trước completion hoặc thiếu response id.");
 
+            _requestBudget.ObserveCompleted(null, responseId, prewarm: true);
             _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "success");
             return responseId;
         }
@@ -380,7 +396,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 
         // From this point onward a network failure is ambiguous: the provider may have accepted
         // the request. Do not auto-fallback/retry, which could duplicate tool execution or output.
-        await _connection.SendTextAsync(payload.ToJsonString(), token);
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token);
+        await _connection.SendTextAsync(serialized, token);
 
         var startedEmitted = false;
         var completed = false;
@@ -473,6 +490,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 
         _previousResponseId = responseId;
         _pendingCalls = calls;
+        _requestBudget.ObserveCompleted(usage, responseId);
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
         foreach (var call in calls) yield return AgentTransportEvent.Tool(call);
         yield return AgentTransportEvent.Complete(responseId, calls.Count > 0 ? "tool_calls" : "stop");

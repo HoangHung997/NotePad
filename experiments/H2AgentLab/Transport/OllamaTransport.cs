@@ -12,7 +12,7 @@ namespace H2AgentLab.Transport;
 /// message shapes. Tool outputs are supplied through ContinueAsync; the full message replay is an
 /// Ollama limitation and is advertised by IncrementalContinuation=false.
 /// </summary>
-public sealed class OllamaTransport : IAgentTransport
+public sealed class OllamaTransport : IAgentTransport, IAgentRequestBudgetSource
 {
     private sealed class ToolAccumulator(string id)
     {
@@ -22,6 +22,13 @@ public sealed class OllamaTransport : IAgentTransport
         public string? ObjectArguments { get; set; }
     }
 
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add => _requestBudget.Evaluated += value;
+        remove => _requestBudget.Evaluated -= value;
+    }
     private readonly AiProfile _profile;
     private readonly HttpClient _http;
     private readonly CancellationTokenSource _lifetime = new();
@@ -44,6 +51,7 @@ public sealed class OllamaTransport : IAgentTransport
         // Shared Core owns the snapshot contract so future AiProfile fields cannot be silently
         // omitted by this transport while a turn is running.
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.Ollama;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false })
         {
@@ -158,9 +166,10 @@ public sealed class OllamaTransport : IAgentTransport
         else if (_profile.OllamaThinking is bool thinking)
             payload["think"] = thinking;
 
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "OllamaTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "api/chat"))
         {
-            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")
+            Content = new StringContent(serialized, Encoding.UTF8, "application/json")
         };
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (!response.IsSuccessStatusCode) throw AiFailure.FromStatus(response.StatusCode, "");
@@ -252,6 +261,7 @@ public sealed class OllamaTransport : IAgentTransport
         _pendingCalls = resolvedCalls;
 
         foreach (var call in resolvedCalls) yield return AgentTransportEvent.Tool(call);
+        _requestBudget.ObserveCompleted(usage);
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
         yield return AgentTransportEvent.Complete(finishReason: resolvedCalls.Count > 0 ? "tool_calls" : doneReason ?? "stop");
     }

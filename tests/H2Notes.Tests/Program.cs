@@ -709,6 +709,7 @@ H2AgentProcessDrainTests.Run(Test);
 H2AgentLongJobTests.Run(Test);
 H2AgentJobProductionTests.Run(Test);
 H2AgentJobObservationTests.Run(Test);
+H2AgentRequestBudgetTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);

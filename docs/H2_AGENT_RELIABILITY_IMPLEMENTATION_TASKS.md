@@ -479,26 +479,25 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-040_ACCEPTED_NEXT_AR-050",
+  "phase": "AR-050_ACTIVE_SERIALIZED_REQUEST_VALIDATION",
   "active_task": "AR-050",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar040-repair-2026-09-23",
+  "owner_session": "chatgpt-ar050-2026-09-23",
   "last_code_commit": "462ab1dec0d0c723920283b0b3b9142b46d6796a",
   "last_validated_code_commit": "462ab1dec0d0c723920283b0b3b9142b46d6796a",
   "last_validation_result": "AR040_57_PASS_X3; ALL_RETAINED_AR_PASS; AGENT74_PASS; FULL915_PASS; NATIVE_GATES_UNCHANGED",
   "capture_checked_head": "12b31e8088df72ae2b25300ac5f086eaeecb34e5",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Focused CI checkout CLEAN. Docs-only checkpoint verifies refs and normal push. Local review is a verified offline source snapshot, not the user-PC checkout; user-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Reviewed source committed on existing branch; user-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T04:16:51.350114+00:00",
-  "completed_this_session": [
-    "AR-040"
-  ],
+  "checkpoint_saved_at_utc": "2026-09-23T04:54:40.913877+00:00",
+  "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-050 NOT_STARTED. Implement actual serialized per-request budgeting under the approved spec."
+    "Build and run AR-050 actual serializers, 205-cycle corpora, all retained regressions and full CI on delivery code SHA; repair failures.",
+    "Verify exact bytes versus estimated token costs, server-held context, prewarm/fallback, media limitations and sourced limits."
   ],
   "last_test_commands": [
     {
@@ -964,7 +963,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Reconcile main, existing feature branch, PR #3 and working tree; begin only AR-050. Extend existing per-request hooks/transport serialization budgets before Start/Continue/repair/steering sends; measure actual messages/tools/images/files plus output reserve/margin with sourced limits; test RC-17/18 and retained AR corpora on the exact saved code. No new engine/store or real provider call without existing authorization. Keep AR-020/033 native E3 pending and AR-083 DEFERRED_BY_USER; AR-041 remains not started pending prerequisites.",
+  "next_exact_action": "Continue only AR-050. Inspect delivery code_sha and Windows CI. Fix failures then verify receipts and save evidence. AR-020/033 E3 and E4 remain NOT_RUN; AR-083 DEFERRED_BY_USER. No automatic compaction or model/endpoint switch.",
   "next_task_if_active_done": "Evaluate AR-051 dependencies and evidence; do not bypass native gates.",
   "last_runtime_source_commit": "5d17d348416c3ffcb27bad33318a091914837ef5",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",

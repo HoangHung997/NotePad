@@ -565,6 +565,10 @@ public sealed partial class H2ProductionAgentAdapter :
         {
             Complete(live, H2AgentTaskStatus.Cancelled, null, null);
         }
+        catch (AgentRequestBudgetException ex)
+        {
+            Complete(live, H2AgentTaskStatus.Blocked, null, Bound(ex.Message, 2_000));
+        }
         catch (AgentVerificationRequiredException ex)
         {
             lock (live.Gate) live.Completion = ex.Completion;
