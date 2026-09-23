@@ -7,6 +7,7 @@ using H2AgentLab.Integration;
 using H2AgentLab.Metrics;
 using H2AgentLab.Transport;
 using H2Notes.Core;
+using H2Notes.Avalonia;
 
 /// <summary>E2 only: actual production adapter/runtime, concrete Responses HTTP serializer,
 /// real disposable file IO, verification and archive reopen; scripted HTTP handler instead
