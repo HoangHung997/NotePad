@@ -1,0 +1,75 @@
+name: AR-051 reviewed cancellation boundary delivery
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar051-cancellation-repair.yml]
+permissions:
+  contents: write
+concurrency:
+  group: h2-ar051-cancellation-delivery
+  cancel-in-progress: false
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Apply reviewed exact sources and save active handoff
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import os, pathlib, subprocess, hashlib, json, urllib.request, base64, datetime
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          def digest(b): return hashlib.sha256(b).hexdigest()
+          branch='feature/h2-agent-reliability-ar-000'
+          assert os.environ['GITHUB_REF_NAME']==branch and git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          assert git('rev-parse','HEAD^')=='ceaf0238c01d84389af9595a5325cf47c2e75671','Concurrent update: reconcile, never reset'
+          assert not git('status','--porcelain')
+          pending={}
+          path='experiments/H2AgentLab/Session/RuntimeCompactionCoordinator.Work.cs'
+          b=subprocess.check_output(['git','show','HEAD:'+path]); assert digest(b)=='0e96fe8f0c8edc2c3a80f3fee3af1eb3477272c68082e68ee1fd3d8d189b893c'
+          old='            var summary = _summarizer(source, anchorsHash); // deterministic extracts; no unbudgeted model call'
+          new='            // Durable source admission may complete after the caller requested cancellation.\n            // Retain its receipt, but do not start a summarizer or replace cancellation with its error.\n            ct.ThrowIfCancellationRequested();\n'+old
+          text=b.decode(); assert text.count(old)==1; pending[path]=text.replace(old,new).encode()
+          assert digest(pending[path])=='e6b51b5cc6b7da32dbd2e609a88c5cd3ee17c236f6b3a2d72f74254fe7f749be'
+          path='tests/H2Notes.Tests/H2AgentWorkCompactionTests.cs'
+          b=subprocess.check_output(['git','show','HEAD:'+path]); assert digest(b)=='411419207ed6048ba40218bfc852f1acb0aecdeb62f69a9077638ae392b82937'
+          text=b.decode()
+          for old,new in [('internal static class H2AgentWorkCompactionTests','internal static partial class H2AgentWorkCompactionTests'),('    internal static void Run(Action<string, Action> test)\n    {','    internal static void Run(Action<string, Action> test)\n    {\n        RunSourceCancellationTests(test);')]:
+              assert text.count(old)==1; text=text.replace(old,new)
+          pending[path]=text.encode(); assert digest(pending[path])=='1aa9277703fc0b92489306a9ff3d5bf91e5821399337f0d81b4fe2365d37e420'
+          path='tests/H2Notes.Tests/H2AgentWorkCompactionTests.Cancellation.cs'; assert not pathlib.Path(path).exists()
+          blob='81a1a9aa1ed367c3ecb150ee2bbfd7900fe61b4c'
+          request=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+blob,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(request,timeout=30) as response: data=json.load(response)
+          b=base64.b64decode(data['content']); assert data['sha']==blob and len(b)==6054 and digest(b)=='af2e765430c1a30bd6bcca618528658bcd3567c048ae5773d886cb0aeee6f9c9'
+          assert hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==blob; pending[path]=b
+          tracker='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'; text=subprocess.check_output(['git','show','HEAD:'+tracker]).decode()
+          pos=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+len('```yaml\n'); state,end=json.JSONDecoder().raw_decode(text[pos:])
+          assert state['active_task']=='AR-051' and state['implementation_status']=='ACTIVE'
+          state.update(phase='AR-051_SOURCE_CANCELLATION_REPAIR_VALIDATION',acceptance_status='NOT_RUN',owner_session='chatgpt-ar051-source-cancellation-review-2026-09-23',completed_this_session=[],uncommitted_files=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),capture_checked_head=os.environ['GITHUB_SHA'],working_tree='Reviewed source committed on existing branch; user-PC working tree NOT_ACCESSIBLE; local review uses hash-verified CI source snapshot.',remaining_in_active_task=['Run six registered cancellation-source tests against old/current coordinator, restore exact source, run all 37 AR-051 tests three times and full retained regressions/CI.','Inspect candidate/source/revision/history evidence; keep required E4 actual H2 UI/model/tools NOT_RUN/AWAITING_ENVIRONMENT.'],next_exact_action='Read this delivery saved.json for actual code SHA. Continue AR-051 cancellation boundary verification on Windows CI. Preserve AR-020/033 E3, AR-051 E4 and deferred AR-083; no native waiver, replay or main merge.')
+          text=text[:pos]+json.dumps(state,ensure_ascii=False,indent=2)+text[pos+end:]
+          text=text.replace('| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | NOT_STARTED |','| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | ACTIVE / REPAIR_VALIDATION |')
+          pending[tracker]=text.encode()
+          for path,b in pending.items(): pathlib.Path(path).write_bytes(b)
+          subprocess.run(['git','diff','--check'],check=True); subprocess.run(['git','add','--',*pending],check=True)
+          assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==os.environ['GITHUB_SHA'],'Concurrent update: no push'
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(AR-051): honor cancellation after durable source admission before summarization'],check=True)
+          code=git('rev-parse','HEAD'); assert not git('status','--porcelain')
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
+          out=pathlib.Path('artifacts/ar051-cancel-delivery'); out.mkdir(parents=True,exist_ok=True)
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'branch':branch,'files':list(pending),'status':'ACTIVE / NOT_RUN','source_sha256':{p:digest(b) for p,b in pending.items()}},indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR051-Cancellation-Source-Delivery
+          path: artifacts/ar051-cancel-delivery/
+          if-no-files-found: error
+          retention-days: 14
