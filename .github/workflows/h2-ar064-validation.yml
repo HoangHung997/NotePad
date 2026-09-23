@@ -9,6 +9,7 @@ on:
       - src/H2Notes.Core/**
       - src/H2Notes.Avalonia/**
       - tests/H2Notes.Tests/**
+      - tools/agent-reliability/test_ar064_outcome_control.py
       - .github/workflows/h2-ar064-validation.yml
 permissions:
   contents: read
@@ -43,6 +44,11 @@ jobs:
           if ($LASTEXITCODE) { throw 'Restore failed' }
           dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar064/build.log
           if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Reproduce old plugin metadata loss then restore exact current source
+        shell: pwsh
+        run: |
+          python tools/agent-reliability/test_ar064_outcome_control.py
+          if ($LASTEXITCODE) { throw 'Plugin outcome control failed' }
       - name: Repeat lifecycle and chat then retain all AR regressions
         id: corpus
         shell: pwsh
