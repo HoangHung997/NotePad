@@ -19,7 +19,7 @@ jobs:
         with:
           ref: feature/h2-agent-reliability-ar-000
           fetch-depth: 0
-      - name: Verify exact reviewed documentation-only program
+      - name: Verify reviewed program and exact receipt-count correction
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -31,9 +31,16 @@ jobs:
           data=base64.b64decode(value['content'])
           assert value['sha']==sha and hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha
           assert hashlib.sha256(data).hexdigest()=='00918218b15117d366ad5ce4b6692cb2c4a07a0230559150aca77c3d5191a2f4'
+          source=data.decode("utf-8")
+          patches=[["text('rev-parse','HEAD^')==CODE", "text('rev-parse','HEAD^')=='bf99821f017d6a295a7c82dc47e19b4acf698788'"], [" assert results==[('1077','0')]", " assert results==[('1070','0')]\n # Do not infer the total from older reports. Verify each AR064 name against the actual full log.\n with zipfile.ZipFile(io.BytesIO(raw)) as focused_zip:\n  focused_names=re.findall(r'^PASS (AR-064[^\\r\\n]*)',focused_zip.read('AR-064-1.log').decode('utf-8-sig'),re.M)\n full_names=re.findall(r'^\\d{4}-[^\\r\\n]*?Z PASS (AR-064[^\\r\\n]*)',decoded,re.M)\n assert len(focused_names)==75 and len(full_names)==75 and sorted(full_names)==sorted(focused_names)\n full_ar064_inventory={'count':len(full_names),'matches_focused':True,'names':full_names}"], ["'full':{'run':FULL,'job':full_job['id'],'status':'SUCCESS','actual_checkout':merge,'source_equal':True,", "'full':{'run':FULL,'job':full_job['id'],'status':'SUCCESS','actual_checkout':merge,'source_equal':True,'ar064_inventory':full_ar064_inventory,"], ["'previous_failures':['35845044820 cancelled before complete corpus'", "'previous_failures':['35866508066 docs-only checkpoint failed before any writes because an inferred 1077 total differed from actual full log 1070/0; current checkpoint verifies all 75 AR064 case names rather than assuming counts. Product assertions unchanged.','35845044820 cancelled before complete corpus'"]]
+          for old,new in patches:
+              assert source.count(old)==1
+              source=source.replace(old,new,1)
+          data=source.encode('utf-8')
+          assert hashlib.sha256(data).hexdigest()=='3ef21be8da7e150682c4c3511eb800a4c4b1c18bf698b14a594a40072ba1f6f4'
           pathlib.Path(os.environ['RUNNER_TEMP'],'ar064-checkpoint.py').write_bytes(data)
           PY
-      - name: Verify source, control, receipts, full CI and refs then save only three documents
+      - name: Verify every case name, source, control, full CI and refs then save only three documents
         env:
           GH_TOKEN: ${{ github.token }}
         run: python "$RUNNER_TEMP/ar064-checkpoint.py"
