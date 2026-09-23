@@ -178,7 +178,9 @@ internal static class H2AgentRequestBudgetTests
             {
                 using var fixture = new WireFixture(kind, Profile(kind, 4096)) { ReportedInput = 3900 };
                 await using var transport = fixture.Create(); var seen = new List<AgentRequestBudgetReceipt>(); Subscribe(transport, seen);
-                var start = Start("first"); var events = await Collect(transport.StartAsync(start));
+                // This fixture returns lookup: advertise it before testing retained-context rejection.
+                var start = Start("first") with { Tools = [new("lookup", "lookup fixture", Parameters())] };
+                var events = await Collect(transport.StartAsync(start));
                 var call = events.Single(e => e.Kind == AgentTransportEventKind.ToolCall).ToolCall!;
                 await ExpectAsync<AgentRequestBudgetException>(() => Collect(transport.ContinueAsync(new(start.TaskId, start.TurnId, [new(call.Id, call.Name, "tiny")]))));
                 Check(fixture.Bodies.Count == 1 && seen[^1].RetainedContextEstimate >= 3964 && !seen[^1].Allowed, "Server-held lineage missing.");

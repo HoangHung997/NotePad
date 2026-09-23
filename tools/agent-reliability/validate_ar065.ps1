@@ -12,6 +12,7 @@ python tools/agent-reliability/test_ar065_wire_control.py
 $control=$LASTEXITCODE
 $failed=@();$results=@()
 foreach ($case in @('AR-065-1','AR-065-2','AR-065-3','FULL')) {
+  $env:H2_AR065_EVIDENCE_DIR = Join-Path (Resolve-Path artifacts/ar065) ("receipts-" + $case)
   $filter=if($case -eq 'FULL'){@()}else{@('--filter','AR-065')}
   dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- @filter 2>&1 | Tee-Object "artifacts/ar065/$case.log"
   $exit=$LASTEXITCODE;$text=Get-Content "artifacts/ar065/$case.log" -Raw
