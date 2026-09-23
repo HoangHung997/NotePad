@@ -21,6 +21,7 @@
 10. Test bằng tài liệu mẫu riêng. Không sửa/xóa tài liệu cá nhân để thử, không tự đóng app người dùng, không chạy lệnh gửi email/upload/submit hoặc dùng tài khoản mới để tạo evidence khi chưa được phép.
 11. Test 2 PC/NAS thật được user hoãn: ghi `DEFERRED_BY_USER`, tiếp tục phần độc lập; không tuyên bố E5 đã pass. Thiếu môi trường Office/model thật phải ghi riêng, không tự suy rằng cũng được miễn nghiệm thu.
 12. Không thêm subsystem chỉ vì tên của task. Ưu tiên sửa/reuse file và contract hiện hữu. Physical moves/namespace churn không phải tiêu chí hoàn thành.
+13. **Critical user-reported gate (2026-09-23):** đọc `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`. Không ngắt AR-064 đang active; sau khi lưu/kiểm checkpoint AR-064, phải thực hiện AR-065 → AR-068 và gate AR-069 trước khi quay lại roadmap thông thường. Đây là lỗi production người dùng đã gặp, không được đóng bằng fixture cũ hoặc bằng cách chỉ ẩn thông báo lỗi.
 
 ## 2. Trạng thái, phụ thuộc và định nghĩa DONE
 
@@ -65,6 +66,7 @@ Không có quyền chạy tool/môi trường thì ghi `NOT_RUN`, tuyệt đối
 | Thử Cua/engine khác | AR-072 có điều kiện | Không phải yêu cầu thay engine mặc định |
 | H2M-093 | AR-010 regression | Bảo toàn bridge đã có, không làm lại từ đầu |
 | H2M-116/H2M-133, bug ledger NAS | AR-083 | Không đóng nghiệm thu physical bằng simulation |
+| 4 lỗi production user 23/09 | AR-065/066/067/068 + gate AR-069 | Xem `H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`; regression phải tái hiện đường user gặp lỗi |
 
 AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mới nhất, không thay cả tracker hoặc xóa các task đã có. MB-124–127 vẫn mở cho tới khi đủ phụ thuộc/evidence; cập nhật cross-reference là đủ, không chép nguyên toàn bộ AR vào Master.
 
@@ -97,6 +99,11 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | ACTIVE / PARTIAL |
+| AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | NOT_STARTED — CRITICAL |
+| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | NOT_STARTED — CRITICAL |
+| AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
+| AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
+| AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
@@ -471,6 +478,14 @@ dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-
 ```
 
 Test command mới phải được đăng ký vào runner/CI phù hợp, không chỉ tạo file test không ai gọi. Dùng targeted tests trong lúc sửa và full gate ở checkpoint task. Không sửa workflow để toàn bộ failures thành continue-on-error. Các nhóm độc lập có thể chạy riêng để một guard lỗi không che toàn bộ kết quả, nhưng aggregation cuối vẫn fail nếu mandatory suite lỗi.
+
+## 6.1. CRITICAL REPAIR GATE — user report 2026-09-23
+
+The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
+
+**Current active work remains AR-064. Do not discard it.** After AR-064 is checkpointed, the next implementation sequence is **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, before selecting another ordinary roadmap task.
+
+Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
 ## 7. SESSION HANDOFF — nguồn tiếp tục ở cuộc trò chuyện mới
 
@@ -1030,9 +1045,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "blocks_independent_implementation": false
     }
   ],
+  "critical_user_reported_repairs": [
+    {"id":"AR-065","issue":"GPT-5.6 Luna text chat works but Agent tool task HTTP 400","status":"NOT_STARTED"},
+    {"id":"AR-066","issue":"Live app resource/native Word-Excel-AutoCAD-Browser semantics","status":"NOT_STARTED"},
+    {"id":"AR-067","issue":"Every meaningful failure returns to Agent for recovery or specific explanation","status":"NOT_STARTED"},
+    {"id":"AR-068","issue":"Command Center attention collapse and acknowledgement lifecycle","status":"NOT_STARTED"},
+    {"id":"AR-069","issue":"Integrated production acceptance of all four user-reported defects","status":"NOT_STARTED"}
+  ],
+  "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [],
   "next_exact_action": "Continue only AR-064 on existing branch/PR #3. Add/run read-only validation on exact new source, repair every failure, finish production lifecycle and real trusted local package RC-28; do not close native gates or merge main.",
-  "next_task_if_active_done": "Reconcile remaining independent tasks; native gates remain mandatory.",
+  "next_task_if_active_done": "AR-065 — CRITICAL: reproduce and repair OpenAI/Luna Agent HTTP 400; then AR-066/067/068 and AR-069 gate",
   "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
   "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
   "finalization_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
@@ -1074,7 +1097,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "implemented_this_session": [
     "AR-051"
   ],
-  "next_ready_independent_task": "AR-064",
+  "next_ready_independent_task": "AR-065 (after AR-064 checkpoint; critical user-reported gate)",
   "independent_dependency_assessment": {
     "id": "AR-064",
     "dependencies": [
