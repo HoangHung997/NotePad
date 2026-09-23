@@ -1,0 +1,143 @@
+--- a/experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs
++++ b/experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs
+@@ -25,6 +25,11 @@
+     private readonly Dictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
+     private readonly Dictionary<string, H2AgentTargetResolution> _pins = new(StringComparer.Ordinal);
+     private readonly ConcurrentDictionary<string, AgentRuntimeDomainVerification> _reports = new();
++    // Disposable task-local observation, not another truth store or proof of the whole goal.
++    private readonly ConcurrentDictionary<H2ApplicationKind, string> _observedLiveSessions = new();
++    internal bool HasCompletedLiveObservation(H2ApplicationKind application)
++        => application is H2ApplicationKind.Word or H2ApplicationKind.Excel
++            && _observedLiveSessions.ContainsKey(application);
+     private readonly SemaphoreSlim _gate = new(1, 1);
+     private readonly OfficeRejectedMutationRecovery _wordRecovery = new();
+     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
+@@ -125,6 +130,7 @@
+                 return JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode,
+                     message = problem, mutationApplied = false });
+         }
++        var application = call.Name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
+         await _gate.WaitAsync(ct).ConfigureAwait(false);
+         try
+         {
+@@ -132,7 +138,6 @@
+             var name = call.Name;
+             var session = H2ProductionToolSession.Arg(call, "session_id") ?? "";
+             var token = H2ProductionToolSession.Arg(call, "state_token") ?? "";
+-            var application = name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
+             var listing = name is "excel.list_workbooks" or "word.list_documents";
+             var observed = await DiscoverAsync(application, ct).ConfigureAwait(false);
+             H2AgentTargetResolution? target = null;
+@@ -299,9 +304,14 @@
+                     throw new ToolPreflightException("stale_resource");
+                 await RevalidateAsync(application, target, ct, mutating).ConfigureAwait(false);
+             }
+-            return JsonSerializer.Serialize(result);
+-        }
+-        catch { _reports.TryRemove(call.Id, out _); throw; }
++            var serialized = JsonSerializer.Serialize(result);
++            // Discovery and provider readiness are metadata only. Mark a source only after the
++            // actual selected-session operation, identity validation and final reprobe succeeded.
++            if (!listing && target is not null && !name.EndsWith("save_copy", StringComparison.Ordinal))
++                _observedLiveSessions[application] = session;
++            return serialized;
++        }
++        catch { _reports.TryRemove(call.Id, out _); _observedLiveSessions.TryRemove(application, out _); throw; }
+         finally { _gate.Release(); }
+     }
+ 
+@@ -384,6 +394,13 @@
+     private async Task RevalidateAsync(H2ApplicationKind application, H2AgentTargetResolution target, CancellationToken ct, bool afterPossibleWrite)
+     {
+         var observation = await DiscoverAsync(application, ct).ConfigureAwait(false);
++        var report = observation.Discovery is ExcelDiscovery excel ? excel.Report : ((WordDiscovery)observation.Discovery).Report;
++        if (report is { Complete: false })
++        {
++            var code = report.Issues.FirstOrDefault()?.Code ?? "native_object_unavailable";
++            if (afterPossibleWrite) throw new OfficeHostClientException(code, "Native revalidation is incomplete after dispatch; reconcile effects before retrying.");
++            throw new ToolPreflightException(code);
++        }
+         var current = Resolve(application, observation.Resources, target.Binding!.DocumentSessionId);
+         if (current.Resolved && target.Binding.MatchesObservation(current.Binding!, requireContentVersion: false)) return;
+         if (afterPossibleWrite) throw new OfficeHostClientException("stale_resource", "Resource identity changed after dispatch; effects need reconciliation.");
+--- a/experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs
++++ b/experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs
+@@ -14,6 +14,7 @@
+             _targetPolicy, _context?.TargetIntent ?? H2Notes.Core.H2AgentTargetIntent.OpenDocument,
+             _targetObserved, _officeClientFactory, _captureValidator);
+         _owned.Add(office);
++        _liveOffice = office;
+         if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace) office.Register(registry);
+         verifiers.RemoveAll(item => item is StructuredOfficeRuntimeDomainVerifier);
+         verifiers.Add(office);
+--- a/experiments/H2AgentLab/Integration/H2ProductionToolSession.LiveResource.cs
++++ b/experiments/H2AgentLab/Integration/H2ProductionToolSession.LiveResource.cs
+@@ -7,6 +7,31 @@
+ internal sealed partial class H2ProductionToolSession
+ {
+     private readonly H2AgentLiveResourceRequirement _liveRequirement;
++    private H2OfficeRuntimeTools? _liveOffice;
++
++    internal IAgentRuntimeHooks WithLiveSourceGuard(IAgentRuntimeHooks inner)
++        => !_liveRequirement.Required ? inner : new LiveSourceHooks(inner, this);
++
++    private sealed class LiveSourceHooks(IAgentRuntimeHooks inner, H2ProductionToolSession session) : IAgentRuntimeHooks
++    {
++        public ValueTask BeforeModelRequestAsync(AgentRuntimeModelRequestBoundary boundary, CancellationToken ct)
++            => inner.BeforeModelRequestAsync(boundary, ct);
++        public ValueTask AfterToolObservationAsync(AgentRuntimeObservationBoundary boundary, CancellationToken ct)
++            => inner.AfterToolObservationAsync(boundary, ct);
++        public ValueTask OnCheckpointAsync(AgentRuntimeCheckpointBoundary boundary, CancellationToken ct)
++            => inner.OnCheckpointAsync(boundary, ct);
++        public async ValueTask BeforeCompletionAsync(AgentRuntimeCompletionBoundary boundary, CancellationToken ct)
++        {
++            await inner.BeforeCompletionAsync(boundary, ct).ConfigureAwait(false);
++            ct.ThrowIfCancellationRequested();
++            // Preserve existing unresolved-effect diagnostics. This guard only adds the missing
++            // source-observation requirement; it does not award semantic/mutation verification.
++            if (boundary.UnresolvedCalls == 0 && !boundary.MutationAwaitingVerification
++                && session._liveOffice?.HasCompletedLiveObservation(session._liveRequirement.ApplicationKind) != true)
++                throw new AgentVerificationRequiredException("live_resource_required: No validated observation of the required live source is available. "
++                    + ToolOutcomeBridge.SafeMessage("live_resource_required"));
++        }
++    }
+     internal string LiveResourceInstruction => !_liveRequirement.Required ? "" :
+         "\nHost source requirement: LiveResource (" + _liveRequirement.ApplicationKind + "). "
+         + ToolOutcomeBridge.SafeMessage("live_resource_required")
+--- a/experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs
++++ b/experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs
+@@ -59,7 +59,10 @@
+             new StructuredOfficeRuntimeDomainVerifier()
+         };
+         if (tools.ProductionSession is { } session)
++        {
+             registry = session.Configure(tools, registry, domainVerifiers);
++            hooks = session.WithLiveSourceGuard(hooks);
++        }
+         var transport = _transportFactory.Create(profile, apiKey, telemetry);
+         var verifier = new AgentRuntimeDomainVerifierRouter(domainVerifiers);
+ 
+--- a/tests/H2Notes.Tests/H2AgentLiveResourceTests.cs
++++ b/tests/H2Notes.Tests/H2AgentLiveResourceTests.cs
+@@ -167,8 +167,11 @@
+                         ActiveWorkContext: notice ? null : Capture(source)), readOnly: false);
+                 original = await Wait(adapter, task);
+                 if (notice)
++                {
++                    Check(original.Status == H2AgentTaskStatus.Blocked, "Readiness metadata cannot complete a live-resource task.");
+                     Check(wire.Results.Any(r => r.Content.Contains(mode == "browser-notice" ? "browser.live_tab" : "autocad.live_drawing", StringComparison.Ordinal)
+                         && r.Content.Contains("not an equivalent source", StringComparison.Ordinal)), "Missing truthful live-provider readiness notice.");
++                }
+                 else if (mode == "disk-only")
+                 {
+                     Check(original.Status == H2AgentTaskStatus.Completed && client.Discoveries == 0,
+--- a/tests/H2Notes.Tests/H2AgentSteeringWireTests.cs
++++ b/tests/H2Notes.Tests/H2AgentSteeringWireTests.cs
+@@ -12,6 +12,7 @@
+         H2AgentOpenAiProductionTests.Run(test);
+         H2AgentLiveResourceTests.Run(test);
+         H2AgentDiskOfficeSourceTests.Run(test);
++        H2AgentLiveCompletionTests.Run(test);
+         foreach (var kind in new[] { "ollama", "chat", "responses", "responses-stored" })
+             test("Agent steering wire preserves user role and turn identity: " + kind, () => Task.Run(async () =>
+             {
