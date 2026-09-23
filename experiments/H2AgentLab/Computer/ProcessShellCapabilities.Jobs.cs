@@ -187,7 +187,9 @@ public sealed partial class ProcessShellCapabilities
             {
                 _process.Stop();
                 var wait = Stopwatch.StartNew();
-                while (_process.ActiveProcesses() != 0 && wait.Elapsed < TimeSpan.FromSeconds(5)) Thread.Sleep(25);
+                // Job accounting may reach zero before the root handle becomes signaled.
+                while ((!_process.RootState().Exited || _process.ActiveProcesses() != 0)
+                    && wait.Elapsed < TimeSpan.FromSeconds(5)) Thread.Sleep(25);
                 var root = _process.RootState();
                 lock (_gate) { _rootExited = root.Exited; _exitCode = root.ExitCode; _allExited = _process.ActiveProcesses() == 0; }
             }
@@ -247,7 +249,10 @@ public sealed partial class ProcessShellCapabilities
                 {
                     _process.Stop();
                     var grace = Stopwatch.StartNew();
-                    while (_process.ActiveProcesses() != 0 && grace.Elapsed < TimeSpan.FromSeconds(5))
+                    // Observe both identities before finalizing cancellation/deadline; job
+                    // accounting alone may lead the process termination signal.
+                    while ((!_process.RootState().Exited || _process.ActiveProcesses() != 0)
+                        && grace.Elapsed < TimeSpan.FromSeconds(5))
                         await Task.Delay(25).ConfigureAwait(false);
                 }
                 try { await drains.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
