@@ -508,13 +508,14 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
   "last_validated_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
   "last_validation_result": "AR066134_PASS_X3; NEW_CONSENT58; FULL1266_PASS; AGENT74_PASS; CONSENT232_AND_TOTAL432_E2_RECEIPTS; ALL_EXACT_SHA_CI_PASS; NATIVE_E3_E4_AWAITING; NOT_DONE",
-  "capture_checked_head": "7df767dc1b50d24e97e5906be457cde90a216d10",
+  "capture_checked_head": "cea6d297ae9d1a48770664a3babaf819f3da65c6",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact focused CI clean start/end and every source Git blob verified; full test-merge tree identical. GitHub code normal-pushed. User-PC working tree NOT_ACCESSIBLE. This checkpoint changes documentation only.",
+  "working_tree": "Validated code remains 17af5676bcfb397441a4a8aae264c6088a5701e1; HEAD cea6d297ae9d1a48770664a3babaf819f3da65c6 differs only by five AR-066 documentation files. User-PC working tree NOT_ACCESSIBLE. Current HEAD pull_request workflows are action_required with no jobs; no new C# result exists.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T19:34:44.751780+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T19:53:00+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
+    "Approve the existing GitHub pull_request workflows on HEAD cea6d297ae9d1a48770664a3babaf819f3da65c6; current runs are action_required and have no jobs/logs, so they are neither PASS nor code failures.",
     "Execute authorized real native E3 and real H2/model/UI E4 corpus including source-approval rendering and live/disk differing content. No real environment available in this session.",
     "Retain conservative exact-resource limitations; unknown/multiple ambiguous live sources are not guessed. Any observed native/production regression stays in AR-066."
   ],
@@ -1210,9 +1211,10 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [
+    "Approve workflows to run for the existing PR #3 action_required runs on HEAD cea6d297ae9d1a48770664a3babaf819f3da65c6; this approval is required before those runs can create jobs.",
     "Provide/connect an authorized isolated Windows/H2/Office test environment and finite permitted model-test budget. Credentials remain on that machine."
   ],
-  "next_exact_action": "Reconcile refs/checkpoint and continue ONLY AR-066 native E3 and real H2 E4 using real-native-acceptance.md: Word unsaved, Excel selection/multiple views, same-object reconnect, no silent disk fallback, and real source approval allow/deny/reference/output/replacement/reselection on both surfaces. Use an authorized isolated Windows/H2/Office environment and existing authorized model with a finite operator budget; never paste keys into chat. Inspect journal/postconditions before repeating uncertain work. Repair any observed regression in AR-066 and rerun exact-SHA CI. Do not start AR-067 in this continuation.",
+  "next_exact_action": "Continue ONLY AR-066. First approve the existing PR #3 workflows currently action_required on HEAD cea6d297ae9d1a48770664a3babaf819f3da65c6, then inspect their jobs/logs and repair any AR-066 regression if present. In parallel only after an authorized isolated Windows/H2/Office environment is connected, run native E3 using real-native-acceptance.md with disposable fixtures; run real H2/model E4 only with an already authorized model profile and finite operator budget. Inspect journal/postconditions before repeating uncertain work. Do not start AR-067.",
   "next_task_if_active_done": "AR-067 after AR-066 acceptance or a separately recorded section 2.2 independent-core dependency decision; no AR-067 implementation this turn.",
   "last_runtime_source_commit": "4c6a96ee39116c431dcd7d69a620c6c4f5bb94e2",
   "previous_saved_checkpoint_commit": "3b3a2f31c7e353faef6187c194f0eeb4d6eee296",
