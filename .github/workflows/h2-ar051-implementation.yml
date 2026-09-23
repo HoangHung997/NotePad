@@ -18,33 +18,43 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
-      - name: Apply exact compile repair without changing assertions
+      - name: Apply hash-verified capability and regression repair
         shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          import os,subprocess,pathlib,hashlib,json
+          import os,subprocess,pathlib,hashlib,json,urllib.request,base64,zlib
           def git(*a): return subprocess.check_output(['git',*a],text=True).strip()
           branch='feature/h2-agent-reliability-ar-000';head=git('rev-parse','HEAD')
           assert os.environ['GITHUB_REF_NAME']==branch and head==os.environ['GITHUB_SHA']
-          assert git('rev-parse','HEAD^')=='78daa6a24b39d4a77c5caa032d68f52f407cceef'
+          assert git('rev-parse','HEAD^')=='fa820ffc08cb33f3e40f24b39cff49aa647df46b'
           assert not git('status','--porcelain')
-          changes=[('tests/H2Notes.Tests/H2AgentWorkCompactionTests.cs','ac03442a291d4514db5b80b269a1709caef39042d9089c21d83684bf11fdea89','using H2Notes.Core;','using H2Notes.Core;\nusing H2Notes.Avalonia;','168503c03574b1464b9949dd58099f32ef5504a8122e307ba53676e4340a5d07'),('experiments/H2AgentLab/Integration/H2HistoryRuntimeTools.cs','d807089f0648062dd75e8c3a5de5026d357f822b05e5044a52713b9c60783b1a','expectedHash = proofs[0].Sha256;','expectedHash = proofs[0].Sha256!;','ac2827a2c40eb065c85d5248254c374863c4b9bc1d095c2537884fdd57aa53aa')]
+          sha='09e47c752bbdb85f4abc6109ba2597f493d89cec'
+          req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response: blob=json.load(response)
+          packed=base64.b64decode(blob['content']);assert hashlib.sha1(b'blob '+str(len(packed)).encode()+b'\0'+packed).hexdigest()==sha
+          raw=zlib.decompress(packed);assert len(raw)==8748 and hashlib.sha256(raw).hexdigest()=='0a0600ae5172e7a41bbf31cf52b1c74be64ebf52a8e0070573c3562bba8fd189'
+          changes=json.loads(raw);assert {c['path'] for c in changes}=={'experiments/H2AgentLab/Runtime/AgentRuntime.cs','tests/H2Notes.Tests/H2AgentWorkCompactionTests.cs'}
           pending={}
-          for path,before,old,new,after in changes:
-            b=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(b).hexdigest()==before,path
-            text=b.decode('utf-8');assert text.count(old)==1
-            content=text.replace(old,new).encode('utf-8');assert hashlib.sha256(content).hexdigest()==after
+          for c in changes:
+            path=c['path'];b=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(b).hexdigest()==c['before'],path
+            text=b.decode('utf-8');previous=len(text)+1
+            for start,end,replacement in reversed(c['edits']):
+              assert 0<=start<=end<previous
+              text=text[:start]+replacement+text[end:];previous=start
+            content=text.encode('utf-8');assert hashlib.sha256(content).hexdigest()==c['after'],path
             pending[path]=content
           for path,b in pending.items():pathlib.Path(path).write_bytes(b)
           subprocess.run(['git','diff','--check'],check=True)
           subprocess.run(['git','add','--',*pending],check=True)
           assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==head
-          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(AR-051): import production scope mapper in compaction tests'],check=True)
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(AR-051): respect optional compaction capability and verify decoded exact source'],check=True)
           code=git('rev-parse','HEAD');assert not git('status','--porcelain')
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
           out=pathlib.Path('artifacts/ar051-delivery');out.mkdir(parents=True,exist_ok=True)
-          (out/'saved.json').write_text(json.dumps({'code_sha':code,'files':list(pending),'status':'ACTIVE / NOT_RUN'},indent=2))
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'files':list(pending),'status':'ACTIVE / NOT_RUN','manifest_sha256':hashlib.sha256(raw).hexdigest()},indent=2))
       - uses: actions/upload-artifact@v4
         if: always()
         with:
