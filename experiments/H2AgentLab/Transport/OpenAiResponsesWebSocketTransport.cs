@@ -176,7 +176,7 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
         _turnId = request.TurnId;
         _allowParallelToolCalls = request.AllowParallelToolCalls;
         _promptCacheKey = NormalizeCacheKey(request.PromptCacheKey);
-        foreach (var tool in SnapshotTools(request.Tools)) _tools[tool.Name] = tool;
+        OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.Tools));
         foreach (var message in request.Messages) _initialInput.Add(ToResponsesMessage(message));
         if (_initialInput.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
         _started = true;
@@ -241,7 +241,7 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
         }
 
         if (request.NewlyLoadedTools is { Count: > 0 })
-            foreach (var tool in SnapshotTools(request.NewlyLoadedTools)) _tools[tool.Name] = tool;
+            OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.NewlyLoadedTools));
 
         var input = new JsonArray();
         foreach (var call in _pendingCalls)
@@ -419,12 +419,12 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
             var type = String(root, "type") ?? "";
 
             if (type == "error")
-                throw new IOException("OpenAI Responses WebSocket báo lỗi. Không tự phát lại request.");
+                throw OpenAiResponsesDiagnostics.Error(root, _previousResponseId is null ? "initial" : "tool_continuation");
             if (type == "response.failed")
-                throw new IOException("OpenAI Responses WebSocket kết thúc ở trạng thái failed.");
+                throw OpenAiResponsesDiagnostics.Error(root, _previousResponseId is null ? "initial" : "tool_continuation");
             if (type == "response.incomplete")
             {
-                var reason = ReadIncompleteReason(root);
+                var reason = ReadIncompleteReason(root) is "max_output_tokens" ? "max_output_tokens" : "not_exposed";
                 throw new IOException("OpenAI Responses WebSocket kết thúc chưa hoàn tất" + (reason.Length > 0 ? ": " + reason : "."));
             }
 
@@ -470,8 +470,11 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
                     throw new InvalidDataException("response.completed thiếu response object.");
                 responseId = String(responseObject, "id") ?? responseId;
                 usage = ReadUsage(responseObject);
-                if (outputItems.Count == 0 && responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
+                if (responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array && output.GetArrayLength() > 0)
+                {
+                    outputItems.Clear();
                     outputItems.AddRange(output.EnumerateArray().Select(x => x.GetRawText()));
+                }
                 completed = true;
                 break;
             }
@@ -550,18 +553,7 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
     }
 
     private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
-    {
-        var result = new JsonArray();
-        foreach (var tool in candidates ?? _tools.Values)
-            result.Add(new JsonObject
-            {
-                ["type"] = "function",
-                ["name"] = tool.Name,
-                ["description"] = tool.Description,
-                ["parameters"] = JsonNode.Parse(tool.Parameters.GetRawText())
-            });
-        return result;
-    }
+        => OpenAiResponsesWireContract.Tools(candidates ?? _tools.Values);
 
     private static IReadOnlyList<AgentToolDefinition> SnapshotTools(IEnumerable<AgentToolDefinition> tools)
     {
@@ -576,7 +568,7 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
         return result;
     }
 
-    private static List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
+    private List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
     {
         var result = new List<AgentTransportToolCall>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -593,7 +585,7 @@ public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport,
             using var args = JsonDocument.Parse(arguments);
             if (args.RootElement.ValueKind != JsonValueKind.Object)
                 throw new InvalidDataException("Responses function_call arguments phải là JSON object.");
-            result.Add(new AgentTransportToolCall(id, name, arguments));
+            result.Add(new AgentTransportToolCall(id, OpenAiResponsesWireContract.InternalName(name, _tools.Values), arguments));
         }
         return result;
     }

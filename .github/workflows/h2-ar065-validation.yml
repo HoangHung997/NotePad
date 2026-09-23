@@ -1,0 +1,39 @@
+name: AR-065 Responses wire contract validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths:
+      - experiments/H2AgentLab/**
+      - src/H2Notes.Core/**
+      - tests/H2Notes.Tests/**
+      - tools/agent-reliability/*ar065*
+      - .github/workflows/h2-ar065-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar065-validation
+  cancel-in-progress: false
+jobs:
+  validation:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate exact AR-065 source and retain regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar065.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR065-Wire-Evidence
+          path: artifacts/ar065/
+          if-no-files-found: error
+          retention-days: 14

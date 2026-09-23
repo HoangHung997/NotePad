@@ -8,6 +8,7 @@ internal static class H2AgentSteeringWireTests
 {
     public static void Run(Action<string, Action> test)
     {
+        H2AgentOpenAiWireTests.Run(test);
         foreach (var kind in new[] { "ollama", "chat", "responses", "responses-stored" })
             test("Agent steering wire preserves user role and turn identity: " + kind, () => Task.Run(async () =>
             {
