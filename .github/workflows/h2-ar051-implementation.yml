@@ -12,73 +12,39 @@ jobs:
   delivery:
     if: github.repository == 'HoangHung997/NotePad'
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
-      - name: Verify exact reviewed sources and preserve canonical handoff before normal push
+      - name: Apply exact compile repair without changing assertions
         shell: python
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          import os, json, pathlib, subprocess, hashlib, base64, zlib, urllib.request, datetime
-          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
-          def run(*args): subprocess.run(['git', *args], check=True)
-          branch='feature/h2-agent-reliability-ar-000'
-          head=git('rev-parse','HEAD')
+          import os,subprocess,pathlib,hashlib,json
+          def git(*a): return subprocess.check_output(['git',*a],text=True).strip()
+          branch='feature/h2-agent-reliability-ar-000';head=git('rev-parse','HEAD')
           assert os.environ['GITHUB_REF_NAME']==branch and head==os.environ['GITHUB_SHA']
-          assert git('rev-parse','HEAD^')=='ae46b0228738f4441796521f81295c26d96b1a54', 'Concurrent change: reconcile; never reset'
+          assert git('rev-parse','HEAD^')=='78daa6a24b39d4a77c5caa032d68f52f407cceef'
           assert not git('status','--porcelain')
-          assert git('ls-remote','origin','refs/heads/main').split()[0]=='1283bc13e07c3cd47d04886166de3dfc595422c0'
-          parts=[]
-          for sha in ['1d0f77639819491af9c8e9d85601ba78738c03d9','4bffbdb8457f24feb497bf06a74681f35fa0cb4f','9ec8f4a15cf758d50a7e00accef947992fba661a','dedce1197bcd35968c71cf8377a7885b95c0964e']:
-            req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
-            with urllib.request.urlopen(req,timeout=30) as response: blob=json.load(response)
-            b=base64.b64decode(blob['content'])
-            assert hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==sha
-            parts.append(b)
-          raw=zlib.decompress(b''.join(parts))
-          assert len(raw)==90765 and hashlib.sha256(raw).hexdigest()=='d2fdf2d56d4006d69729888f77d971c92344cc94d246d26bc8fcde93f8caeb16'
-          changes=json.loads(raw); assert len(changes)==22
+          changes=[('tests/H2Notes.Tests/H2AgentWorkCompactionTests.cs','ac03442a291d4514db5b80b269a1709caef39042d9089c21d83684bf11fdea89','using H2Notes.Core;','using H2Notes.Core;\nusing H2Notes.Avalonia;','168503c03574b1464b9949dd58099f32ef5504a8122e307ba53676e4340a5d07'),('experiments/H2AgentLab/Integration/H2HistoryRuntimeTools.cs','d807089f0648062dd75e8c3a5de5026d357f822b05e5044a52713b9c60783b1a','expectedHash = proofs[0].Sha256;','expectedHash = proofs[0].Sha256!;','ac2827a2c40eb065c85d5248254c374863c4b9bc1d095c2537884fdd57aa53aa')]
           pending={}
-          for c in changes:
-            path=c['path']; p=pathlib.Path(path)
-            assert not p.is_absolute() and '..' not in p.parts and path.startswith(('experiments/H2AgentLab/','tests/H2Notes.Tests/')) and path.endswith('.cs')
-            if c['before'] is None:
-              assert not p.exists(), path
-              content=c['content'].encode('utf-8')
-            else:
-              original=subprocess.check_output(['git','show','HEAD:'+path])
-              assert hashlib.sha256(original).hexdigest()==c['before'], path
-              text=original.decode('utf-8')
-              previous=len(text)+1
-              for start,end,replacement in reversed(c['edits']):
-                assert 0<=start<=end<previous
-                text=text[:start]+replacement+text[end:]; previous=start
-              content=text.encode('utf-8')
-            assert hashlib.sha256(content).hexdigest()==c['after'], path
+          for path,before,old,new,after in changes:
+            b=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(b).hexdigest()==before,path
+            text=b.decode('utf-8');assert text.count(old)==1
+            content=text.replace(old,new).encode('utf-8');assert hashlib.sha256(content).hexdigest()==after
             pending[path]=content
-          tracker='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
-          text=subprocess.check_output(['git','show','HEAD:'+tracker]).decode('utf-8')
-          pos=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+len('```yaml\n')
-          state,end=json.JSONDecoder().raw_decode(text[pos:])
-          assert state['active_task']=='AR-051' and state['implementation_status']=='NOT_STARTED'
-          state.update(phase='AR-051_ACTIVE_SOURCE_BACKED_COMPACTION',implementation_status='ACTIVE',acceptance_status='NOT_RUN',owner_session='chatgpt-ar051-2026-09-23',capture_checked_head=head,working_tree='Reviewed source committed on existing branch. User-PC working tree NOT_ACCESSIBLE; local review is an offline exact-source snapshot.',uncommitted_files=[],completed_this_session=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),remaining_in_active_task=['Build exact delivered source on Windows and run registered AR-051 10-cycle concrete serializer and production corpora; fix failures.','Validate journal/source integrity, candidate activation, scope, pending jobs and failure preservation; retain AR-050 and earlier regressions.','Real H2 UI/model/tool E4 subset remains NOT_RUN; deterministic E2 is not full acceptance.'],next_exact_action='Continue only AR-051. Read delivery saved.json code_sha and validation/full CI; repair then rerun. Preserve E3 native gates and AR-083 DEFERRED_BY_USER. No main merge, automatic replay, provider/endpoint switch or parallel state store.')
-          pending[tracker]=(text[:pos]+json.dumps(state,ensure_ascii=False,indent=2)+text[pos+end:]).encode('utf-8')
-          pending['docs/agent-reliability/AR-051/implementation.md']=b'# AR-051 source-backed work compaction\n\nACTIVE / NOT_RUN. Existing RuntimeCompactionCoordinator/CompactionManager, ArtifactStore and Agent journal own source, mandatory anchors and atomic activation. Actual same-provider serializers preview a candidate and revalidate its exact body before sending. Deterministic extractive summaries retain exact source spans, not counts-only memory or semantic model certification. New E1/E2 tests use intercepted concrete transports, real temporary files/journal and ten compaction cycles. E4 actual H2 UI/model/tools NOT_RUN. Native AR-020/033 remain awaiting environment; AR-083 DEFERRED_BY_USER. No automatic mutation replay, new provider credentials or main merge.\n'
-          for path,content in pending.items():
-            p=pathlib.Path(path); p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(content)
-          run('diff','--check'); run('add','--',*pending)
+          for path,b in pending.items():pathlib.Path(path).write_bytes(b)
+          subprocess.run(['git','diff','--check'],check=True)
+          subprocess.run(['git','add','--',*pending],check=True)
           assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
-          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==head, 'Concurrent update'
-          run('-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','feat(AR-051): integrate source-backed work compaction and atomic validated context checkpoints')
-          code=git('rev-parse','HEAD'); assert not git('status','--porcelain')
-          run('push','origin','HEAD:refs/heads/'+branch)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==head
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(AR-051): import production scope mapper in compaction tests'],check=True)
+          code=git('rev-parse','HEAD');assert not git('status','--porcelain')
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
-          out=pathlib.Path('artifacts/ar051-delivery'); out.mkdir(parents=True,exist_ok=True)
-          (out/'saved.json').write_text(json.dumps({'code_sha':code,'branch':branch,'files':list(pending),'status':'ACTIVE / NOT_RUN','manifest_sha256':hashlib.sha256(raw).hexdigest()},indent=2),encoding='utf-8')
+          out=pathlib.Path('artifacts/ar051-delivery');out.mkdir(parents=True,exist_ok=True)
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'files':list(pending),'status':'ACTIVE / NOT_RUN'},indent=2))
       - uses: actions/upload-artifact@v4
         if: always()
         with:
