@@ -174,7 +174,7 @@ internal sealed class H2HistoryRuntimeTools : IDisposable
                 if (proofs.Length == 0 || proofs.Select(e => (e.Kind, e.Sha256)).Distinct().Count() != 1
                     || proofs[0].Sha256 is not { Length: 64 })
                     throw new UnauthorizedAccessException("No scoped artifact proof.");
-                expectedHash = proofs[0].Sha256;
+                expectedHash = proofs[0].Sha256!;
             }
             if (!ValidArtifactId(evidence)) throw new UnauthorizedAccessException("Invalid artifact identity.");
             var root = Path.Combine(_stateRoot, "tasks", document.Source.TaskId.ToString("N"));

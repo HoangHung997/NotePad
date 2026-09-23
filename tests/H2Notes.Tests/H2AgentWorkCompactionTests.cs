@@ -11,6 +11,7 @@ using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
 using H2Notes.Core;
+using H2Notes.Avalonia;
 
 /// <summary>E1 invariant/candidate tests; E2 real serializers with intercepted HTTP/socket,
 /// production registry, actual disposable files, ArtifactStore and Agent journal. The model
