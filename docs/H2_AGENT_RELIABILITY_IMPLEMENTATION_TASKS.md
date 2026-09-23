@@ -96,7 +96,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | NOT_STARTED |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
-| AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | NOT_STARTED |
+| AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | ACTIVE / PARTIAL |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
@@ -375,7 +375,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** trong phạm vi công bố có execution thật và evidence; ngoài phạm vi hiện Unsupported/NotConfigured; không hạ requirement live thành closed mà không ghi rõ và xin quyết định nếu muốn defer.
 
-### [ ] AR-064 — Lifecycle plugin/provider trên production
+### [~] AR-064 — Lifecycle plugin/provider trên production
 
 **Sửa/reuse:** PluginManager/ProviderManager/registry composition/pinning/skill source/UI hoặc command path quản lý được sản phẩm dùng.
 
@@ -483,43 +483,31 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-051_E2_VALIDATED_E4_PENDING_NEXT_AR-064",
+  "phase": "AR-064_FOUNDATION_AWAITING_CI",
   "active_task": "AR-064",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE / PARTIAL",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar051-source-cancellation-review-2026-09-23",
-  "last_code_commit": "28e34454c7f44deebaa867121e661739a79470b5",
+  "owner_session": "chatgpt-ar064-resume-2026-09-23",
+  "last_code_commit": "ebb3fab416d921bcbf47058f1db2018349f26f20",
   "last_validated_code_commit": "28e34454c7f44deebaa867121e661739a79470b5",
-  "last_validation_result": "AR051_37_PASS_X3; OLD_COORDINATOR_6_EXPECTED_FAILURES; TEN_CYCLES_5_MODES_X3; PRODUCTION_GLOBAL_PROJECT_PASS; AGENT74_PASS; FULL1002_PASS; E4_NOT_RUN",
+  "last_validation_result": "NEW_CODE_NOT_RUN; prior HEAD full CI 35836793456 had 1001 pass / 1 chat fixture cleanup failure",
   "capture_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact focused CI checkout clean; docs-only checkpoint verified source equality, refs and normal push. Local review uses verified CI snapshot; user-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Isolated delivery checkout clean after commit; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T08:20:53.824738+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T09:46:35.610556+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-064 NOT_STARTED. Reconcile existing PluginManager/ProviderManager/registry/pinning before implementation; use one task only."
+    "Build and execute new lifecycle corpus plus chat cleanup regression; retain all AR and Agent suites.",
+    "Complete product-used plugin/provider package composition, version pinning, real local package execution and RC-28 before acceptance. Foundation alone is not DONE."
   ],
   "last_test_commands": [
     {
-      "command": "H2Notes.Tests --filter AR-051 x3; retained AR suites; run_agent_suites.ps1",
-      "run_id": 35835063919,
-      "sha": "28e34454c7f44deebaa867121e661739a79470b5",
-      "result": "37/37 x3; all retained corpora pass; 74/74 Agent suites"
-    },
-    {
-      "command": "Old coordinator plus six current cancellation tests; exact source restore and rebuild",
-      "run_id": 35835063919,
-      "sha": "28e34454c7f44deebaa867121e661739a79470b5",
-      "result": "0 pass / 6 expected failures on old class; current code passes"
-    },
-    {
-      "command": "Avalonia CI + publish + packaged helper IPC",
-      "run_id": 35835069955,
-      "sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
-      "result": "1002/1002; required steps success"
+      "command": "Windows build + AR-064 / chat / retained AR / independent Agent suites + full CI",
+      "sha": "ebb3fab416d921bcbf47058f1db2018349f26f20",
+      "result": "NOT_RUN"
     }
   ],
   "ci_runs": [
@@ -1043,7 +1031,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue only independent AR-064 under section 2.2 after reconciling current refs, working tree and checkpoint. Read production plugin/provider lifecycle, use real trusted local test package and finite budget for RC-28. AR-051 is IMPLEMENTED/E2_PASS but AWAITING_ENVIRONMENT for E4, not DONE. Do not waive AR-020/033 E3, AR-041 dependencies or AR-083 DEFERRED_BY_USER.",
+  "next_exact_action": "Continue only AR-064 on existing branch/PR #3. Add/run read-only validation on exact new source, repair every failure, finish production lifecycle and real trusted local package RC-28; do not close native gates or merge main.",
   "next_task_if_active_done": "Reconcile remaining independent tasks; native gates remain mandatory.",
   "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
   "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
