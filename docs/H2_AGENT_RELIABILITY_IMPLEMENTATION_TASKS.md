@@ -90,7 +90,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
-| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | ACTIVE / REPAIR_VALIDATION |
+| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | NOT_STARTED |
@@ -313,7 +313,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** không request over-limit known được gửi; estimate/exact labels đúng; metrics capture thực không chỉ counting synthetic summary. Threshold là cấu hình có nguồn, không bịa model context.
 
-### [ ] AR-051 — Compaction có nghĩa công việc và checkpoint an toàn
+### [~] AR-051 — Compaction có nghĩa công việc và checkpoint an toàn
 
 **Sửa:** RuntimeCompactionCoordinator/CompactionManager và production hooks; dùng Agent journal/state, không chỉ LabSession.
 
@@ -322,6 +322,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test E2 + E4 subset:** RC-16/17/26/34; ít nhất 10 compaction cycles deterministic; lỗi summarizer; missing constraints; outdated requirement; retrieval exact number/formula; test thật với model người dùng và budget có phép.
 
 **Acceptance:** đo semantic recall với nguồn thay vì chỉ prompt length; counts-only summary không phải memory chính; compaction thất bại vẫn có state an toàn và blocker có nghĩa.
+
+**AR-051 E2 checkpoint 2026-09-23:** IMPLEMENTED / AWAITING_ENVIRONMENT, **not DONE**. Exact tested `28e34454c7f44deebaa867121e661739a79470b5`; focused 35835063919 **37/37 x3**, old coordinator **six expected cancellation failures**, all retained AR suites and **74/74** Agent suites pass. Full 35835069955 **1002/1002**, publish/helper IPC PASS. Same-provider concrete serializers, ten source-backed cycles, real temporary files and Agent journal; deterministic extracts are not live-model semantic recall. Required E4 remains NOT_RUN. [Evidence](agent-reliability/AR-051/acceptance.json). Independent AR-064 may proceed under section 2.2; AR-020/033 and deferred AR-083 unchanged.
 
 ### [ ] AR-052 — Đổi model/context và tiếp tục từ state chuẩn
 
@@ -481,50 +483,43 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-051_SOURCE_CANCELLATION_REPAIR_VALIDATION",
-  "active_task": "AR-051",
-  "implementation_status": "ACTIVE",
+  "phase": "AR-051_E2_VALIDATED_E4_PENDING_NEXT_AR-064",
+  "active_task": "AR-064",
+  "implementation_status": "NOT_STARTED",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar051-source-cancellation-review-2026-09-23",
-  "last_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-  "last_validated_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-  "last_validation_result": "AR050_50_PASS_X3; SETTINGS_OLD_CLASS_EXPECTED_FAILURE; ACTUAL_WIRE_205_X5_X3; POST_EFFECT_GLOBAL_PROJECT_PASS_X3; ALL_RETAINED_AR_PASS; AGENT74_PASS; FULL965_PASS",
-  "capture_checked_head": "7b364cc0989406fd7ec03249432eee238809bf3a",
+  "last_code_commit": "28e34454c7f44deebaa867121e661739a79470b5",
+  "last_validated_code_commit": "28e34454c7f44deebaa867121e661739a79470b5",
+  "last_validation_result": "AR051_37_PASS_X3; OLD_COORDINATOR_6_EXPECTED_FAILURES; TEN_CYCLES_5_MODES_X3; PRODUCTION_GLOBAL_PROJECT_PASS; AGENT74_PASS; FULL1002_PASS; E4_NOT_RUN",
+  "capture_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Reviewed source committed on existing branch; user-PC working tree NOT_ACCESSIBLE; local review uses hash-verified CI source snapshot.",
+  "working_tree": "Exact focused CI checkout clean; docs-only checkpoint verified source equality, refs and normal push. Local review uses verified CI snapshot; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T08:02:56.499704+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T08:20:53.824738+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Run six registered cancellation-source tests against old/current coordinator, restore exact source, run all 37 AR-051 tests three times and full retained regressions/CI.",
-    "Inspect candidate/source/revision/history evidence; keep required E4 actual H2 UI/model/tools NOT_RUN/AWAITING_ENVIRONMENT."
+    "AR-064 NOT_STARTED. Reconcile existing PluginManager/ProviderManager/registry/pinning before implementation; use one task only."
   ],
   "last_test_commands": [
     {
-      "command": "H2Notes.Tests --filter AR-050 x3 plus all retained AR suites",
-      "run_id": 35821961122,
-      "sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-      "result": "50/50 x3; all retained pass"
+      "command": "H2Notes.Tests --filter AR-051 x3; retained AR suites; run_agent_suites.ps1",
+      "run_id": 35835063919,
+      "sha": "28e34454c7f44deebaa867121e661739a79470b5",
+      "result": "37/37 x3; all retained corpora pass; 74/74 Agent suites"
     },
     {
-      "command": "Old AiSettingsWindow class with unchanged current settings test, then exact restore/rebuild",
-      "run_id": 35821961122,
-      "sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-      "result": "Expected 0 pass / 1 budget-preservation failure; new code pass"
+      "command": "Old coordinator plus six current cancellation tests; exact source restore and rebuild",
+      "run_id": 35835063919,
+      "sha": "28e34454c7f44deebaa867121e661739a79470b5",
+      "result": "0 pass / 6 expected failures on old class; current code passes"
     },
     {
-      "command": "run_agent_suites.ps1",
-      "run_id": 35821961122,
-      "sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-      "result": "74/74"
-    },
-    {
-      "command": "Avalonia CI + publish + helper IPC",
-      "run_id": 35821963881,
-      "sha": "e40011dd4f02d8a900f658368678934c4a5d52e3",
-      "result": "965/965; all steps success"
+      "command": "Avalonia CI + publish + packaged helper IPC",
+      "run_id": 35835069955,
+      "sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
+      "result": "1002/1002; required steps success"
     }
   ],
   "ci_runs": [
@@ -959,6 +954,23 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "result": "SUCCESS_VERIFIED",
       "h2_tests": "965 passed / 0 failed",
       "raw_log_sha256": "445868b628572868ab71a1202e74ade3df05d96319a99715a5a8fa7f84c170af"
+    },
+    {
+      "id": 35835063919,
+      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
+      "result": "SUCCESS",
+      "AR051": "37/37 x3",
+      "old_class_control": "0/6 expected failures",
+      "agent_suites": "74/74"
+    },
+    {
+      "id": 35835069955,
+      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
+      "tested_checkout_sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
+      "result": "SUCCESS",
+      "h2_tests": "1002/1002",
+      "publish_and_helper_ipc": "SUCCESS",
+      "build_warnings": 38
     }
   ],
   "evidence_locations": [
@@ -997,11 +1009,21 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "docs/agent-reliability/AR-040/acceptance.json",
     "docs/agent-reliability/AR-040/implementation.md",
     "docs/agent-reliability/AR-050/acceptance.json",
-    "docs/agent-reliability/AR-050/implementation.md"
+    "docs/agent-reliability/AR-050/implementation.md",
+    "docs/agent-reliability/AR-051/acceptance.json",
+    "docs/agent-reliability/AR-051/implementation.md",
+    "Actions 35835063919 AR051-Work-Compaction-Evidence",
+    "Actions 35835069955 H2Notes-Avalonia-Portable-win-x64"
   ],
   "known_failures": [],
   "external_blockers": [
-    "AR-020/033 native E3 remain AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER. AR-051 deterministic core may proceed; do not waive its E4 subset."
+    "AR-020/033 native E3 remain AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER. AR-051 deterministic core may proceed; do not waive its E4 subset.",
+    {
+      "id": "AR-051-E4",
+      "missing_evidence": "Actual authorized H2 UI/model/tools semantic recall subset",
+      "status": "AWAITING_ENVIRONMENT",
+      "blocks_independent_implementation": false
+    }
   ],
   "deferred_acceptance": [
     {
@@ -1021,11 +1043,11 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Read this delivery saved.json for actual code SHA. Continue AR-051 cancellation boundary verification on Windows CI. Preserve AR-020/033 E3, AR-051 E4 and deferred AR-083; no native waiver, replay or main merge.",
-  "next_task_if_active_done": "Reconcile dependencies; do not waive native AR-020/033 or AR-051 E4.",
-  "last_runtime_source_commit": "023b08989e9f1d59ade6b62112c9355fe2bcb0ca",
-  "previous_saved_checkpoint_commit": "35f6fc3fbbd6ebc2dd06ee4e7493641950a21782",
-  "finalization_checked_head": "65469ff7f456905f531c553e938148bf402efc45",
+  "next_exact_action": "Continue only independent AR-064 under section 2.2 after reconciling current refs, working tree and checkpoint. Read production plugin/provider lifecycle, use real trusted local test package and finite budget for RC-28. AR-051 is IMPLEMENTED/E2_PASS but AWAITING_ENVIRONMENT for E4, not DONE. Do not waive AR-020/033 E3, AR-041 dependencies or AR-083 DEFERRED_BY_USER.",
+  "next_task_if_active_done": "Reconcile remaining independent tasks; native gates remain mandatory.",
+  "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
+  "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
+  "finalization_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
   "additional_ci_after_recorded_run": "Not used as acceptance; later documentation/workflow runs need independent inspection.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
@@ -1058,25 +1080,22 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "cause": "Exact-output fixture also received native PowerShell progress; production stderr was not stripped"
     }
   ],
-  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs",
+  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Session/RuntimeCompactionCoordinator.Work.cs",
   "previous_completed_task": "AR-040",
-  "current_candidate_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Core/H2AgentResourceBinding.cs",
-  "last_full_ci_checkout_sha": "e40011dd4f02d8a900f658368678934c4a5d52e3",
+  "last_full_ci_checkout_sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
   "implemented_this_session": [
-    "AR-050"
+    "AR-051"
   ],
-  "next_ready_independent_task": "AR-051",
+  "next_ready_independent_task": "AR-064",
   "independent_dependency_assessment": {
-    "id": "AR-051",
+    "id": "AR-064",
     "dependencies": [
-      "AR-031 accepted",
-      "AR-032 accepted",
-      "AR-050 accepted"
+      "AR-010 accepted",
+      "AR-011 accepted",
+      "AR-031 accepted"
     ],
-    "basis": "Tracker section 2.2; core independent while E4 acceptance remains separate."
+    "basis": "Tracker 2.2. Plugin/provider lifecycle core does not depend on unaccepted AR-051 E4, AR-020/033 E3 or AR-041 restart."
   },
-  "candidate_base": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-  "candidate_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Tasking/AgentGoalState.cs",
   "parked_acceptance": [
     {
       "id": "AR-020",
@@ -1092,6 +1111,17 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
       "completed_level": "E2",
       "required_level": "E3",
       "done": false
+    },
+    {
+      "id": "AR-051",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "AWAITING_ENVIRONMENT",
+      "completed_level": "E2",
+      "required_level": "E4",
+      "done": false,
+      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
+      "missing_evidence": "Actual H2 UI/model/tools semantic recall and failure subset under authorized configured model budget",
+      "blocks_independent_implementation": false
     }
   ],
   "resolved_in_this_session": [
