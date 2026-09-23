@@ -136,7 +136,7 @@ internal static class H2AgentRuntimeHookTests
                 var wire = transport.Sessions.Single();
                 Check(wire.Continuations.Any(c => c.ToolResults.Count == 0
                     && c.SupplementalUserMessages?.Any(s => s.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
-                        && s.Contains("\"unresolvedToolFailures\":1", StringComparison.Ordinal)) == true),
+                        && s.Contains("\"UnresolvedAttempts\":1", StringComparison.Ordinal)) == true),
                     "Structured recovery-state continuation was not exercised.");
                 Check(traces.Count(e => e.Kind == AgentRuntimeHookKind.BeforeModelRequest) == wire.Sends,
                     "Recovery-state continuation bypassed pre-request hook.");
