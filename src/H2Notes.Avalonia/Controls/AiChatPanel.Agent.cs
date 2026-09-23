@@ -177,7 +177,8 @@ public sealed partial class AiChatPanel
                     };
 
                     if (summary.Status == H2AgentTaskStatus.Blocked
-                        && string.IsNullOrWhiteSpace(answer.ErrorText))
+                        && string.IsNullOrWhiteSpace(answer.ErrorText)
+                        && string.IsNullOrWhiteSpace(answer.Content))
                         answer.ErrorText = "Agent bị chặn trước khi hoàn tất.";
                     if (summary.Status == H2AgentTaskStatus.Failed
                         && string.IsNullOrWhiteSpace(answer.ErrorText))

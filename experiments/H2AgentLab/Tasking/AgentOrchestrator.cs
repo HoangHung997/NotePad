@@ -87,6 +87,12 @@ public sealed class AgentOrchestrator
                 UpdateContract(current, effective);
             Verify(current, "AgentRuntime returned; host completion state evaluated.");
 
+            if (result.Completion is { State: "Blocked" or "PartiallyCompleted" })
+            {
+                Block(current, "AgentRuntime exhausted bounded goal-preserving recovery; authoritative completion remains blocked.");
+                return result;
+            }
+
             if (result.VerificationHistory.Count > 0)
             {
                 var latest = result.VerificationHistory[^1];

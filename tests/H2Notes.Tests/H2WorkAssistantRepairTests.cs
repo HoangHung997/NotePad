@@ -247,15 +247,39 @@ internal static class H2WorkAssistantRepairTests
         });
 
         foreach (var name in new[] { "files:write", "made_up_tool" })
-            test("Work Assistant unknown tool blocks false completion: " + name, () => InWorkspace(root =>
+            test("AR-067 Work Assistant unknown tool returns Agent-authored blocked explanation: " + name, () => InWorkspace(root =>
             {
-                var script = new Script([new("bad", name, "{\"path\":\"hello.txt\",\"content\":\"xin chào\"}")]);
+                var script = new Script(
+                    [new("bad", name, "{\"path\":\"hello.txt\",\"content\":\"xin chào\"}")],
+                    finalText: "Không thể hoàn tất: unknown_tool không tồn tại cho tệp hello.txt. Tôi không đổi sang một thao tác ghi khác khi chưa có callable phù hợp; cần nạp/cài công cụ tương ứng rồi tiếp tục.");
                 using var adapter = Adapter(root, script);
                 var done = Wait(adapter, adapter.StartTaskAsync(null, "Create requested file", Context(root), false).Result);
-                Check(done.Status == H2AgentTaskStatus.Blocked && done.Error!.Contains("unknown_tool"), done.Error ?? done.Status.ToString());
+                Check(done.Status == H2AgentTaskStatus.Blocked
+                    && done.FinalText?.Contains("unknown_tool", StringComparison.Ordinal) == true
+                    && string.IsNullOrWhiteSpace(done.Error), done.Error ?? done.FinalText ?? done.Status.ToString());
                 Check(!File.Exists(Path.Combine(root, "hello.txt")), "Unknown tool executed a write");
                 Check(script.Results.Single().IsError, "Failure was not sent to model");
+                Check(script.Supplemental.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
+                    && x.Contains("\"errorCode\":\"unknown_tool\"", StringComparison.Ordinal)
+                    && x.Contains("\"safeRecoveryCandidates\"", StringComparison.Ordinal)),
+                    "Structured failure state was not returned to the production Agent.");
             }));
+
+        test("AR-067 Work Assistant model continuation outage exposes technical card without claiming completion", () => InWorkspace(root =>
+        {
+            var script = new Script(
+                [new("bad", "definitely_missing_ar067_tool", "{\"path\":\"hello.txt\",\"content\":\"xin chào\"}")],
+                failRecoveryContinuation: true);
+            using var adapter = Adapter(root, script);
+            var done = Wait(adapter, adapter.StartTaskAsync(null, "Create requested file", Context(root), false).Result);
+            Check(done.Status == H2AgentTaskStatus.Blocked
+                && done.FinalText?.Contains("model_continuation", StringComparison.Ordinal) == true
+                && done.FinalText.Contains("khôi phục kết nối/cấu hình model", StringComparison.Ordinal)
+                && string.IsNullOrWhiteSpace(done.Error),
+                done.Error ?? done.FinalText ?? done.Status.ToString());
+            Check(script.Supplemental.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)),
+                "Model outage fixture did not reach the recovery continuation boundary.");
+        }));
 
         test("Work Assistant recovers qualified callable with selected-folder permission and verified write", () => InWorkspace(root =>
         {
@@ -368,10 +392,13 @@ internal static class H2WorkAssistantRepairTests
         var result = adapter.GetTaskSummary(id);
         if (result.Status is H2AgentTaskStatus.Completed or H2AgentTaskStatus.Failed or H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Cancelled) return result;
         Pump(); Thread.Sleep(10); } throw new TimeoutException(JsonSerializer.Serialize(adapter.ObserveTask(id))); }
-    private sealed class Script(AgentTransportToolCall[] calls) : IAgentTransportFactory
+    private sealed class Script(AgentTransportToolCall[] calls, string finalText = "Tôi đã xong.",
+        bool failRecoveryContinuation = false) : IAgentTransportFactory
     {
         private readonly AgentTransportToolCall[] _calls = calls;
-        public List<AgentToolResult> Results = []; public List<string> Loaded = [];
+        private readonly string _finalText = finalText;
+        private readonly bool _failRecoveryContinuation = failRecoveryContinuation;
+        public List<AgentToolResult> Results = []; public List<string> Loaded = []; public List<string> Supplemental = [];
         public IAgentTransport Create(AiProfile p, string key, AgentRunTelemetry t) => new Transport(this);
         private sealed class Transport(Script script) : IAgentTransport
         {
@@ -379,11 +406,27 @@ internal static class H2WorkAssistantRepairTests
             public AgentTransportCapabilities Capabilities => AgentTransportCapabilities.ChatCompletionsFallback;
             public IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest r, CancellationToken ct = default) => Round(ct);
             public IAsyncEnumerable<AgentTransportEvent> ContinueAsync(AgentTransportContinuationRequest r, CancellationToken ct = default)
-            { script.Results.AddRange(r.ToolResults); script.Loaded.AddRange(r.NewlyLoadedTools?.Select(x => x.Name) ?? []); return Round(ct); }
+            {
+                script.Results.AddRange(r.ToolResults);
+                script.Loaded.AddRange(r.NewlyLoadedTools?.Select(x => x.Name) ?? []);
+                script.Supplemental.AddRange(r.SupplementalUserMessages ?? []);
+                if (script._failRecoveryContinuation
+                    && (r.SupplementalUserMessages?.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)) ?? false))
+                    return FailedRound(ct);
+                return Round(ct);
+            }
+            private async IAsyncEnumerable<AgentTransportEvent> FailedRound([EnumeratorCancellation] CancellationToken ct)
+            {
+                await Task.Yield(); ct.ThrowIfCancellationRequested();
+                throw new HttpRequestException("synthetic AR-067 model continuation outage");
+#pragma warning disable CS0162
+                yield break;
+#pragma warning restore CS0162
+            }
             private async IAsyncEnumerable<AgentTransportEvent> Round([EnumeratorCancellation] CancellationToken ct)
             { await Task.CompletedTask; ct.ThrowIfCancellationRequested();
                 if (_next < script._calls.Length) yield return AgentTransportEvent.Tool(script._calls[_next++]);
-                else yield return AgentTransportEvent.TextDeltaEvent("Tôi đã xong.");
+                else yield return AgentTransportEvent.TextDeltaEvent(script._finalText);
                 yield return AgentTransportEvent.Complete(); }
             public void Cancel() { } public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }

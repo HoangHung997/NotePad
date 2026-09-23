@@ -575,7 +575,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 live,
                 status,
                 result.FinalText,
-                status == H2AgentTaskStatus.Blocked
+                status == H2AgentTaskStatus.Blocked && string.IsNullOrWhiteSpace(result.FinalText)
                     ? "Agent host completion gate blocked the task."
                     : null);
         }
@@ -594,7 +594,9 @@ public sealed partial class H2ProductionAgentAdapter :
         catch (AgentVerificationRequiredException ex)
         {
             lock (live.Gate) live.Completion = ex.Completion;
-            Complete(live, H2AgentTaskStatus.Blocked, null, Bound(ex.Message, 2_000));
+            var publicText = BoundOrNull(ex.PublicText, 16_000);
+            Complete(live, H2AgentTaskStatus.Blocked, publicText,
+                publicText is null ? Bound(ex.Message, 2_000) : null);
         }
         catch (Exception ex)
         {

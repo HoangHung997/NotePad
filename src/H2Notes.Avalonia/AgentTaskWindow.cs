@@ -47,7 +47,7 @@ public sealed class AgentTaskWindow : Window
             _surface.PresentTasks(_adapter, tasks, (task.ThreadId ?? task.TaskId).ToString());
             _state.Text = task.Status switch { H2AgentTaskStatus.WaitingForApproval => "Cần bạn xác nhận", H2AgentTaskStatus.Completed => "Đã hoàn tất",
                 H2AgentTaskStatus.Blocked => "Chưa thể hoàn tất", H2AgentTaskStatus.Failed => "Tác vụ gặp lỗi", H2AgentTaskStatus.Cancelled => "Đã dừng", _ => "Agent đang làm việc" };
-            _result.Text = task.Goal + "\n\n" + (task.Error ?? task.FinalText ?? "Đang chờ kết quả…");
+            _result.Text = task.Goal + "\n\n" + (task.FinalText ?? task.Error ?? "Đang chờ kết quả…");
             _approval.Present(_adapter, _taskId, task.PendingApproval);
             _evidence.Text = string.Join("\n\n", task.Evidence.Select(item =>
                 (item.VerificationPassed == true ? "Đã xác minh: " : item.VerificationPassed == false ? "Xác minh chưa đạt: " : "Bằng chứng: ")
