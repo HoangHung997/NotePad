@@ -18,94 +18,44 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
-      - name: Apply reviewed exact sources and preserve current checkpoint
+      - name: Apply only reviewed settings preservation and three registered persistence tests
         shell: python
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          import os, subprocess, pathlib, json, hashlib, base64, urllib.request, datetime
-          def git(*args): return subprocess.check_output(['git',*args], text=True).strip()
+          import os,subprocess,pathlib,json,hashlib,base64,urllib.request
+          def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
           branch='feature/h2-agent-reliability-ar-000'
           assert os.environ['GITHUB_REF_NAME']==branch and git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
-          assert git('rev-parse','HEAD^')=='97b7d6d16e20bb083dd4f5445c00aa4219de81c5', 'Concurrent source change: reconcile without reset'
+          assert git('rev-parse','HEAD^')=='33fc0a09346dd8816860d48e9ec01369c60d6dc9','Concurrent update: reconcile without reset'
           assert not git('status','--porcelain')
-          root='experiments/H2AgentLab/Transport/'
-          expected={
-            'src/H2Notes.Core/AiClient.cs':('5bc426ec10d6a461cd1617ab6b092cc884c2e422a8cb27f72837bbf8eecb047b','f37fa951ed142dd28cb1553d97348074b5e7767643a4e84e57892f9451a79194'),
-            root+'OllamaTransport.cs':('1206a74e5c18b2230e5d3c589e0f179e3d76a87b74f1aea47a32da54ba30f123','4f888d98671a697a616298b8c9fbaaf17b715e7ad8a1ef57241c06925482d53f'),
-            root+'ChatCompletionsTransport.cs':('0d68c2f63f5e9770e107fb4f9d32d5b63f5b80b9f495b7d76e627c7763cd9ada','57825f57daa03e00e8fdbd02af4e2bb43c3804548fe62fe1cb3f4610dac2fd03'),
-            root+'OpenAiResponsesTransport.cs':('db8c1c663e60fd34342139d6431b42305dfcd0a95e60ca54915bfd56edc288ba','58f4e575df6bf51cc4fad1b8f151db5280e523b931dae9d30e1699b1acf95cfe'),
-            root+'OpenAiResponsesWebSocketTransport.cs':('084ff9b3735ac293b3847d8fb86638d800d68eb29231b0f4a8f3568a8a037f31','29d650d35b1ff3b246f17d8a600a4829b59d765caa3a535e6d60aed2e69aaf96'),
-            root+'AgentTransportFactory.cs':('f86b98e070c04654a5a95dfb32f12ee00e9a98de6666f86d45580ed925078073','e53a257d8483f6fc9c2bded3d028a52428c9b014bf2fd6a5ac9f27bfc035334c'),
-            'experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs':('a483875b5882f9a6a4c65b3fbf609b5a2210c7da6cf4cc61d4c47c817764f004','0fd41476ed713d9922e9534c200b2d60dfd4b11815002a4f4cda831f8bb8cf36'),
-            'tests/H2Notes.Tests/Program.cs':('2a6678d339207fa89e984f58d6eab26bec665a8498e03aef0a10bd0f183f21df','d8ae7e18bbeacc215b988e3be367abf105941f0323a124cc965180a228bce7f2')}
           pending={}
-          for path,(before,after) in expected.items():
-            data=subprocess.check_output(['git','show','HEAD:'+path]); assert hashlib.sha256(data).hexdigest()==before,path
-            pending[path]=data.decode()
-          def replace(path,old,new):
-            assert pending[path].count(old)==1,(path,old)
-            pending[path]=pending[path].replace(old,new)
-          replace('src/H2Notes.Core/AiClient.cs','    internal AiProfile Copy() =>','    public AiRequestBudgetSettings RequestBudget { get; set; } = new();\n    internal AiProfile Copy() =>')
-          properties='    private readonly AgentRequestBudgetGuard _requestBudget;\n    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;\n    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated\n    {\n        add => _requestBudget.Evaluated += value;\n        remove => _requestBudget.Evaluated -= value;\n    }\n'
-          classes=['OllamaTransport','ChatCompletionsTransport','OpenAiResponsesTransport','OpenAiResponsesWebSocketTransport']
-          for name in classes:
-            path=root+name+'.cs'
-            replace(path,'public sealed class '+name+' : IAgentTransport','public sealed class '+name+' : IAgentTransport, IAgentRequestBudgetSource')
-            replace(path,'    private readonly AiProfile _profile;',properties+'    private readonly AiProfile _profile;')
-            replace(path,'        _profile = profile.Copy();','        _profile = profile.Copy();\n        _requestBudget = new AgentRequestBudgetGuard(_profile);')
-          for name,endpoint in [('OllamaTransport','api/chat'),('ChatCompletionsTransport','chat/completions'),('OpenAiResponsesTransport','responses')]:
-            path=root+name+'.cs';old='        using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "'+endpoint+'"))'
-            replace(path,old,'        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "'+name+'", token);\n'+old)
-            replace(path,'Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")','Content = new StringContent(serialized, Encoding.UTF8, "application/json")')
-          metering='        if (usage is not null) yield return AgentTransportEvent.Meter(usage);'
-          replace(root+'OllamaTransport.cs',metering,'        _requestBudget.ObserveCompleted(usage);\n'+metering)
-          replace(root+'ChatCompletionsTransport.cs','        yield return AgentTransportEvent.Complete(','        _requestBudget.ObserveCompleted(null);\n        yield return AgentTransportEvent.Complete(')
-          replace(root+'OpenAiResponsesTransport.cs',metering,'        _requestBudget.ObserveCompleted(usage, responseId);\n'+metering)
-          path=root+'OpenAiResponsesWebSocketTransport.cs'
-          replace(path,'            await _connection.SendTextAsync(payload.ToJsonString(), token);','            var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token, prewarm: true);\n            await _connection.SendTextAsync(serialized, token);')
-          replace(path,'            _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "success");','            _requestBudget.ObserveCompleted(null, responseId, prewarm: true);\n            _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "success");')
-          replace(path,'        await _connection.SendTextAsync(payload.ToJsonString(), token);','        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token);\n        await _connection.SendTextAsync(serialized, token);')
-          replace(path,metering,'        _requestBudget.ObserveCompleted(usage, responseId);\n'+metering)
-          replace(path,'        _fallback = _httpFallbackFactory();','        _fallback = _httpFallbackFactory();\n        if (_fallback is IAgentRequestBudgetSource budgeted)\n            budgeted.RequestBudgetEvaluated += ForwardFallbackBudget;')
-          replace(path,'    private async Task EnsureConnected(CancellationToken cancellationToken)','    private void ForwardFallbackBudget(AgentRequestBudgetReceipt receipt)\n        => _fallbackBudgetObserver?.Invoke(receipt);\n    private event Action<AgentRequestBudgetReceipt>? _fallbackBudgetObserver;\n\n    private async Task EnsureConnected(CancellationToken cancellationToken)')
-          replace(path,'        add => _requestBudget.Evaluated += value;\n        remove => _requestBudget.Evaluated -= value;','        add { _requestBudget.Evaluated += value; _fallbackBudgetObserver += value; }\n        remove { _requestBudget.Evaluated -= value; _fallbackBudgetObserver -= value; }')
-          replace(path,'    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;','    public AgentRequestBudgetReceipt? LastRequestBudget => (_fallback as IAgentRequestBudgetSource)?.LastRequestBudget ?? _requestBudget.LastReceipt;')
-          path=root+'AgentTransportFactory.cs'
-          replace(path,'        return profile.Protocol switch','        IAgentTransport transport = profile.Protocol switch')
-          replace(path,'        };\n    }\n}','        };\n        if (transport is IAgentRequestBudgetSource budgeted)\n            budgeted.RequestBudgetEvaluated += receipt => telemetry.Trace.Mark(\n                AgentTraceKind.RuntimeHook, "outgoing-request-budget", System.Text.Json.JsonSerializer.Serialize(receipt));\n        return transport;\n    }\n}')
-          replace('experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs','        catch (AgentVerificationRequiredException ex)','        catch (AgentRequestBudgetException ex)\n        {\n            Complete(live, H2AgentTaskStatus.Blocked, null, Bound(ex.Message, 2_000));\n        }\n        catch (AgentVerificationRequiredException ex)')
-          replace('tests/H2Notes.Tests/Program.cs','H2AgentJobObservationTests.Run(Test);','H2AgentJobObservationTests.Run(Test);\nH2AgentRequestBudgetTests.Run(Test);')
-          for path,(_,after) in expected.items(): assert hashlib.sha256(pending[path].encode()).hexdigest()==after,path
-          # These are reviewed UTF-8 C# blobs created through the authorized connector.
-          blobs={'src/H2Notes.Core/AiRequestBudgetSettings.cs':'0c8e9b16c44079b22ab269da127517ccedf81c6a',root+'AgentRequestBudget.cs':'587c9986a125e77d66c729d1a21904cb6c7c27ce','tests/H2Notes.Tests/H2AgentRequestBudgetTests.cs':'79bebe831cc1fa82529e6a7c6c2edd3c01c208f8'}
-          for path,sha in blobs.items():
-            assert not pathlib.Path(path).exists(),path
-            req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
-            with urllib.request.urlopen(req,timeout=30) as response: obj=json.load(response)
-            assert obj['encoding']=='base64' and obj['sha']==sha
-            data=base64.b64decode(obj['content']);assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha
-            pending[path]=data.decode('utf-8')
-          tracker='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md';text=subprocess.check_output(['git','show','HEAD:'+tracker]).decode()
-          pos=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+len('```yaml\n')
-          state,end=json.JSONDecoder().raw_decode(text[pos:]);assert state['active_task']=='AR-050' and state['implementation_status']=='NOT_STARTED'
-          state.update(phase='AR-050_ACTIVE_SERIALIZED_REQUEST_VALIDATION',implementation_status='ACTIVE',acceptance_status='NOT_RUN',owner_session='chatgpt-ar050-2026-09-23',working_tree='Reviewed source committed on existing branch; user-PC tree NOT_ACCESSIBLE.',uncommitted_files=[],completed_this_session=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),remaining_in_active_task=['Build and run AR-050 actual serializers, 205-cycle corpora, all retained regressions and full CI on delivery code SHA; repair failures.','Verify exact bytes versus estimated token costs, server-held context, prewarm/fallback, media limitations and sourced limits.'],next_exact_action='Continue only AR-050. Inspect delivery code_sha and Windows CI. Fix failures then verify receipts and save evidence. AR-020/033 E3 and E4 remain NOT_RUN; AR-083 DEFERRED_BY_USER. No automatic compaction or model/endpoint switch.')
-          pending[tracker]=text[:pos]+json.dumps(state,ensure_ascii=False,indent=2)+text[pos+end:]
-          pending['docs/agent-reliability/AR-050/implementation.md']='# AR-050 serialized request budgets\n\nACTIVE / NOT_RUN. Every concrete Agent transport has a final serializer guard; bytes/hash are exact, token/media/retained-context costs are labelled estimates. Explicit context limits require source-backed profile configuration; fallback is local policy, not an advertised model limit. Stored Responses and WebSocket prewarm/continuation retain context counters; cached tokens do not remove context. Output reserves use provider dialect. Guard failures block without trimming source or switching providers. No new engine/state store. E1/E2 tests intercept actual serializers, not live API/model/Office calls. Native gates and deferred AR-083 remain. The first delivery attempt failed before modifying application source because its encoded carrier was malformed; it is not a test pass.\n'
-          for path,text in pending.items(): p=pathlib.Path(path);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(text.encode('utf-8'))
-          subprocess.run(['git','diff','--check'],check=True)
-          subprocess.run(['git','add','--',*pending],check=True)
+          changes=[
+            ('src/H2Notes.Avalonia/AiSettingsWindow.cs','17a09364521398ccc898c5752139db7c84e2ccb6','                ReasoningEffort = selected.ReasoningEffort,','                ReasoningEffort = selected.ReasoningEffort,\n                RequestBudget = selected.RequestBudget,'),
+            ('tests/H2Notes.Tests/H2AgentRequestBudgetTests.cs','79bebe831cc1fa82529e6a7c6c2edd3c01c208f8','    public static void Run(Action<string, Action> test)\n    {','    public static void Run(Action<string, Action> test)\n    {\n        H2AgentRequestBudgetPersistenceTests.Run(test);')]
+          for path,sha,old,new in changes:
+            original=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha1(b'blob '+str(len(original)).encode()+b'\0'+original).hexdigest()==sha,path
+            text=original.decode();assert text.count(old)==1,path;pending[path]=text.replace(old,new).encode()
+          path='tests/H2Notes.Tests/H2AgentRequestBudgetPersistenceTests.cs';sha='a847d102fca0172a1476e94ec6bb0b13e80d4509'
+          assert not pathlib.Path(path).exists()
+          req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response:obj=json.load(response)
+          assert obj['encoding']=='base64' and obj['sha']==sha
+          data=base64.b64decode(obj['content']);assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha
+          data.decode('utf-8');pending[path]=data
+          for path,data in pending.items():p=pathlib.Path(path);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+          subprocess.run(['git','diff','--check'],check=True);subprocess.run(['git','add','--',*pending],check=True)
           assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==os.environ['GITHUB_SHA'],'Concurrent update'
-          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','feat(AR-050): guard actual serialized model requests and register bounded wire tests'],check=True)
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(AR-050): preserve request budgets in settings and test post-effect overflow'],check=True)
           code=git('rev-parse','HEAD');assert not git('status','--porcelain')
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
           assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
           out=pathlib.Path('artifacts/ar050-delivery');out.mkdir(parents=True,exist_ok=True)
-          (out/'saved.json').write_text(json.dumps({'code_sha':code,'branch':branch,'files':list(pending),'status':'ACTIVE / NOT_RUN'},indent=2))
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'branch':branch,'files':list(pending),'status':'ACTIVE / ADDITIONAL_TESTS_NOT_RUN'},indent=2))
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AR050-Source-Delivery
+          name: AR050-Persistence-Delivery
           path: artifacts/ar050-delivery/
           if-no-files-found: error
