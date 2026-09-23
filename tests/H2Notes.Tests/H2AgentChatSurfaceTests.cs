@@ -176,7 +176,20 @@ internal static class H2AgentChatSurfaceTests
         throw new TimeoutException("Agent task did not finish");
     }
     private static void WithRoot(Func<string, Task> action)
-        => WithRoot(root => { action(root).GetAwaiter().GetResult(); });
+    {
+        var root = Path.Combine(Path.GetTempPath(), "h2-chat-surface-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        // These three fixtures exercise only the production adapter, not controls. Do not
+        // block Avalonia's synchronization context on an await-using continuation.
+        var execution = Task.Run(() => action(root));
+        try { execution.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult(); }
+        finally
+        {
+            // A timeout is not a quiescence barrier. Keep evidence rather than masking the
+            // primary timeout by deleting a directory whose writer may still be live.
+            if (execution.IsCompleted) Directory.Delete(root, true);
+        }
+    }
 
     private static void WithRoot(Action<string> action)
     {

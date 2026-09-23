@@ -349,7 +349,7 @@ internal static class H2AgentPluginLifecycleTests
             => new DelegatingToolExecutor("ar064-fixture", async (_, ct) =>
             {
                 Interlocked.Increment(ref Calls); Entered.TrySetResult();
-                if (Hold) await Task.Delay(Timeout.Infinite, ct);
+                if (Hold) await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
                 return JsonSerializer.Serialize(new { version = manifest.Version });
             });
     }
@@ -368,11 +368,11 @@ internal static class H2AgentPluginLifecycleTests
         public Task<IReadOnlyList<ProviderNamespaceSummary>> ListNamespacesAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ProviderNamespaceSummary>>([]);
         public Task<IReadOnlyList<ProviderToolSummary>> ListToolSummariesAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ProviderToolSummary>>([]);
         public async Task<IReadOnlyList<ProviderToolDefinition>> LoadToolDefinitionsAsync(IReadOnlyList<string> names, CancellationToken ct)
-        { if (LoadRelease is not null) await LoadRelease.Task.WaitAsync(ct); AfterLoad?.Invoke(); return Definitions; }
+        { if (LoadRelease is not null) await LoadRelease.Task.WaitAsync(ct).ConfigureAwait(false); AfterLoad?.Invoke(); return Definitions; }
         public Task<IReadOnlyList<ProviderResourceSummary>> ListResourcesAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ProviderResourceSummary>>([]);
         public Task<string> ReadResourceAsync(string id, CancellationToken ct) => throw new NotSupportedException();
         public async ValueTask<string> ExecuteToolAsync(string name, JsonElement args, CancellationToken ct)
-        { Calls++; if (ExecuteRelease is not null) await ExecuteRelease.Task.WaitAsync(ct); return "{}"; }
+        { Calls++; if (ExecuteRelease is not null) await ExecuteRelease.Task.WaitAsync(ct).ConfigureAwait(false); return "{}"; }
         public ValueTask DisposeAsync() { Disposed = true; return ValueTask.CompletedTask; }
     }
 }
