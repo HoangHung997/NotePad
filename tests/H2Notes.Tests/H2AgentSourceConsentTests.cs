@@ -62,6 +62,7 @@ internal static class H2AgentSourceConsentTests
         var profile = new AiProfile { Protocol = AiProtocol.OpenAiChat, Model = "ar066-scripted-source-consent", BaseUrl = "https://example.test/v1" };
         var wire = new Wire(); var factory = new Factory(wire);
         var approvals = new List<Guid>(); var decisions = Array.Empty<H2AgentSourceDecision>();
+        H2AgentToolOutcome? uncertainBeforeReopen = null;
         Guid task = Guid.Empty; H2AgentTaskSummary original;
         var expiry = DateTime.UtcNow.AddSeconds(mode == "expired-pending" ? 6 : 600);
         var grant = new H2AgentPermissionScope(H2AgentPermissionMode.FullAccess, H2AgentResourceScopeKind.Machine,
@@ -170,8 +171,14 @@ internal static class H2AgentSourceConsentTests
                     Check(wire.Result("attempt-write").Contains(mode == "readonly-write" ? "permission_required" : "live_resource_required", StringComparison.Ordinal), "Source consent widened mutation authority.");
                 if (mode == "output-overwrite") Check(wire.Result("overwrite-output").Contains("live_resource_required", StringComparison.Ordinal), "Output approval permitted overwriting a created file.");
                 if (mode == "unknown-effect")
+                {
                     Check(native.Patches == 1 && File.ReadAllText(effect) == "APPLIED-ONCE" && decisions.Length == 0
                         && wire.Result("choose").Contains("outcome_unknown", StringComparison.Ordinal), "Source selection cleared or repeated an uncertain effect.");
+                    uncertainBeforeReopen = adapter.ObserveTask(task).Progress.Select(p => p.ToolOutcome)
+                        .Single(o => o is { Effect: H2ToolMutationEffect.Unknown, ErrorCode: "connection_lost" });
+                    Check(uncertainBeforeReopen is { InvocationId: var id, Verification: H2ToolVerificationStatus.NotRun }
+                        && id != Guid.Empty, "Lost-response fixture did not retain the authoritative uncertain invocation.");
+                }
                 if (mode is not ("file-changed" or "post-read-change")) Check(Hash(source) == sourceBefore, "Unapproved source write occurred.");
                 if (mode == "file-changed") Check(File.ReadAllText(source) == "CHANGED-WHILE-APPROVAL-PENDING", "Pending-file fixture was overwritten.");
                 if (mode == "post-read-change") Check(File.ReadAllText(source) == "CHANGED-AFTER-READ", "Changed source was replayed.");
@@ -180,13 +187,35 @@ internal static class H2AgentSourceConsentTests
                 if (isOutput) Check(File.ReadAllText(output) == (mode == "output-existing" ? "EXISTING-OUTPUT" : "Created,ĐÚNG"), "Output was lost or overwritten.");
             }
             var requests = wire.Rounds; var lastHash = Hash(source); var outputHash = File.Exists(output) ? Hash(output) : null;
+            var effectHash = File.Exists(effect) ? Hash(effect) : null;
             await using (var reopened = new H2ProductionAgentAdapter(state, () => new(profile, ""), factory, officeClientFactory: () => native, captureValidator: _ => true))
             {
                 var replay = reopened.ObserveTask(task);
                 var retained = replay.Progress.Where(p => p.SourceDecision is not null).Select(p => p.SourceDecision!).ToArray();
-                Check(replay.Summary.Status == original.Status && replay.Summary.Error == original.Error && retained.SequenceEqual(decisions)
-                    && factory.Created == 1 && wire.Rounds == requests, "Reopen dropped decisions, reallocated provider or replayed source work.");
-                Check(Hash(source) == lastHash && Hash(control) == controlBefore && (File.Exists(output) ? Hash(output) : null) == outputHash, "Reopen changed file state.");
+                Check(replay.Summary.Status == original.Status, $"Reopen changed terminal state: {original.Status} -> {replay.Summary.Status}.");
+                Check(retained.SequenceEqual(decisions), "Reopen changed source-decision receipts.");
+                Check(factory.Created == 1 && wire.Rounds == requests, "Reopen reallocated provider or replayed source work.");
+                if (mode == "unknown-effect")
+                {
+                    // Existing AR-031 archive.Get intentionally projects unresolved effects as
+                    // ReconcileRequired. The original live error is not the restart authority.
+                    Check(replay.Summary.Recovery is { ReconcileRequired: true, Interrupted: false }
+                        && replay.Summary.Error == "Interrupted / ReconcileRequired: tác động cần đối soát; không tự lặp lệnh ghi.",
+                        "Uncertain restart lost the required reconciliation projection: " + JsonSerializer.Serialize(replay.Summary.Recovery));
+                    var operation = replay.Summary.Recovery!.Operations.Single(o => o.ToolCallId == "uncertain");
+                    Check(uncertainBeforeReopen is not null && operation.InvocationId == uncertainBeforeReopen.InvocationId
+                        && operation.LogicalOperationId == uncertainBeforeReopen.LogicalOperationId
+                        && operation.ToolName == "word.replace_range" && operation.GoalRevisionId == original.GoalState!.RevisionId
+                        && operation.State == "Result" && operation.Effect == "Unknown" && operation.ErrorCode == "connection_lost"
+                        && operation.ArgumentsSha256.Length == 64 && operation.OutputSha256?.Length == 64,
+                        "Restart lost exact failed mutation identity, hashes or unknown-effect receipt.");
+                    Check(replay.Progress.Any(p => p.ToolOutcome == uncertainBeforeReopen)
+                        && native.Patches == 1 && File.ReadAllText(effect) == "APPLIED-ONCE",
+                        "Restart erased the original outcome or repeated its native fixture effect.");
+                }
+                else Check(replay.Summary.Error == original.Error, "Non-uncertain terminal error changed on reopen.");
+                Check(Hash(source) == lastHash && Hash(control) == controlBefore && (File.Exists(output) ? Hash(output) : null) == outputHash
+                    && (File.Exists(effect) ? Hash(effect) : null) == effectHash, "Reopen changed file/effect state.");
                 var receipts = Environment.GetEnvironmentVariable("H2_AR066_EVIDENCE");
                 if (!string.IsNullOrWhiteSpace(receipts))
                 {
@@ -197,6 +226,9 @@ internal static class H2AgentSourceConsentTests
                         approvals, decisions, status = original.Status.ToString(), sourceBefore, sourceAfter = lastHash,
                         controlBefore, controlAfter = Hash(control), referenceBefore, referenceAfter = Hash(reference), outputHash,
                         native.Patches, native.Reads, providerAllocations = factory.Created, providerRequests = requests,
+                        originalError = original.Error, reopenedError = replay.Summary.Error,
+                        reopenedStatus = replay.Summary.Status.ToString(), recovery = replay.Summary.Recovery,
+                        uncertainBeforeReopen, effectHash, reopenedEffectHash = File.Exists(effect) ? Hash(effect) : null,
                         reopenedWithoutReplay = true, E3 = "AWAITING_ENVIRONMENT", E4 = "AWAITING_ENVIRONMENT", E5 = "DEFERRED_BY_USER"
                     }, new JsonSerializerOptions { WriteIndented = true }));
                 }
