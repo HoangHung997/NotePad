@@ -125,14 +125,24 @@ internal static class H2AgentOpenAiProductionTests
                     : JsonSerializer.SerializeToElement(new { path = "source.txt" })));
             // The observation is from actual file IO, not a synthetic executor counter.
             Check(await File.ReadAllTextAsync(mode == "write-400" ? output : source, token) == Sentinel, "Requested file effect not observed before continuation.");
+            if (mode != "write-400")
+            {
+                var observed = results.Last().GetProperty("output").GetString()!;
+                Check(observed.Contains(Sentinel, StringComparison.Ordinal) || observed.Contains(JsonSerializer.Serialize(Sentinel)[1..^1], StringComparison.Ordinal), "Read observation did not reach the actual model continuation.");
+            }
             return mode == "read-final" ? Completed(new { type = "message", id = "msg_final", role = "assistant", status = "completed",
                 content = new[] { new { type = "output_text", text = Sentinel, annotations = Array.Empty<object>() } } }) : Bad("input[0].call_id");
         }
         private static object Call(string name, string id, object args) => new
         { type = "function_call", id = "fc_" + id, call_id = id, name, arguments = JsonSerializer.Serialize(args), status = "completed" };
-        private static HttpResponseMessage Completed(object item) => new(HttpStatusCode.OK)
-        { Content = new StringContent("data: " + JsonSerializer.Serialize(new { type = "response.completed", response = new
-            { id = "resp_" + Guid.NewGuid().ToString("N"), status = "completed", output = new[] { item } } }) + "\n\n", Encoding.UTF8, "text/event-stream") };
+        private static HttpResponseMessage Completed(object item)
+        {
+            var delta = JsonSerializer.SerializeToElement(item).GetProperty("type").GetString() == "message"
+                ? "data: " + JsonSerializer.Serialize(new { type = "response.output_text.delta", delta = Sentinel }) + "\n\n" : "";
+            return new(HttpStatusCode.OK) { Content = new StringContent(delta + "data: " + JsonSerializer.Serialize(new
+            { type = "response.completed", response = new { id = "resp_" + Guid.NewGuid().ToString("N"), status = "completed", output = new[] { item } } })
+                + "\n\n", Encoding.UTF8, "text/event-stream") };
+        }
         private static HttpResponseMessage Bad(string param) => new(HttpStatusCode.BadRequest)
         { Content = new StringContent(JsonSerializer.Serialize(new { error = new { code = "invalid_value", type = "invalid_request_error", param, message = Private + " " + Key } })) };
     }
