@@ -1,0 +1,70 @@
+name: AR-064 reviewed discovery boundary repair
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar064-boundary-repair.yml]
+permissions:
+  contents: write
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/h2-agent-reliability-ar-000
+          fetch-depth: 0
+      - name: Validate preimages, apply reviewed source, save active handoff, normal push
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import base64, datetime, hashlib, json, os, pathlib, subprocess, urllib.request
+          def git(*a): return subprocess.check_output(['git',*a],text=True).strip()
+          assert not git('status','--porcelain'), 'Dirty checkout'
+          start=git('rev-parse','HEAD')
+          assert start == os.environ['GITHUB_SHA'], 'Concurrent branch change; reconcile before retry'
+          def oid(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          def current(path, expected):
+              raw=subprocess.check_output(['git','show','HEAD:'+path]); assert oid(raw)==expected, path+' preimage changed'
+              return raw.decode('utf-8')
+          def blob(sha):
+              req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req, timeout=30) as r: obj=json.load(r)
+              raw=base64.b64decode(obj['content']); assert oid(raw)==sha, 'Blob identity mismatch'
+              return raw
+          pending={}
+          adapter='experiments/H2AgentLab/Providers/CapabilityProviderToolRegistryAdapter.cs'
+          current(adapter,'bc70f238f0b8af593183b8360e69720b5098040d')
+          pending[adapter]=blob('818ef4f2f58419a161125c952028cbac1a3fa670')
+          new='tests/H2Notes.Tests/H2AgentProviderRevocationTests.cs'
+          assert not pathlib.Path(new).exists(), 'Test file appeared concurrently'
+          pending[new]=blob('a3a433a1b962c6430534ab2c5d4bcde36009623b')
+          tests='tests/H2Notes.Tests/H2AgentPluginLifecycleTests.cs'
+          text=current(tests,'da098bf4b120a726e19ca7775249643161293019')
+          edits=[('ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException','ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException'),('ex is IOException or ArgumentException or OperationCanceledException','ex is IOException or InvalidDataException or ArgumentException or OperationCanceledException'),('public static void Run(Action<string, Action> test)\n    {','public static void Run(Action<string, Action> test)\n    {\n        H2AgentProviderRevocationTests.Run(test);')]
+          for old,new in edits:
+              assert text.count(old)==1, 'Test edit mismatch'; text=text.replace(old,new,1)
+          pending[tests]=text.encode('utf-8')
+          mb='experiments/H2AgentLab/Capabilities/MbRuntimeCapabilityInstallTests.cs'
+          text=current(mb,'15bcfdc675ed355e4a3a5442e8f2c663a3f30e90')
+          old='        public bool IsInstalled(string id)\n        {\n            if (!_expected.TryGetValue(id, out var expected)) return false;'
+          new='        public bool IsInstalled(string id)\n        {\n            // The production manager now rejects altered admitted bytes before returning a manifest.\n            // Treat that specific integrity failure as failed readback, not a successful install.\n            try { return InspectInstalled(id); }\n            catch (InvalidDataException) { return false; }\n        }\n        private bool InspectInstalled(string id)\n        {\n            if (!_expected.TryGetValue(id, out var expected)) return false;'
+          assert text.count(old)==1, 'MB74 verifier edit mismatch'; pending[mb]=text.replace(old,new,1).encode('utf-8')
+          tracker='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+          text=current(tracker,'de024b12bc80315d253429a988a5f35a3f83f319')
+          a=text.index('```yaml',text.index('## 7. SESSION HANDOFF')); b=text.index('\n```',a+7)
+          state=json.loads(text[a+7:b].strip()); assert state['active_task']=='AR-064'
+          state.update(phase='AR-064_DISCOVERY_REVOCATION_REPAIR',implementation_status='ACTIVE / PARTIAL',acceptance_status='NOT_RUN',owner_session='chatgpt-ar064-boundary-repair-2026-09-23',last_code_commit='Resolve this delivery commit from git log; candidate follows '+start,last_validation_result='Baseline ed11a1e: AR064 31 pass / 11 invalid-data exception failures x3; chat 10/10 x3; all retained AR pass; Agent suites 73/74, MB74 rejects tampered payload. New repair NOT_RUN.',uncommitted_files=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),next_exact_action='Run current AR-064 revocation tests against old adapter then exact restore/rebuild, AR064 x3, chat x3, retained AR and all 74 Agent suites/full CI. Complete product-used package lifecycle, task pinning and real local package RC-28 before accepting AR-064; no E3/E4 claims from foundation.')
+          state['remaining_in_active_task']=['Validate reviewed discovery revocation/generation fence and test exception handling on Windows.','Complete product-used package lifecycle, task pinning, real package/tool RC-28 and E3; AR064 is not DONE.']
+          pending[tracker]=(text[:a]+'```yaml\n'+json.dumps(state,ensure_ascii=False,indent=2)+text[b:]).encode('utf-8')
+          for path, raw in pending.items(): pathlib.Path(path).write_bytes(raw)
+          subprocess.run(['git','diff','--check'],check=True)
+          subprocess.run(['git','add','--',*pending],check=True)
+          assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
+          subprocess.run(['git','config','user.name','github-actions[bot]'],check=True)
+          subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'],check=True)
+          subprocess.run(['git','commit','-m','fix(AR-064): fence stale provider discovery and preserve strict integrity test results'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/feature/h2-agent-reliability-ar-000'],check=True)
+          print('Saved code and active handoff at '+git('rev-parse','HEAD'))
