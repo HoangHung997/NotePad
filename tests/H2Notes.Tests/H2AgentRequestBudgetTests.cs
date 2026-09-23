@@ -20,6 +20,7 @@ internal static class H2AgentRequestBudgetTests
     private const string Marker = "SOURCE-ĐÚNG-😀-\\\"";
     public static void Run(Action<string, Action> test)
     {
+        H2AgentRequestBudgetPersistenceTests.Run(test);
         test("AR-050 policy local fallback is labelled and never invents an Ollama context allocation", () =>
         {
             var guard = new AgentRequestBudgetGuard(new() { Model = "unknown-name" });
