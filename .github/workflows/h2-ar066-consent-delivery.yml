@@ -28,9 +28,11 @@ jobs:
           manifest=pathlib.Path('.github/ar066-consent/manifest.json')
           m=json.loads(manifest.read_text());(out/'manifest.json').write_bytes(manifest.read_bytes())
           before=git('rev-parse','HEAD')
-          assert before==os.environ['GITHUB_SHA'] and git('rev-parse','HEAD^')==m['reviewed_base'], 'Changed HEAD: reconcile, do not replay delivery'
+          assert before==os.environ['GITHUB_SHA'], 'Changed HEAD: reconcile, do not replay delivery'
+          assert git('rev-parse','HEAD^')=='1395922997777a34a534247d31df54b5a2e077e5' and git('rev-parse','HEAD^^')==m['reviewed_base'], 'Unexpected repair lineage'
+          assert git('diff','--no-renames','--name-only','HEAD^','HEAD')=='.github/workflows/h2-ar066-consent-delivery.yml', 'Repair must change only inventory reader'
           assert not git('status','--porcelain'), 'Dirty isolated checkout'
-          delivery=set(git('diff','--name-only',m['reviewed_base'],before).splitlines())
+          delivery=set(git('diff','--no-renames','--name-only',m['reviewed_base'],before).splitlines())
           expected={'.github/workflows/h2-ar066-consent-delivery.yml','.github/ar066-consent/manifest.json',m['patch_path']}|{x['staged_path'] for x in m['files'] if x['before_blob'] is None}
           assert delivery==expected, 'Unexpected staging changes'
           assert blob(pathlib.Path(m['patch_path']).read_bytes())==m['patch_blob'], 'Patch integrity mismatch'
@@ -53,13 +55,15 @@ jobs:
           git('add','--',*[x['path'] for x in m['files']])
           git('rm','-r','--','.github/ar066-consent','.github/workflows/h2-ar066-consent-delivery.yml')
           git('diff','--cached','--check')
-          assert set(git('diff','--cached','--name-only').splitlines())==expected|{x['path'] for x in m['files']}
+          actual=set(git('diff','--cached','--no-renames','--name-only').splitlines())
+          assert actual==expected|{x['path'] for x in m['files']}, 'Complete staged path inventory mismatch'
+          (out/'inventory.json').write_text(json.dumps({'actual':sorted(actual),'complete_without_rename_folding':True},indent=2))
           assert git('ls-remote','origin','refs/heads/'+m['branch']).split()[0]==before, 'Another worker advanced branch'
           git('config','user.name','H2 AR-066 implementation')
           git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
           git('commit','-m','feat(AR-066): approve exact live and disk source roles through existing H2 approval and journal')
           after=git('rev-parse','HEAD')
-          receipt={'task':'AR-066','before':before,'code_sha':after,'branch':m['branch'],'files':m['files'],'validation':'NOT_RUN: trigger exact-source Windows regression next','E3':'AWAITING_ENVIRONMENT','E4':'AWAITING_ENVIRONMENT'}
+          receipt={'task':'AR-066','before':before,'code_sha':after,'branch':m['branch'],'files':m['files'],'prior_failed_run':35902491484,'prior_failure':'inventory rename folding before commit or push; source hashes unchanged','validation':'NOT_RUN: trigger exact-source Windows regression next','E3':'AWAITING_ENVIRONMENT','E4':'AWAITING_ENVIRONMENT'}
           (out/'receipt.json').write_text(json.dumps(receipt,indent=2))
           subprocess.run(['git','push','origin','HEAD:refs/heads/'+m['branch']],check=True)
           assert git('ls-remote','origin','refs/heads/'+m['branch']).split()[0]==after
