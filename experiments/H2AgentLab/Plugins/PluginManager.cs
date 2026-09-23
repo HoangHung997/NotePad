@@ -24,7 +24,10 @@ public sealed record PluginInstallPolicy(
 public sealed record PluginActivationRecord(
     string ActiveVersion,
     string? PreviousVersion,
-    DateTime ActivatedUtc);
+    DateTime ActivatedUtc)
+{
+    public bool Enabled { get; init; } = true;
+}
 
 public sealed record PluginToolDefinition(
     string Name,
@@ -63,7 +66,7 @@ public interface IPluginToolExecutorResolver
         PluginToolDefinition tool);
 }
 
-public sealed class PluginManager
+public sealed partial class PluginManager
 {
     private readonly string _root;
     private readonly ToolRegistry _registry;
@@ -95,7 +98,7 @@ public sealed class PluginManager
         return new Scope(this);
     }
 
-    public PluginInstallResult InstallFromArchive(
+    private PluginInstallResult InstallFromArchiveCore(
         string archivePath,
         PluginCatalogEntry catalogEntry,
         PluginInstallPolicy policy,
@@ -106,7 +109,24 @@ public sealed class PluginManager
         ArgumentNullException.ThrowIfNull(policy);
         EnsureActivationBoundary();
 
-        var archiveBytes = File.ReadAllBytes(archivePath);
+        H2PluginManifest.ValidateHash(catalogEntry.ArchiveSha256, "Catalog archive hash");
+        if (new FileInfo(archivePath).Length > 32 * 1024 * 1024)
+            throw new InvalidDataException("Plugin archive exceeds 32 MiB.");
+        byte[] archiveBytes;
+        using (var input = File.OpenRead(archivePath))
+        using (var memory = new MemoryStream())
+        {
+            var buffer = new byte[16384]; int count;
+            while ((count = input.Read(buffer)) > 0)
+            {
+                if (memory.Length + count > 32L * 1024 * 1024)
+                    throw new InvalidDataException("Plugin archive exceeds 32 MiB.");
+                memory.Write(buffer, 0, count);
+            }
+            archiveBytes = memory.ToArray();
+        }
+        if (archiveBytes.Length > 32 * 1024 * 1024)
+            throw new InvalidDataException("Plugin archive exceeds 32 MiB.");
         var archiveSha = global::H2AgentLab.SafeWorkspace.Hash(archiveBytes).ToLowerInvariant();
         var expectedArchive = catalogEntry.ArchiveSha256[7..].ToLowerInvariant();
         if (!string.Equals(archiveSha, expectedArchive, StringComparison.Ordinal))
@@ -125,6 +145,7 @@ public sealed class PluginManager
             || manifest.Publisher != catalogEntry.Publisher)
             throw new InvalidDataException("Plugin manifest identity does not match catalog entry.");
 
+        ValidateEntries(zip, manifest, policy);
         H2PluginManifest.ValidateHash(manifest.PackageHash, "Plugin payload hash");
         var payloadSha = ComputePayloadHash(zip);
         if (!string.Equals(
@@ -169,6 +190,8 @@ public sealed class PluginManager
             Extract(zip, staging);
             RunDeclarativeSelfTest(manifest, staging);
             ValidateToolDefinitions(manifest, staging);
+            WriteAtomic(Path.Combine(staging, "admission.json"), JsonSerializer.SerializeToUtf8Bytes(
+                new AdmissionReceipt(1, HashFile(Path.Combine(staging, "manifest.json")), payloadSha)));
             Directory.Move(staging, finalRoot);
         }
         catch
@@ -178,13 +201,8 @@ public sealed class PluginManager
         }
 
         var previous = previousActive?.Manifest.Version;
-        var registered = ActivateIntoRegistry(manifest, finalRoot);
-        WriteActivation(
-            pluginRoot,
-            new PluginActivationRecord(
-                manifest.Version,
-                previous,
-                DateTime.UtcNow));
+        var registered = ActivateIntoRegistry(manifest, finalRoot, () => WriteActivation(
+            pluginRoot, new PluginActivationRecord(manifest.Version, previous, DateTime.UtcNow)));
 
         return new PluginInstallResult(
             manifest.Id,
@@ -214,7 +232,7 @@ public sealed class PluginManager
             .ToArray();
     }
 
-    public H2PluginManifest Rollback(string pluginId)
+    private H2PluginManifest RollbackCore(string pluginId)
     {
         EnsureActivationBoundary();
         var pluginRoot = PluginRoot(pluginId);
@@ -223,23 +241,18 @@ public sealed class PluginManager
         if (string.IsNullOrWhiteSpace(activation.PreviousVersion))
             throw new InvalidOperationException("Plugin has no previous version to roll back to.");
 
-        var previousRoot = Path.Combine(pluginRoot, activation.PreviousVersion);
+        var previousRoot = VersionRoot(pluginId, activation.PreviousVersion);
         if (!Directory.Exists(previousRoot))
             throw new InvalidOperationException("Previous plugin version is unavailable.");
 
-        var previousManifest = ReadManifest(previousRoot);
+        var previousManifest = VerifyVersion(pluginId, activation.PreviousVersion);
         var current = activation.ActiveVersion;
-        ActivateIntoRegistry(previousManifest, previousRoot);
-        WriteActivation(
-            pluginRoot,
-            new PluginActivationRecord(
-                previousManifest.Version,
-                current,
-                DateTime.UtcNow));
+        ActivateIntoRegistry(previousManifest, previousRoot, () => WriteActivation(
+            pluginRoot, new PluginActivationRecord(previousManifest.Version, current, DateTime.UtcNow)));
         return previousManifest;
     }
 
-    public void Quarantine(
+    private void QuarantineCore(
         string pluginId,
         string version,
         string reason)
@@ -247,7 +260,7 @@ public sealed class PluginManager
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         EnsureActivationBoundary();
         var pluginRoot = PluginRoot(pluginId);
-        var versionRoot = Path.Combine(pluginRoot, version);
+        var versionRoot = VersionRoot(pluginId, version);
         if (!Directory.Exists(versionRoot))
             throw new DirectoryNotFoundException("Plugin version is not installed.");
 
@@ -261,19 +274,26 @@ public sealed class PluginManager
 
         var activation = ReadActivation(pluginRoot);
         if (activation?.ActiveVersion == version)
-            _ = Rollback(pluginId);
+        {
+            DisableCore(pluginId);
+            // A first/only version has no fallback. It must remain disabled, not callable.
+            if (!string.IsNullOrWhiteSpace(activation.PreviousVersion))
+            {
+                try { _ = VerifyVersion(pluginId, activation.PreviousVersion); }
+                catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+                { return; }
+                _ = RollbackCore(pluginId);
+            }
+        }
     }
 
-    public IReadOnlyList<(H2PluginManifest Manifest, string VersionRoot)> ActivePlugins()
+    private IReadOnlyList<(H2PluginManifest Manifest, string VersionRoot)> ActivePluginsCore()
     {
         var result = new List<(H2PluginManifest, string)>();
         foreach (var pluginRoot in Directory.EnumerateDirectories(_root))
         {
-            var activation = ReadActivation(pluginRoot);
-            if (activation is null) continue;
-            var versionRoot = Path.Combine(pluginRoot, activation.ActiveVersion);
-            if (!Directory.Exists(versionRoot)) continue;
-            result.Add((ReadManifest(versionRoot), versionRoot));
+            var active = GetActiveCore(Path.GetFileName(pluginRoot));
+            if (active is not null) result.Add(active.Value);
         }
         return result
             .OrderBy(x => x.Item1.Id, StringComparer.Ordinal)
@@ -297,23 +317,24 @@ public sealed class PluginManager
             tools.Select(x => x.Name + "@" + x.ToolVersion).ToArray());
     }
 
-    public (H2PluginManifest Manifest, string VersionRoot)? GetActive(string pluginId)
+    private (H2PluginManifest Manifest, string VersionRoot)? GetActiveCore(string pluginId)
     {
         var pluginRoot = PluginRoot(pluginId);
         if (!Directory.Exists(pluginRoot)) return null;
         var activation = ReadActivation(pluginRoot);
-        if (activation is null) return null;
-        var versionRoot = Path.Combine(pluginRoot, activation.ActiveVersion);
-        return Directory.Exists(versionRoot)
-            ? (ReadManifest(versionRoot), versionRoot)
-            : null;
+        if (activation is null || !activation.Enabled) return null;
+        var versionRoot = VersionRoot(pluginId, activation.ActiveVersion);
+        if (File.Exists(Path.Combine(versionRoot, "quarantine.json"))) return null;
+        return (VerifyVersion(pluginId, activation.ActiveVersion), versionRoot);
     }
 
     private IReadOnlyList<string> ActivateIntoRegistry(
         H2PluginManifest manifest,
-        string versionRoot)
+        string versionRoot, Action commit)
     {
         EnsureActivationBoundary();
+        _ = VerifyVersion(manifest.Id, manifest.Version);
+        var generation = _generations.GetValueOrDefault(manifest.Id) + 1;
         var providerId = "plugin." + manifest.Id;
         var descriptors = new List<ToolDescriptor>();
 
@@ -343,7 +364,7 @@ public sealed class PluginManager
                 tool.SupportsParallel,
                 tool.SchemaVersion,
                 tool.CallableSchema,
-                executor,
+                new VersionExecutor(this, manifest, generation, executor),
                 provenance: new ToolProvenance(
                     providerId,
                     manifest.Version,
@@ -353,17 +374,16 @@ public sealed class PluginManager
                     tool.ResourceScope,
                     tool.ResourceScope),
                 serializationKey: tool.SerializationKey,
-                canProvideVerificationEvidence: false));
+                canProvideVerificationEvidence: false,
+                readinessSnapshot: () => VersionReadiness(manifest.Id, manifest.Version, generation)));
         }
 
-        _registry.UnregisterWhere(x =>
-            string.Equals(
-                x.Provenance?.ProviderId,
-                providerId,
-                StringComparison.Ordinal));
-
-        foreach (var descriptor in descriptors)
-            _registry.Register(descriptor);
+        _registry.ReplaceWhere(x => string.Equals(x.Provenance?.ProviderId,
+            providerId, StringComparison.Ordinal), descriptors, () =>
+        {
+            commit();
+            _generations[manifest.Id] = generation;
+        });
 
         return descriptors.Select(x => x.Name).ToArray();
     }
@@ -442,10 +462,18 @@ public sealed class PluginManager
         H2PluginManifest manifest,
         PluginInstallPolicy policy)
     {
+        if (zip.Entries.Count > 2048 || zip.Entries.Sum(x => x.Length) > 64L * 1024 * 1024)
+            throw new InvalidDataException("Plugin expanded package exceeds bounded limits.");
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in zip.Entries)
         {
             var normalized = NormalizeEntry(entry.FullName);
             H2PluginManifest.ValidateRelativePath(normalized, "package entry");
+            if (!paths.Add(normalized.TrimEnd('/'))
+                || normalized.TrimEnd('/').Split('/').Any(x => x.Length == 0 || x == "." || x.EndsWith('.') || x.EndsWith(' '))
+                || new[] { "admission.json", "quarantine.json", "active.json" }.Contains(normalized, StringComparer.OrdinalIgnoreCase)
+                || ((entry.ExternalAttributes >> 16) & 0xF000) == 0xA000)
+                throw new InvalidDataException("Plugin package contains an ambiguous or reserved path.");
             if (normalized.StartsWith(".", StringComparison.Ordinal)
                 || normalized.Contains("/.", StringComparison.Ordinal))
                 throw new InvalidDataException("Plugin package contains hidden/dot paths.");
@@ -582,14 +610,17 @@ public sealed class PluginManager
     }
 
     private static string NormalizeEntry(string value)
-        => value.Replace((char)92, '/').TrimStart('/');
+        => value.Replace((char)92, '/');
 
     private string PluginRoot(string pluginId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId)
+        if (string.IsNullOrWhiteSpace(pluginId) || pluginId.Length > 128
+            || !char.IsAsciiLetterOrDigit(pluginId[0])
             || pluginId.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_')))
             throw new ArgumentException("Plugin ID is invalid.", nameof(pluginId));
-        return Path.Combine(_root, pluginId);
+        var path = Path.Combine(_root, pluginId);
+        RejectLinks(path);
+        return path;
     }
 
     private static H2PluginManifest ReadManifest(string versionRoot)
