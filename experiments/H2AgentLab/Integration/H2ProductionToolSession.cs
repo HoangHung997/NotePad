@@ -40,8 +40,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
         Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
-        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null)
+        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null)
     {
+        _liveRequirement = H2AgentLiveResourceRequirement.FromUserRequest(userGoal, context?.ActiveWorkContext, context?.TargetIntent);
         _jobRevision = jobRevision; _ownerCancellation = ownerCancellation; _jobObserved = jobObserved;
         _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
@@ -166,6 +167,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         var key = ResourceKey(descriptor, call);
         if (_scope?.Mode == H2AgentPermissionMode.FullAccess && !_scope.HasFullAccessAt(DateTime.UtcNow))
             return AgentRuntimePermissionDecision.Deny("expired_permission", "Quyền toàn máy đã hết hạn; chọn lại quyền và gửi yêu cầu mới.", key);
+        var semantics = CheckResourceSemantics(descriptor, call, key);
+        if (semantics is not null) return semantics;
         var grounding = CheckFileGrounding(descriptor, call, key);
         if (grounding is not null) return grounding;
         if (!descriptor.IsMutating) return AgentRuntimePermissionDecision.Allow(key);

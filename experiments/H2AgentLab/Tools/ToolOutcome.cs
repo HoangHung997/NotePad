@@ -345,7 +345,7 @@ public static class ToolOutcomeBridge
         "session_not_found" => "stale_resource",
         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
         "timeout" => "deadline_exceeded", "validation_failed" => "verification_failed",
-        "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
+        "live_resource_required" or "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
             or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"
             or "deadline_exceeded" or "rate_limited" or "partial_result" or "verification_failed"
@@ -363,6 +363,7 @@ public static class ToolOutcomeBridge
             "resource_not_found" => "The selected resource could not be found; observe exact resources again.",
             "ambiguous_target" => "More than one target matches; select an exact resource.",
             "target_not_grounded" => "The target does not match a host-selected project, linked, explicit or captured resource. Select the exact target; more permission alone does not resolve it.",
+            "live_resource_required" => "This request requires the same live application resource. A saved file, HTTP fetch or unbound command is not an equivalent source. Recover the bound live provider; changing to a disk snapshot requires a separate explicit user request. Full Access does not change source semantics.",
             "stale_resource" => "The resource changed; read its current state before proceeding.",
             "provider_busy" or "modal_blocked" => "The provider is busy or blocked by a modal state.",
             "permission_denied" => "Permission is missing, expired or denied. Do not route around it.",

@@ -99,8 +99,22 @@ public sealed class OfficeWindowCatalog : IDisposable
                 catch(Exception ex) when(OfficeNativeWindowProbe.IsProbeFailure(ex))
                 { view?.Dispose(); issues.Add(new(OfficeNativeWindowProbe.FaultCode(ex),candidate.RootHandle,candidate.ProcessId)); }
             }
+            // A transient probe failure is not evidence that a previously observed document
+            // closed. Keep its bounded owned reference ONLY for future identity comparison;
+            // never return it as a current observation or dispatch through it without re-probing.
+            // A successful absence, ambiguity or stale identity still retires the old binding.
+            bool RetainUnobserved(KeyValuePair<string, OfficeViewLease> pair)
+            {
+                if (next.ContainsKey(pair.Key) || ambiguous.Contains(pair.Key)) return false;
+                var old = pair.Value.Candidate;
+                var relevant = issues.Where(i => i.WindowHandle is null || i.WindowHandle == old.RootHandle).ToArray();
+                if (relevant.Any(i => i.Code is "stale_resource" or "ambiguous_target" or "permission_denied")) return false;
+                return !scan.Complete || relevant.Any(i => i.Code is "native_object_unavailable"
+                    or "provider_busy" or "modal_blocked" or "discovery_limit");
+            }
             var replaced = _views.Where(p=>p.Value.Candidate.Application==application
-                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)).ToArray();
+                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)
+                && !RetainUnobserved(p)).ToArray();
             // A targeted refresh replaces only one root. Without a lifetime-wide bound,
             // closed roots from successive captures would retain COM references forever.
             // Reject BEFORE mutating the accepted cache; the finally block releases the

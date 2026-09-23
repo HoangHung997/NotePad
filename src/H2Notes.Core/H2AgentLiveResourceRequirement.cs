@@ -16,7 +16,8 @@ public sealed record H2AgentLiveResourceRequirement(bool Required, H2Application
         var live = hostIntent is H2AgentTargetIntent.CapturedActive or H2AgentTargetIntent.CapturedSelection
             || new[] { "dang mo", "dang chon", "dang active", "dang hoat dong", "tren man hinh",
                 "currently open", "current selection", "active workbook", "active document", "active window",
-                "current drawing", "current tab", "open word document", "open excel workbook" }.Any(text.Contains)
+                "current drawing", "current tab", "current browser tab", "current autocad drawing",
+                "current word document", "current excel workbook", "open word document", "open excel workbook" }.Any(text.Contains)
             || capture is not null && new[] { "file nay", "tai lieu nay", "cong thuc nay", "o nay",
                 "vung nay", "this document", "this workbook", "this cell", "this tab" }.Any(text.Contains);
         var kinds = new List<H2ApplicationKind>();

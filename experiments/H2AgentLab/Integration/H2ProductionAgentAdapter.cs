@@ -386,7 +386,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
                     resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history,
                 () => { lock (live.Gate) return live.GoalState?.RevisionId ?? throw new InvalidOperationException("Goal revision unavailable."); },
-                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job));
+                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job), live.Goal);
             using var tools = new global::H2AgentLab.AgentTools(
                 safeWorkspace,
                 taskStateRoot,
@@ -416,6 +416,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 CurrentState: history.MinimumContext(contract.Goals?.RevisionId) + "Host-selected workspace: " + live.WorkspaceRoot
                     + (fullAccess ? "\nFull access grants execution permission, NOT automatic target selection. File tools still require this workspace or an exact host-listed external target. exec_command runs PowerShell without a workspace/network sandbox; it is not a way around a denied target. Never claim success without checking results.\n"
                         : "\nFile tools accept relative workspace paths, plus exact host-listed external targets.\n")
+                    + toolSession.LiveResourceInstruction
                     + "\nTask targets: " + JsonSerializer.Serialize(live.RequestContext?.TargetPaths ?? [])
                     + "\nSelected attachments (read with read_attachment using the exact attachment_id): "
                     + JsonSerializer.Serialize((live.RequestContext?.Attachments ?? []).Select(a => new {

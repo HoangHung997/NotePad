@@ -100,7 +100,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
-| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | NOT_STARTED — CRITICAL |
+| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | ACTIVE — core validation pending; E3/E4 AWAITING_ENVIRONMENT |
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
@@ -483,7 +483,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**AR-064 is checkpointed PARTIAL, not DONE. Current task is AR-065, implemented with E1/E2 and full CI; real H2/model E4 remains AWAITING_ENVIRONMENT.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+**Current task is AR-066 core, selected under section 2.2 with implemented AR-012/020 dependencies. AR-065 stays IMPLEMENTED/E2_PASS with E4 AWAITING_ENVIRONMENT; AR-064 stays PARTIAL. No acceptance is waived.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
 
 Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
@@ -498,45 +498,27 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-065_IMPLEMENTED_E2_PASS_AWAITING_REAL_H2_E4",
-  "active_task": "AR-065",
-  "implementation_status": "IMPLEMENTED",
-  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "phase": "AR-066_CORE_ACTIVE_PENDING_CI",
+  "active_task": "AR-066",
+  "implementation_status": "ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar065-reconcile-2026-09-23",
-  "last_code_commit": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+  "owner_session": "chatgpt-ar066-live-resource-2026-09-23",
+  "last_code_commit": null,
   "last_validated_code_commit": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-  "last_validation_result": "AR065_55_PASS_X3; PRODUCTION10_X3_AND_FULL; OLD_TRANSPORT4_EXPECTED_FAILURES; FULL1132_PASS; AGENT74_PASS; E4_AWAITING_ENVIRONMENT; NOT_DONE",
-  "capture_checked_head": "ac3f986c65f2d05b661aac13235a5bb988a08b6b",
+  "last_validation_result": "AR066_NOT_RUN; prior AR065 E2 retained separately, not reused as AR066 acceptance",
+  "capture_checked_head": "e29319b6003f3911a55224956f7720d535910b98",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact focused checkout CLEAN, control bytes restored and rebuilt, final CI checkout CLEAN. Full CI test-merge application/test/tools trees equal. User-PC working tree NOT_ACCESSIBLE. This checkpoint changes documentation only.",
+  "working_tree": "Isolated CI clean checkout before bounded reviewed source delivery. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T15:50:20.271102+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T16:27:13.135095+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Real H2 UI with existing authorized exact Luna Responses profile: read-only task, harmless creation/readback and deferred tool loading, plus reopen/no replay, under a finite operator budget.",
-    "Capture exact sanitized original provider rejection if it remains. No claim of real incident resolution from scripted E2 alone."
+    "Build/test the exact integrated AR066 source, repair all regressions, then persist exact-SHA evidence.",
+    "Real Office native recovery and H2 UI/model E3/E4 remain AWAITING_ENVIRONMENT; no live acceptance claimed."
   ],
-  "last_test_commands": [
-    {
-      "command": "tools/agent-reliability/validate_ar065.ps1 (old source control; AR-065 x3; full H2; all Agent flags)",
-      "sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-      "run_id": 35881691347,
-      "job_id": 107251468701,
-      "attempt": 1,
-      "result": "55/55 x3; full1132/1132; Agent74/74; exact old-source4 expected failures"
-    },
-    {
-      "command": "Avalonia CI (build, full H2, all required suites, win-x64 publish, packaged helper IPC)",
-      "sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
-      "head_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-      "run_id": 35881698306,
-      "job_id": 107251491366,
-      "attempt": 1,
-      "result": "All mandatory steps PASS; H2 1132/1132; test merge NOT main merge"
-    }
-  ],
+  "last_test_commands": [],
   "ci_runs": [
     {
       "id": 35687637186,
@@ -1142,7 +1124,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-066",
       "issue": "Live app resource/native Word-Excel-AutoCAD-Browser semantics",
-      "status": "NOT_STARTED"
+      "status": "ACTIVE / E1-E2_NOT_RUN / E3-E4_AWAITING_ENVIRONMENT"
     },
     {
       "id": "AR-067",
@@ -1164,9 +1146,9 @@ Do not claim these defects were already covered by historical Office/transport/U
   "pending_user_decisions": [
     "Provide an authorized isolated Windows/H2 test environment and a finite live-model test budget; keep credentials on that machine, never paste keys into chat."
   ],
-  "next_exact_action": "Reconcile latest branch/PR/checkpoint first. Continue only AR-065 real H2/Luna E4 using docs/agent-reliability/AR-065/real-h2-acceptance.md and an authorized existing profile with finite budget. Read journal and verify postconditions before any uncertain operation. Do not reapply either old ZIP or corrupt transfer payload, rename registry tools, change provider/engine, waive E4, or close AR064/MB124-127. If no authorized environment exists, retain AWAITING_ENVIRONMENT; the next independent critical core candidate is AR066 after a separately recorded dependency decision.",
+  "next_exact_action": "Inspect completed delivery receipt and exact branch SHA; run only AR066 Windows validation and retained/full regressions. Never rerun a delivery with an uncertain push result: inspect branch/files first. Keep AR065 E4 and prior debt open.",
   "next_task_if_active_done": "AR-066 after AR-065 gates/checkpoint and explicit independent dependency assessment; then AR-067/068 and AR-069",
-  "last_runtime_source_commit": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
+  "last_runtime_source_commit": null,
   "previous_saved_checkpoint_commit": "9691e2092ee0f1783df4fe0b2640c2acbd0e94f2",
   "finalization_checked_head": "ac3f986c65f2d05b661aac13235a5bb988a08b6b",
   "additional_ci_after_recorded_run": "Not used as acceptance; later documentation/workflow runs need independent inspection.",
@@ -1201,21 +1183,23 @@ Do not claim these defects were already covered by historical Office/transport/U
       "cause": "Exact-output fixture also received native PowerShell progress; production stderr was not stripped"
     }
   ],
-  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Transport/OpenAiResponsesWireContract.cs",
+  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs experiments/H2AgentLab/Integration/H2ProductionToolSession.cs",
   "previous_completed_task": "AR-040",
   "last_full_ci_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
   "implemented_this_session": [
-    "AR-065"
+    "AR-066"
   ],
-  "next_ready_independent_task": "AR-066 core is the next critical candidate; NOT_STARTED in this session.",
+  "next_ready_independent_task": "Do not start another task this turn; AR067 remains NOT_STARTED.",
   "independent_dependency_assessment": {
-    "id": "AR-065",
+    "id": "AR-066",
+    "rule": "Tracker section 2.2: independent core may proceed with implemented dependencies and passed regressions while real E3/E4 gates await environment.",
     "dependencies": [
-      "AR-010 accepted",
-      "AR-011 accepted",
-      "AR-050 accepted with repaired stale fixture declarations"
+      "AR-012 DONE",
+      "AR-020 IMPLEMENTED with passed E2 regression; native E3 remains open"
     ],
-    "basis": "Critical priority after saved AR064 partial checkpoint. No E3/E4 waiver and no other AR implementation this session."
+    "reconciled_head": "05fe85d07083862943b2d60e0e299b1de09fd0f9",
+    "basis": "AR065 has passing E1/E2/full CI and no unresolved code failure. Its E4 is parked, not waived. AR066 core has no AR065 E4 dependency. Latest user continue requests exactly one task.",
+    "limits": "This is only AR066. No real native/model acceptance, no new engine/store, no personal side effects."
   },
   "parked_acceptance": [
     {
@@ -1243,15 +1227,20 @@ Do not claim these defects were already covered by historical Office/transport/U
       "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
       "missing_evidence": "Actual H2 UI/model/tools semantic recall and failure subset under authorized configured model budget",
       "blocks_independent_implementation": false
+    },
+    {
+      "id": "AR-065",
+      "implementation_status": "IMPLEMENTED",
+      "acceptance_status": "AWAITING_ENVIRONMENT",
+      "completed_level": "E2",
+      "required_level": "E4",
+      "done": false,
+      "code_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+      "evidence": "docs/agent-reliability/AR-065/evidence.json",
+      "blocks_independent_implementation": false
     }
   ],
-  "resolved_in_this_session": [
-    "Reconciled worker AR065 runtime wire repair without overwriting it or reapplying the stale local ZIP.",
-    "Fixed two AR050 fixtures to advertise their scripted lookup callable while retaining unadvertised-tool and budget guards.",
-    "Added ten Global/Project production HTTP/runtime/file/archive cases; fixed missing test namespace and required read offset, then verified exact leading JSON content/hash.",
-    "Replaced a timing-dependent two-second child sleep in retained AR040 roundtrip with a bounded same-job two-observed-poll handshake; preserved effect, identity, terminal, output and archive assertions.",
-    "Ran and independently verified exact-SHA focused/full Windows CI, old-source negative control, source/artifact checksums and per-case receipts; no real provider calls."
-  ],
+  "resolved_in_this_session": [],
   "last_test_commit": "2aadf0c1d06aaa928529f8986192a2f2798ebdc4",
   "last_native_acceptance": "AR-020/033 E3 and AR-065 E4 AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER",
   "parked_ar064": {

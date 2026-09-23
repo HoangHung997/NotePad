@@ -168,7 +168,7 @@ internal static class H2AgentLiveResourceTests
                 original = await Wait(adapter, task);
                 if (notice)
                     Check(wire.Results.Any(r => r.Content.Contains(mode == "browser-notice" ? "browser.live_tab" : "autocad.live_drawing", StringComparison.Ordinal)
-                        && r.Content.Contains("live_resource_required", StringComparison.Ordinal)), "Missing truthful live-provider readiness notice.");
+                        && r.Content.Contains("not an equivalent source", StringComparison.Ordinal)), "Missing truthful live-provider readiness notice.");
                 else if (mode == "disk-only")
                 {
                     Check(original.Status == H2AgentTaskStatus.Completed && client.Discoveries == 0,
@@ -185,6 +185,7 @@ internal static class H2AgentLiveResourceTests
                     Check(!fallback.Contains("DISK-IS-NOT-UNSAVED-LIVE", StringComparison.Ordinal), "Disk body escaped as live source.");
                     Check(original.Status != H2AgentTaskStatus.Completed, "Unresolved live operation became completed.");
                 }
+                Check(wire.LiveRequirementAdvertised == (mode != "disk-only"), "Trusted live-source constraint did not reach the actual model request.");
                 Check(Hash(source) == before && Hash(diskWord) == beforeWord && !File.Exists(marker), "A forbidden fallback changed test bytes.");
             }
             var rounds = wire.Rounds;
@@ -248,8 +249,13 @@ internal static class H2AgentLiveResourceTests
     private sealed class Wire(AgentTransportToolCall[] calls) : IAgentTransport
     {
         private int _next; public int Rounds; public List<AgentToolResult> Results = [];
+        public bool LiveRequirementAdvertised;
         public AgentTransportCapabilities Capabilities => AgentTransportCapabilities.ChatCompletionsFallback;
-        public IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest r, CancellationToken ct = default) => Round(ct);
+        public IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest r, CancellationToken ct = default)
+        {
+            LiveRequirementAdvertised = r.Messages.Any(m => m.Content.Contains("Host source requirement: LiveResource", StringComparison.Ordinal));
+            return Round(ct);
+        }
         public IAsyncEnumerable<AgentTransportEvent> ContinueAsync(AgentTransportContinuationRequest r, CancellationToken ct = default)
         { Results.AddRange(r.ToolResults); return Round(ct); }
         private async IAsyncEnumerable<AgentTransportEvent> Round([EnumeratorCancellation] CancellationToken ct)

@@ -23,6 +23,8 @@ internal sealed partial class H2ProductionToolSession
             var cad = new H2AutoCadFileTools(cadExecutable, tools.Workspace, tools.StateRoot); cad.Register(registry); verifiers.Add(cad);
         }
 
+        registry.RegisterCapabilityNotice(new("autocad.live_drawing", "No live AutoCAD drawing/SelectionSet provider is composed here. Core Console operates on disk files, not the current unsaved drawing.", new(ToolReadinessState.Unsupported, "live_resource_required")));
+        registry.RegisterCapabilityNotice(new("browser.live_tab", "No existing live browser tab/session is bound. HTTP fetch is a separate public disk/network snapshot, not the logged-in current tab.", new(ToolReadinessState.NeedsConfiguration, "live_resource_required")));
         registry.RegisterCapabilityNotice(new("web.search", "Web search requires a configured search backend; fetch accepts an explicit URL.", new(ToolReadinessState.NeedsConfiguration)));
         registry.RegisterCapabilityNotice(new("web.open_browser", "Interactive browser automation requires a configured browser backend; fetch is not browser control.", new(ToolReadinessState.NeedsConfiguration)));
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
