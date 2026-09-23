@@ -431,12 +431,12 @@ internal static class H2AgentWorkCompactionTests
                 Check(owner.Budgets.Count == owner.Sends && owner.Budgets[^1].PayloadSha256 == RuntimeContextCompactionTurn.Hash(raw), "Final body was not budgeted.");
                 if (owner.Sends >= 44)
                     return Response(new { message = new { role = "assistant", content = "Readback finished; missing PDF remains." }, done = true });
-                var name = owner.Sends is 1 or 3 ? "tool_search" : owner.Sends == 2 ? "write_text" : "read_text";
+                var name = owner.Sends is 1 or 3 ? "tool_search" : owner.Sends == 2 ? "write_text" : "read_file";
                 var args = owner.Sends switch
                 {
                     1 => JsonSerializer.SerializeToElement(new { query = "write_text" }),
                     2 => JsonSerializer.SerializeToElement(new { path = "once.txt", text = "WRITTEN-ONCE " + Formula, expectedHash = "" }),
-                    3 => JsonSerializer.SerializeToElement(new { query = "read_text" }),
+                    3 => JsonSerializer.SerializeToElement(new { query = "read_file" }),
                     _ => JsonSerializer.SerializeToElement(new { path = "once.txt" })
                 };
                 if (owner.Sends == 2) owner.Writes++;
