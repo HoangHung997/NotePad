@@ -1,4 +1,5 @@
 name: AR-065 Responses wire contract validation
+run-name: AR-065 exact-source validation (${{ github.sha }})
 on:
   workflow_dispatch:
   push:
