@@ -286,7 +286,7 @@ public static class MbRepairRuntimeTests
         var registry = new ToolRegistry();
         registry.Register(new ToolDescriptor(
             "fixture.recover",
-            new ToolNamespace("core", "AR-067 typed recovery fixture."),
+            new ToolNamespace("fixture", "AR-067 typed recovery fixture."),
             "Read one exact fixture resource and fail safely when its input is invalid or unavailable.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
@@ -331,8 +331,8 @@ public static class MbRepairRuntimeTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return AgentTransportEvent.Tool(new("ar067-bad", "fixture.recover",
-                "{\"resource_id\":\"doc-1\",\"value\":\"bad\"}"));
+            yield return AgentTransportEvent.Tool(new("ar067-search", DeferredToolDiscovery.SearchToolName,
+                "{\"query\":\"fixture recover exact resource\"}"));
             await Task.Yield();
             yield return AgentTransportEvent.Complete("ar067", "tool_calls");
         }
@@ -345,6 +345,15 @@ public static class MbRepairRuntimeTests
             _continuations++;
             if (_continuations == 1)
             {
+                if (request.NewlyLoadedTools?.Any(x => x.Name == "fixture.recover") != true)
+                    throw new InvalidOperationException("fixture.recover was not loaded by tool_search.");
+                yield return AgentTransportEvent.Tool(new("ar067-bad", "fixture.recover",
+                    "{\"resource_id\":\"doc-1\",\"value\":\"bad\"}"));
+                yield return AgentTransportEvent.Complete("ar067", "tool_calls");
+                yield break;
+            }
+            if (_continuations == 2)
+            {
                 var failed = request.ToolResults.Single();
                 SawTypedFailure = failed.IsError
                     && failed.Outcome?.Error?.Code == "invalid_arguments"
@@ -354,7 +363,7 @@ public static class MbRepairRuntimeTests
                 yield return AgentTransportEvent.Complete("ar067", "tool_calls");
                 yield break;
             }
-            if (_continuations == 2)
+            if (_continuations == 3)
             {
                 if (request.ToolResults.Single().IsError)
                     throw new InvalidOperationException("Corrected AR-067 call still failed.");
