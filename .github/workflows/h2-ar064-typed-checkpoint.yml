@@ -1,0 +1,46 @@
+name: AR-064 verified partial checkpoint before critical repairs
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar064-typed-checkpoint.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: h2-ar064-typed-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/h2-agent-reliability-ar-000
+          fetch-depth: 0
+      - name: Verify exact reviewed documentation-only program
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64,hashlib,json,os,pathlib,urllib.request
+          sha='386e4a8f5a56db34dbb69a1a623cfc9148934aad'
+          req=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(req,timeout=30) as response: value=json.loads(response.read(100000))
+          data=base64.b64decode(value['content'])
+          assert value['sha']==sha and hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha
+          assert hashlib.sha256(data).hexdigest()=='00918218b15117d366ad5ce4b6692cb2c4a07a0230559150aca77c3d5191a2f4'
+          pathlib.Path(os.environ['RUNNER_TEMP'],'ar064-checkpoint.py').write_bytes(data)
+          PY
+      - name: Verify source, control, receipts, full CI and refs then save only three documents
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python "$RUNNER_TEMP/ar064-checkpoint.py"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR064-Typed-Verified-Checkpoint
+          path: artifacts/ar064-typed-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
