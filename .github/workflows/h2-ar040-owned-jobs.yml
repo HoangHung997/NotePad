@@ -1,0 +1,131 @@
+name: AR-040 owned job core integration and validation
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar040-owned-jobs.yml]
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar040-owned-jobs
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.repository == 'HoangHung997/NotePad' && github.ref == 'refs/heads/feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      code: ${{ steps.save.outputs.code }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHECKED_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Save only reviewed owned-job core on unchanged feature branch
+        id: save
+        shell: python
+        run: |
+          import base64,gzip,hashlib,io,json,os,pathlib,subprocess
+          R='HoangHung997/NotePad';B='feature/h2-agent-reliability-ar-000';BASE='81901fd6e7b80904a0c43ac9e870b8bbae3833c2'
+          MAIN='1283bc13e07c3cd47d04886166de3dfc595422c0';WF='.github/workflows/h2-ar040-owned-jobs.yml'
+          def require(ok,msg):
+              if not ok: raise RuntimeError(msg)
+          def git(*a): return subprocess.check_output(['git',*a],text=True,timeout=90).strip()
+          def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          head=os.environ['CHECKED_HEAD']
+          require(git('rev-parse','HEAD')==head and not git('status','--porcelain'),'Wrong/dirty checkout')
+          require(git('rev-parse','HEAD^')==BASE and git('diff','--name-only',BASE,head)==WF,'Other work appeared')
+          require(git('ls-remote','origin','refs/heads/main').split()[0]==MAIN,'Main changed')
+          require(git('ls-remote','origin','refs/heads/'+B).split()[0]==head,'Branch changed')
+          chunks=[('215be3d99dbc83216b9cd27406b95e28773f0ce2',7000),('6b472e5477219a464859a3062d70eed6eb4a064f',2000),('91785e519975e8df8159496c6b3c3778637411fb',2000),('76b28db658df5ea07761f68308def6baffaea8ad',2000),('6e7ae2d489b5d0f6656ecf9bd7076ccdfc2e1601',1161)]
+          compressed=b''
+          for sha,size in chunks:
+              response=json.loads(subprocess.check_output(['gh','api','repos/'+R+'/git/blobs/'+sha],timeout=60))
+              b=base64.b64decode(response['content']);require(len(b)==size and blob(b)==sha,'Chunk mismatch');compressed+=b
+          require(len(compressed)==14161 and blob(compressed)=='4cd274c42dc2b7884afe31fbfec0345c14378b69','Transfer mismatch')
+          with gzip.GzipFile(fileobj=io.BytesIO(compressed)) as stream:
+              patch=stream.read(56014);require(len(patch)==56013 and stream.read(1)==b'','Patch length')
+          require(hashlib.sha256(patch).hexdigest()=='2ea225d33aa7b54a13203b39de534144ef07f67aed133f0912abcfd2e0bccbdc','Patch identity')
+          entries=[
+            ('experiments/H2AgentLab/Computer/WindowsOwnedProcess.cs',None,'1c4029431cd8556f714ddbe9b877e0f264a5b055'),
+            ('experiments/H2AgentLab/Computer/ProcessShellCapabilities.Jobs.cs',None,'0e63ef918dd6b14100eae262c07bc7a8bac0cea7'),
+            ('experiments/H2AgentLab/Computer/ProcessShellCapabilities.cs','30b762720ab0ac55707d69deb200fdb72b7f2560','8847cbab9376f00b9775f57654fd952dd3632c35'),
+            ('tests/H2Notes.Tests/H2AgentLongJobTests.cs',None,'9d08c3fef4f1cff8e55f3de5c4bac26de067e6a8'),
+            ('tests/H2Notes.Tests/Program.cs','314e61f445fdb2e77e4315da912327280e10336e','1fef3e2e88c81b2a3b4203cd663fa8d2ad573159')]
+          for p,old,new in entries:
+              require(not pathlib.Path(p).exists() if old is None else blob(pathlib.Path(p).read_bytes())==old,'Preimage '+p)
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'ar040-owned-source';out.mkdir();pf=out/'reviewed.patch';pf.write_bytes(patch)
+          subprocess.run(['git','apply','--index','--check',str(pf)],check=True);subprocess.run(['git','apply','--index',str(pf)],check=True)
+          for p,old,new in entries: require(blob(pathlib.Path(p).read_bytes())==new,'Postimage '+p)
+          require(set(git('diff','--cached','--name-only').splitlines())=={p for p,_,_ in entries},'Unexpected stage')
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          require(git('ls-remote','origin','refs/heads/'+B).split()[0]==head,'Concurrent branch work')
+          git('config','user.name','github-actions[bot]');git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          subprocess.run(['git','commit','-m','feat(AR-040): add bounded owner-scoped jobs to existing process service'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+B],check=True,timeout=120)
+          code=git('rev-parse','HEAD');require(not git('status','--porcelain') and git('ls-remote','origin','refs/heads/'+B).split()[0]==code,'Save differs')
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'entries':entries,'status':'AR040_ACTIVE_CORE_ONLY_PRODUCTION_WIRING_PENDING','tests':'NOT_RUN_AT_SAVE'},indent=2))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('code='+code+'\n')
+      - name: Dispatch unchanged full CI for saved source
+        run: gh api -X POST repos/HoangHung997/NotePad/actions/workflows/avalonia-ci.yml/dispatches -f ref=feature/h2-agent-reliability-ar-000
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR040-Owned-Core-Delivery
+          path: ${{ runner.temp }}/ar040-owned-source/
+          if-no-files-found: error
+          retention-days: 14
+  validate:
+    needs: integrate
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.integrate.outputs.code }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Exact source identity and build
+        id: build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop';New-Item -ItemType Directory -Force artifacts/ar040-owned | Out-Null
+          if(git status --porcelain){throw 'Dirty checkout'}
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';task='AR-040 ACTIVE';E2='Actual owned subprocesses; core only, production integration pending';E3='NOT_RUN';E4='NOT_RUN';E5='DEFERRED_BY_USER'}|ConvertTo-Json|Set-Content artifacts/ar040-owned/identity.json
+          python -c "import hashlib,json,pathlib,subprocess,zipfile; paths=subprocess.check_output(['git','ls-files'],text=True).splitlines(); selected=[p for p in paths if pathlib.Path(p).suffix.lower() in ['.cs','.csproj','.props','.targets','.md','.json','.yml','.yaml','.ps1','.slnx','.py']]; z=zipfile.ZipFile('artifacts/ar040-owned/committed-source.zip','w',zipfile.ZIP_DEFLATED); rows=[]; [(z.writestr(p,b),rows.append({'path':p,'sha256':hashlib.sha256(b).hexdigest(),'blob':hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()})) for p in selected for b in [subprocess.check_output(['git','show','HEAD:'+p])]]; z.close(); pathlib.Path('artifacts/ar040-owned/source-receipt.json').write_text(json.dumps(rows,indent=2))"
+          if($LASTEXITCODE){throw 'Receipt failed'}
+          dotnet restore H2Notes.Avalonia.slnx
+          if($LASTEXITCODE){throw 'Restore failed'}
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar040-owned/build.log
+          if($LASTEXITCODE){throw 'Build failed'}
+      - name: Repeat owned jobs and retained regressions
+        id: corpus
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop';$failed=@()
+          foreach($name in 'AR-040-1','AR-040-2','AR-040-3','AR-033','AR-032','AR-031','AR-030','AR-020','AR-012','AR-011','AR-010','AR-001'){
+            $env:H2_AR040_EVIDENCE_DIR=Join-Path $PWD "artifacts/ar040-owned/$name"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $name.Substring(0,6) 2>&1|Tee-Object "artifacts/ar040-owned/$name.log"
+            $exit=$LASTEXITCODE;$expected=if($name.StartsWith('AR-040')){'RESULT: 24 passed, 0 failed'}else{'RESULT: [1-9][0-9]* passed, 0 failed'}
+            if($exit -ne 0 -or (Get-Content "artifacts/ar040-owned/$name.log" -Raw) -notmatch $expected){$failed+=$name}
+          }
+          @{failed=$failed;scope='Owned job core; not complete AR-040 acceptance'}|ConvertTo-Json|Set-Content artifacts/ar040-owned/corpus.json
+          if($failed.Count){throw ('Failed: '+($failed -join ','))}
+      - name: Independent required Agent suites
+        if: always() && steps.build.outcome == 'success'
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar040-owned/agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR040-Owned-Core-Evidence
+          path: artifacts/ar040-owned/
+          if-no-files-found: error
+          retention-days: 14
