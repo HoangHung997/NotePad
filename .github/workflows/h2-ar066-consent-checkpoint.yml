@@ -1,0 +1,31 @@
+name: AR-066 verified source-consent checkpoint
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar066-consent-checkpoint.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: h2-ar066-consent-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/h2-agent-reliability-ar-000
+          fetch-depth: 0
+      - name: Verify completed exact-source runs and source-consent receipts before saving handoff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/ar066-consent-checkpoint.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR066-Consent-Verified-Checkpoint
+          path: ${{ runner.temp }}/ar066-consent-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
