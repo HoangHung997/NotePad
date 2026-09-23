@@ -36,7 +36,7 @@ public sealed record BoundedProcessResult(
     public string? CleanupIssue { get; init; }
 }
 
-public sealed class ProcessShellCapabilities : IDisposable
+public sealed partial class ProcessShellCapabilities : IDisposable
 {
     private readonly global::H2AgentLab.SafeWorkspace _workspace;
     private readonly ProcessShellPolicy _policy;
@@ -325,6 +325,7 @@ public sealed class ProcessShellCapabilities : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        DisposeJobs();
         foreach (var process in _owned.Values)
         {
             try
