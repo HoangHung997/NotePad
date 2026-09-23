@@ -1,0 +1,48 @@
+name: AR-050 verified serialized-budget checkpoint
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar050-checkpoint.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: h2-ar050-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Verify reviewed documentation-only program identity
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import os,json,base64,hashlib,pathlib,urllib.request
+          sha='d3be3b56ba08e9434baa8c390538f67e339c1ffc'
+          request=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(request,timeout=30) as response:obj=json.load(response)
+          assert obj['sha']==sha and obj['encoding']=='base64'
+          data=base64.b64decode(obj['content'])
+          assert len(data)==26184 and hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha
+          compile(data.decode('utf-8'),'reviewed-ar050-checkpoint','exec')
+          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'ar050-checkpoint.py'
+          path.write_bytes(data)
+      - name: Verify completed runs, actual wire receipts and full checkout then normal-push only three docs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python "$RUNNER_TEMP/ar050-checkpoint.py"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR050-Verified-Checkpoint
+          path: artifacts/ar050-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
