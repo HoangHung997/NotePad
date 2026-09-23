@@ -24,7 +24,7 @@ internal static class H2AgentPluginLifecycleTests
     private static void Reject(Action action)
     {
         try { action(); }
-        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException) { return; }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException) { return; }
         throw new Exception("Expected rejection before activation/execution.");
     }
     internal static void WithRoot(Action<string> action)
@@ -37,6 +37,7 @@ internal static class H2AgentPluginLifecycleTests
 
     public static void Run(Action<string, Action> test)
     {
+        H2AgentProviderRevocationTests.Run(test);
         test("AR-064 registry duplicate registration cannot leak a new namespace", () =>
         {
             var registry = new ToolRegistry(); registry.Register(Descriptor("fixture.a")); var version = registry.Version;
@@ -102,7 +103,7 @@ internal static class H2AgentPluginLifecycleTests
                         ["fixture.a", "fixture.b"], cts.Token).GetAwaiter().GetResult();
                     throw new Exception("Invalid provider projection accepted.");
                 }
-                catch (Exception ex) when (ex is IOException or ArgumentException or OperationCanceledException) { }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or OperationCanceledException) { }
                 Check(registry.Version == version && registry.TryGet("fixture.a", out var same)
                     && ReferenceEquals(same, original), "Rejected provider load removed old tools.");
             });

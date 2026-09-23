@@ -554,6 +554,13 @@ public static class MbRuntimeCapabilityInstallTests
         }
         public bool IsInstalled(string id)
         {
+            // The production manager now rejects altered admitted bytes before returning a manifest.
+            // Treat that specific integrity failure as failed readback, not a successful install.
+            try { return InspectInstalled(id); }
+            catch (InvalidDataException) { return false; }
+        }
+        private bool InspectInstalled(string id)
+        {
             if (!_expected.TryGetValue(id, out var expected)) return false;
             var active = _plugins.GetActive(id);
             if (active is null || active.Value.Manifest.Version != expected.Package.Manifest.Version) return false;

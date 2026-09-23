@@ -498,25 +498,25 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-064_FOUNDATION_AWAITING_CI",
+  "phase": "AR-064_DISCOVERY_REVOCATION_REPAIR",
   "active_task": "AR-064",
   "implementation_status": "ACTIVE / PARTIAL",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar064-resume-2026-09-23",
-  "last_code_commit": "ebb3fab416d921bcbf47058f1db2018349f26f20",
+  "owner_session": "chatgpt-ar064-boundary-repair-2026-09-23",
+  "last_code_commit": "Resolve this delivery commit from git log; candidate follows 2e4f172850a1a8488f901f7a1214fee764433b86",
   "last_validated_code_commit": "28e34454c7f44deebaa867121e661739a79470b5",
-  "last_validation_result": "NEW_CODE_NOT_RUN; prior HEAD full CI 35836793456 had 1001 pass / 1 chat fixture cleanup failure",
+  "last_validation_result": "Baseline ed11a1e: AR064 31 pass / 11 invalid-data exception failures x3; chat 10/10 x3; all retained AR pass; Agent suites 73/74, MB74 rejects tampered payload. New repair NOT_RUN.",
   "capture_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
   "working_tree": "Isolated delivery checkout clean after commit; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T09:46:35.610556+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T10:55:03.990955+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Build and execute new lifecycle corpus plus chat cleanup regression; retain all AR and Agent suites.",
-    "Complete product-used plugin/provider package composition, version pinning, real local package execution and RC-28 before acceptance. Foundation alone is not DONE."
+    "Validate reviewed discovery revocation/generation fence and test exception handling on Windows.",
+    "Complete product-used package lifecycle, task pinning, real package/tool RC-28 and E3; AR064 is not DONE."
   ],
   "last_test_commands": [
     {
@@ -1046,15 +1046,35 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "critical_user_reported_repairs": [
-    {"id":"AR-065","issue":"GPT-5.6 Luna text chat works but Agent tool task HTTP 400","status":"NOT_STARTED"},
-    {"id":"AR-066","issue":"Live app resource/native Word-Excel-AutoCAD-Browser semantics","status":"NOT_STARTED"},
-    {"id":"AR-067","issue":"Every meaningful failure returns to Agent for recovery or specific explanation","status":"NOT_STARTED"},
-    {"id":"AR-068","issue":"Command Center attention collapse and acknowledgement lifecycle","status":"NOT_STARTED"},
-    {"id":"AR-069","issue":"Integrated production acceptance of all four user-reported defects","status":"NOT_STARTED"}
+    {
+      "id": "AR-065",
+      "issue": "GPT-5.6 Luna text chat works but Agent tool task HTTP 400",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "AR-066",
+      "issue": "Live app resource/native Word-Excel-AutoCAD-Browser semantics",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "AR-067",
+      "issue": "Every meaningful failure returns to Agent for recovery or specific explanation",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "AR-068",
+      "issue": "Command Center attention collapse and acknowledgement lifecycle",
+      "status": "NOT_STARTED"
+    },
+    {
+      "id": "AR-069",
+      "issue": "Integrated production acceptance of all four user-reported defects",
+      "status": "NOT_STARTED"
+    }
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [],
-  "next_exact_action": "Continue only AR-064 on existing branch/PR #3. Add/run read-only validation on exact new source, repair every failure, finish production lifecycle and real trusted local package RC-28; do not close native gates or merge main.",
+  "next_exact_action": "Run current AR-064 revocation tests against old adapter then exact restore/rebuild, AR064 x3, chat x3, retained AR and all 74 Agent suites/full CI. Complete product-used package lifecycle, task pinning and real local package RC-28 before accepting AR-064; no E3/E4 claims from foundation.",
   "next_task_if_active_done": "AR-065 — CRITICAL: reproduce and repair OpenAI/Luna Agent HTTP 400; then AR-066/067/068 and AR-069 gate",
   "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
   "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",

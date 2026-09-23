@@ -14,6 +14,7 @@ public sealed class CapabilityProviderToolRegistryAdapter
     private sealed class ProviderState
     {
         public bool Revoked;
+        public long RevocationEpoch;
         public readonly Dictionary<string, long> Generations = new(StringComparer.Ordinal);
         public readonly Dictionary<string, int> Calls = new(StringComparer.Ordinal);
     }
@@ -32,6 +33,9 @@ public sealed class CapabilityProviderToolRegistryAdapter
                 throw new InvalidOperationException("Provider tool is in flight; revoke at its safe boundary.");
             _registry.ReplaceWhere(d => d.Provenance?.ProviderId == provider.Provenance.ProviderId, [], () =>
             {
+                // Removal also fences discovery admitted before this boundary, including
+                // providers that have not published any descriptor yet.
+                state.RevocationEpoch++;
                 foreach (var name in state.Generations.Keys.ToArray()) state.Generations[name]++;
                 state.Revoked = permanent;
             });
@@ -57,7 +61,17 @@ public sealed class CapabilityProviderToolRegistryAdapter
             throw new ArgumentException("Selected provider names must be bounded and unique.");
         var provenance = provider.Provenance;
         cancellationToken.ThrowIfCancellationRequested();
-        lock (_gate) if (State(provider).Revoked) throw new InvalidOperationException("Provider was unregistered.");
+        ProviderState state;
+        long admittedEpoch;
+        Dictionary<string, long> admittedGenerations;
+        lock (_gate)
+        {
+            state = State(provider);
+            if (state.Revoked) throw new InvalidOperationException("Provider was unregistered.");
+            admittedEpoch = state.RevocationEpoch;
+            admittedGenerations = selected.ToDictionary(name => name,
+                name => state.Generations.GetValueOrDefault(name), StringComparer.Ordinal);
+        }
         var definitions = await provider.LoadToolDefinitionsAsync(
             namesSnapshot,
             cancellationToken).ConfigureAwait(false);
@@ -70,60 +84,65 @@ public sealed class CapabilityProviderToolRegistryAdapter
 
         lock (_gate)
         {
-        var state = State(provider);
-        if (state.Revoked || provider.Provenance != provenance)
-            throw new InvalidOperationException("Provider identity changed during discovery.");
-        if (selected.Any(name => state.Calls.GetValueOrDefault(name) != 0))
-            throw new InvalidOperationException("Selected provider tool is in flight.");
-        var descriptors = new List<ToolDescriptor>();
-        foreach (var definition in definitions)
-        {
-            var summary = definition.Summary;
-            var descriptor = new ToolDescriptor(
-                summary.Name,
-                new ToolNamespace(
-                    summary.Namespace,
-                    $"Capabilities provided by {provider.Provenance.ProviderId}."),
-                summary.Description,
-                summary.Risk,
-                summary.Access,
-                summary.SupportsParallel,
-                summary.SchemaVersion,
-                definition.CallableSchema,
-                new ProviderRegistryExecutor(this, provider, provenance, state, summary.Name, state.Generations.GetValueOrDefault(summary.Name) + 1),
-                provenance: new ToolProvenance(
-                    provider.Provenance.ProviderId,
-                    provider.Provenance.ProviderVersion,
-                    provider.Provenance.ServerId,
-                    summary.ToolVersion),
-                resourceScope: new ToolResourceScope(
-                    summary.ResourceScope,
-                    summary.ResourceScope),
-                serializationKey: summary.SerializationKey,
-                canProvideVerificationEvidence: false,
-                readiness: new(provider.Health.Status switch {
-                    ProviderHealthStatus.Ready => ToolReadinessState.Ready,
-                    ProviderHealthStatus.Degraded => ToolReadinessState.Degraded,
-                    ProviderHealthStatus.Connecting => ToolReadinessState.Busy,
-                    _ => ToolReadinessState.Unavailable }),
-                dependencies: [provider.Provenance.ProviderId],
-                readinessSnapshot: () => new(provider.Health.Status switch {
-                    ProviderHealthStatus.Ready => ToolReadinessState.Ready,
-                    ProviderHealthStatus.Degraded => ToolReadinessState.Degraded,
-                    ProviderHealthStatus.Connecting => ToolReadinessState.Busy,
-                    _ => ToolReadinessState.Unavailable }));
-
-            descriptors.Add(descriptor);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var names = descriptors.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
-        _registry.ReplaceWhere(x => string.Equals(x.Provenance?.ProviderId,
-            provenance.ProviderId, StringComparison.Ordinal) && names.Contains(x.Name), descriptors, () =>
+            if (state.Revoked || state.RevocationEpoch != admittedEpoch || provider.Provenance != provenance
+                || selected.Any(name => state.Generations.GetValueOrDefault(name) != admittedGenerations[name]))
+                throw new InvalidOperationException("Provider binding changed during discovery; request a new explicit load.");
+            if (selected.Any(name => state.Calls.GetValueOrDefault(name) != 0))
+                throw new InvalidOperationException("Selected provider tool is in flight.");
+            var descriptors = new List<ToolDescriptor>();
+            foreach (var definition in definitions)
             {
-                foreach (var name in names) state.Generations[name] = state.Generations.GetValueOrDefault(name) + 1;
-            });
-        return descriptors;
+                var summary = definition.Summary;
+                var generation = state.Generations.GetValueOrDefault(summary.Name) + 1;
+                var descriptor = new ToolDescriptor(
+                    summary.Name,
+                    new ToolNamespace(summary.Namespace, $"Capabilities provided by {provenance.ProviderId}."),
+                    summary.Description,
+                    summary.Risk,
+                    summary.Access,
+                    summary.SupportsParallel,
+                    summary.SchemaVersion,
+                    definition.CallableSchema,
+                    new ProviderRegistryExecutor(this, provider, provenance, state, summary.Name, generation),
+                    provenance: new ToolProvenance(provenance.ProviderId, provenance.ProviderVersion,
+                        provenance.ServerId, summary.ToolVersion),
+                    resourceScope: new ToolResourceScope(summary.ResourceScope, summary.ResourceScope),
+                    serializationKey: summary.SerializationKey,
+                    canProvideVerificationEvidence: false,
+                    readiness: HealthReadiness(provider),
+                    dependencies: [provenance.ProviderId],
+                    readinessSnapshot: () => BindingReadiness(provider, provenance, state, summary.Name, generation));
+                descriptors.Add(descriptor);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var names = descriptors.Select(d => d.Name).ToHashSet(StringComparer.Ordinal);
+            _registry.ReplaceWhere(x => string.Equals(x.Provenance?.ProviderId,
+                provenance.ProviderId, StringComparison.Ordinal) && names.Contains(x.Name), descriptors, () =>
+                {
+                    foreach (var name in names) state.Generations[name] = state.Generations.GetValueOrDefault(name) + 1;
+                });
+            return descriptors;
+        }
+    }
+
+    private static ToolReadiness HealthReadiness(ICapabilityProvider provider) => new(provider.Health.Status switch
+    {
+        ProviderHealthStatus.Ready => ToolReadinessState.Ready,
+        ProviderHealthStatus.Degraded => ToolReadinessState.Degraded,
+        ProviderHealthStatus.Connecting => ToolReadinessState.Busy,
+        _ => ToolReadinessState.Unavailable
+    });
+
+    private ToolReadiness BindingReadiness(ICapabilityProvider provider, ProviderProvenance provenance,
+        ProviderState state, string name, long generation)
+    {
+        lock (_gate)
+        {
+            if (state.Revoked || state.Generations.GetValueOrDefault(name) != generation
+                || provider.Provenance != provenance)
+                return new(ToolReadinessState.Unavailable);
+            return HealthReadiness(provider);
         }
     }
 
