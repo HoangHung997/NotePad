@@ -390,8 +390,8 @@ public static class MbRepairRuntimeTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return AgentTransportEvent.Tool(new("ar067-denied", "fixture.recover",
-                "{\"resource_id\":\"doc-1\",\"value\":\"read\"}"));
+            yield return AgentTransportEvent.Tool(new("ar067-search", DeferredToolDiscovery.SearchToolName,
+                "{\"query\":\"fixture recover exact resource\"}"));
             await Task.Yield();
             yield return AgentTransportEvent.Complete("ar067", "tool_calls");
         }
@@ -403,6 +403,15 @@ public static class MbRepairRuntimeTests
             cancellationToken.ThrowIfCancellationRequested();
             _continuations++;
             if (_continuations == 1)
+            {
+                if (request.NewlyLoadedTools?.Any(x => x.Name == "fixture.recover") != true)
+                    throw new InvalidOperationException("fixture.recover was not loaded by tool_search.");
+                yield return AgentTransportEvent.Tool(new("ar067-denied", "fixture.recover",
+                    "{\"resource_id\":\"doc-1\",\"value\":\"read\"}"));
+                yield return AgentTransportEvent.Complete("ar067", "tool_calls");
+                yield break;
+            }
+            if (_continuations == 2)
             {
                 if (!request.ToolResults.Single().IsError
                     || request.ToolResults.Single().Outcome?.Error?.Code != "permission_denied")
