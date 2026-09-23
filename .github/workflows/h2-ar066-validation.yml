@@ -1,5 +1,5 @@
 name: AR-066 live resource semantics validation
-run-name: AR-066 exact-source validation (${{ github.sha }})
+run-name: AR-066 source and completion validation (${{ github.sha }})
 on:
   workflow_dispatch:
   push:
