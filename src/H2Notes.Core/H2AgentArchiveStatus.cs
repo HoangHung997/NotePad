@@ -9,4 +9,12 @@ public sealed record H2AgentRecoverySnapshot(bool Interrupted, bool ReconcileReq
 /// Dispatched without a result is uncertain, not a retry instruction.</summary>
 public sealed record H2AgentOperationRecord(Guid InvocationId, string LogicalOperationId, Guid TurnId,
     string GoalRevisionId, string ToolCallId, string ToolName, string State, string Status, string Effect,
-    string ArgumentsSha256, string? ResourceKeySha256, string? OutputSha256, string? ErrorCode);
+    string ArgumentsSha256, string? ResourceKeySha256, string? OutputSha256, string? ErrorCode)
+{
+    public H2AgentProcessJobInfo? Job { get; init; }
+}
+/// <summary>Agent-owned process receipt, not H2 project state or authority to adopt a saved PID.</summary>
+public sealed record H2AgentProcessJobInfo(string JobId, Guid OwnerTaskId, string GoalRevisionId,
+    int ProcessId, DateTime ProcessStartedUtc, DateTime DeadlineUtc, string Status,
+    bool RootExited, bool AllProcessesExited, bool StreamsDrained, bool OutputComplete,
+    int? ExitCode, string HostExitPolicy, IReadOnlyList<string> OutputArtifacts);

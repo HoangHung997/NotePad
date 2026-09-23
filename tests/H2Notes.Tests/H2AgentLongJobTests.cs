@@ -18,7 +18,8 @@ internal static class H2AgentLongJobTests
             var before = Stopwatch.StartNew(); var running = await f.Service.PollJobAsync(f.Owner, job.JobId, TimeSpan.FromMilliseconds(75));
             Check(!running.Terminal && before.Elapsed < TimeSpan.FromSeconds(2), "Poll became the job lifetime.");
             Throws(() => f.Service.JobResult(f.Owner, job.JobId));
-            var end = await f.Service.CancelJobAsync(f.Owner, job.JobId); Check(end.Status == "Cancelled" && end.AllJobProcessesExited && end.StreamsDrained, "Cancel not observed.");
+            var end = await f.Service.CancelJobAsync(f.Owner, job.JobId); f.Record("identity-observed", end);
+            Check(end.Status == "Cancelled" && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited && end.StreamsDrained, "Cancel not observed: " + JsonSerializer.Serialize(end));
             Check(f.Start("quiet").JobId == job.JobId, "Terminal request was replayed."); f.Record("identity", end);
         });
         Case("poll request cancellation does not terminate the owned job", async () =>
@@ -35,7 +36,8 @@ internal static class H2AgentLongJobTests
             using var f = new Fixture(); using var other = new Fixture(); using var stop = new CancellationTokenSource();
             var a = f.Start("tree", ownerToken: stop.Token); var b = other.Start("quiet");
             await f.WaitFor("tree-ready"); await other.WaitFor("quiet-ready"); stop.Cancel();
-            var end = await f.Terminal(a.JobId); Check(end.Status == "Cancelled" && end.AllJobProcessesExited, "Owned descendants remained.");
+            var end = await f.Terminal(a.JobId); f.Record("owner-cancel-observed", end);
+            Check(end.Status == "Cancelled" && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited, "Owned descendants remained: " + JsonSerializer.Serialize(end));
             Check(!(await other.Service.PollJobAsync(other.Owner, b.JobId, TimeSpan.Zero)).Terminal, "Other job was killed.");
             f.AssertAllExited(); f.Record("owner-cancel", end);
         });
@@ -80,13 +82,14 @@ internal static class H2AgentLongJobTests
         });
         Case("silent job has a finite no-output deadline", async () =>
         {
-            using var f = new Fixture(); var job = f.Start("quiet", lifetime: 15, idle: 3); var end = await f.Terminal(job.JobId);
-            Check(end.Status == "TimedOut" && end.Reason == "no_output_deadline" && end.AllJobProcessesExited, "Silent job lacked explicit finite deadline."); f.Record("idle", end);
+            using var f = new Fixture(); var job = f.Start("quiet", lifetime: 15, idle: 3); var end = await f.Terminal(job.JobId); f.Record("idle-observed", end);
+            Check(end.Status == "TimedOut" && end.Reason == "no_output_deadline" && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited && end.StreamsDrained, "Silent job lacked a confirmed finite deadline: " + JsonSerializer.Serialize(end)); f.Record("idle", end);
         });
         Case("heartbeat cannot reset the absolute execution lifetime", async () =>
         {
-            using var f = new Fixture(); var job = f.Start("heartbeat", lifetime: 4, idle: 3); var end = await f.Terminal(job.JobId);
-            Check(end.Status == "TimedOut" && end.Reason == "lifetime_exceeded" && end.StdoutObservedCharacters > 0,
+            using var f = new Fixture(); var job = f.Start("heartbeat", lifetime: 4, idle: 3); var end = await f.Terminal(job.JobId); f.Record("lifetime-observed", end);
+            Check(end.Status == "TimedOut" && end.Reason == "lifetime_exceeded" && end.StdoutObservedCharacters > 0
+                && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited && end.StreamsDrained,
                 "Liveness hid lifetime exhaustion."); f.Record("lifetime", end);
         });
         Case("pre-cancel and conflicting request are rejected without another dispatch", async () =>
@@ -104,6 +107,111 @@ internal static class H2AgentLongJobTests
             await f.WaitFor("host-ready"); host.Kill(); await host.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
             var clock = Stopwatch.StartNew(); while (f.AnyAlive() && clock.Elapsed < TimeSpan.FromSeconds(8)) await Task.Delay(25);
             f.AssertAllExited(); f.Record("host-crash", new { HostPid=host.Id, HostExited=host.HasExited, AllObservedExited=true });
+        });
+        Case("termination waits for the exact root handle across repeated cancellations", async () =>
+        {
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                using var f = new Fixture(); var job = f.Start("quiet"); await f.WaitFor("quiet-ready");
+                var end = await f.Service.CancelJobAsync(f.Owner, job.JobId);
+                f.Record("root-wait-" + attempt, end);
+                Check(end.JobId == job.JobId && end.ProcessId == job.ProcessId
+                    && end.ProcessStartedUtc == job.ProcessStartedUtc, "Native process identity changed.");
+                Check(end.Status == "Cancelled" && end.RootExited && end.ExitCode.HasValue
+                    && end.AllJobProcessesExited && end.StreamsDrained,
+                    "Root stop was not confirmed: " + JsonSerializer.Serialize(end));
+                Check(end.Reason == "cancel_requested", "Requested stop reason was lost.");
+                Check(f.Service.JobResult(f.Owner, job.JobId) == end, "Terminal observation was not retained.");
+                f.AssertAllExited();
+            }
+        });
+        Case("failed admission confirms the suspended root before releasing its handle", async () =>
+        {
+            using var f = new Fixture(); var original = new IOException("Injected admission failure.");
+            try
+            {
+                f.Start("effect", admission: _ => throw original);
+                throw new InvalidOperationException("Failed journal admission was accepted.");
+            }
+            catch (IOException ex) { Check(ReferenceEquals(ex, original), "Cleanup replaced the admission error."); }
+            var end = f.Service.ObserveJobs(f.Owner).Single(); f.Record("admission-root-observed", end);
+            Check(end.Status == "Rejected" && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited,
+                "Suspended root stop was not confirmed: " + JsonSerializer.Serialize(end));
+            Check(!File.Exists(Path.Combine(f.Root, "effect")), "Rejected admission executed the application.");
+            Check(f.Start("effect").JobId == end.JobId, "Rejected idempotency key was dispatched again.");
+            await Task.Delay(100);
+            Check(!File.Exists(Path.Combine(f.Root, "effect")), "Repeated request executed rejected code.");
+        });
+        Case("owner cancellation at admission cannot execute or replay the suspended job", async () =>
+        {
+            using var f = new Fixture(); using var stop = new CancellationTokenSource();
+            ProcessJobSnapshot? admitted = null;
+            try
+            {
+                f.Start("effect", ownerToken: stop.Token, admission: snapshot =>
+                {
+                    admitted = snapshot;
+                    stop.Cancel();
+                });
+                throw new InvalidOperationException("Owner cancellation at admission was ignored.");
+            }
+            catch (OperationCanceledException ex)
+            {
+                Check(ex.CancellationToken == stop.Token, "The original owner token was lost.");
+            }
+            var end = f.Service.ObserveJobs(f.Owner).Single(); f.Record("cancel-at-admission", end);
+            Check(admitted is not null && end.JobId == admitted.JobId && end.ProcessId == admitted.ProcessId
+                && end.ProcessStartedUtc == admitted.ProcessStartedUtc, "Admission identity changed.");
+            Check(end.Status == "Rejected" && end.RootExited && end.ExitCode.HasValue && end.AllJobProcessesExited,
+                "Pre-resume cancellation was not confirmed: " + JsonSerializer.Serialize(end));
+            Check(f.Start("effect").JobId == end.JobId, "Cancelled request started a second process.");
+            await Task.Delay(100);
+            Check(!File.Exists(Path.Combine(f.Root, "effect")), "Cancelled suspended code had an effect.");
+        });
+        Case("late cancellation cannot rewrite a completed exit code or repeat an effect", async () =>
+        {
+            using var f = new Fixture(); var job = f.Start("effect");
+            var before = await f.Terminal(job.JobId); f.Record("late-cancel-before", before);
+            Check(before.Status == "Succeeded" && before.ExitCode == 0 && before.RootExited
+                && before.AllJobProcessesExited && before.StreamsDrained, "Success lacked a terminal observation.");
+            var identities = Directory.EnumerateFiles(f.Root, "*.identity").Order(StringComparer.Ordinal).ToArray();
+            var after = await f.Service.CancelJobAsync(f.Owner, job.JobId); f.Record("late-cancel-after", after);
+            Check(after == before && f.Service.JobResult(f.Owner, job.JobId) == before,
+                "Late cancellation rewrote the observed terminal result.");
+            Check(f.Start("effect").JobId == before.JobId, "Completed request was replayed.");
+            Check(identities.SequenceEqual(Directory.EnumerateFiles(f.Root, "*.identity").Order(StringComparer.Ordinal))
+                && File.ReadAllText(Path.Combine(f.Root, "effect")) == "effect", "Idempotent read changed execution state.");
+            f.AssertAllExited();
+        });
+        Case("two owners in one service keep independent request and cancellation identities", async () =>
+        {
+            using var f = new Fixture(); var otherOwner = Guid.NewGuid();
+            var first = f.Start("quiet");
+            var second = f.Service.StartJob(otherOwner, "fixture-r1", "request", Environment.ProcessPath!,
+                Args("heartbeat", f.Root, f.Nonce), lifetime: TimeSpan.FromSeconds(30));
+            await f.WaitFor("quiet-ready"); await f.WaitFor("heartbeat-ready");
+            Check(first.JobId != second.JobId && first.ProcessId != second.ProcessId,
+                "The same request ID collided across task owners.");
+            try
+            {
+                await f.Service.CancelJobAsync(f.Owner, second.JobId);
+                throw new InvalidOperationException("Foreign owner cancelled another job in the same service.");
+            }
+            catch (KeyNotFoundException) { }
+            var end = await f.Service.CancelJobAsync(f.Owner, first.JobId);
+            var stillRunning = await f.Service.PollJobAsync(otherOwner, second.JobId, TimeSpan.Zero);
+            f.Record("same-service-first-stop", new { Cancelled = end, Other = stillRunning });
+            Check(end.Status == "Cancelled" && end.RootExited && end.AllJobProcessesExited
+                && !stillRunning.Terminal && stillRunning.JobId == second.JobId,
+                "Owned cancellation leaked across the service boundary.");
+            Check(f.Service.ObserveJobs(f.Owner).Single().JobId == first.JobId
+                && f.Service.ObserveJobs(otherOwner).Single().JobId == second.JobId,
+                "Owner query exposed another task's job.");
+            var secondEnd = await f.Service.CancelJobAsync(otherOwner, second.JobId);
+            f.Record("same-service-second-stop", secondEnd);
+            Check(secondEnd.Status == "Cancelled" && secondEnd.RootExited && secondEnd.AllJobProcessesExited
+                && secondEnd.StreamsDrained, "Second owned job did not stop.");
+            f.AssertAllExited();
         });
         Case("journal admission failure cannot resume suspended application code", async () =>
         {

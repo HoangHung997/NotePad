@@ -34,7 +34,8 @@ public sealed record AgentRuntimeRequest(
     Func<bool, IReadOnlyList<AgentGoalInput>>? TakeGoalInput = null,
     Action<AgentTaskContract>? ContractObserver = null,
     Action<H2AgentOperationRecord>? JournalObserver = null,
-    Action<H2AgentCompletionAssessment>? CompletionObserver = null);
+    Action<H2AgentCompletionAssessment>? CompletionObserver = null,
+    Func<IReadOnlyList<AgentRuntimeJobObservation>>? ObserveJobResults = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -251,6 +252,59 @@ public sealed class AgentRuntime : IAsyncDisposable
         var completionRepairRequested = false;
         var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
         var uncertainResources = new HashSet<string>(StringComparer.Ordinal);
+        var jobs = new AgentRuntimeJobs(request.JournalObserver);
+        async Task ObserveFinishedJobsAsync()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedJobs = request.ObserveJobResults?.Invoke() ?? [];
+            foreach (var (call, output) in jobs.Observe(observedJobs, effectiveContract, _registry))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!_registry.TryGet(call.Name, out var descriptor)) throw new AgentVerificationRequiredException("Job tool is no longer registered.");
+                var projection = _evidenceProjector?.Project(descriptor,
+                    $"job-result:{call.Invocation!.InvocationId:N}", (long)toolRounds * 1000 + 999, output.DomainPayload);
+                var jobEvidence = (projection is null ? Array.Empty<AgentEvidenceReference>() : new[] { projection.Evidence })
+                    .Concat(_evidenceProjector is null ? [] : outcomeArtifacts()).ToArray();
+                IEnumerable<AgentEvidenceReference> outcomeArtifacts() => output.Outcome.ArtifactRefs
+                    .Select(id => _evidenceProjector!.ObserveJobOutput(id, output.Outcome.Job!.JobId));
+                var outcome = output.Outcome with { EvidenceRefs = jobEvidence.Select(x => x.ReferenceId).ToArray() };
+                var result = new AgentToolResult(call.Id, call.Name, projection?.ModelContent ?? output.DomainPayload,
+                    outcome.IsError) { Outcome = outcome };
+                var observation = new AgentRuntimeVerificationContext(effectiveContract, toolRounds, [call], [result])
+                { Evidence = jobEvidence, RawToolOutputs = new Dictionary<string, string> { [call.Id] = output.DomainPayload },
+                    MutationCallIds = descriptor.IsMutating && outcome.Effect != ToolMutationEffect.None ? [call.Id] : [] };
+                assessment.ObserveJob(observation);
+                observation = observation with { Attempts = assessment.Attempts };
+                evidenceHistory.AddRange(jobEvidence);
+                request.EvidenceObserver?.Invoke(jobEvidence);
+                request.ToolResultObserver?.Invoke(result); // Host progress only: never resend a protocol tool result ID.
+                if (outcome.IsPending) pendingOperations[outcome.Invocation.LogicalOperationId] = outcome;
+                else
+                {
+                    pendingOperations.Remove(outcome.Invocation.LogicalOperationId);
+                    if (outcome.Resource is not null && !pendingOperations.Values.Any(p => p.Resource?.Id == outcome.Resource.Id))
+                        uncertainResources.Remove(outcome.Resource.Id);
+                    _scheduler.ObserveCompletedJob(outcome);
+                }
+                if (outcome.IsError)
+                    unresolvedCalls.Add((call.Name, outcome.Error?.Code ?? "outcome_unknown", [], call.Arguments.Clone(), null, call.Invocation.InvocationId));
+                await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
+                if (_verifier is not null)
+                {
+                    var report = await _verifier.VerifyAsync(observation, cancellationToken).ConfigureAwait(false);
+                    if (report is not null)
+                    {
+                        latestVerification = assessment.Observe(observation, report);
+                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
+                            observation.Contract.Goals!.RevisionId, latestVerification, evidenceHistory.ToArray()));
+                        request.ContractObserver?.Invoke(effectiveContract);
+                        verificationHistory.Add(latestVerification);
+                        request.VerificationObserver?.Invoke(latestVerification, verificationHistory.Count - 1);
+                    }
+                }
+                mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
+            }
+        }
 
         try
         {
@@ -267,6 +321,7 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 if (round.ToolCalls.Count == 0)
                 {
+                    await ObserveFinishedJobsAsync().ConfigureAwait(false);
                     var supplements = TakeClosingInput();
                     if (supplements.Count > 0)
                     {
@@ -350,7 +405,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     round.ToolCalls,
                     failedMutationSignatures,
                     uncertainResources,
-                    request.JournalObserver,
+                    request.JournalObserver is null ? null : jobs.Record,
                     cancellationToken).ConfigureAwait(false);
 
                 var results = execution.Results.ToArray();
@@ -367,6 +422,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                         .Select(call => call.Id).ToArray()
                 };
                 assessment.Register(observation);
+                jobs.Register(observation);
                 observation = observation with { Attempts = assessment.Attempts };
                 var retryCandidates = new List<(Guid Failed, Guid Replacement)>();
                 await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
@@ -511,6 +567,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     }
                 }
 
+                await ObserveFinishedJobsAsync().ConfigureAwait(false);
                 unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId)
                     || retryCandidates.Any(c => c.Failed == f.InvocationId && assessment.CanResolveExactRetry(c.Failed, c.Replacement)));
                 mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;

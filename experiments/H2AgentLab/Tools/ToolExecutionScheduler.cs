@@ -31,6 +31,17 @@ public sealed class ToolExecutionScheduler : IDisposable
         new(StringComparer.Ordinal);
     private bool _disposed;
     private readonly ConcurrentDictionary<string, byte> _uncertainResources = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, (string Resource, string JobId)> _runningJobs = new();
+
+    // Called only after a bound host observation, never by model text or a provider's JSON.
+    internal void ObserveCompletedJob(ToolOutcome outcome)
+    {
+        if (outcome.Status != ToolOutcomeStatus.Succeeded || outcome.NeedsReconciliation || outcome.Job is null) return;
+        if (_runningJobs.TryGetValue(outcome.Invocation.InvocationId, out var owned)
+            && owned.JobId == outcome.Job.JobId
+            && _runningJobs.TryRemove(outcome.Invocation.InvocationId, out _))
+            _uncertainResources.TryRemove(owned.Resource, out _);
+    }
 
     public async Task<IReadOnlyList<ToolExecutionResult>> ExecuteBatchAsync(
         IReadOnlyList<ToolExecutionRequest> requests,
@@ -107,9 +118,19 @@ public sealed class ToolExecutionScheduler : IDisposable
                 request.AfterExecute?.Invoke(call, cancelled.Observed);
                 throw;
             }
-            if (request.Descriptor.IsMutating && output.Outcome.IsPending) _uncertainResources.TryAdd(resourceKey!, 0);
+            if (request.Descriptor.IsMutating && output.Outcome.IsPending)
+            {
+                _uncertainResources.TryAdd(resourceKey!, 0);
+                if (output.Outcome.Status == ToolOutcomeStatus.Running && output.Outcome.Job is not null)
+                    _runningJobs[call.Invocation!.InvocationId] = (resourceKey!, output.Outcome.Job.JobId);
+            }
             try { request.AfterExecute?.Invoke(call, output); }
-            catch { if (request.Descriptor.IsMutating) _uncertainResources.TryAdd(resourceKey!, 0); throw; }
+            catch
+            {
+                _runningJobs.TryRemove(call.Invocation!.InvocationId, out _); // Lost durable receipt is not a releasable running-job fence.
+                if (request.Descriptor.IsMutating) _uncertainResources.TryAdd(resourceKey!, 0);
+                throw;
+            }
             results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output.DomainPayload)
             { Outcome = output.Outcome };
         }

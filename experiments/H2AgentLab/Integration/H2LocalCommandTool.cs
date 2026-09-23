@@ -9,18 +9,18 @@ namespace H2AgentLab.Integration;
 
 /// <summary>Only registered for an explicit task-local full-access grant. Never offered in
 /// scoped/read-only modes: a working directory alone is not a process sandbox.</summary>
-internal sealed class H2LocalCommandTool : IAgentRuntimeDomainVerifier
+internal sealed partial class H2LocalCommandTool : IAgentRuntimeDomainVerifier, IDisposable
 {
     private readonly Dictionary<string, (string Output, bool Passed)> _observed = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _failedDirectories = new(StringComparer.Ordinal);
     public string DomainId => "local-command-exit";
-    public bool CanVerify(ToolCall call, string output) => call.Name == "exec_command";
+    public bool CanVerify(ToolCall call, string output) => call.Name is "exec_command" or "start_command_job" or "write_command_stdin";
     public Task<AgentRuntimeDomainVerification> VerifyAsync(AgentRuntimeVerificationContext context, ToolCall call, string output, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var passed = _observed.TryGetValue(call.Id, out var result) && result.Output == output && result.Passed;
         return Task.FromResult(new AgentRuntimeDomainVerification(DomainId, passed,
-            passed ? ["command-exit-zero:" + call.Id] : [], passed ? null : "Local command failed or timed out."));
+            passed ? [(call.Name == "write_command_stdin" ? "stdin-accepted:" : "command-exit-zero:") + call.Id] : [], passed ? null : "Local command failed or timed out."));
     }
 
     internal void Register(ToolRegistry registry, SafeWorkspace workspace)

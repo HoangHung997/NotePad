@@ -73,6 +73,16 @@ public sealed class AgentRuntimeEvidenceProjector
         return new AgentRuntimeEvidenceProjection(evidence, modelContent);
     }
 
+    internal AgentEvidenceReference ObserveJobOutput(string id, string jobId)
+    {
+        var handle = _store.LoadHandle(id); // Validates the current content hash, not merely the manifest.
+        if (handle.Kind is not (AgentArtifactKind.Stdout or AgentArtifactKind.Stderr)
+            || handle.SourceId != "job:" + jobId + ":" + (handle.Kind == AgentArtifactKind.Stdout ? "stdout" : "stderr"))
+            throw new AgentVerificationRequiredException("Process output artifact is not bound to this job.");
+        return new(AgentEvidenceKind.ToolResult, handle.Id, handle.Sha256,
+            "Retained " + handle.Kind + " from " + jobId + "; process output, not independent postcondition verification.");
+    }
+
     public void EnsureReachable(IEnumerable<AgentEvidenceReference> references)
     {
         foreach (var item in references.Distinct())

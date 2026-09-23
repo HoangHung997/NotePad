@@ -29,7 +29,7 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
 {
     private sealed class Attempt(AgentVerificationAttempt value, JsonElement arguments)
     {
-        public AgentVerificationAttempt Value { get; } = value;
+        public AgentVerificationAttempt Value { get; set; } = value;
         public JsonElement Arguments { get; } = arguments;
         public Dictionary<string, VerificationCallCoverage> Coverage { get; } = new(StringComparer.Ordinal);
         public string? VerifierId { get; set; }
@@ -62,6 +62,23 @@ internal sealed class AgentCompletionAssessment(bool requireObservedProof)
             if (!_attempts.TryAdd(value.InvocationId, new(value, call.Arguments.Clone())))
                 throw new AgentVerificationRequiredException("Duplicate host invocation identity.");
         }
+    }
+
+    // Only the host-owned job source may advance an already-registered invocation.
+    // Completion is re-verified below; terminal process state is not an alternate recovery.
+    public void ObserveJob(AgentRuntimeVerificationContext context)
+    {
+        var call = context.Calls.Single();
+        var outcome = context.Results.Single().Outcome!;
+        if (call.Invocation is null || !_attempts.TryGetValue(call.Invocation.InvocationId, out var attempt)
+            || (attempt.Value.Status != ToolOutcomeStatus.Running
+                && !(attempt.Value.Status == ToolOutcomeStatus.Succeeded && outcome.Status == ToolOutcomeStatus.Succeeded
+                    && attempt.Value.Effect == outcome.Effect)) || outcome.Status == ToolOutcomeStatus.Running
+            || attempt.Value.GoalRevisionId != context.Contract.Goals!.RevisionId
+            || attempt.Value.TargetId != Target(call, outcome.Resource?.Id))
+            throw new AgentVerificationRequiredException("Job lifecycle cannot replace a different or already terminal attempt.");
+        attempt.Value = attempt.Value with { Status = outcome.Status, Effect = outcome.Effect };
+        attempt.Verified = false;
     }
 
     // No semantic inference: exact resource selectors if present, otherwise the complete argument

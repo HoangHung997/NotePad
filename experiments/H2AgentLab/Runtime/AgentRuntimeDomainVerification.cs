@@ -61,6 +61,9 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
             if (!context.RawToolOutputs.TryGetValue(call.Id, out var raw))
                 continue;
 
+            // A running job is an observation, not a failed verifier and not terminal proof.
+            if (context.Results.Any(r => r.ToolCallId == call.Id && r.Outcome?.Status == Tools.ToolOutcomeStatus.Running))
+                continue;
             if (context.Results.Any(r => r.ToolCallId == call.Id && r.IsError))
             {
                 if (context.MutationCallIds.Contains(call.Id))

@@ -21,6 +21,11 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly IH2ProjectToolHost? _projects;
     private readonly Guid _taskId;
     private readonly H2HistoryRuntimeTools? _history;
+    private readonly Func<string>? _jobRevision;
+    private readonly CancellationToken _ownerCancellation;
+    private readonly Action<ToolCall, H2AgentProcessJobInfo>? _jobObserved;
+    private H2LocalCommandTool? _commands;
+    internal IReadOnlyList<AgentRuntimeJobObservation> ObserveJobResults() => _commands?.ObserveJobResults() ?? [];
     private SafeWorkspace? _fileTargets;
     private readonly H2AgentTargetBindingPolicy? _targetPolicy;
     private readonly Action<H2AgentTargetResolution>? _targetObserved;
@@ -33,8 +38,11 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         H2AgentTargetBindingPolicy? targetPolicy = null,
         Action<H2AgentTargetResolution>? targetObserved = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
-        Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null)
+        Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
+        Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
+        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null)
     {
+        _jobRevision = jobRevision; _ownerCancellation = ownerCancellation; _jobObserved = jobObserved;
         _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
         _targetPolicy = targetPolicy; _targetObserved = targetObserved;
@@ -64,6 +72,10 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         {
             var commands = new H2LocalCommandTool();
             commands.Register(registry, tools.Workspace); verifiers.Add(commands);
+            _commands = commands; _owned.Add(commands);
+            if (_jobRevision is not null && _jobObserved is not null)
+                commands.RegisterJobs(registry, tools.Workspace, tools.StateRoot, _taskId,
+                    _jobRevision, _ownerCancellation, _scope.ExpiresUtc, _jobObserved);
         }
         var wrapped = new ToolRegistry();
         foreach (var notice in registry.CapabilityNotices) wrapped.RegisterCapabilityNotice(notice);
@@ -241,6 +253,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
 
     private string ResourceKey(ToolDescriptor descriptor, ToolCall call)
     {
+        if (call.Name is "write_command_stdin" or "cancel_command_job")
+            return call.Name + ":" + _taskId.ToString("N") + ":" + (Arg(call, "job_id") ?? "unbound");
         if (descriptor.Namespace.Name == "h2") return "h2-project:" + Arg(call, "project_id");
         if (descriptor.Namespace.Name == "desktop") return _selectedWindowIdentity ?? "unbound-window";
         if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)

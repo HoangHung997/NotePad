@@ -477,25 +477,27 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-040_ACTIVE_DRAIN_FOUNDATION",
+  "phase": "AR-040_ACTIVE_PRODUCTION_VALIDATION",
   "active_task": "AR-040",
   "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar040-resume-2026-09-23",
+  "owner_session": "chatgpt-ar040-production-2026-09-23",
   "last_code_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
   "last_validated_code_commit": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
   "last_validation_result": "AR033_42_PASS_X3; CONTROL_36_PASS_6_EXPECTED_FAILURES; AGENT74_PASS; FULL858_PASS; AR033_E3_PENDING",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Clean CI checkout before reviewed integration; normal push verified. User-PC tree NOT_ACCESSIBLE.",
+  "working_tree": "Reviewed exact source committed by bounded integration; user-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T00:57:20.478969+00:00",
-  "completed_this_session": [],
+  "checkpoint_saved_at_utc": "2026-09-23T03:17:18.235917+00:00",
+  "completed_this_session": [
+    "Integrated reviewed production job descriptors, host terminal observations, ownership journal and registered tests; not yet accepted."
+  ],
   "remaining_in_active_task": [
-    "Run drain tests and all regressions on saved code; fix every failure.",
-    "Implement stable long-job start/poll/read_output/cancel/result, stdin opt-in, lifetime/no-progress bounds and journal ownership in existing services."
+    "Build and run AR-040 three times, every retained AR regression and all mandatory Agent/full-CI steps; repair any failures.",
+    "Verify production Global/Project jobs with actual owned processes and archive/output readback; retain native AR-020/033 debt."
   ],
   "last_test_commands": [
     {
@@ -950,7 +952,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue only AR-040 on existing branch/PR #3. Inspect this integration and full CI, repair actual failures, then complete long-job APIs in existing process service. Do not mark DONE for drain foundation alone. AR-020/033 E3 pending; AR-083 deferred.",
+  "next_exact_action": "Inspect Windows validation and full CI on saved.json code_sha. Fix compiler/runtime/test failures without weakening assertions; AR-040 is ACTIVE, not DONE. Preserve AR-083 DEFERRED_BY_USER and all native one-PC gates.",
   "next_task_if_active_done": "Re-evaluate dependency readiness in tracker; do not bypass AR-041 native gates.",
   "last_runtime_source_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",

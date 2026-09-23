@@ -383,7 +383,9 @@ public sealed partial class H2ProductionAgentAdapter :
                 live.RequestContext, _projectTools,
                 (title, details, ct) => RequestApprovalAsync(live, title, details, ct), targetPolicy,
                 resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
-                    resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history);
+                    resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history,
+                () => { lock (live.Gate) return live.GoalState?.RevisionId ?? throw new InvalidOperationException("Goal revision unavailable."); },
+                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job));
             using var tools = new global::H2AgentLab.AgentTools(
                 safeWorkspace,
                 taskStateRoot,
@@ -438,6 +440,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 Files: live.RequestContext?.Files,
                 TakeGoalInput: closing => TakeSupplementalInput(live, closing),
                 JournalObserver: receipt => _archive.RecordOperation(live.TaskId, receipt),
+                ObserveJobResults: toolSession.ObserveJobResults,
                 CompletionObserver: assessment =>
                 {
                     lock (live.Gate) live.Completion = assessment;

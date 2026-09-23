@@ -162,8 +162,24 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
     {
         lock (_gate)
         {
+            // The runtime's general result receipt must not erase native job ownership.
+            if (item.Job is null && _operations.TryGetValue((taskId, item.InvocationId), out var previous))
+                item = item with { Job = previous.Job };
             if (item.State == "Dispatched") Append(taskId, "operation-intent", item with { State = "Prepared", Status = "NotRun", Effect = "None" });
             Append(taskId, item.State == "Dispatched" ? "operation-dispatched" : "operation-result", item);
+        }
+    }
+    public void RecordJob(Guid taskId, Guid invocationId, H2AgentProcessJobInfo job)
+    {
+        lock (_gate)
+        {
+            if (!_operations.TryGetValue((taskId, invocationId), out var original)
+                || original.State == "Prepared" || job.OwnerTaskId != taskId
+                || original.GoalRevisionId != job.GoalRevisionId)
+                throw new InvalidDataException("job-without-owned-dispatch");
+            RecordOperation(taskId, original with { State = "Result", Job = job,
+                Status = job.Status == "Running" ? "Running" : job.Status == "Succeeded" ? "Succeeded" : "OutcomeUnknown",
+                Effect = job.Status == "Succeeded" ? "Applied" : "Unknown" });
         }
     }
     public void RecordVerification(Guid taskId, object value)
@@ -265,7 +281,16 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
                 if (operation is null || operation.InvocationId == Guid.Empty || string.IsNullOrWhiteSpace(operation.LogicalOperationId)
                     || operation.ArgumentsSha256 is not { Length: 64 } || string.IsNullOrWhiteSpace(operation.GoalRevisionId)
                     || operation.State != (e.Kind == "operation-intent" ? "Prepared" : e.Kind == "operation-dispatched" ? "Dispatched" : "Result"))
-                    throw new InvalidDataException("operation-shape"); break;
+                    throw new InvalidDataException("operation-shape");
+                if (operation.Job is { } job && (job.OwnerTaskId != e.StreamId
+                    || job.GoalRevisionId != operation.GoalRevisionId || job.ProcessId <= 0
+                    || job.JobId is not { Length: > 0 and <= 128 } || job.JobId.Any(char.IsControl)
+                    || job.ProcessStartedUtc.Kind != DateTimeKind.Utc || job.DeadlineUtc.Kind != DateTimeKind.Utc
+                    || job.HostExitPolicy != "CancelOnHostExit" || job.OutputArtifacts is null || job.OutputArtifacts.Count > 2
+                    || job.OutputArtifacts.Any(id => id is not { Length: > 0 and <= 128 } || id.Any(char.IsControl))
+                    || job.Status == "Succeeded" && (!job.RootExited || !job.AllProcessesExited || !job.StreamsDrained || job.ExitCode != 0)))
+                    throw new InvalidDataException("job-shape");
+                break;
             case "verification": if (e.Payload.ValueKind != JsonValueKind.Object) throw new InvalidDataException("verification-shape"); break;
             default: throw new InvalidDataException("unsupported-event-kind");
         }
@@ -290,6 +315,11 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
                 || operation.GoalRevisionId != prior.GoalRevisionId || operation.ToolName != prior.ToolName || operation.TurnId != prior.TurnId
                 || operation.ResourceKeySha256 != prior.ResourceKeySha256 || operation.ToolCallId != prior.ToolCallId))
                 throw new InvalidDataException("operation-identity-changed");
+            if (prior?.Job is { } previousJob && (operation.Job is not { } currentJob
+                || previousJob.JobId != currentJob.JobId || previousJob.OwnerTaskId != currentJob.OwnerTaskId
+                || previousJob.GoalRevisionId != currentJob.GoalRevisionId || previousJob.ProcessId != currentJob.ProcessId
+                || previousJob.ProcessStartedUtc != currentJob.ProcessStartedUtc || previousJob.DeadlineUtc != currentJob.DeadlineUtc))
+                throw new InvalidDataException("job-identity-changed");
         }
     }
     private void Apply(JournalEntry e)
