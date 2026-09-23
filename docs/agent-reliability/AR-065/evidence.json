@@ -1,0 +1,1203 @@
+{
+  "build_warnings": 38,
+  "build_errors": 0,
+  "task": "AR-065",
+  "implementation": "IMPLEMENTED",
+  "acceptance": "E1/E2_PASS; E4_AWAITING_ENVIRONMENT; NOT_DONE",
+  "code_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+  "runtime_commit": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
+  "branch": "feature/h2-agent-reliability-ar-000",
+  "pr": 3,
+  "focused_run": 35881691347,
+  "focused_job": 107251468701,
+  "full_run": 35881698306,
+  "full_job": 107251491366,
+  "attempt": 1,
+  "full_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
+  "full_log_sha256": "a228b677e58d5b5928612aeaa7e71112eaeb05bbc2d8952a43dc5736d9f0b43d",
+  "full_artifact_inventory": [
+    {
+      "id": 10760934383,
+      "name": "H2Notes-Avalonia-Portable-win-x64",
+      "bytes": 110200826,
+      "digest": "sha256:d1d2a7924184e566f88ced32012d0e0537958df9b127c698fb6316bae977179c",
+      "archive_download_verified": false
+    },
+    {
+      "id": 10760584624,
+      "name": "H2Notes-NasAcceptance-win-x64",
+      "bytes": 39407590,
+      "digest": "sha256:421997c30a7dde5eb769e76f01649cf84eba838e93e185bf4a9a98140f6b12b4",
+      "archive_download_verified": false
+    }
+  ],
+  "full_h2": {
+    "passed": 1132,
+    "failed": 0
+  },
+  "focused_each": {
+    "passed": 55,
+    "failed": 0,
+    "repetitions": 3
+  },
+  "independent_agent_suites": 74,
+  "artifact": {
+    "id": 10761303971,
+    "bytes": 3200447,
+    "sha256": "c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2"
+  },
+  "source": {
+    "files": 805,
+    "bytes": 9161014,
+    "all_git_blobs_verified": true
+  },
+  "negative_control": {
+    "kind": "negative control",
+    "source_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+    "old_transport_sha": "aaf06a6b1b9e3981a699672ba141a5a875aa40c6",
+    "exit_code": 1,
+    "results": [
+      [
+        "0",
+        "4"
+      ]
+    ],
+    "restored_sha256": {
+      "experiments/H2AgentLab/Transport/OpenAiResponsesTransport.cs": "caf27573d4b416e2df6849188d832cba44fb4c111dda508383de8fce1ed46098",
+      "experiments/H2AgentLab/Transport/OpenAiResponsesWebSocketTransport.cs": "4be714ef887ecdb4c21c65b327fd779b3812895f5932a5b1e82b52a1045ad938"
+    },
+    "exact_restoration": true,
+    "clean_restoration": true,
+    "restored_build_exit": 0
+  },
+  "restoration_eol_reconciliation": [
+    {
+      "path": "experiments/H2AgentLab/Transport/OpenAiResponsesTransport.cs",
+      "git_source_sha256": "d91f0bfc622438e84506f3292f7da43ef91582529575b1fa473e589fbf674d1f",
+      "restored_checkout_sha256": "caf27573d4b416e2df6849188d832cba44fb4c111dda508383de8fce1ed46098",
+      "comparison": "GIT_LF_TO_WINDOWS_CRLF_ONLY",
+      "original_checkout_restored_exactly": true,
+      "git_clean_after_restore": true
+    },
+    {
+      "path": "experiments/H2AgentLab/Transport/OpenAiResponsesWebSocketTransport.cs",
+      "git_source_sha256": "59ab037c0b3687f09bf570f9382c9cfb5b3d83408e20c252bcb64e2d63e9889f",
+      "restored_checkout_sha256": "4be714ef887ecdb4c21c65b327fd779b3812895f5932a5b1e82b52a1045ad938",
+      "comparison": "GIT_LF_TO_WINDOWS_CRLF_ONLY",
+      "original_checkout_restored_exactly": true,
+      "git_clean_after_restore": true
+    }
+  ],
+  "inventory": [
+    "AR-065 Luna reasoning exact official metadata and unknown provider isolation",
+    "AR-065 WIRE CONTROL dotted callable roundtrip http",
+    "AR-065 WIRE CONTROL dotted callable roundtrip ws",
+    "AR-065 WIRE CONTROL explicit non-strict schema http",
+    "AR-065 WIRE CONTROL explicit non-strict schema ws",
+    "AR-065 aliases distinguish dots underscores case and reserved literals",
+    "AR-065 continuation HTTP400 retains phase and does not replay earlier tool effects",
+    "AR-065 continuation rejects unmatched output without another send duplicate",
+    "AR-065 continuation rejects unmatched output without another send missing",
+    "AR-065 continuation rejects unmatched output without another send wrong-id",
+    "AR-065 continuation rejects unmatched output without another send wrong-name",
+    "AR-065 deferred contract replacement is atomic and idempotent",
+    "AR-065 deterministic bounded wire identity autocad.inspect_file",
+    "AR-065 deterministic bounded wire identity excel.read_range",
+    "AR-065 deterministic bounded wire identity tool_search",
+    "AR-065 deterministic bounded wire identity word.replace_range",
+    "AR-065 deterministic bounded wire identity xxxxxxxxxxxxxxxxxxxxxxxx",
+    "AR-065 deterministic bounded wire identity Đọc.bảng",
+    "AR-065 duplicate advertised identities refused",
+    "AR-065 error body reads at most 16KiB and caller cancellation propagates",
+    "AR-065 malformed oversized or malicious body stays bounded 15",
+    "AR-065 malformed oversized or malicious body stays bounded 18",
+    "AR-065 malformed oversized or malicious body stays bounded 20000",
+    "AR-065 malformed oversized or malicious body stays bounded 99",
+    "AR-065 malformed provider batch has zero dispatch array-arguments",
+    "AR-065 malformed provider batch has zero dispatch duplicate-id",
+    "AR-065 malformed provider batch has zero dispatch unknown-name",
+    "AR-065 non-object schema refused before wire \"object\"",
+    "AR-065 non-object schema refused before wire []",
+    "AR-065 non-object schema refused before wire null",
+    "AR-065 optional schema preserved and strict false explicit without mutating source",
+    "AR-065 production archive and no replay initial-400 Global",
+    "AR-065 production archive and no replay initial-400 Project",
+    "AR-065 production archive and no replay read-400 Global",
+    "AR-065 production archive and no replay read-400 Project",
+    "AR-065 production archive and no replay read-final Global",
+    "AR-065 production archive and no replay read-final Project",
+    "AR-065 production archive and no replay unknown-tool Global",
+    "AR-065 production archive and no replay unknown-tool Project",
+    "AR-065 production archive and no replay write-400 Global",
+    "AR-065 production archive and no replay write-400 Project",
+    "AR-065 projection refuses collisions rather than choosing an arbitrary callable",
+    "AR-065 rebase preview is pure and matches exact mapped request budget http",
+    "AR-065 rebase preview is pure and matches exact mapped request budget ws",
+    "AR-065 safe status diagnostic and no retry 400",
+    "AR-065 safe status diagnostic and no retry 401",
+    "AR-065 safe status diagnostic and no retry 403",
+    "AR-065 safe status diagnostic and no retry 429",
+    "AR-065 safe status diagnostic and no retry 500",
+    "AR-065 search deferred dot-tool output final and stable registry http",
+    "AR-065 search deferred dot-tool output final and stable registry stored",
+    "AR-065 search deferred dot-tool output final and stable registry ws",
+    "AR-065 stateless complete output repairs partial done events preserving reasoning phase roles and IDs",
+    "AR-065 stream error exposes safe diagnostic without dispatch http",
+    "AR-065 stream error exposes safe diagnostic without dispatch ws"
+  ],
+  "production_receipts": [
+    {
+      "artifact_path": "receipts-AR-065-1/initial-400-global.json",
+      "sha256": "8e2ced917f7de8094f77e9552379c0c8707d66c987a4d14be57d7e5cdd945e3d",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "d861c477-825e-43da-84e1-22c4d69dfbce",
+        "mode": "initial-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "1e306d219bf64f73aeea02bde31d85a983dd24998bd3e97733ada3917d652b9b"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/initial-400-project.json",
+      "sha256": "22c5da06b22e63ed2470763739df9f3c576bf102de86cea65ac48cc42fc99460",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "0f8d88a9-fc99-4e6b-a142-92da901c5509",
+        "mode": "initial-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "a1fb4dcf1563061ef4a5996465123f79eaa67747a41fbf69aa0945415d07d18a"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/read-400-project.json",
+      "sha256": "6b5d47605f0975d28b2f4c239e7692e836445558031e4099dcfe6d9f8d4cd83f",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "d3e310ea-30ef-46e6-8137-68a7985ceabc",
+        "mode": "read-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "676dd5868a9bb8791d9678beb9164bebafb4410cc9d1bcf2930d512e3d1bff98",
+          "c2715c63b27a4a4c36fd93b2e876549000d9c1b649ad5048cc05dd4c54cb252b",
+          "76be8fe419c9c1777c7b1331f6065131d7101398b81e8b01544d32274fc9624e"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/read-400-global.json",
+      "sha256": "6702e2396e20cbd7e613d480def5e02bcf7cd8c28f3b9e03ecbea5d9ef9c8ca6",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "c293e13b-7915-4a65-9256-b5818af81dff",
+        "mode": "read-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "7cd24f7e09330bcf6d237d9a41f2214b06fdf5acd8512a4d353b8ad551d06aa6",
+          "bc299106b7053306c023bf7312486b22e5cbba89852bac5b85ec04482d0fa040",
+          "b9d31697d393585b698b4742b334866de15a7d5e5d2faa13b660a5be116eb03a"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/read-final-global.json",
+      "sha256": "c953494a3676d9eabe533a217b8bdbd70d8094c777ebd5a61688b1658b309136",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "c7e2dd23-12fb-4ee5-905f-f18ac92b867c",
+        "mode": "read-final",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "76ec48df1b1bac110dcbd205c9e86b0ac123ff8aa5d0c9313111f01dd8039c07",
+          "bb7821b8148de621814f18c444b970952a1e570fa0a7a176307d7cb40444f933",
+          "b75aebd81304a62e55f8a049d5194c02b9a642b7d53fb5194b9586ce10beae99"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/read-final-project.json",
+      "sha256": "2cd7c28fabc5e37c92795fce2092387fed8089557c62c6ecf000142a73a4da7b",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "2bb922c1-b883-4259-920a-3a007f289d83",
+        "mode": "read-final",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "5ba6bdb57a9547227fb9d92d0c84354acc318259e2d05571f888bc7c575617ab",
+          "6146b696ef29dec44239815a6eca6c88f468f2efce029d465bdf3a5c144f1ba7",
+          "aeff00706720de5645de3feea9308128a1cb7c41c67fade79c9e4f0d745421f9"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/unknown-tool-global.json",
+      "sha256": "1343b37e0367116654f805f62caa8a0aa1cece6859445ab89b91640464d58f6e",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "96e26c39-d7cf-4da2-a3b7-bf3873f0f543",
+        "mode": "unknown-tool",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "892c908c35055da941443f31c1ebf2b5006887be7642c8e873226c32cf2fd35e"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/unknown-tool-project.json",
+      "sha256": "c6377ad32d50e5a55ac459e4c54d090a4f22851329b4f7f48678ab091eb935dd",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "9db748e3-fd68-4eb7-ab6c-c95a252a0c1c",
+        "mode": "unknown-tool",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "7c39ffad6cbb6f87507cc896262e8b4cc425bde0918c8b8e56af01405da4fdf1"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/write-400-global.json",
+      "sha256": "56f10aa528b275d60720f83c6e8e747ec0ae42884584309b701946e608b69e12",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "a3aaf86d-9ef6-4696-bc33-115cfcf0baaa",
+        "mode": "write-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "09bc1697d51bf4f6a36d40d73c74e7537b25b99c3ba68e870c28f45c5e269e44",
+          "083d785682dc0301ddfa6cad2861832f947be4f87479375ee846d0f01a3c4c8b",
+          "d5b4ce8dc47fc594dd695d1d4f4310827c0bb7be7b41be6bd2774d96b760c24b"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-1/write-400-project.json",
+      "sha256": "0190f89803d7b538032988c0879d5386699cd6b2e3f82f89168f2cb3664fcc1f",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "b91468b1-54f8-49ed-a8e7-ba0e05874039",
+        "mode": "write-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "a2dd68fa43570b93a7080abc55c18326e61c21b18a6b9cac96134b917dcf339e",
+          "c43a5afca8c07c51f2b493017b6e374a880a1110ae063a11e6fc14c740acedde",
+          "5a9607c4ea878a20afa188e8ac8f9d96bb799bc63a7ae1350ea76a0becd059d0"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/initial-400-project.json",
+      "sha256": "3ea0da50d24986610f4c970f246bc58ee95f59f66adb057d2546ba0850487292",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "3228ee94-3cbc-4df6-b734-49ee557d04ed",
+        "mode": "initial-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "6c8ecf0898fbd28f429298f5c7aac632b123b7ad42bde7bf48028c0e6112c683"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/initial-400-global.json",
+      "sha256": "6483fec2a25f3ef17c8609cb749b138c508c7f492e8ff91493bfbacf04f008c8",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "a1324879-52ca-40b4-9ee7-449e2b28c48b",
+        "mode": "initial-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "7831187a7177e91791b39eee95a320cb85dfbf8fcb742a97841a9d9b8df61f4f"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/read-400-project.json",
+      "sha256": "7c6ebfe0f55b8c83a4c1aaa7e27635707b2ae03ee479ed0f46c32d4ee3729806",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "8c6f49a5-e19e-4b85-a738-c29d91278af0",
+        "mode": "read-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "b330c0bc9097ff034a0ec4e7ba9ed2b9349f76df5e0aaff84aaa2d3de6773055",
+          "35d0347c885b1bba18ba189d561264e113504c94711d1a6ef402029eff44c2fb",
+          "079507c4117717ad14402908fe01e3a5d5eee4c91de194bcbc6f0c95b9c872b5"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/read-400-global.json",
+      "sha256": "324de21e99d06fd0a92b15429b89259b6f027674fc668f96aba0a1d149924346",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "88814fd6-cf6e-4d1a-82cf-a7721dcd0c28",
+        "mode": "read-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "2c01c273a9503d8b646c10a647d33c202854521f3633b432ea948cb8113fb1df",
+          "4a4f68ea1959ac84395333a0c324b68d22478eefa28d6a3e27b5c737cacd4646",
+          "2ee5e9200293f76bc9ab1c346ea0ae5834d373915b38e84e9e6d588281f51956"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/read-final-global.json",
+      "sha256": "b13690d93b22fa1cd09a10b5c706faf4fc70ae571469dd80b4661922eb2ff81f",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "effe4bc1-fbd2-46f3-b1f5-7addcf3ac3da",
+        "mode": "read-final",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "6882efc0a495877c136666101f1ea66d8662519e5dd98e95ed4389db1571c0cb",
+          "89a73ebd8f836eafc74a76c784d6ffaa53d1d0ee1c0f6550ccbb44acae8485d4",
+          "0d21d878b5077de0cea25ae4f9441741ead1d76a84d0c0b226f4cb87982dbc43"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/read-final-project.json",
+      "sha256": "b0ee38770bed64ff7a7bf38af43d12e9a233db3e4b74014a14f6cab5dd055890",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "dd16a6f6-86d2-49a0-86cb-d2dc7a0dcb45",
+        "mode": "read-final",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "c08eb5abcf62d14472daf4c6c0a6dbfac1ee7a0699cd6788e92d9d89f3886ad9",
+          "fed9c667979b4f821c67cbdd1d68cc9ed55ee4ae59302e587fc355a8620a0d27",
+          "4479d0f35ed9d305d4a121d1693c33128c11351a2c4e3d6295e6e2ae698942bc"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/unknown-tool-global.json",
+      "sha256": "f3970e73cf1a99d37ad0cc10cac0c11fa13d8694bbce140156ce78334f44bc82",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "027cb3d3-cac1-43fa-847d-4af13b528f3f",
+        "mode": "unknown-tool",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "aec150b2cec68fc9b412fa7a4cff79e381d39796f622942f55605dde513029ff"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/unknown-tool-project.json",
+      "sha256": "142ec900d26f719ed7c68b56a493093482c3108bd052461e12f58f3d932a54cb",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "9ee7ac9b-cb42-429d-9003-bf88e07a4ed6",
+        "mode": "unknown-tool",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "2fd6755eabbc8a65c80a133f049f8b15e73b953a88445b4991fe64bdca31c5d1"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/write-400-global.json",
+      "sha256": "6ff8f5162c244d66d5cc2838cd775eba7b431e2681294277c462b8f209211ef5",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "14026183-3b2b-4722-98eb-8e781dcff377",
+        "mode": "write-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "48497f4fd3d7fcfd332c365eaedbf7982fab4ca5090545b46fe3b7c243346e60",
+          "a758650166e2497e182f3f112c43f8ec936fe1cb2f2ab0cedb31720c2432a8d4",
+          "bd498a8217c4a58186eacb5e867489d83b424fa566af9f77e24fbbb71c92406f"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-2/write-400-project.json",
+      "sha256": "01815dacffb30ada469d7bf520461966a3d7eb6c18baa5cc68c8f385e962aa67",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "2e9a9aae-dbb0-4778-bf64-5ec27ff2fdea",
+        "mode": "write-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "e7b45bc0886539aafafecd8440eae3ef8b604dec775b834d3f123b64436c5e48",
+          "e73518493978bab810a135b9604f73aaea2bd574bddeb3c9d22c9b814baa540d",
+          "92757cebd7cecd131bcb8687c7f22bcd38fc725549f8e7f209ba8b1de5807c78"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/initial-400-global.json",
+      "sha256": "6d311717b1759b0ad368a344057141d29546ae6f8abad916a649cfd8d6116fa4",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "086c9b5b-cbdf-4c7c-901f-56ef30633087",
+        "mode": "initial-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "f8bf401f09c71b16bf77239a3f40e3b608fd31342011120ce5df799948ef403e"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/initial-400-project.json",
+      "sha256": "f50f1c486942e4b2b74aebd071a0fe6b32981f40c6e671d53725cc5c95cade53",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "15b2f554-5774-4a09-8a4c-cd350ae6794e",
+        "mode": "initial-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "aa098673091bfca05687df30ce41464490fb2251f258f028c09c8732c86220c8"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/read-400-global.json",
+      "sha256": "0087de06b52f00d22f6a5e54b5c503926703878431b7999494b150adaae4ab79",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "f465216e-3037-4396-a779-4fbb0291d989",
+        "mode": "read-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "3302734de4784e35343ac8243604908c9ff457738f682e020b53b4212df54f60",
+          "8a7cc225b65bde199ce55326418a35d89adfdd6d821b853096e6fb615d84e419",
+          "e347437f318757680ebb86765ebc3b1609f4825ad6ff53bf50a77b7696fc28ad"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/read-final-global.json",
+      "sha256": "70da266aa28993b848dc35b8362681906ee11fd6dc23705a6671bc2b6a6d845a",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "e302ac9c-ddb5-42ce-8151-1a14572dbda5",
+        "mode": "read-final",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "1a9e06a7e35e62ea4e01a98446d777d47beb7cebbc12a131fd04936ba8b061c6",
+          "7a9fac58bbeaaa13b44dffc9fda70b146044e9aa0ff056e564ec8be51dd7ec50",
+          "33fff4e92d315e0f0f9b0589d832da47614e489a11cc2952c8101ab315eb66b5"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/read-400-project.json",
+      "sha256": "b7a3750df7dfd2ad495fe75db3e0a76ffebdf0b15d907aa37b0348c66126d47b",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "cdb0fdd8-1ebb-47e2-980e-4cfe7d830b6d",
+        "mode": "read-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "399228d91b2872ca425735d62a4e3658966718dd096713847e6ba3993bc8c07b",
+          "f567ae3b2b437c27382cea7694c6b41c7526923b69dc1a4efedbbeee6ea28df9",
+          "0598cacf9877329ee76c78f1c439568f6200d18f48885fa7272330e50b44ba0c"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/unknown-tool-global.json",
+      "sha256": "e717db4813060b6fdbb86d4eb0fc5d9d610251e847a3ed49431aff0aa683100b",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "9731aead-dc8a-4f67-86b9-b504eb38a9d7",
+        "mode": "unknown-tool",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "4302cc11bea6a30310f63f274a548aced313a30e6fd27829024e10e64a2fcfd0"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/read-final-project.json",
+      "sha256": "3a060079e253bbbe4f7b8f0add7deada95aa2db20c9f870e66fd3a3a062dc35d",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "8cc09eb1-abe6-41be-9059-8dd7a443ab88",
+        "mode": "read-final",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "6b24a0cf947c059f4cd4354e09dc67e60887a7fc6aeaa30c567521be9a0f1138",
+          "4773bd976582d2d0f19cbbaed20264097097d65215578bf805076c4a4c31a0ee",
+          "21097d7867b5921af3291ee680ae81fa10c2f9bf041092b397f8990aa6ff2c28"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/unknown-tool-project.json",
+      "sha256": "afb8a620e8acdd4ad903b288c87e56485f4a1a6fd21a7743f4c4b3bbac21a5b3",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "78121e32-89d9-4a7f-8a7d-eb0c492ef68d",
+        "mode": "unknown-tool",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "95debbaa4277ac4ea196fba67a8fbefd4f9de4527d747e580469737cd41936fc"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/write-400-global.json",
+      "sha256": "88f4d7f8a8e683e57b08db751565bc90b3bd3e0c1231ba4741b8178342eb94b3",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "73a87f7d-659e-41e0-8248-17662455efcc",
+        "mode": "write-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "322ede5472410d12fc4e0c84bf47153ba8229aece7d5f127ec00dea577bb1cec",
+          "75605cd40fb65fa75df09c0fae18490f87f955373bf5a3835c8fb2a4bde58acc",
+          "838c3d6b04bff09bb4aa78e64dd408f2e5c5b1284fccef2335b0a84b4cce9ef5"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-AR-065-3/write-400-project.json",
+      "sha256": "3c3ca6591884698e316b85ecdd1595213405705408c09a869940d922a257db86",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "68438e1d-a5f1-4180-b967-9602e6990fcd",
+        "mode": "write-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "9bbe764feb69ce436f30060dc0738f31b6e861b83fec9f65c21aed615290d2c4",
+          "9600946ae6c330b9824b93b79a235a6737346fb442440cf78dc7ace05f68c9f1",
+          "b4704d436fc0bc82a8e0ce07fa1609928011dc8e803fe680c84381ea45f3c61e"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/initial-400-global.json",
+      "sha256": "a2e6841c4030cc2f5ac0e95bfaa17d37c7cbf2d3d3be290c6de167a78931c181",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "1ab640ad-25e8-496e-9843-ab045d5b6bf3",
+        "mode": "initial-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "f299d0f851580fec84f9db625f9c098381eecae70364a1aa3569a64bc7758ae9"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/initial-400-project.json",
+      "sha256": "9d122166658b35890d72ed7a13965b07884fe7a0991e3d37c4268ef6cdc9122c",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "234199e0-cc70-4f89-8a93-3c725f6c0b01",
+        "mode": "initial-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "43afdeba4b9637fbbc0a96334df7d56900636982e5d2866e0f4230542e931348"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=initial; code=invalid_value; type=invalid_request_error; param=tools[0].name]: Kiểm tra tên tool trên wire. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/read-400-global.json",
+      "sha256": "9ca305aa6b1e9e61e3beb4ba7d111fa336550a7391e4a5761059c612aceba471",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "dd17fddd-8a5b-4557-bf6c-3675e4e5a406",
+        "mode": "read-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "8d574d102106fb44daaf08288fe2213be8a6c0b52aad516551945c47725dabd0",
+          "9627ba9699ca8f8f966444c6ded846c059678d1999a5702e1ac4ce3434e01006",
+          "ca51bcba1c89710c71160c8acc7ca64ec386da46bb9c7d2dfce23fc89d749dd2"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/read-final-global.json",
+      "sha256": "232ba6cefb2b6237714aa6cb2e2c4709c644ed1874a66ff4856c8fb52b17788c",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "651329c8-f828-4082-a9a7-cbf3820a0b1f",
+        "mode": "read-final",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "5b63af21d292d64b62ad343ad0ea828f622193da0cc0a0f3cab65cb52d833061",
+          "5dd2a3357580524aa90f3d40c4be363015ac105fd5d7320cb76788fc9c19432c",
+          "ed8692231bc1719a79c9fa3b00e4041ee5c1d7b554d4810d6f425ea9f711ca4e"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/read-400-project.json",
+      "sha256": "f3d5046eb7379f16f9993ff802824c6d3cdea79e7c9ef35b47b2b9ef41b1d4af",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "e5d1de9f-8444-434b-96b5-3a731ce83899",
+        "mode": "read-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "666e0f7a233c8053d5af7eddb8dcb2dddc3dcabf88cc5085a19ae9cbc79a1eb2",
+          "adb81a029d91490bd5a650be88a2f1e944b042ad441b92ac58c70fd6349c52fe",
+          "54251d82d91bd8f4698e21fc874d055c05f1f697d9ada609ad426fbf6f68749d"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/read-final-project.json",
+      "sha256": "33cee1104762e06458795fe97c7d7ea69f2cd64217432ea5d373ad346693921c",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "7109b2fd-8191-4d92-9f94-b72d950222a5",
+        "mode": "read-final",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "7459b90cf780cf226eb1118c49dd1974921d7bced2dc5d5ba00f9044953495b3",
+          "1a8a34e430881ea3c85b9c7d3e1e7aef8471ed8d6cf0559aa808ebfa9c495a56",
+          "ad565fb8050826ed57582c966df529f7cc577c3426abc92e344bb657339ba43e"
+        ],
+        "status": "Completed",
+        "Error": null,
+        "evidenceCount": 2,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/unknown-tool-global.json",
+      "sha256": "ba37e363830d18086ff14a1ebb965c3a99dd4148cceb15b229f5a1fa38cd5e11",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "777e8b43-aa0c-4d7b-aec8-1b52a2fc72b6",
+        "mode": "unknown-tool",
+        "project": false,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "5c60dd4d4964ee399b4ed97a3de4ee6e35366303195c8f5692eaa840dd913988"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/write-400-global.json",
+      "sha256": "93431670d0c32946e4166a2ee958080593a01198ed3f98dd531b235f90008d42",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "d9b603f5-8cca-44d4-8b7d-be63202f2643",
+        "mode": "write-400",
+        "project": false,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "0b295c2150150abeb2986d7d42bfe06145061fc1bc43afc50b5f33d495177c47",
+          "69ad766b49f13e5803571cb3a2645de911cf9c96710bd3e6092a392483fe9cec",
+          "5d58a8ade576c9a139cfa8c492b38c8edc19cb879648d503de8e3df38cee0cff"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/unknown-tool-project.json",
+      "sha256": "31aa03a1cb62029de3b811f1db58f5ba5c2c7197eee1b6459045aabf37837911",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "a27533a9-b3e5-49d8-b0c6-c64047f4dbef",
+        "mode": "unknown-tool",
+        "project": true,
+        "Created": 1,
+        "Sends": 1,
+        "RequestHashes": [
+          "6fc9cdbd305cb4ba785b61cab1a83af7323fc01b0f08da04b24966a7a21468ba"
+        ],
+        "status": "Failed",
+        "Error": "Responses returned an unadvertised wire tool name; no tool was dispatched.",
+        "evidenceCount": 0,
+        "mutationCount": 0,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": null,
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    },
+    {
+      "artifact_path": "receipts-FULL/write-400-project.json",
+      "sha256": "3f20c6ebbe66efe62140357f355f7f0baa4bf98352d4bfd33e3129528d4ef4d2",
+      "observed": {
+        "level": "E2",
+        "injected": "scripted HTTP handler; real production adapter/runtime/file IO/archive",
+        "task": "020b1433-e246-4042-92db-59192ddf35d7",
+        "mode": "write-400",
+        "project": true,
+        "Created": 1,
+        "Sends": 3,
+        "RequestHashes": [
+          "61f591a86b3cc80996cc93eb1d95ec880465de13cd27d610fcbff4cc289fdbce",
+          "3984e98f0ca37b0e7046bf5010b244d42bec2a3c9b8bf1838555393b8783b919",
+          "575fd8241a830f39811b71433750ff09981d787450baa14cc630a0a48632d418"
+        ],
+        "status": "Failed",
+        "Error": "HTTP 400 [phase=tool_continuation; code=invalid_value; type=invalid_request_error; param=input[0].call_id]: Kiểm tra hợp đồng request tại tham số đã chỉ ra; nội dung phản chiếu từ máy chủ không được lưu. Không tự gửi lại; kết quả tool trước đó phải được đối chiếu.",
+        "evidenceCount": 3,
+        "mutationCount": 1,
+        "sourceHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "controlHash": "b578ccfaab77fd4c03aca825d1872f524971451fdcae17d5061602203dbc25df",
+        "outputHash": "8f49a3ce324e6583e00d0e4b5325682af40851d82b243391c22e8f413ec6071e",
+        "reopenedWithoutReplay": true,
+        "E4": "AWAITING_ENVIRONMENT"
+      }
+    }
+  ],
+  "scope": "Scripted handler/socket; actual serializers, production adapter/runtime, disposable file IO, archive. Not actual model/UI/Office acceptance.",
+  "original_http400": "Exact original user provider reason still not captured; E2 wire defects are not proof of the sole original cause.",
+  "E3": "AWAITING_ENVIRONMENT",
+  "E4": "AWAITING_ENVIRONMENT",
+  "E5": "AR-083 DEFERRED_BY_USER"
+}

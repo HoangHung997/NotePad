@@ -99,7 +99,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
-| AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | NOT_STARTED — CRITICAL |
+| AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
 | AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | NOT_STARTED — CRITICAL |
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
@@ -483,7 +483,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current active work remains AR-064. Do not discard it.** After AR-064 is checkpointed, the next implementation sequence is **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, before selecting another ordinary roadmap task.
+**AR-064 is checkpointed PARTIAL, not DONE. Current task is AR-065, implemented with E1/E2 and full CI; real H2/model E4 remains AWAITING_ENVIRONMENT.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
 
 Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
@@ -498,37 +498,43 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-064_PARTIAL_E2_CHECKPOINT_CRITICAL_AR-065_NEXT",
+  "phase": "AR-065_IMPLEMENTED_E2_PASS_AWAITING_REAL_H2_E4",
   "active_task": "AR-065",
-  "implementation_status": "NOT_STARTED",
-  "acceptance_status": "NOT_RUN",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar064-typed-outcome-2026-09-23",
-  "last_code_commit": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
-  "last_validated_code_commit": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
-  "last_validation_result": "AR064_TYPED26_AND_TOTAL75_PASS_X3; OLD_WRAPPER_7_EXPECTED_FAILURES; CHAT10_X3; RETAINED_AR_PASS; AGENT74_PASS; FULL1077_PASS; AR064_NOT_DONE",
-  "capture_checked_head": "c0f986074b8d21e17f109a15eaf0936bc48c68e9",
+  "owner_session": "chatgpt-ar065-reconcile-2026-09-23",
+  "last_code_commit": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+  "last_validated_code_commit": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+  "last_validation_result": "AR065_55_PASS_X3; PRODUCTION10_X3_AND_FULL; OLD_TRANSPORT4_EXPECTED_FAILURES; FULL1132_PASS; AGENT74_PASS; E4_AWAITING_ENVIRONMENT; NOT_DONE",
+  "capture_checked_head": "ac3f986c65f2d05b661aac13235a5bb988a08b6b",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact CI checkout CLEAN; docs checkpoint normal-pushes only three reviewed documents. User-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Exact focused checkout CLEAN, control bytes restored and rebuilt, final CI checkout CLEAN. Full CI test-merge application/test/tools trees equal. User-PC working tree NOT_ACCESSIBLE. This checkpoint changes documentation only.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T13:33:10.556196+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T15:50:20.271102+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-065 NOT_STARTED. Investigate and repair the exact user-reported OpenAI Agent HTTP400 path per critical issue document; retain actual provider E4 gate."
+    "Real H2 UI with existing authorized exact Luna Responses profile: read-only task, harmless creation/readback and deferred tool loading, plus reopen/no replay, under a finite operator budget.",
+    "Capture exact sanitized original provider rejection if it remains. No claim of real incident resolution from scripted E2 alone."
   ],
   "last_test_commands": [
     {
-      "command": "AR064 old-wrapper control, current AR064 x3, Agent chat x3, every retained AR and Agent suites",
-      "sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
-      "run_id": 35864935194,
-      "result": "Old source 0/7 expected failures; current75/75 x3, chat10/10 x3; retained pass; Agent74/74"
+      "command": "tools/agent-reliability/validate_ar065.ps1 (old source control; AR-065 x3; full H2; all Agent flags)",
+      "sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+      "run_id": 35881691347,
+      "job_id": 107251468701,
+      "attempt": 1,
+      "result": "55/55 x3; full1132/1132; Agent74/74; exact old-source4 expected failures"
     },
     {
-      "command": "Avalonia CI incl build, all H2 tests, native Windows publish and packaged helper IPC",
-      "sha": "f1eb0d19e80b535b25574a6c95a72cbec3255ea0",
-      "run_id": 35864940427,
-      "result": "1077/0; all mandatory steps success; test merge, not main merge"
+      "command": "Avalonia CI (build, full H2, all required suites, win-x64 publish, packaged helper IPC)",
+      "sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
+      "head_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+      "run_id": 35881698306,
+      "job_id": 107251491366,
+      "attempt": 1,
+      "result": "All mandatory steps PASS; H2 1132/1132; test merge NOT main merge"
     }
   ],
   "ci_runs": [
@@ -1000,6 +1006,53 @@ Do not claim these defects were already covered by historical Office/transport/U
       "result": "SUCCESS",
       "h2_passed": 1077,
       "h2_failed": 0
+    },
+    {
+      "id": 35874131889,
+      "sha": "0a75675e73ad7567e458b41bafe0e57b91363f87",
+      "result": "FAILURE before source mutation",
+      "reason": "Damaged transfer zlib bytes; other worker later removed payload/workflow.",
+      "attempt": 1
+    },
+    {
+      "id": 35875731324,
+      "sha": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
+      "result": "1120 passed / 2 failed; later stages skipped",
+      "reason": "Retained AR050 scripted lookup omitted from advertised tools.",
+      "attempt": 1
+    },
+    {
+      "id": 35878985021,
+      "sha": "8ba51247dc74522a752acf434317e8c053171018",
+      "result": "BUILD_FAILURE; tests NOT_RUN",
+      "reason": "New test missing H2Notes.Avalonia namespace import.",
+      "attempt": 1
+    },
+    {
+      "id": 35879547779,
+      "sha": "d5be56c91039bdd4ec0696acccd41c91c12d34f9",
+      "result": "AR065 51/4 x3; full1127/5; Agent74 passed; NOT acceptance",
+      "artifact_id": 10760388238,
+      "digest": "a061fe29e18e602f1ec6cdedf47dacb0131605d2c6e1801731a64b692aa23c2d",
+      "reason": "Four new read fixtures omitted offset; one retained AR040 two-poll timing assumption.",
+      "attempt": 1
+    },
+    {
+      "id": 35881691347,
+      "sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+      "attempt": 1,
+      "job_id": 107251468701,
+      "result": "SUCCESS; E1/E2 only",
+      "artifact_id": 10761303971,
+      "artifact_sha256": "c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2"
+    },
+    {
+      "id": 35881698306,
+      "head_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
+      "actual_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
+      "attempt": 1,
+      "job_id": 107251491366,
+      "result": "SUCCESS; H2 1132/0, all mandatory stages and publish/helper IPC"
     }
   ],
   "evidence_locations": [
@@ -1042,16 +1095,25 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-051/acceptance.json",
     "docs/agent-reliability/AR-051/implementation.md",
     "Actions 35835063919 AR051-Work-Compaction-Evidence",
-    "Actions 35835069955 H2Notes-Avalonia-Portable-win-x64"
+    "Actions 35835069955 H2Notes-Avalonia-Portable-win-x64",
+    "docs/agent-reliability/AR-065/evidence.json",
+    "docs/agent-reliability/AR-065/implementation-review.md",
+    "docs/agent-reliability/AR-065/real-h2-acceptance.md",
+    "Actions run 35881691347 artifact 10761303971 SHA256 c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2"
   ],
   "known_failures": [],
   "external_blockers": [
-    "AR-020/033 native E3 remain AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER. AR-051 deterministic core may proceed; do not waive its E4 subset.",
+    "AR-020/033 native E3 and AR-051 real-model E4 remain AWAITING_ENVIRONMENT; AR-083 stays DEFERRED_BY_USER. No acceptance waiver.",
     {
       "id": "AR-051-E4",
       "missing_evidence": "Actual authorized H2 UI/model/tools semantic recall subset",
       "status": "AWAITING_ENVIRONMENT",
       "blocks_independent_implementation": false
+    },
+    {
+      "id": "AR-065-E4",
+      "status": "AWAITING_ENVIRONMENT",
+      "missing_evidence": "Authorized Windows/H2/model profile and finite live-test budget; Remote Desktop Commander was not installed when checked. No new credential, endpoint or personal-document test authorized."
     }
   ],
   "deferred_acceptance": [
@@ -1075,7 +1137,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-065",
       "issue": "GPT-5.6 Luna text chat works but Agent tool task HTTP 400",
-      "status": "NOT_STARTED"
+      "status": "IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT / NOT_DONE"
     },
     {
       "id": "AR-066",
@@ -1099,12 +1161,14 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
-  "pending_user_decisions": [],
-  "next_exact_action": "Reconcile refs, working tree and this saved checkpoint; start only AR-065 from docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md, verify official provider wire constraints and actual serializers, reproduce the defect, repair and run bounded E2 tests. Use only already configured/authorized provider for E4; otherwise AWAITING_ENVIRONMENT. Do not reapply integrated AR064 patches. Follow AR066, AR067, AR068, AR069 critical sequence before ordinary roadmap; AR064 remains partial, AR020/033 E3 and AR051 E4 open, AR083 DEFERRED_BY_USER.",
-  "next_task_if_active_done": "AR-065 — CRITICAL: reproduce and repair OpenAI/Luna Agent HTTP 400; then AR-066/067/068 and AR-069 gate",
-  "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
-  "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
-  "finalization_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
+  "pending_user_decisions": [
+    "Provide an authorized isolated Windows/H2 test environment and a finite live-model test budget; keep credentials on that machine, never paste keys into chat."
+  ],
+  "next_exact_action": "Reconcile latest branch/PR/checkpoint first. Continue only AR-065 real H2/Luna E4 using docs/agent-reliability/AR-065/real-h2-acceptance.md and an authorized existing profile with finite budget. Read journal and verify postconditions before any uncertain operation. Do not reapply either old ZIP or corrupt transfer payload, rename registry tools, change provider/engine, waive E4, or close AR064/MB124-127. If no authorized environment exists, retain AWAITING_ENVIRONMENT; the next independent critical core candidate is AR066 after a separately recorded dependency decision.",
+  "next_task_if_active_done": "AR-066 after AR-065 gates/checkpoint and explicit independent dependency assessment; then AR-067/068 and AR-069",
+  "last_runtime_source_commit": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
+  "previous_saved_checkpoint_commit": "9691e2092ee0f1783df4fe0b2640c2acbd0e94f2",
+  "finalization_checked_head": "ac3f986c65f2d05b661aac13235a5bb988a08b6b",
   "additional_ci_after_recorded_run": "Not used as acceptance; later documentation/workflow runs need independent inspection.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
@@ -1137,21 +1201,21 @@ Do not claim these defects were already covered by historical Office/transport/U
       "cause": "Exact-output fixture also received native PowerShell progress; production stderr was not stripped"
     }
   ],
-  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Session/RuntimeCompactionCoordinator.Work.cs",
+  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Transport/OpenAiResponsesWireContract.cs",
   "previous_completed_task": "AR-040",
-  "last_full_ci_checkout_sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
+  "last_full_ci_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
   "implemented_this_session": [
-    "AR-051"
+    "AR-065"
   ],
-  "next_ready_independent_task": "AR-065 (after AR-064 checkpoint; critical user-reported gate)",
+  "next_ready_independent_task": "AR-066 core is the next critical candidate; NOT_STARTED in this session.",
   "independent_dependency_assessment": {
-    "id": "AR-064",
+    "id": "AR-065",
     "dependencies": [
       "AR-010 accepted",
       "AR-011 accepted",
-      "AR-031 accepted"
+      "AR-050 accepted with repaired stale fixture declarations"
     ],
-    "basis": "Tracker 2.2. Plugin/provider lifecycle core does not depend on unaccepted AR-051 E4, AR-020/033 E3 or AR-041 restart."
+    "basis": "Critical priority after saved AR064 partial checkpoint. No E3/E4 waiver and no other AR implementation this session."
   },
   "parked_acceptance": [
     {
@@ -1182,13 +1246,14 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "resolved_in_this_session": [
-    "AR-050 guards all concrete Agent serializer paths before sending.",
-    "Settings manual draft preserves sourced budget.",
-    "Ambiguous headless settings selector fixed without weakening the budget assertion."
+    "Reconciled worker AR065 runtime wire repair without overwriting it or reapplying the stale local ZIP.",
+    "Fixed two AR050 fixtures to advertise their scripted lookup callable while retaining unadvertised-tool and budget guards.",
+    "Added ten Global/Project production HTTP/runtime/file/archive cases; fixed missing test namespace and required read offset, then verified exact leading JSON content/hash.",
+    "Replaced a timing-dependent two-second child sleep in retained AR040 roundtrip with a bounded same-job two-observed-poll handshake; preserved effect, identity, terminal, output and archive assertions.",
+    "Ran and independently verified exact-SHA focused/full Windows CI, old-source negative control, source/artifact checksums and per-case receipts; no real provider calls."
   ],
-  "last_test_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-  "last_native_acceptance": "AR-033/020 E3 AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER",
-  "foundation_source_parent": "f939cc510c29e655775f973bfb5030758d49ba44",
+  "last_test_commit": "2aadf0c1d06aaa928529f8986192a2f2798ebdc4",
+  "last_native_acceptance": "AR-020/033 E3 and AR-065 E4 AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER",
   "parked_ar064": {
     "implementation": "PARTIAL",
     "acceptance": "E1/E2_PASS_FOR_INTEGRATED_FOUNDATION_ONLY; E3_NOT_RUN; NOT_DONE",
@@ -1197,8 +1262,10 @@ Do not claim these defects were already covered by historical Office/transport/U
       "Product-used PluginManager/ProviderManager lifecycle management and task-version pin/journal composition.",
       "RC28 trusted concrete package/provider tool execution in production; skill-only/tool-only/provider package refresh and uninstall evidence.",
       "Full AR064 acceptance after critical repairs; fixture resolver evidence cannot close E3."
-    ]
-  }
+    ],
+    "historical_foundation_source_parent": "f939cc510c29e655775f973bfb5030758d49ba44"
+  },
+  "ar065_reconciled_base": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5"
 }
 ```
 
