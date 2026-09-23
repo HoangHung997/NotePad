@@ -1,6 +1,6 @@
 # AR-033 — whole-goal completion and verified alternate recovery
 
-Status: IMPLEMENTED / AWAITING_ENVIRONMENT. E1/E2 passed; required native E3 remains NOT_RUN. This file describes source under validation, not successful tests.
+Status: IMPLEMENTED / AWAITING_ENVIRONMENT. E1/E2 passed on the exact source recorded below; required native E3 remains NOT_RUN. AR-033 is not DONE.
 
 Extends the existing AgentRuntime report/attempt assessment and verifier router. A run-local assessment indexes actual invocations and verifier reports; it is not a second engine, journal or database. All active source-backed obligations and required verifier identities remain required. An unrelated verifier/target cannot erase earlier verification debt. Mutation execution and proof are tracked separately. Running/unknown/partial effects remain blockers; no resume/replay is introduced.
 
@@ -8,8 +8,7 @@ Host-only per-call coverage binds a criterion, target, postcondition, invocation
 
 The final gate rechecks referenced ArtifactStore handles for current hashes; it never opens an arbitrary historical path. Typed completion/resolution projections use the existing Agent task summary/archive and progress renderer; no ProjectRecord field or UI layout change. Superseded/waived user criteria do not remove uncertain side effects.
 
-E1 tests define cross-verifier, per-target, missing/conflicting proof and invalid alternate cases. E2 cases use production Global/Project adapters, actual local file tools/readback and archive roundtrip, with a explicitly scripted transport and labelled criterion verifier. They are not native Office/model/UI evidence. RC-11/13/14 and the retained AR corpora must be executed on the exact saved SHA. E3/E4 NOT_RUN; AR-020 native E3 pending; AR-083 DEFERRED_BY_USER.
-
+E1 tests cover cross-verifier, per-target, missing/conflicting proof and invalid alternate cases. E2 cases use production Global/Project adapters, actual local file tools/readback and archive roundtrip, with an explicitly scripted transport and labelled criterion verifier. These cases and retained AR corpora have been executed as recorded below. They are not native Office/model/UI evidence; real app/provider RC-11/13/14 still require E3. E3/E4 NOT_RUN; AR-020 native E3 pending; AR-083 DEFERRED_BY_USER.
 
 ## Reviewed implementation checkpoint — native gate remains open
 
@@ -22,3 +21,5 @@ Only the existing assessment/runtime, goal state, verifier and Agent archive rem
 **Not DONE:** AR-033 requires E2/E3. Real app/provider RC-11/13/14 remain AWAITING_ENVIRONMENT; E4 NOT_RUN and AR-083 DEFERRED_BY_USER. No personal documents, real model calls or new endpoints/credentials were used. The implementation is ready for independent downstream core work under tracker section 2.2.
 
 On the existing branch and PR #3, reconcile current refs, working tree and SESSION HANDOFF. AR-033 implementation has E2 evidence but remains AWAITING_ENVIRONMENT for native E3. Start only independent AR-040 (dependencies AR-011/031 accepted): extend the existing process service with stable job IDs, bounded poll/output/cancel and actual owned-process tests RC-19/20/21; do not add a second engine/store or replay uncertain writes. Keep AR-033/020 native gates and AR-083 deferred; retain AR-033/032/031/030/020/012/011/010/001 regression.
+
+One-use AR-033 source/repair/checkpoint writers were removed in `3a3d30c5f43c8a79605639d62b54a0bb7fea428d`. The current consistency regression workflow is read-only; the older read-only proof-control workflow remains historical and pins its own source explicitly. No application/test source changed after the validated repair. Later documentation/workflow-triggered CI is separate and is not assumed to pass without inspecting its result.
