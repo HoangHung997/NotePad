@@ -1,0 +1,50 @@
+name: AR-051 verified core checkpoint with native gate pending
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar051-checkpoint.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: h2-ar051-checkpoint
+  cancel-in-progress: false
+jobs:
+  checkpoint:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Verify reviewed documentation-only program
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import os, pathlib, urllib.request, json, base64, hashlib
+          blob='f156de6b9e98720f492913e122d69382e73fceac'
+          request=urllib.request.Request('https://api.github.com/repos/HoangHung997/NotePad/git/blobs/'+blob,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'H2-AR051-Checkpoint'})
+          with urllib.request.urlopen(request,timeout=30) as response: data=json.load(response)
+          content=base64.b64decode(data['content'])
+          assert data['sha']==blob and len(content)==23394
+          assert hashlib.sha256(content).hexdigest()=='263d311c49dd5be5986f4b3d3558710dac12faf873e67297d45a6e6044e90ce0'
+          assert hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()==blob
+          out=pathlib.Path('artifacts/ar051-checkpoint');out.mkdir(parents=True,exist_ok=True)
+          (out/'record-reviewed.py').write_bytes(content)
+      - name: Verify completed exact-source runs and save only three documentation files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python artifacts/ar051-checkpoint/record-reviewed.py
+          if ($LASTEXITCODE) { throw 'Checkpoint validation failed; no acceptance inferred' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR051-Verified-Checkpoint
+          path: artifacts/ar051-checkpoint/
+          if-no-files-found: error
+          retention-days: 14
