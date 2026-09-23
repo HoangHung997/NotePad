@@ -41,6 +41,39 @@ jobs:
           if ($LASTEXITCODE) { throw 'Restore failed' }
           dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar051/build.log
           if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Reproduce old source-cancellation behavior and restore exact current code
+        id: cancellation_control
+        shell: python
+        run: |
+          import pathlib, subprocess, hashlib, json, os, re
+          out=pathlib.Path('artifacts/ar051'); out.mkdir(parents=True,exist_ok=True)
+          path='experiments/H2AgentLab/Session/RuntimeCompactionCoordinator.Work.cs'; p=pathlib.Path(path)
+          original=p.read_bytes(); original_hash=hashlib.sha256(original).hexdigest()
+          old=subprocess.check_output(['git','show','ceaf0238c01d84389af9595a5325cf47c2e75671:'+path])
+          assert hashlib.sha256(old).hexdigest()=='0e96fe8f0c8edc2c3a80f3fee3af1eb3477272c68082e68ee1fd3d8d189b893c'
+          head=subprocess.check_output(['git','show','HEAD:'+path])
+          assert hashlib.sha256(head).hexdigest()=='e6b51b5cc6b7da32dbd2e609a88c5cd3ee17c236f6b3a2d72f74254fe7f749be'
+          def run(args,name,timeout=240):
+              with (out/name).open('wb') as log: r=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
+              return r.returncode, (out/name).read_text(encoding='utf-8-sig',errors='replace')
+          control_ok=False
+          try:
+              p.write_bytes(old)
+              rc,_=run(['dotnet','build','H2Notes.Avalonia.slnx','-c','Release','--no-restore'],'cancel-control-build.log')
+              assert rc==0,'Control must compile'
+              os.environ['H2_AR051_EVIDENCE_DIR']=str(out/'cancel-control')
+              rc,log=run(['dotnet','run','--project','tests/H2Notes.Tests/H2Notes.Tests.csproj','-c','Release','--no-build','--','--filter','AR-051 cancellation source'],'cancel-control.log',180)
+              failed=re.findall(r'^FAIL (AR-051 cancellation source.*)',log,re.M)
+              control_ok=rc!=0 and 'RESULT: 0 passed, 6 failed' in log and len(failed)==6 and all('Cancelled source boundary invoked the summarizer.' in s for s in failed)
+              (out/'cancel-control.json').write_text(json.dumps({'runtime_source': 'ceaf0238c01d84389af9595a5325cf47c2e75671','tested_checkout':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'exit_code':rc,'expected_failures':6,'observed_failures':failed,'expected_behavior_reproduced':control_ok},indent=2))
+          finally:
+              p.write_bytes(original)
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==original_hash
+              assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip(),'Current checkout not restored'
+              rc,_=run(['dotnet','build','H2Notes.Avalonia.slnx','-c','Release','--no-restore'],'cancel-current-rebuild.log')
+              assert rc==0,'Current rebuild failed'
+          assert control_ok,'Unexpected cancellation control result; preserve logs and repair, do not weaken assertions'
+          print('Six old-code failures reproduced; exact current source restored and rebuilt.')
       - name: Diagnose compaction boundaries on actual compiled source
         id: diagnosis
         shell: pwsh
