@@ -28,6 +28,8 @@ internal static class H2AgentWorkCompactionTests
                 () => RunAsync(() => RebaseGuards(kind)));
             test("AR-051 RC-16 RC-17 ten durable source-backed cycles preserve revisions and exact recall " + kind,
                 () => RunAsync(() => TenCycles(kind)));
+            test("AR-051 measured pressure reduces actual context while exact earlier output remains retrievable " + kind,
+                () => RunAsync(() => Pressure(kind)));
         }
         foreach (var mode in new[] { "summarizer-throws", "missing-anchor", "invented-excerpt", "activation", "cancel" })
             test("AR-051 failed candidate retains source and previous context " + mode,
@@ -35,6 +37,7 @@ internal static class H2AgentWorkCompactionTests
         foreach (var mode in new[] { "source", "self-rehashed-source", "anchors", "checkpoint" })
             test("AR-051 RC-34 changed checkpoint source is not adopted " + mode,
                 () => RunAsync(() => ChangedSource(mode)));
+        test("AR-051 earlier source corruption is rejected through the full checkpoint chain", () => RunAsync(ChangedAncestor));
         test("AR-051 missing mandatory constraint cannot produce a candidate", () => RunAsync(MissingConstraint));
         test("AR-051 context restart is read-only and cannot grant foreign history scope", () => RunAsync(HistoryScope));
         foreach (var project in new[] { false, true })
@@ -150,17 +153,84 @@ internal static class H2AgentWorkCompactionTests
             userRevision = state.Goals.RevisionId, byteCounts = wire.Bodies.Select(b => Encoding.UTF8.GetByteCount(b)).ToArray() });
     }
 
+
+    private static async Task Pressure(string kind)
+    {
+        using var f = new CaseRoot("pressure-" + kind);
+        using var wire = new H2AgentRequestBudgetTests.WireFixture(kind, Profile(kind, 200_000));
+        await using var transport = wire.Create(); var start = Start(f.Task, f.Turn); var state = Contract(f.Task);
+        using var archive = new AgentIntegrationTaskArchive(f.ArchiveRoot); archive.Upsert(Summary(state, f.Turn));
+        AgentContextCompactionRecord? activated = null;
+        var turn = new RuntimeCompactionCoordinator(f.TaskRoot, new()).CreateWorkTurn(start,
+            r => { archive.RecordContextCompaction(r); activated = r; }, archive.RecordContextSource, new(12, 4, 16, .25));
+        var budgets = new List<AgentRequestBudgetReceipt>();
+        ((IAgentRequestBudgetSource)transport).RequestBudgetEvaluated += budgets.Add;
+        var events = await Collect(transport.StartAsync(start));
+        var large = "EXACT-OLD " + Formula + new string('q', 60_000);
+        for (var i = 1; i <= 4; i++)
+        {
+            var c = Call(events); var ack = Ack(start, c, i == 1 ? large : "latest-" + i, []);
+            var plan = turn.Prepare(transport, i + 1, "observation-" + i, [c], ack,
+                state.Goals!.RevisionId, Anchors(state, f.Turn), default);
+            Check((plan is not null) == (i == 4), "Pressure policy failed before the periodic interval.");
+            events = plan is { } p
+                ? await Collect(((IAgentContextRebaseTransport)transport).RebaseContextAsync(p.Context, ack, p.BodySha256))
+                : await Collect(transport.ContinueAsync(ack));
+        }
+        Check(activated is not null && wire.Bodies.Count == 5 && budgets.Count == 5, "Pressure boundary was not exercised.");
+        Check(budgets[^2].EstimatedInputTokens > 50_000 && budgets[^1].EstimatedInputTokens < budgets[^2].EstimatedInputTokens / 2,
+            "Candidate did not reduce measured effective context pressure.");
+        var before = Encoding.UTF8.GetByteCount(wire.Bodies[^2]); var after = Encoding.UTF8.GetByteCount(wire.Bodies[^1]);
+        if (kind is "chat" or "ollama" or "responses") Check(after < before / 2, "Full-history body did not shrink.");
+        var source = JsonNode.Parse(new ArtifactStore(f.TaskRoot).ReadText(activated!.Source.Id))!;
+        Check(source["Batches"]![0]!["Results"]![0]!["Content"]!.ToString() == large,
+            "Pressure compaction truncated the exact earlier source.");
+        Save("pressure-" + kind, new { activated, beforeBodyBytes = before, afterBodyBytes = after,
+            beforeEstimatedInput = budgets[^2].EstimatedInputTokens, afterEstimatedInput = budgets[^1].EstimatedInputTokens,
+            exactSourceCharacters = large.Length, exactSourceSha256 = RuntimeContextCompactionTurn.Hash(large), budgets });
+    }
+
+    private static async Task ChangedAncestor()
+    {
+        using var f = new CaseRoot("ancestor"); using var wire = new H2AgentRequestBudgetTests.WireFixture("chat", Profile("chat"));
+        await using var transport = wire.Create(); var start = Start(f.Task, f.Turn); var state = Contract(f.Task);
+        using var archive = new AgentIntegrationTaskArchive(f.ArchiveRoot); archive.Upsert(Summary(state, f.Turn));
+        var records = new List<AgentContextCompactionRecord>();
+        var turn = new RuntimeCompactionCoordinator(f.TaskRoot, new()).CreateWorkTurn(start,
+            r => { archive.RecordContextCompaction(r); records.Add(r); }, archive.RecordContextSource, new(2, 2));
+        var events = await Collect(transport.StartAsync(start));
+        for (var i = 1; i <= 4; i++)
+        {
+            var c = Call(events); var ack = Ack(start, c, "ancestor-source-" + i + Formula, []);
+            var plan = turn.Prepare(transport, i + 1, "observation", [c], ack, state.Goals!.RevisionId, Anchors(state, f.Turn), default);
+            events = plan is { } p ? await Collect(((IAgentContextRebaseTransport)transport).RebaseContextAsync(p.Context, ack, p.BodySha256))
+                : await Collect(transport.ContinueAsync(ack));
+        }
+        Check(records.Count == 2, "Two valid prior checkpoints required.");
+        var path = Path.Combine(f.TaskRoot, "artifacts", "context", records[0].Source.Id + ".txt");
+        File.WriteAllText(path, "tampered-ancestor"); var changed = File.ReadAllBytes(path);
+        var call = Call(events); var continuation = Ack(start, call, "five", []);
+        Check(turn.Prepare(transport, 6, "fifth", [call], continuation, state.Goals!.RevisionId, Anchors(state, f.Turn), default) is null,
+            "Unexpected early checkpoint.");
+        events = await Collect(transport.ContinueAsync(continuation)); call = Call(events); continuation = Ack(start, call, "six", []);
+        Expect<AgentContextCompactionException>(() => turn.Prepare(transport, 7, "sixth", [call], continuation,
+            state.Goals.RevisionId, Anchors(state, f.Turn), default));
+        Check(records.Count == 2 && wire.Bodies.Count == 6 && File.ReadAllBytes(path).SequenceEqual(changed),
+            "A healthy latest checkpoint hid a corrupted ancestor.");
+        Save("changed-ancestor", new { activations = records.Count, sends = wire.Bodies.Count, ancestorPreserved = true });
+    }
+
     private static async Task Failure(string mode)
     {
         using var f = new CaseRoot(mode); using var wire = new H2AgentRequestBudgetTests.WireFixture("chat", Profile("chat"));
         await using var transport = wire.Create(); var start = Start(f.Task, f.Turn); var state = Contract(f.Task);
-        using var archive = new AgentIntegrationTaskArchive(f.ArchiveRoot);
+        using var archive = new AgentIntegrationTaskArchive(f.ArchiveRoot, fault: boundary =>
+        { if (mode == "activation" && boundary == "context-before-activation") throw new IOException("fixture-activation-write-failed"); });
         archive.Upsert(Summary(state, f.Turn)); using var cts = new CancellationTokenSource();
         var coordinator = new RuntimeCompactionCoordinator(f.TaskRoot, new());
         var count = 0;
         var turn = coordinator.CreateWorkTurn(start, record =>
         {
-            if (mode == "activation") throw new IOException("fixture-activation-write-failed");
             archive.RecordContextCompaction(record); count++;
         }, source => { archive.RecordContextSource(source); if (mode == "cancel") cts.Cancel(); },
             new(2, 2), (source, hash) => mode switch
@@ -178,7 +248,9 @@ internal static class H2AgentWorkCompactionTests
         else Expect<AgentContextCompactionException>(() => turn.Prepare(transport, 3, "second", [call], ack, state.Goals.RevisionId, Anchors(state, f.Turn), cts.Token));
         Check(count == 0 && wire.Bodies.Count == 2, "Rejected candidate activated or sent.");
         var record = archive.ReadJournal(f.Task).Single(e => e.Kind == "context-source").Payload.Deserialize<AgentContextSourceRecord>()!;
-        Check(new ArtifactStore(f.TaskRoot).ReadText(record.Source.Id).Contains(Formula), "Failed summary lost source.");
+        var failedSource = new ArtifactStore(f.TaskRoot).ReadText(record.Source.Id);
+        using (var decoded = JsonDocument.Parse(failedSource))
+            Check(decoded.RootElement.GetProperty("Batches")[0].GetProperty("Results")[0].GetProperty("Content").GetString() == "preserved-one " + Formula, "Failed summary lost exact source content.");
         // Diagnostic continuation only in this transport test proves failed preview did not
         // mutate pending calls. Production instead stops and never automatically retries.
         await Collect(transport.ContinueAsync(ack));
@@ -279,13 +351,18 @@ internal static class H2AgentWorkCompactionTests
         do
         {
             var page = tools.Execute(new global::H2AgentLab.ToolCall("read-" + pages, H2HistoryRuntimeTools.ReadName,
-                JsonSerializer.SerializeToElement(new { handle, evidence_id = record.Source.Id, cursor })));
+                JsonSerializer.SerializeToElement(cursor is null
+                    ? new Dictionary<string, object?> { ["handle"] = handle, ["evidence_id"] = record.Source.Id }
+                    : new Dictionary<string, object?> { ["handle"] = handle, ["evidence_id"] = record.Source.Id, ["cursor"] = cursor })));
             var p = JsonNode.Parse(page.DomainPayload)!;
-            Check(p["ok"]!.GetValue<bool>() && p["evidenceMayVerifyCurrentTask"]!.GetValue<bool>() == false, "Context source became proof or failed to read.");
+            Save("history-page-" + pages, new { page.DomainPayload, page.Outcome });
+            Check(p["ok"]!.GetValue<bool>() && p["evidenceMayVerifyCurrentTask"]!.GetValue<bool>() == false, "Context source became proof or failed to read: " + page.DomainPayload);
             text.Append(p["content"]!.ToString()); cursor = p["nextCursor"]?.ToString(); pages++;
             Check(pages <= 128, "History paging is not bounded.");
         } while (!string.IsNullOrEmpty(cursor));
-        Check(text.ToString() == new ArtifactStore(f.TaskRoot).ReadText(record.Source.Id) && text.ToString().Contains(Formula), "Historical exact formula differs.");
+        Check(text.ToString() == new ArtifactStore(f.TaskRoot).ReadText(record.Source.Id), "Historical source bytes differ.");
+        using (var decoded = JsonDocument.Parse(text.ToString()))
+            Check(decoded.RootElement.GetProperty("Batches")[0].GetProperty("Results")[0].GetProperty("Content").GetString() == Formula + Poison, "Historical exact formula differs.");
         Save("history-reload", new { source, pages, sends, exactFormula = Formula, noNewRequests = wire.Bodies.Count == sends });
     }
 
@@ -315,7 +392,8 @@ internal static class H2AgentWorkCompactionTests
         {
             var records = archive.ReadJournal(task).Where(e => e.Kind == "context-compaction").Select(e => e.Payload.Deserialize<AgentContextCompactionRecord>()!).ToArray();
             var sources = archive.ReadJournal(task).Where(e => e.Kind == "context-source").ToArray();
-            Check(records.Length == (failSummary ? 0 : 10) && sources.Length == (failSummary ? 1 : 10), "Production cycles/source retention missing: " + records.Length);
+            Save("production-boundary-" + (project ? "project" : "global") + (failSummary ? "-failure" : ""), new { completed, wire.Sends, wire.Writes, records, sources = sources.Select(s => s.Payload), budgets = wire.Budgets });
+            Check(records.Length == (failSummary ? 0 : 10) && sources.Length == (failSummary ? 1 : 10), "Production cycles/source retention missing: " + records.Length + "; sends=" + wire.Sends + "; error=" + completed.Error);
             if (!failSummary)
             {
                 var anchors = JsonNode.Parse(new ArtifactStore(Path.Combine(f.Root, "tasks", task.ToString("N"))).ReadText(records[^1].Anchors.Id))!;

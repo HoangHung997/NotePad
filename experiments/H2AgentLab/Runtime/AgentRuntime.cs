@@ -319,7 +319,10 @@ public sealed class AgentRuntime : IAsyncDisposable
         RuntimeRound? previousRound = null;
         async Task<RuntimeRound> SendModelAsync(AgentTransportStartRequest? start, AgentTransportContinuationRequest? next)
         {
-            if (start is not null && request.ContextCheckpointObserver is not null)
+            // Compaction is an explicit optional transport capability. Concrete Agent transports
+            // implement it; injected/legacy transports keep their existing guarded continuation.
+            if (start is not null && request.ContextCheckpointObserver is not null
+                && _transport is IAgentContextRebaseTransport)
                 compactedTurn = _workCompaction?.CreateWorkTurn(start, request.ContextCheckpointObserver, request.ContextSourceObserver!,
                     WorkCompactionOptions, WorkSummarizer);
             var requestIndex = ++modelRequests;
