@@ -1,4 +1,5 @@
 name: AR-064 plugin provider lifecycle validation
+# Revalidate the committed publication repair; fixture success is not E3 acceptance.
 on:
   workflow_dispatch:
   push:
