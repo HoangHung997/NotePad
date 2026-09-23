@@ -17,6 +17,8 @@ using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
 using NeraSpreadSheet.Scrolling;
 
+if (args.Length == 4 && args[0] == "--ar040-process-probe")
+    return H2AgentProcessDrainTests.Probe(args[1], args[2], args[3]);
 if (args.Length == 3 && args[0] == "--ar031-crash-probe")
     return H2AgentArchiveJournalTests.Probe(args[1], args[2]);
 if (args.Length >= 2 && args[0] == "--desktop-session-probe")
@@ -701,6 +703,7 @@ H2AgentGoalRevisionTests.Run(Test);
 H2AgentArchiveJournalTests.Run(Test);
 H2AgentHistoryRetrievalTests.Run(Test);
 H2AgentCompletionTests.Run(Test);
+H2AgentProcessDrainTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);

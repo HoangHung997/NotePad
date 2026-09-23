@@ -477,24 +477,25 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-033_E2_IMPLEMENTED_NATIVE_PENDING_NEXT_AR-040",
+  "phase": "AR-040_ACTIVE_DRAIN_FOUNDATION",
   "active_task": "AR-040",
-  "implementation_status": "NOT_STARTED",
+  "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar033-consistency-2026-09-23",
+  "owner_session": "chatgpt-ar040-resume-2026-09-23",
   "last_code_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
   "last_validated_code_commit": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
   "last_validation_result": "AR033_42_PASS_X3; CONTROL_36_PASS_6_EXPECTED_FAILURES; AGENT74_PASS; FULL858_PASS; AR033_E3_PENDING",
   "capture_checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Focused checkout CLEAN; docs checkpoint verifies expected refs and non-force push. Local review is an offline source snapshot; user-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Clean CI checkout before reviewed integration; normal push verified. User-PC tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T00:03:40.847563+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T00:57:20.478969+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "AR-040 NOT_STARTED; use existing process service and journal, not a new engine."
+    "Run drain tests and all regressions on saved code; fix every failure.",
+    "Implement stable long-job start/poll/read_output/cancel/result, stdin opt-in, lifetime/no-progress bounds and journal ownership in existing services."
   ],
   "last_test_commands": [
     {
@@ -949,7 +950,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "On the existing branch and PR #3, reconcile current refs, working tree and SESSION HANDOFF. AR-033 implementation has E2 evidence but remains AWAITING_ENVIRONMENT for native E3. Start only independent AR-040 (dependencies AR-011/031 accepted): extend the existing process service with stable job IDs, bounded poll/output/cancel and actual owned-process tests RC-19/20/21; do not add a second engine/store or replay uncertain writes. Keep AR-033/020 native gates and AR-083 deferred; retain AR-033/032/031/030/020/012/011/010/001 regression.",
+  "next_exact_action": "Continue only AR-040 on existing branch/PR #3. Inspect this integration and full CI, repair actual failures, then complete long-job APIs in existing process service. Do not mark DONE for drain foundation alone. AR-020/033 E3 pending; AR-083 deferred.",
   "next_task_if_active_done": "Re-evaluate dependency readiness in tracker; do not bypass AR-041 native gates.",
   "last_runtime_source_commit": "84acbc456026ace4f20d435aed294d7b5099b2c7",
   "previous_saved_checkpoint_commit": "87f7dd17b918f138bd9cac98fc60157e0ccc942b",
@@ -1024,7 +1025,8 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     "Control harness distinguishes LF Git objects from exact CRLF checkout bytes without weakening runtime assertions."
   ],
   "last_test_commit": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
-  "last_native_acceptance": "AR-033/020 E3 AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER"
+  "last_native_acceptance": "AR-033/020 E3 AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER",
+  "foundation_source_parent": "53c829b3c96f38c9e27a06e396d377fd9aed2743"
 }
 ```
 

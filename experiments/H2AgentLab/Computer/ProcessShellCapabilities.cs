@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace H2AgentLab.Computer;
 
@@ -26,7 +25,16 @@ public sealed record BoundedProcessResult(
     string Stdout,
     string Stderr,
     bool TimedOut,
-    TimeSpan Duration);
+    TimeSpan Duration)
+{
+    // These describe retained output / the associated process only, not goal verification.
+    public bool StdoutTruncated { get; init; }
+    public bool StderrTruncated { get; init; }
+    public bool OutputComplete { get; init; }
+    public bool StreamsDrained { get; init; }
+    public bool RootProcessExited { get; init; }
+    public string? CleanupIssue { get; init; }
+}
 
 public sealed class ProcessShellCapabilities : IDisposable
 {
@@ -156,52 +164,32 @@ public sealed class ProcessShellCapabilities : IDisposable
         if (!_policy.AllowStart)
             throw new UnauthorizedAccessException("shell.run_bounded is not allowed by current policy.");
 
+        ArgumentNullException.ThrowIfNull(arguments);
+        var argumentSnapshot = arguments.ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        var duration = ValidateTimeout(timeout); // Reject invalid input before dispatch.
         var normalized = ValidateExecutable(executable);
         var working = _workspace.Resolve(workingDirectory, directory: true);
-        var start = BuildStart(normalized, arguments, working);
+        var start = BuildStart(normalized, argumentSnapshot, working);
         start.RedirectStandardOutput = true;
         start.RedirectStandardError = true;
-
-        using var process = Process.Start(start)
-            ?? throw new IOException("Failed to start bounded process.");
-        var timer = Stopwatch.StartNew();
-        var stdoutTask = ReadBoundedAsync(process.StandardOutput, _policy.MaxOutputCharacters, cancellationToken);
-        var stderrTask = ReadBoundedAsync(process.StandardError, _policy.MaxOutputCharacters, cancellationToken);
-
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(ValidateTimeout(timeout));
-        var timedOut = false;
-        try
+        start.RedirectStandardInput = true;
+        var executionId = "proc-" + Guid.NewGuid().ToString("N");
+        var observed = await BoundedProcessExecution.RunAsync(start, duration,
+            _policy.MaxOutputCharacters, cancellationToken).ConfigureAwait(false);
+        return new BoundedProcessResult(executionId, normalized, argumentSnapshot,
+            observed.TimedOut ? -1 : observed.ExitCode ?? -1,
+            observed.Stdout + (observed.StdoutTruncated ? "\n[truncated]" : ""),
+            observed.Stderr + (observed.StderrTruncated ? "\n[truncated]" : ""),
+            observed.TimedOut, observed.Duration)
         {
-            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            timedOut = true;
-            try
-            {
-                if (!process.HasExited)
-                    process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-            }
-            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-
-        timer.Stop();
-        var stdout = await stdoutTask.ConfigureAwait(false);
-        var stderr = await stderrTask.ConfigureAwait(false);
-
-        return new BoundedProcessResult(
-            "proc-" + Guid.NewGuid().ToString("N"),
-            normalized,
-            arguments.ToArray(),
-            timedOut ? -1 : process.ExitCode,
-            stdout,
-            stderr,
-            timedOut,
-            timer.Elapsed);
+            StdoutTruncated = observed.StdoutTruncated,
+            StderrTruncated = observed.StderrTruncated,
+            OutputComplete = observed.OutputComplete,
+            StreamsDrained = observed.StreamsDrained,
+            RootProcessExited = observed.RootProcessExited,
+            CleanupIssue = observed.CleanupIssue
+        };
     }
 
     public Task<BoundedProcessResult> RunBuildAsync(
@@ -321,28 +309,6 @@ public sealed class ProcessShellCapabilities : IDisposable
         if (value <= TimeSpan.Zero || value > TimeSpan.FromMinutes(10))
             throw new ArgumentOutOfRangeException(nameof(timeout));
         return value;
-    }
-
-    private static async Task<string> ReadBoundedAsync(
-        StreamReader reader,
-        int maxCharacters,
-        CancellationToken cancellationToken)
-    {
-        var builder = new StringBuilder(Math.Min(maxCharacters, 8_192));
-        var buffer = new char[4_096];
-        while (builder.Length < maxCharacters)
-        {
-            var remaining = Math.Min(buffer.Length, maxCharacters - builder.Length);
-            var count = await reader.ReadAsync(
-                buffer.AsMemory(0, remaining),
-                cancellationToken).ConfigureAwait(false);
-            if (count == 0) break;
-            builder.Append(buffer, 0, count);
-        }
-
-        if (!reader.EndOfStream)
-            builder.Append((char)10).Append("[truncated]");
-        return builder.ToString();
     }
 
     private static bool SafeHasExited(Process process)

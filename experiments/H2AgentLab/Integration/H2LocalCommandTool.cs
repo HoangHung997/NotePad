@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using H2AgentLab.Tools;
 using H2AgentLab.Runtime;
+using H2AgentLab.Computer;
 
 namespace H2AgentLab.Integration;
 
@@ -61,36 +62,21 @@ internal sealed class H2LocalCommandTool : IAgentRuntimeDomainVerifier
             start.ArgumentList.Add(argument);
         foreach (var secret in new[] { "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "AZURE_OPENAI_API_KEY" })
             start.Environment.Remove(secret);
-        ct.ThrowIfCancellationRequested();
-        using var process = Process.Start(start) ?? throw new IOException("Could not start PowerShell.");
-        process.StandardInput.Close();
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(TimeSpan.FromSeconds(seconds));
-        var stdout = DrainAsync(process.StandardOutput, deadline.Token); var stderr = DrainAsync(process.StandardError, deadline.Token);
-        var timedOut = false;
-        try
-        {
-            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
-            await Task.WhenAll(stdout, stderr).WaitAsync(deadline.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            timedOut = !ct.IsCancellationRequested;
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        // Continue draining after the output cap to avoid blocking a chatty child on a full pipe.
-        var output = await stdout.ConfigureAwait(false); var error = await stderr.ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
-        var passed = !timedOut && process.ExitCode == 0;
+        var observed = await BoundedProcessExecution.RunAsync(start,
+            TimeSpan.FromSeconds(seconds), 32_000, ct).ConfigureAwait(false);
+        var timedOut = observed.TimedOut;
+        var passed = !timedOut && observed.RootProcessExited && observed.StreamsDrained
+            && observed.ExitCode == 0;
         var retry = H2ProductionToolSession.Arg(call, "retry_of");
         var recovered = passed && retry is not null && _failedDirectories.TryGetValue(retry, out var failedDirectory)
             && string.Equals(directory, failedDirectory, StringComparison.OrdinalIgnoreCase);
         if (!passed) _failedDirectories[call.Id] = directory;
         var result = JsonSerializer.Serialize(new { ok = passed,
             failureId = passed ? null : call.Id, resolvedFailureIds = recovered ? new[] { retry } : Array.Empty<string>(),
-            exit_code = process.ExitCode, timed_out = timedOut, stdout = output.Text, stderr = error.Text,
-            truncated = output.Truncated || error.Truncated,
+            exit_code = observed.ExitCode, timed_out = timedOut, stdout = observed.Stdout, stderr = observed.Stderr,
+            truncated = observed.StdoutTruncated || observed.StderrTruncated,
+            output_complete = observed.OutputComplete, streams_drained = observed.StreamsDrained,
+            root_process_exited = observed.RootProcessExited, cleanup_issue = observed.CleanupIssue,
             verification_scope = "process exit only; inspect files/application state to verify the requested outcome",
             next = passed ? "Verify the requested output and preservation."
                 : timedOut ? "Read actual effects before any further write. The deadline does not prove no changes occurred; do not repeat the command."
@@ -99,20 +85,4 @@ internal sealed class H2LocalCommandTool : IAgentRuntimeDomainVerifier
         return result;
     }
 
-    private static async Task<(string Text, bool Truncated)> DrainAsync(StreamReader reader, CancellationToken ct)
-    {
-        var text = new StringBuilder(); var buffer = new char[4096]; var truncated = false;
-        int count;
-        try
-        {
-            while ((count = await reader.ReadAsync(buffer.AsMemory(), ct).ConfigureAwait(false)) > 0)
-            {
-                var keep = Math.Min(count, 32000 - text.Length);
-                if (keep > 0) text.Append(buffer, 0, keep);
-                if (keep < count) truncated = true;
-            }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { truncated = true; }
-        return (text.ToString(), truncated);
-    }
 }
