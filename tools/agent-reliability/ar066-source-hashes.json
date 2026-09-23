@@ -1,0 +1,10 @@
+[
+  {"path":"experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs","before":"15f3c497db71c565850bd0888d5a4fe5f38a3f2490ba4cb3d9afee58a1135a1b","after":"ef2a7909c1ee3744bddfe7e43cba5141cebda656235eb6ea5392d91c73bd57d5"},
+  {"path":"experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs","before":"62b0846b2683da6300c5327f57d31ac6b50617f054e8ab7283fa979411eab659","after":"28c4b223b89aba722bb4ad0960c719ef565b4c8862c2668822832a4a78761108"},
+  {"path":"experiments/H2AgentLab/Integration/H2ProductionToolSession.cs","before":"0267b7c74d6ed017e1a9bd9f39370e8359a15ce2a3f4a0e14ed9369d5b36e6d4","after":"b0652546d214f290949409e459354c3b96bcdaec7db5f590aa1aa6ba2cac7942"},
+  {"path":"experiments/H2AgentLab/Tools/ToolOutcome.cs","before":"8f0a80908975c51470172561bea0bcda6f1121f66b3075b3f9821a50bb5cb395","after":"c7d2c8b9d0fc3a2b88e1bdf16c8c69117b26e5db81a730d78f55c4ecf9423e74"},
+  {"path":"experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs","before":"59067a3cb14fef519eb14a2423fb9a6debff01879be9fc51a8bf0fd7d222ad56","after":"79ed29cc9ecf6aa62c51f0511335a20050d3b2f4a87f39c626f782da0a6fe773"},
+  {"path":"src/H2Notes.Core/H2AgentLiveResourceRequirement.cs","before":"7a19d629a68bb50e3b41a458f83421e3723e23504531d8fa2948b5d9fda9e934","after":"21dca1efe3eb254f77f25687bf85816f6a074556f6015b7ed62c8a1a24349e94"},
+  {"path":"tests/H2Notes.Tests/H2AgentLiveResourceTests.cs","before":"06d2aa6f88a67612935f8afc50418ba5a5061626dc77c2f8ad098d526ed333b6","after":"04231859158c2708ed9e3404d486b08f718597c878734ed0ba1414c2d7e0c56f"},
+  {"path":"tests/H2Notes.Tests/H2AgentSteeringWireTests.cs","before":"ea2dba40f109ceb793c0edfd541ea39088fadc4ca3ce9abd3d1260d544c04ec0","after":"8bd06f71cd3c8e6fbee65285a0821d266a80f11779ee5b18036febc4f04026e4"}
+]

@@ -1,0 +1,108 @@
+--- a/experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs
++++ b/experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs
+@@ -386,7 +386,7 @@
+                 resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
+                     resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history,
+                 () => { lock (live.Gate) return live.GoalState?.RevisionId ?? throw new InvalidOperationException("Goal revision unavailable."); },
+-                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job));
++                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job), live.Goal);
+             using var tools = new global::H2AgentLab.AgentTools(
+                 safeWorkspace,
+                 taskStateRoot,
+@@ -416,6 +416,7 @@
+                 CurrentState: history.MinimumContext(contract.Goals?.RevisionId) + "Host-selected workspace: " + live.WorkspaceRoot
+                     + (fullAccess ? "\nFull access grants execution permission, NOT automatic target selection. File tools still require this workspace or an exact host-listed external target. exec_command runs PowerShell without a workspace/network sandbox; it is not a way around a denied target. Never claim success without checking results.\n"
+                         : "\nFile tools accept relative workspace paths, plus exact host-listed external targets.\n")
++                    + toolSession.LiveResourceInstruction
+                     + "\nTask targets: " + JsonSerializer.Serialize(live.RequestContext?.TargetPaths ?? [])
+                     + "\nSelected attachments (read with read_attachment using the exact attachment_id): "
+                     + JsonSerializer.Serialize((live.RequestContext?.Attachments ?? []).Select(a => new {
+--- a/experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs
++++ b/experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs
+@@ -23,6 +23,8 @@
+             var cad = new H2AutoCadFileTools(cadExecutable, tools.Workspace, tools.StateRoot); cad.Register(registry); verifiers.Add(cad);
+         }
+ 
++        registry.RegisterCapabilityNotice(new("autocad.live_drawing", "No live AutoCAD drawing/SelectionSet provider is composed here. Core Console operates on disk files, not the current unsaved drawing.", new(ToolReadinessState.Unsupported, "live_resource_required")));
++        registry.RegisterCapabilityNotice(new("browser.live_tab", "No existing live browser tab/session is bound. HTTP fetch is a separate public disk/network snapshot, not the logged-in current tab.", new(ToolReadinessState.NeedsConfiguration, "live_resource_required")));
+         registry.RegisterCapabilityNotice(new("web.search", "Web search requires a configured search backend; fetch accepts an explicit URL.", new(ToolReadinessState.NeedsConfiguration)));
+         registry.RegisterCapabilityNotice(new("web.open_browser", "Interactive browser automation requires a configured browser backend; fetch is not browser control.", new(ToolReadinessState.NeedsConfiguration)));
+         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
+--- a/experiments/H2AgentLab/Integration/H2ProductionToolSession.cs
++++ b/experiments/H2AgentLab/Integration/H2ProductionToolSession.cs
+@@ -40,8 +40,9 @@
+         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+         Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
+         Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
+-        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null)
+-    {
++        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null)
++    {
++        _liveRequirement = H2AgentLiveResourceRequirement.FromUserRequest(userGoal, context?.ActiveWorkContext, context?.TargetIntent);
+         _jobRevision = jobRevision; _ownerCancellation = ownerCancellation; _jobObserved = jobObserved;
+         _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
+         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
+@@ -166,6 +167,8 @@
+         var key = ResourceKey(descriptor, call);
+         if (_scope?.Mode == H2AgentPermissionMode.FullAccess && !_scope.HasFullAccessAt(DateTime.UtcNow))
+             return AgentRuntimePermissionDecision.Deny("expired_permission", "Quyền toàn máy đã hết hạn; chọn lại quyền và gửi yêu cầu mới.", key);
++        var semantics = CheckResourceSemantics(descriptor, call, key);
++        if (semantics is not null) return semantics;
+         var grounding = CheckFileGrounding(descriptor, call, key);
+         if (grounding is not null) return grounding;
+         if (!descriptor.IsMutating) return AgentRuntimePermissionDecision.Allow(key);
+--- a/experiments/H2AgentLab/Tools/ToolOutcome.cs
++++ b/experiments/H2AgentLab/Tools/ToolOutcome.cs
+@@ -345,7 +345,7 @@
+         "session_not_found" => "stale_resource",
+         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
+         "timeout" => "deadline_exceeded", "validation_failed" => "verification_failed",
+-        "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
++        "live_resource_required" or "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
+             or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
+             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"
+             or "deadline_exceeded" or "rate_limited" or "partial_result" or "verification_failed"
+@@ -363,6 +363,7 @@
+             "resource_not_found" => "The selected resource could not be found; observe exact resources again.",
+             "ambiguous_target" => "More than one target matches; select an exact resource.",
+             "target_not_grounded" => "The target does not match a host-selected project, linked, explicit or captured resource. Select the exact target; more permission alone does not resolve it.",
++            "live_resource_required" => "This request requires the same live application resource. A saved file, HTTP fetch or unbound command is not an equivalent source. Recover the bound live provider; changing to a disk snapshot requires a separate explicit user request. Full Access does not change source semantics.",
+             "stale_resource" => "The resource changed; read its current state before proceeding.",
+             "provider_busy" or "modal_blocked" => "The provider is busy or blocked by a modal state.",
+             "permission_denied" => "Permission is missing, expired or denied. Do not route around it.",
+--- a/experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs
++++ b/experiments/H2AgentLab.OfficeHost/OfficeWindowCatalog.cs
+@@ -99,8 +99,22 @@
+                 catch(Exception ex) when(OfficeNativeWindowProbe.IsProbeFailure(ex))
+                 { view?.Dispose(); issues.Add(new(OfficeNativeWindowProbe.FaultCode(ex),candidate.RootHandle,candidate.ProcessId)); }
+             }
++            // A transient probe failure is not evidence that a previously observed document
++            // closed. Keep its bounded owned reference ONLY for future identity comparison;
++            // never return it as a current observation or dispatch through it without re-probing.
++            // A successful absence, ambiguity or stale identity still retires the old binding.
++            bool RetainUnobserved(KeyValuePair<string, OfficeViewLease> pair)
++            {
++                if (next.ContainsKey(pair.Key) || ambiguous.Contains(pair.Key)) return false;
++                var old = pair.Value.Candidate;
++                var relevant = issues.Where(i => i.WindowHandle is null || i.WindowHandle == old.RootHandle).ToArray();
++                if (relevant.Any(i => i.Code is "stale_resource" or "ambiguous_target" or "permission_denied")) return false;
++                return !scan.Complete || relevant.Any(i => i.Code is "native_object_unavailable"
++                    or "provider_busy" or "modal_blocked" or "discovery_limit");
++            }
+             var replaced = _views.Where(p=>p.Value.Candidate.Application==application
+-                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)).ToArray();
++                && (rootHandle is null || p.Value.Candidate.RootHandle==rootHandle)
++                && !RetainUnobserved(p)).ToArray();
+             // A targeted refresh replaces only one root. Without a lifetime-wide bound,
+             // closed roots from successive captures would retain COM references forever.
+             // Reject BEFORE mutating the accepted cache; the finally block releases the
+--- a/tests/H2Notes.Tests/H2AgentSteeringWireTests.cs
++++ b/tests/H2Notes.Tests/H2AgentSteeringWireTests.cs
+@@ -10,6 +10,7 @@
+     {
+         H2AgentOpenAiWireTests.Run(test);
+         H2AgentOpenAiProductionTests.Run(test);
++        H2AgentLiveResourceTests.Run(test);
+         foreach (var kind in new[] { "ollama", "chat", "responses", "responses-stored" })
+             test("Agent steering wire preserves user role and turn identity: " + kind, () => Task.Run(async () =>
+             {
