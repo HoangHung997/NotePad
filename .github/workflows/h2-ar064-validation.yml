@@ -1,5 +1,6 @@
 name: AR-064 plugin provider lifecycle validation
 on:
+  workflow_dispatch:
   push:
     branches: [feature/h2-agent-reliability-ar-000]
     paths:
