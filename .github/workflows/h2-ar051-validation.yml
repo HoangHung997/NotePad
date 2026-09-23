@@ -1,4 +1,5 @@
 name: AR-051 source-backed work compaction validation
+# Canonical read_file fixture includes its required string offset; no assertion removed.
 on:
   push:
     branches: [feature/h2-agent-reliability-ar-000]
