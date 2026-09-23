@@ -40,9 +40,12 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
         Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
-        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null)
+        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null,
+        Func<string, string, CancellationToken, Task<SourceApprovalReply>>? approveSource = null,
+        Func<string>? sourceAuthorityStamp = null, Action<H2AgentSourceDecision>? sourceDecisionObserved = null)
     {
         _liveRequirement = H2AgentLiveResourceRequirement.FromUserRequest(userGoal, context?.ActiveWorkContext, context?.TargetIntent);
+        _approveSource = approveSource; _sourceAuthorityStamp = sourceAuthorityStamp; _sourceDecisionObserved = sourceDecisionObserved;
         _jobRevision = jobRevision; _ownerCancellation = ownerCancellation; _jobObserved = jobObserved;
         _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
@@ -66,6 +69,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         H2AttachmentRuntimeTools.Register(registry, _context);
         _history?.Register(registry);
         ConfigureDomains(tools, registry, verifiers);
+        RegisterSourceSelection(registry);
         if (tools.Desktop is null && _desktopBindingFailure is not null)
             registry.RegisterCapabilityNotice(new("desktop.bound_window", "Desktop actions require a current host-captured target; Full Access does not choose one.",
                 new(ToolReadinessState.Unavailable, _desktopBindingFailure)));
@@ -130,7 +134,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                         ? await typed.ExecuteOutcomeAsync(call, ct).ConfigureAwait(false)
                         : ToolOutcomeBridge.FromLegacy(call, descriptor,
                             await descriptor.Executor.ExecuteAsync(call, ct).ConfigureAwait(false));
-                    return ToolOutcomeBridge.Validate(output, call, descriptor);
+                    output = ToolOutcomeBridge.Validate(output, call, descriptor);
+                    ObserveSourceResult(descriptor, call, output);
+                    return output;
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex) when (ex is IOException or HttpRequestException or FormatException
@@ -139,8 +145,10 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 {
                     if (ex is H2AgentLab.Office.OfficeHostClientException { NoEffect: true } rejected)
                         return ToolOutcomeBridge.Failure(call, descriptor, rejected.Code, ToolErrorPhase.Preflight, ToolMutationEffect.None);
-                    return ToolOutcomeBridge.FromException(call, descriptor, ex,
+                    var failure = ToolOutcomeBridge.FromException(call, descriptor, ex,
                         ex is H2AgentLab.Office.OfficeHostClientException office ? office.Code : null);
+                    ObserveSourceResult(descriptor, call, failure);
+                    return failure;
                 }
                 finally { _executingAuthorizedCall.Value = false; }
             });

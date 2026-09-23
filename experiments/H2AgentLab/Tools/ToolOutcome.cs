@@ -363,7 +363,7 @@ public static class ToolOutcomeBridge
             "resource_not_found" => "The selected resource could not be found; observe exact resources again.",
             "ambiguous_target" => "More than one target matches; select an exact resource.",
             "target_not_grounded" => "The target does not match a host-selected project, linked, explicit or captured resource. Select the exact target; more permission alone does not resolve it.",
-            "live_resource_required" => "This request requires the same live application resource. A saved file, HTTP fetch or unbound command is not an equivalent source. Recover the bound live provider; changing to a disk snapshot requires a separate explicit user request. Full Access does not change source semantics.",
+            "live_resource_required" => "This request requires the same live application resource. A saved file, HTTP fetch or unbound command is not an equivalent source. Recover the bound live provider; inspect resource_sources and request_source_change for an exact, explicit user source decision. Full Access does not change source semantics.",
             "stale_resource" => "The resource changed; read its current state before proceeding.",
             "provider_busy" or "modal_blocked" => "The provider is busy or blocked by a modal state.",
             "permission_denied" => "Permission is missing, expired or denied. Do not route around it.",

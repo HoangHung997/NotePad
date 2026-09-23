@@ -22,7 +22,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     private readonly Func<IOfficeSessionClient>? _clientFactory;
     private readonly Func<H2ActiveWorkContext, bool> _captureValidator;
     private IOfficeSessionClient? _client;
-    private readonly Dictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
+    private readonly ConcurrentDictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
+    internal H2AgentResourceBinding? SelectedSource(H2ApplicationKind application)
+        => _selected.TryGetValue(application, out var selected) ? selected.Binding : null;
     private readonly Dictionary<string, H2AgentTargetResolution> _pins = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, AgentRuntimeDomainVerification> _reports = new();
     // Disposable task-local observation, not another truth store or proof of the whole goal.

@@ -42,7 +42,7 @@ internal sealed partial class H2ProductionToolSession
             // source-observation requirement; it does not award semantic/mutation verification.
             var requirement = Volatile.Read(ref session._liveRequirement);
             if (requirement.Required && boundary.UnresolvedCalls == 0 && !boundary.MutationAwaitingVerification
-                && session._liveOffice?.HasCompletedLiveObservation(requirement.ApplicationKind) != true)
+                && !session.HasRequiredSourceObservation(requirement))
                 throw new AgentVerificationRequiredException("live_resource_required: No validated observation of the required live source is available. "
                     + ToolOutcomeBridge.SafeMessage("live_resource_required"));
         }
@@ -50,12 +50,18 @@ internal sealed partial class H2ProductionToolSession
     internal string LiveResourceInstruction => !_liveRequirement.Required ? "" :
         "\nHost source requirement: LiveResource (" + _liveRequirement.ApplicationKind + "). "
         + ToolOutcomeBridge.SafeMessage("live_resource_required")
-        + " Unrelated reference files remain subject to normal grounding. Native save-copy is a new output, not a replacement input.\n";
+        + " Use resource_sources to inspect host source identity and request_source_change for an exact disk reference, output, or explicitly approved replacement. "
+        + "A source approval changes meaning only, never file permissions or unresolved effects. Native save-copy is a new output, not a replacement input.\n";
 
     private AgentRuntimePermissionDecision? CheckResourceSemantics(ToolDescriptor descriptor, ToolCall call, string key)
     {
         var requirement = Volatile.Read(ref _liveRequirement);
         if (!requirement.Required) return null;
+        // Once the user selects a disk replacement, don't silently switch that input back to live.
+        if (descriptor.Namespace.Name is "word" or "excel"
+            && HasReplacementFor(descriptor.Namespace.Name == "word" ? H2ApplicationKind.Word : H2ApplicationKind.Excel))
+            return AgentRuntimePermissionDecision.Deny("live_resource_required",
+                "This input was explicitly changed to DiskSnapshot. Start a new source decision before returning to live state.", key);
         AgentRuntimePermissionDecision Deny() => AgentRuntimePermissionDecision.Deny("live_resource_required",
             ToolOutcomeBridge.SafeMessage("live_resource_required"), key);
         // An unrestricted process has no target/provenance contract. Full Access is permission,
@@ -79,7 +85,7 @@ internal sealed partial class H2ProductionToolSession
             paths.Add(destination);
         foreach (var path in paths)
             if (H2AgentTargetScope.TryNormalize(path, out var canonical, _fileTargets.Root)
-                && requirement.RejectsDiskPath(canonical)) return Deny();
+                && requirement.RejectsDiskPath(canonical) && !AllowsSelectedDisk(descriptor, call, canonical)) return Deny();
         return null; // Existing target, schema, permission and effect guards still run.
     }
 }

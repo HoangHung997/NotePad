@@ -386,7 +386,16 @@ public sealed partial class H2ProductionAgentAdapter :
                 resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
                     resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history,
                 () => { lock (live.Gate) return live.GoalState?.RevisionId ?? throw new InvalidOperationException("Goal revision unavailable."); },
-                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job), live.Goal);
+                live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job), live.Goal,
+                async (title, details, ct) =>
+                {
+                    var id = Guid.Empty;
+                    var accepted = await RequestApprovalAsync(live, title, details, ct, value => id = value).ConfigureAwait(false);
+                    return new H2ProductionToolSession.SourceApprovalReply(id, accepted);
+                },
+                () => { lock (live.Gate) return (live.GoalState?.RevisionId ?? "not-ready") + ":" + live.SupplementalIds.Count; },
+                decision => { lock (live.Gate) AddProgressLocked(live, "source", "source-decision",
+                    $"{decision.Role}: {decision.ReasonCode} · {decision.DiskPath}", sourceDecision: decision); });
             using var tools = new global::H2AgentLab.AgentTools(
                 safeWorkspace,
                 taskStateRoot,
@@ -617,7 +626,8 @@ public sealed partial class H2ProductionAgentAdapter :
         LiveTask live,
         string title,
         string details,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<Guid>? approvalCreated = null)
     {
         TaskCompletionSource<bool> completion;
         lock (live.Gate)
@@ -631,6 +641,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 Bound(details, 8_000),
                 DateTime.UtcNow);
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            approvalCreated?.Invoke(approval.ApprovalId);
             live.PendingApproval = approval;
             live.ApprovalCompletion = completion;
             live.Status = H2AgentTaskStatus.WaitingForApproval;
@@ -749,10 +760,11 @@ public sealed partial class H2ProductionAgentAdapter :
         string kind,
         string code,
         string message,
-        H2AgentToolOutcome? outcome = null, H2AgentTargetResolution? targetBinding = null)
+        H2AgentToolOutcome? outcome = null, H2AgentTargetResolution? targetBinding = null,
+        H2AgentSourceDecision? sourceDecision = null)
     {
         var progress = new H2AgentProgress(live.Progress.Count, DateTime.UtcNow,
-            BoundCode(kind), BoundCode(code), Bound(message, 2_000)) { ToolOutcome = outcome, TargetBinding = targetBinding };
+            BoundCode(kind), BoundCode(code), Bound(message, 2_000)) { ToolOutcome = outcome, TargetBinding = targetBinding, SourceDecision = sourceDecision };
         try { PersistProgress(live.TaskId, progress); }
         catch
         {

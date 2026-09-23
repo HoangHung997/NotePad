@@ -188,6 +188,7 @@ public sealed record H2AgentProgress(
 {
     public H2AgentToolOutcome? ToolOutcome { get; init; }
     public H2AgentTargetResolution? TargetBinding { get; init; }
+    public H2AgentSourceDecision? SourceDecision { get; init; }
 }
 
 public sealed record H2AgentApproval(
