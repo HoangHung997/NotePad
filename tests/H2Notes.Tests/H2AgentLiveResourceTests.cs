@@ -135,7 +135,7 @@ internal static class H2AgentLiveResourceTests
         if (notice) calls.Add(Search(mode == "browser-notice" ? "browser.live_tab" : "autocad.live_drawing"));
         else
         {
-            var name = mode switch { "write" => "write_file", "python" => "run_python", "command" => "exec_command", _ => "read_file" };
+            var name = mode switch { "write" => "write_text", "python" => "run_python", "command" => "exec_command", _ => "read_file" };
             calls.Add(Search(name));
             object arguments = mode switch
             {
