@@ -98,7 +98,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | NOT_STARTED |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
-| AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | ACTIVE / PARTIAL |
+| AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | NOT_STARTED — CRITICAL |
 | AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | NOT_STARTED — CRITICAL |
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
@@ -498,31 +498,37 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-064_TYPED_OUTCOME_VALIDATION_PENDING",
-  "active_task": "AR-064",
-  "implementation_status": "ACTIVE / PARTIAL",
+  "phase": "AR-064_PARTIAL_E2_CHECKPOINT_CRITICAL_AR-065_NEXT",
+  "active_task": "AR-065",
+  "implementation_status": "NOT_STARTED",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar064-typed-outcome-2026-09-23",
-  "last_code_commit": "Resolve delivery commit via git log -1 -- experiments/H2AgentLab/Plugins/PluginManager.Lifecycle.cs",
-  "last_validated_code_commit": "1aef7d3386ea22ae1f8dd30e6ff1ad4948a6016e",
-  "last_validation_result": "BASE ONLY: AR064 49/49 x3; CHAT10 x3; retained AR and Agent74 pass. New typed outcome repair NOT_RUN.",
-  "capture_checked_head": "2a51cd6da53f5be3fcbf5f9d4b9ef43f74219634",
+  "last_code_commit": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+  "last_validated_code_commit": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+  "last_validation_result": "AR064_TYPED26_AND_TOTAL75_PASS_X3; OLD_WRAPPER_7_EXPECTED_FAILURES; CHAT10_X3; RETAINED_AR_PASS; AGENT74_PASS; FULL1077_PASS; AR064_NOT_DONE",
+  "capture_checked_head": "c0f986074b8d21e17f109a15eaf0936bc48c68e9",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Isolated source delivery with exact preimages; user-PC working tree NOT_ACCESSIBLE.",
+  "working_tree": "Exact CI checkout CLEAN; docs checkpoint normal-pushes only three reviewed documents. User-PC working tree NOT_ACCESSIBLE.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T13:05:56.540561+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T13:33:10.556196+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Validate integrated typed wrapper, quarantine fallback and 26 new tests; old-wrapper control then AR064/chat/retained AR/Agent74/full CI.",
-    "Complete product-used lifecycle, task version pin/journal and real trusted package RC-28 E3; not DONE."
+    "AR-065 NOT_STARTED. Investigate and repair the exact user-reported OpenAI Agent HTTP400 path per critical issue document; retain actual provider E4 gate."
   ],
   "last_test_commands": [
     {
-      "command": "Windows build + AR-064 / chat / retained AR / independent Agent suites + full CI",
-      "sha": "ebb3fab416d921bcbf47058f1db2018349f26f20",
-      "result": "NOT_RUN"
+      "command": "AR064 old-wrapper control, current AR064 x3, Agent chat x3, every retained AR and Agent suites",
+      "sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+      "run_id": 35864935194,
+      "result": "Old source 0/7 expected failures; current75/75 x3, chat10/10 x3; retained pass; Agent74/74"
+    },
+    {
+      "command": "Avalonia CI incl build, all H2 tests, native Windows publish and packaged helper IPC",
+      "sha": "f1eb0d19e80b535b25574a6c95a72cbec3255ea0",
+      "run_id": 35864940427,
+      "result": "1077/0; all mandatory steps success; test merge, not main merge"
     }
   ],
   "ci_runs": [
@@ -974,6 +980,26 @@ Do not claim these defects were already covered by historical Office/transport/U
       "h2_tests": "1002/1002",
       "publish_and_helper_ipc": "SUCCESS",
       "build_warnings": 38
+    },
+    {
+      "run_id": 35864935194,
+      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+      "result": "SUCCESS",
+      "owner": "AR-064 typed outcome checkpoint",
+      "artifact": {
+        "id": 10751613347,
+        "name": "AR064-Lifecycle-Evidence",
+        "size_in_bytes": 3024593,
+        "digest": "sha256:51c4309607c63130acc99d5ef73b0e62dd24e80cd7fbae64ac514e2a14eba5ba"
+      }
+    },
+    {
+      "run_id": 35864940427,
+      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+      "actual_checkout": "f1eb0d19e80b535b25574a6c95a72cbec3255ea0",
+      "result": "SUCCESS",
+      "h2_passed": 1077,
+      "h2_failed": 0
     }
   ],
   "evidence_locations": [
@@ -1074,7 +1100,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [],
-  "next_exact_action": "Run validation workflow on the committed typed repair, inspect exact-SHA results and fix failures. Retain native debts and critical AR065-069 priority after the AR064 checkpoint.",
+  "next_exact_action": "Reconcile refs, working tree and this saved checkpoint; start only AR-065 from docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md, verify official provider wire constraints and actual serializers, reproduce the defect, repair and run bounded E2 tests. Use only already configured/authorized provider for E4; otherwise AWAITING_ENVIRONMENT. Do not reapply integrated AR064 patches. Follow AR066, AR067, AR068, AR069 critical sequence before ordinary roadmap; AR064 remains partial, AR020/033 E3 and AR051 E4 open, AR083 DEFERRED_BY_USER.",
   "next_task_if_active_done": "AR-065 — CRITICAL: reproduce and repair OpenAI/Luna Agent HTTP 400; then AR-066/067/068 and AR-069 gate",
   "last_runtime_source_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
   "previous_saved_checkpoint_commit": "c6432a216326890b30cb6aba14196e6aedbf0b59",
@@ -1162,7 +1188,17 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "last_test_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
   "last_native_acceptance": "AR-033/020 E3 AWAITING_ENVIRONMENT; E4 NOT_RUN; AR-083 DEFERRED_BY_USER",
-  "foundation_source_parent": "f939cc510c29e655775f973bfb5030758d49ba44"
+  "foundation_source_parent": "f939cc510c29e655775f973bfb5030758d49ba44",
+  "parked_ar064": {
+    "implementation": "PARTIAL",
+    "acceptance": "E1/E2_PASS_FOR_INTEGRATED_FOUNDATION_ONLY; E3_NOT_RUN; NOT_DONE",
+    "reason": "Critical user report explicitly requires saving the current AR064 checkpoint before AR065-069. Not a waiver or completion.",
+    "remaining": [
+      "Product-used PluginManager/ProviderManager lifecycle management and task-version pin/journal composition.",
+      "RC28 trusted concrete package/provider tool execution in production; skill-only/tool-only/provider package refresh and uninstall evidence.",
+      "Full AR064 acceptance after critical repairs; fixture resolver evidence cannot close E3."
+    ]
+  }
 }
 ```
 
