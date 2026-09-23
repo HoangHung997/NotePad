@@ -1,0 +1,28 @@
+name: AR-065 transfer integrity check
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar065-transfer-check.yml]
+permissions:
+  contents: read
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AR065-Transfer-Receipt
+          path: tools/agent-reliability/ar065-delivery.b64
+          retention-days: 3
+      - name: Check reviewed payload checksum without executing or writing source
+        shell: python
+        run: |
+          import base64,hashlib,pathlib,zlib
+          raw=pathlib.Path('tools/agent-reliability/ar065-delivery.b64').read_text()
+          data=zlib.decompress(base64.b64decode(raw))
+          assert hashlib.sha256(data).hexdigest()=='9dbf71007c145778bff9136687de910c1512baebe082ea8b54d278017c90014f', 'Transfer integrity mismatch; source was not changed'
+          print('Verified reviewed payload checksum; no source mutation.')
