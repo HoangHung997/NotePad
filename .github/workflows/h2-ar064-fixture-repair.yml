@@ -1,0 +1,62 @@
+name: AR-064 reviewed asynchronous fixture repair
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar064-fixture-repair.yml]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/h2-agent-reliability-ar-000
+          fetch-depth: 0
+      - name: Apply exact reviewed fixture-only repair and normal push
+        shell: python
+        run: |
+          import hashlib,pathlib,subprocess,textwrap
+          def git(*a): return subprocess.check_output(['git',*a],text=True).strip()
+          head=git('rev-parse','HEAD')
+          assert git('rev-parse','HEAD^')=='730203eb05c65c7b66fc7088068e6d8c934f979f'
+          assert not git('status','--porcelain')
+          paths=['tests/H2Notes.Tests/H2AgentChatSurfaceTests.cs','tests/H2Notes.Tests/H2AgentPluginLifecycleTests.cs']
+          before=['57331f06db7bf8431ca97ecf75785ba8fd16fdc27c79b0e46c20c9eee46779e7','fd55058c5808d291e71c8b4e3884b31ef5ad94011d5bc06b68587395ba9aadf9']
+          after=['0019256781c3caec40f63da6fddb7adfd2ab67bac69c7f6e0a2c39284e3abedf','8fde48476cc68da85e867017f1420228275070f80b83fc048586331ead0cd6b3']
+          texts=[]
+          for path,sha in zip(paths,before):
+              raw=subprocess.check_output(['git','show','HEAD:'+path]);assert hashlib.sha256(raw).hexdigest()==sha
+              texts.append(raw.decode('utf-8'))
+          old='    private static void WithRoot(Func<string, Task> action)\n        => WithRoot(root => { action(root).GetAwaiter().GetResult(); });'
+          new='''    private static void WithRoot(Func<string, Task> action)
+              {
+                  var root = Path.Combine(Path.GetTempPath(), "h2-chat-surface-" + Guid.NewGuid().ToString("N"));
+                  Directory.CreateDirectory(root);
+                  // These three fixtures exercise only the production adapter, not controls. Do not
+                  // block Avalonia's synchronization context on an await-using continuation.
+                  var execution = Task.Run(() => action(root));
+                  try { execution.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult(); }
+                  finally
+                  {
+                      // A timeout is not a quiescence barrier. Keep evidence rather than masking the
+                      // primary timeout by deleting a directory whose writer may still be live.
+                      if (execution.IsCompleted) Directory.Delete(root, true);
+                  }
+              }'''
+          new='\n'.join([new.splitlines()[0]]+[line[10:] for line in new.splitlines()[1:]])
+          assert texts[0].count(old)==1;texts[0]=texts[0].replace(old,new)
+          for old in ['await Task.Delay(Timeout.Infinite, ct);','await LoadRelease.Task.WaitAsync(ct);','await ExecuteRelease.Task.WaitAsync(ct);']:
+              assert texts[1].count(old)==1;texts[1]=texts[1].replace(old,old[:-1]+'.ConfigureAwait(false);')
+          for path,text,sha in zip(paths,texts,after):
+              raw=text.encode('utf-8');assert hashlib.sha256(raw).hexdigest()==sha,(path,'Unexpected repair bytes')
+          for path,text in zip(paths,texts): pathlib.Path(path).write_bytes(text.encode('utf-8'))
+          subprocess.run(['git','add',*paths],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          assert set(git('diff','--cached','--name-only').splitlines())==set(paths)
+          subprocess.run(['git','config','user.name','github-actions[bot]'],check=True)
+          subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'],check=True)
+          subprocess.run(['git','commit','-m','test(AR-064): await fixture disposal outside UI context and avoid captured-context provider waits'],check=True)
+          assert git('ls-remote','origin','refs/heads/feature/h2-agent-reliability-ar-000').split()[0]==head
+          subprocess.run(['git','push','origin','HEAD:refs/heads/feature/h2-agent-reliability-ar-000'],check=True)
