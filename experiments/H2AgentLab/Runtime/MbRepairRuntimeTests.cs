@@ -356,7 +356,8 @@ public static class MbRepairRuntimeTests
             }
             if (_continuations == 2)
             {
-                Check(!request.ToolResults.Single().IsError, "Corrected AR-067 call still failed.");
+                if (request.ToolResults.Single().IsError)
+                    throw new InvalidOperationException("Corrected AR-067 call still failed.");
                 yield return AgentTransportEvent.TextDeltaEvent("recovered-after-corrected-input");
                 await Task.Yield();
                 yield return AgentTransportEvent.Complete("ar067", "stop");
@@ -394,9 +395,9 @@ public static class MbRepairRuntimeTests
             _continuations++;
             if (_continuations == 1)
             {
-                Check(request.ToolResults.Single().IsError
-                    && request.ToolResults.Single().Outcome?.Error?.Code == "permission_denied",
-                    "Permission failure did not return to the Agent.");
+                if (!request.ToolResults.Single().IsError
+                    || request.ToolResults.Single().Outcome?.Error?.Code != "permission_denied")
+                    throw new InvalidOperationException("Permission failure did not return to the Agent.");
                 yield return AgentTransportEvent.TextDeltaEvent("I need authoritative recovery state.");
                 yield return AgentTransportEvent.Complete("ar067", "stop");
                 yield break;
