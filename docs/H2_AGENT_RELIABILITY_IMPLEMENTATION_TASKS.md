@@ -508,11 +508,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
   "last_validated_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
   "last_validation_result": "AR066134_PASS_X3; NEW_CONSENT58; FULL1266_PASS; AGENT74_PASS; CONSENT232_AND_TOTAL432_E2_RECEIPTS; ALL_EXACT_SHA_CI_PASS; NATIVE_E3_E4_AWAITING; NOT_DONE",
-  "capture_checked_head": "467be48e3c1f9d73db92e7de6b98908bf866fe60",
+  "capture_checked_head": "3cb65cbf9d889f33583688e920ce20e0de51351a",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Validated runtime/test code remains 17af5676bcfb397441a4a8aae264c6088a5701e1. HEAD 467be48e3c1f9d73db92e7de6b98908bf866fe60 differs from that code only by AR-066 documentation/tracker changes. User-PC working tree NOT_ACCESSIBLE. All ten pull_request workflows on 467be completed SUCCESS, including full Avalonia publish/helper IPC.",
+  "working_tree": "Validated runtime/test code remains 17af5676bcfb397441a4a8aae264c6088a5701e1. HEAD 3cb65cbf9d889f33583688e920ce20e0de51351a differs from that code only by AR-066 documentation/tracker changes. User-PC working tree NOT_ACCESSIBLE. All ten pull_request workflows on 3cb65cb completed SUCCESS, including full Avalonia publish/helper IPC.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T20:12:00+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T20:28:00+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
     "Execute authorized real native E3 and real H2/model/UI E4 corpus including source-approval rendering and live/disk differing content. No real environment available in this session.",
@@ -1217,7 +1217,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_runtime_source_commit": "4c6a96ee39116c431dcd7d69a620c6c4f5bb94e2",
   "previous_saved_checkpoint_commit": "3b3a2f31c7e353faef6187c194f0eeb4d6eee296",
   "finalization_checked_head": "7df767dc1b50d24e97e5906be457cde90a216d10",
-  "additional_ci_after_recorded_run": "Docs-only HEAD 467be48e3c1f9d73db92e7de6b98908bf866fe60 independently inspected: all ten associated pull_request workflows SUCCESS. Avalonia CI 35912683826 / job 107356221014 SUCCESS with full H2/Agent gates, Windows publish and packaged helper IPC; artifacts 10774835931 (portable, 110223407 bytes, sha256 af5f046e...) and 10774306811 (NAS probe, 39410410 bytes, sha256 9278319a...). This does not upgrade native E3/E4.",
+  "additional_ci_after_recorded_run": "Docs-only HEAD 3cb65cbf9d889f33583688e920ce20e0de51351a independently inspected: all ten associated pull_request workflows SUCCESS. Avalonia CI 35914444213 / job 107362241166 SUCCESS with full H2/Agent/MB gates, Windows publish and packaged helper IPC; portable artifact 10774913357 (110223348 bytes, sha256 142d7f9263a44779aa6560bfefe8aad89aefdc38ca3f0a6429b3123e3b07f26b) and NAS probe artifact 10774149933 (39410384 bytes, sha256 7bba71c0f49262bd5af6e613f635c4e90c26b66dd22bdc804319b4b4c69c8343). This does not upgrade native E3/E4.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
     "B01 skill-name drift",
