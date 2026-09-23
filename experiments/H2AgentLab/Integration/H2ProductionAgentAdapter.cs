@@ -452,6 +452,11 @@ public sealed partial class H2ProductionAgentAdapter :
                 },
                 ContractObserver: current =>
                 {
+                    // Only the existing trusted user-input boundary creates goal revisions.
+                    // Scan the bounded complete source sequence, not merely the last item in a
+                    // queued batch: later ordinary text cannot hide an earlier live requirement.
+                    foreach (var revision in current.Goals!.Revisions)
+                        toolSession.ObserveUserSourceRevision(revision.SourceText);
                     lock (live.Gate)
                     {
                         var previousRevision = live.GoalState?.RevisionId;
