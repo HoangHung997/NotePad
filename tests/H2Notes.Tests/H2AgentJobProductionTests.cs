@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using H2AgentLab;
+using H2AgentLab.Tools;
 using H2AgentLab.Integration;
 using H2AgentLab.Metrics;
 using H2AgentLab.Session;
@@ -16,6 +18,24 @@ internal static class H2AgentJobProductionTests
 {
     public static void Run(Action<string, Action> test)
     {
+        foreach (var jobsFirst in new[] { false, true })
+            test("AR-040 command and job metadata compose without weakening namespace identity jobsFirst=" + jobsFirst, () => InWorkspace(root =>
+            {
+                var registry = new ToolRegistry(); var workspace = new SafeWorkspace(root);
+                using var commands = new H2LocalCommandTool();
+                void RegisterJobs() => commands.RegisterJobs(registry, workspace, Path.Combine(root, "metadata-state"),
+                    Guid.NewGuid(), () => "metadata-only-revision", CancellationToken.None, DateTime.UtcNow.AddMinutes(1),
+                    (_, _) => throw new InvalidOperationException("Metadata registration must never dispatch a process."));
+                if (jobsFirst) { RegisterJobs(); commands.Register(registry, workspace); }
+                else { commands.Register(registry, workspace); RegisterJobs(); }
+                Check(registry.Tools.Count == 7 && registry.Namespaces.Count == 1
+                    && registry.Namespaces.Single().Name == "shell", "Command and job tools did not share one canonical namespace.");
+                var version = registry.Version; var rejected = false;
+                try { registry.RegisterNamespace(new("shell", "Deliberately conflicting fixture metadata")); }
+                catch (InvalidOperationException) { rejected = true; }
+                Check(rejected && registry.Version == version && registry.Tools.Count == 7,
+                    "Registry silently accepted conflicting namespace metadata or changed an existing descriptor.");
+            }));
         foreach (var project in new[] { false, true })
             test("AR-040 production stable job poll output result and archive roundtrip " + (project ? "Project" : "Global"), () => InWorkspace(root =>
             {
@@ -107,7 +127,9 @@ internal static class H2AgentJobProductionTests
             }));
         test("AR-040 production large retained output is paged and linked without entering the model in full", () => InWorkspace(root =>
         {
-            var wire = new Wire("[Console]::Write(('Z'*1200000)); [Console]::Error.Write('stderr-ĐÚNG'); Start-Sleep -Seconds 1", Mode.Large);
+            // Isolate the requested byte stream from PowerShell's module-autoload progress.
+            // Production still retains all stderr; the separate explicit-progress case checks it.
+            var wire = new Wire("$ProgressPreference='SilentlyContinue'; [Console]::Write(('Z'*1200000)); [Console]::Error.Write('stderr-ĐÚNG'); Start-Sleep -Seconds 1", Mode.Large);
             var (summary, _) = Execute(root, wire);
             Check(summary.Status == H2AgentTaskStatus.Completed, Detail(summary, wire));
             Check(wire.Results.All(r => r.Content.Length <= 16_384), "Long-job output exceeded advertised wire bound.");
@@ -115,9 +137,31 @@ internal static class H2AgentJobProductionTests
             Check(!terminal.GetProperty("job").GetProperty("OutputComplete").GetBoolean(), "Retained excerpt claimed full output.");
             var handles = terminal.GetProperty("output_artifacts").EnumerateArray().Select(x => x.GetString()!).ToArray();
             var store = new ArtifactStore(Path.Combine(root, "state", "tasks", summary.TaskId.ToString("N")));
-            Check(handles.Length == 2 && store.ReadText(handles[0]) == new string('Z', 1_000_000)
-                && store.ReadText(handles[1]) == "stderr-ĐÚNG", "Bounded retained output or exact stderr was lost.");
+            Check(handles.Length == 2, "Expected separate retained stdout and stderr handles.");
+            var stdout = store.ReadText(handles[0]); var stderr = store.ReadText(handles[1]);
+            Save(root, "large-output-readback", new { terminal, stdoutCharacters = stdout.Length,
+                stdoutSha256 = store.LoadHandle(handles[0]).Sha256, stderr });
+            Check(stdout == new string('Z', 1_000_000), "Bounded stdout content changed: " + stdout.Length);
+            Check(stderr == "stderr-ĐÚNG", "Exact fixture stderr changed: " + JsonSerializer.Serialize(stderr));
             Check(wire.Output.Length <= 2048, "Test transport downloaded all stdout instead of a page.");
+        }));
+        test("AR-040 production retains explicit PowerShell progress and stderr without stripping diagnostics", () => InWorkspace(root =>
+        {
+            var wire = new Wire("$ProgressPreference='Continue'; Write-Progress -Activity 'H2-FIXTURE-PROGRESS' -Status 'CONTROLLED' -PercentComplete 50; [Console]::Error.Write('H2-STDERR-ĐÚNG'); Start-Sleep -Milliseconds 250",
+                outputStream: "stderr");
+            var (summary, _) = Execute(root, wire);
+            Check(summary.Status == H2AgentTaskStatus.Completed, Detail(summary, wire));
+            var terminal = Read(wire.Results.Last(r => r.ToolName == "get_command_result"));
+            var handles = terminal.GetProperty("output_artifacts").EnumerateArray().Select(x => x.GetString()!).ToArray();
+            Check(handles.Length == 2, "Diagnostic streams lost their artifact handles.");
+            var store = new ArtifactStore(Path.Combine(root, "state", "tasks", summary.TaskId.ToString("N")));
+            var stderr = store.ReadText(handles[1]);
+            Save(root, "progress-stderr-readback", new { terminal, stderr, wire.Output });
+            Check(stderr.Length <= 2048 && stderr.Contains("H2-FIXTURE-PROGRESS", StringComparison.Ordinal)
+                && stderr.Contains("H2-STDERR-ĐÚNG", StringComparison.Ordinal), "PowerShell progress or Unicode stderr was dropped.");
+            Check(stderr == wire.Output && terminal.GetProperty("job").GetProperty("StderrObservedCharacters").GetInt64() == stderr.Length,
+                "Paged output, durable artifact and observed stderr disagree.");
+            Check(terminal.GetProperty("job").GetProperty("OutputComplete").GetBoolean(), "Fully retained diagnostic stream claimed truncation.");
         }));
         test("AR-040 production observer failure before Resume cannot execute job code", () => InWorkspace(root =>
         {
@@ -143,7 +187,7 @@ internal static class H2AgentJobProductionTests
     }
 
     private enum Mode { Normal, Input, Premature, Cancel, Fail, Deadline, ForeignOwner, Malformed, Large }
-    private sealed class Wire(string command, Mode mode = Mode.Normal) : IAgentTransportFactory
+    private sealed class Wire(string command, Mode mode = Mode.Normal, string outputStream = "stdout") : IAgentTransportFactory
     {
         public List<AgentToolResult> Results { get; } = [];
         public string? JobId { get; private set; }
@@ -172,7 +216,7 @@ internal static class H2AgentJobProductionTests
             if (mode == Mode.Cancel && Polls >= 1 && (ReadyToCancel?.Invoke() ?? true) && _stage == _tools.Length + 1)
             { _stage++; return Call("cancel_command_job", new { job_id = JobId }); }
             if (_lastStatus == "Running") { Polls++; return Call("poll_command_job", new { job_id = JobId, wait_seconds = 1 }); }
-            if (_stage < 20) { _stage = 20; return Call("read_command_output", new { job_id = JobId, stream = "stdout", max_characters = 2048 }); }
+            if (_stage < 20) { _stage = 20; return Call("read_command_output", new { job_id = JobId, stream = outputStream, max_characters = 2048 }); }
             if (_stage == 20) { _stage++; return Call("get_command_result", new { job_id = JobId }); }
             return null;
         }
