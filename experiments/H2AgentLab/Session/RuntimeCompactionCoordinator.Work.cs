@@ -145,6 +145,9 @@ internal sealed class RuntimeContextCompactionTurn
             ct.ThrowIfCancellationRequested();
             _preserveSource(new(1, _initial.TaskId, _initial.TurnId, _cycle + 1, requestIndex,
                 revisionId, _previous?.CheckpointId, sourceHandle, anchorHandle, _batches.Count, DateTime.UtcNow));
+            // Durable source admission may complete after the caller requested cancellation.
+            // Retain its receipt, but do not start a summarizer or replace cancellation with its error.
+            ct.ThrowIfCancellationRequested();
             var summary = _summarizer(source, anchorsHash); // deterministic extracts; no unbudgeted model call
             ValidateSummary(source, anchorsHash, summary);
             ct.ThrowIfCancellationRequested();

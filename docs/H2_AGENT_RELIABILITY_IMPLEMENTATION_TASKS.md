@@ -90,7 +90,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
-| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | NOT_STARTED |
+| AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | ACTIVE / REPAIR_VALIDATION |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | NOT_STARTED |
@@ -481,26 +481,25 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-051_ACTIVE_SOURCE_BACKED_COMPACTION",
+  "phase": "AR-051_SOURCE_CANCELLATION_REPAIR_VALIDATION",
   "active_task": "AR-051",
   "implementation_status": "ACTIVE",
   "acceptance_status": "NOT_RUN",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar051-2026-09-23",
+  "owner_session": "chatgpt-ar051-source-cancellation-review-2026-09-23",
   "last_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
   "last_validated_code_commit": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
   "last_validation_result": "AR050_50_PASS_X3; SETTINGS_OLD_CLASS_EXPECTED_FAILURE; ACTUAL_WIRE_205_X5_X3; POST_EFFECT_GLOBAL_PROJECT_PASS_X3; ALL_RETAINED_AR_PASS; AGENT74_PASS; FULL965_PASS",
-  "capture_checked_head": "c1681e5ef410e73889fba259b2b9e3fcdb39cedd",
+  "capture_checked_head": "7b364cc0989406fd7ec03249432eee238809bf3a",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Reviewed source committed on existing branch. User-PC working tree NOT_ACCESSIBLE; local review is an offline exact-source snapshot.",
+  "working_tree": "Reviewed source committed on existing branch; user-PC working tree NOT_ACCESSIBLE; local review uses hash-verified CI source snapshot.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T06:26:58.642514+00:00",
+  "checkpoint_saved_at_utc": "2026-09-23T08:02:56.499704+00:00",
   "completed_this_session": [],
   "remaining_in_active_task": [
-    "Build exact delivered source on Windows and run registered AR-051 10-cycle concrete serializer and production corpora; fix failures.",
-    "Validate journal/source integrity, candidate activation, scope, pending jobs and failure preservation; retain AR-050 and earlier regressions.",
-    "Real H2 UI/model/tool E4 subset remains NOT_RUN; deterministic E2 is not full acceptance."
+    "Run six registered cancellation-source tests against old/current coordinator, restore exact source, run all 37 AR-051 tests three times and full retained regressions/CI.",
+    "Inspect candidate/source/revision/history evidence; keep required E4 actual H2 UI/model/tools NOT_RUN/AWAITING_ENVIRONMENT."
   ],
   "last_test_commands": [
     {
@@ -1022,7 +1021,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Continue only AR-051. Read delivery saved.json code_sha and validation/full CI; repair then rerun. Preserve E3 native gates and AR-083 DEFERRED_BY_USER. No main merge, automatic replay, provider/endpoint switch or parallel state store.",
+  "next_exact_action": "Read this delivery saved.json for actual code SHA. Continue AR-051 cancellation boundary verification on Windows CI. Preserve AR-020/033 E3, AR-051 E4 and deferred AR-083; no native waiver, replay or main merge.",
   "next_task_if_active_done": "Reconcile dependencies; do not waive native AR-020/033 or AR-051 E4.",
   "last_runtime_source_commit": "023b08989e9f1d59ade6b62112c9355fe2bcb0ca",
   "previous_saved_checkpoint_commit": "35f6fc3fbbd6ebc2dd06ee4e7493641950a21782",
