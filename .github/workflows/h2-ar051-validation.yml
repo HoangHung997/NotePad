@@ -1,4 +1,5 @@
 name: AR-051 source-backed work compaction validation
+# Retain initial compile failure; validate repaired source without dropping assertions.
 on:
   push:
     branches: [feature/h2-agent-reliability-ar-000]
