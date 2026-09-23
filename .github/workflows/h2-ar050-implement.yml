@@ -1,0 +1,75 @@
+name: AR-050 reviewed source delivery
+on:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths: [.github/workflows/h2-ar050-implement.yml]
+permissions:
+  contents: write
+concurrency:
+  group: h2-ar050-delivery
+  cancel-in-progress: false
+jobs:
+  delivery:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Verify reviewed source, preserve checkpoint history, and normal-push one implementation commit
+        shell: python
+        env:
+          SOURCE: |
+            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
+        run: |
+          import os, subprocess, pathlib, json, hashlib, base64, zlib, re, datetime
+          def git(*args): return subprocess.check_output(['git',*args], text=True).strip()
+          branch='feature/h2-agent-reliability-ar-000'
+          assert os.environ['GITHUB_REF_NAME']==branch and git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          assert git('rev-parse','HEAD^')=='f939cc510c29e655775f973bfb5030758d49ba44', 'Concurrent source change: reconcile, never reset'
+          assert not git('status','--porcelain')
+          data=zlib.decompress(base64.b64decode(''.join(os.environ['SOURCE'].split())))
+          assert len(data)==58203 and hashlib.sha256(data).hexdigest()=='1a8bdf4ca3ca853c2d1632cb1d92802c5bbd663b01a8b839b41d352f790ea99a'
+          changes=json.loads(data); assert len(changes)==11
+          pending={}
+          for c in changes:
+            path=c['path']; p=pathlib.Path(path)
+            assert not p.is_absolute() and '..' not in p.parts and path.startswith(('src/','tests/','experiments/'))
+            if c['before'] is None:
+              assert not p.exists(); content=c['content'].encode()
+            else:
+              original=subprocess.check_output(['git','show','HEAD:'+path]); assert hashlib.sha256(original).hexdigest()==c['before'], path
+              text=original.decode()
+              for e in c['edits']:
+                assert text.count(e['old'])==1, path
+                text=text.replace(e['old'],e['new'])
+              content=text.encode()
+            assert hashlib.sha256(content).hexdigest()==c['after'], path
+            pending[path]=content
+          tracker='docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+          text=subprocess.check_output(['git','show','HEAD:'+tracker]).decode()
+          pos=text.index('```yaml\n',text.index('## 7. SESSION HANDOFF'))+len('```yaml\n')
+          state,end=json.JSONDecoder().raw_decode(text[pos:]); assert state['active_task']=='AR-050' and state['implementation_status']=='NOT_STARTED'
+          state.update(phase='AR-050_ACTIVE_SERIALIZED_REQUEST_VALIDATION',implementation_status='ACTIVE',acceptance_status='NOT_RUN',owner_session='chatgpt-ar050-2026-09-23',working_tree='Reviewed source committed on existing branch; user-PC tree NOT_ACCESSIBLE.',uncommitted_files=[],completed_this_session=[],checkpoint_saved_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),remaining_in_active_task=['Run registered AR-050 actual serializers, 205-cycle corpora, all retained regressions and full CI on delivery code SHA; repair failures.','Verify exact bytes versus estimated tokens, server-held context, prewarm/fallback, native media limitations and source-backed limits.'],next_exact_action='Continue only AR-050. Read source delivery code_sha and Windows CI. Fix failures, then verify receipts and save evidence. AR-020/033 E3 and E4 remain NOT_RUN; AR-083 DEFERRED_BY_USER. No automatic compaction (AR-051) or model/endpoint switch.')
+          pending[tracker]=(text[:pos]+json.dumps(state,ensure_ascii=False,indent=2)+text[pos+end:]).encode()
+          pending['docs/agent-reliability/AR-050/implementation.md']=b'# AR-050 serialized request budgets\n\nACTIVE / NOT_RUN. Every concrete Agent transport has a final serializer guard; bytes/hash are exact, token/media/retained-context counts are labelled estimates. Provider context limits require source-backed profile configuration; fallback is a local policy, not an advertised model limit. Stored Responses and WebSocket prewarm/continuation retain context counters; cached tokens never remove context. Output reserves are sent in provider dialect. Guard failures block without trimming source or switching providers. No new engine/state store. E1/E2 tests use intercepted actual serializers, not live API/Office/model calls. Native gates and deferred AR-083 remain.\n'
+          for path,content in pending.items():
+            p=pathlib.Path(path); p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(content)
+          subprocess.run(['git','diff','--check'],check=True)
+          subprocess.run(['git','add','--',*pending],check=True)
+          assert set(git('diff','--cached','--name-only').splitlines())==set(pending)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==os.environ['GITHUB_SHA'], 'Concurrent update'
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','feat(AR-050): guard actual serialized model requests and register bounded wire tests'],check=True)
+          code=git('rev-parse','HEAD'); assert not git('status','--porcelain')
+          subprocess.run(['git','push','origin','HEAD:refs/heads/'+branch],check=True)
+          assert git('ls-remote','origin','refs/heads/'+branch).split()[0]==code
+          out=pathlib.Path('artifacts/ar050-delivery');out.mkdir(parents=True,exist_ok=True)
+          (out/'saved.json').write_text(json.dumps({'code_sha':code,'branch':branch,'files':list(pending),'status':'ACTIVE / NOT_RUN'},indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR050-Source-Delivery
+          path: artifacts/ar050-delivery/
+          if-no-files-found: error
