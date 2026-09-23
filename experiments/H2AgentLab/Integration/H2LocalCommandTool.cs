@@ -29,7 +29,7 @@ internal sealed partial class H2LocalCommandTool : IAgentRuntimeDomainVerifier, 
             + "Use for local files, scripts, builds and installed applications. Network and filesystem are not sandboxed. "
             + "No administrator elevation. Inspect stdout, stderr and exit_code; exit 0 alone does not prove the user's goal. "
             + "Use literal paths; do not mix shells for file operations. Long commands are cancelled at timeout.";
-        registry.Register(new ToolDescriptor("exec_command", new("shell", "Local Windows commands with explicit full access."), description,
+        registry.Register(new ToolDescriptor("exec_command", new("shell", "Owned Windows jobs with explicit full access."), description,
             AgentToolRisk.High, AgentToolAccess.Mutating, false, "v1",
             JsonSerializer.SerializeToElement(new { type = "function", function = new { name = "exec_command", description,
                 parameters = new { type = "object", properties = new {
