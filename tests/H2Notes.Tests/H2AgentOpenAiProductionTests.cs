@@ -123,16 +123,28 @@ internal static class H2AgentOpenAiProductionTests
             if (step == 2)
                 return Completed(Call(name, "call_file", mode == "write-400"
                     ? JsonSerializer.SerializeToElement(new { path = "written-once.txt", text = Sentinel, expectedHash = "" })
-                    : JsonSerializer.SerializeToElement(new { path = "source.txt" })));
+                    : JsonSerializer.SerializeToElement(new { path = "source.txt", offset = "0" })));
             // The observation is from actual file IO, not a synthetic executor counter.
             Check(await File.ReadAllTextAsync(mode == "write-400" ? output : source, token) == Sentinel, "Requested file effect not observed before continuation.");
             if (mode != "write-400")
             {
                 var observed = results.Last().GetProperty("output").GetString()!;
-                Check(observed.Contains(Sentinel, StringComparison.Ordinal) || observed.Contains(JsonSerializer.Serialize(Sentinel)[1..^1], StringComparison.Ordinal), "Read observation did not reach the actual model continuation.");
+                CheckReadObservation(observed, source);
             }
             return mode == "read-final" ? Completed(new { type = "message", id = "msg_final", role = "assistant", status = "completed",
                 content = new[] { new { type = "output_text", text = Sentinel, annotations = Array.Empty<object>() } } }) : Bad("input[0].call_id");
+        }
+        private static void CheckReadObservation(string observed, string source)
+        {
+  // The domain result is JSON followed by the existing host evidence suffix.
+  // Decode the leading value rather than matching differently escaped JSON text.
+  var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(observed));
+  using var json = JsonDocument.ParseValue(ref reader);
+  var value = json.RootElement;
+  Check(value.GetProperty("content").GetString() == Sentinel
+      && string.Equals(value.GetProperty("hash").GetString(), Hash(source), StringComparison.OrdinalIgnoreCase)
+      && value.GetProperty("offset").GetInt32() == 0
+      && !value.GetProperty("truncated").GetBoolean(), "Exact read content/hash did not reach the model continuation.");
         }
         private static object Call(string name, string id, object args) => new
         { type = "function_call", id = "fc_" + id, call_id = id, name, arguments = JsonSerializer.Serialize(args), status = "completed" };

@@ -40,7 +40,12 @@ internal static class H2AgentJobProductionTests
             test("AR-040 production stable job poll output result and archive roundtrip " + (project ? "Project" : "Global"), () => InWorkspace(root =>
             {
                 File.WriteAllText(Path.Combine(root, "unchanged.txt"), "KEEP");
-                var wire = new Wire("[IO.File]::AppendAllText('count.txt','ONE'); [Console]::Write('READY'); Start-Sleep -Seconds 2; [Console]::Write('ĐÃ XONG')");
+                // A fixed sleep cannot guarantee two polls on a loaded runner. The disposable
+      // child waits for two observed polls of its own job, with an independent deadline.
+      var wire = new Wire("[IO.File]::AppendAllText('count.txt','ONE'); [Console]::Write('READY'); "
+          + "$deadline=[DateTime]::UtcNow.AddSeconds(20); while(-not [IO.File]::Exists('release-polls.flag')) { "
+          + "if([DateTime]::UtcNow -gt $deadline) { exit 9 }; Start-Sleep -Milliseconds 25 }; [Console]::Write('ĐÃ XONG')");
+      wire.PollObserved = polls => { if (polls == 2) File.WriteAllText(Path.Combine(root, "release-polls.flag"), "RELEASE"); };
                 var (summary, progress) = Execute(root, wire, project: project);
                 Check(summary.Status == H2AgentTaskStatus.Completed, Detail(summary, wire));
                 Check(File.ReadAllText(Path.Combine(root, "count.txt")) == "ONE" && File.ReadAllText(Path.Combine(root, "unchanged.txt")) == "KEEP", "Effect duplicated or unrelated fixture modified.");
@@ -194,6 +199,8 @@ internal static class H2AgentJobProductionTests
         public string Output { get; private set; } = "";
         public int Polls { get; private set; }
         public Action? BeforeStart { get; set; }
+        public Action<int>? PollObserved { get; set; }
+        private int _observedPolls;
         public Func<bool>? ReadyToCancel { get; set; }
         private int _stage, _serial;
         private string _lastStatus = "Running";
@@ -233,7 +240,12 @@ internal static class H2AgentJobProductionTests
                     var payload = Read(result);
                     if (payload.TryGetProperty("job", out var job)) _lastStatus = job.GetProperty("Status").GetString()!;
                 }
-                if (result.ToolName == "cancel_command_job") _lastStatus = Read(result).GetProperty("Status").GetString()!;
+                if (result.ToolName == "poll_command_job")
+      {
+          Check(Read(result).GetProperty("job").GetProperty("JobId").GetString() == JobId, "Observed poll changed the owned job.");
+          PollObserved?.Invoke(++_observedPolls);
+      }
+      if (result.ToolName == "cancel_command_job") _lastStatus = Read(result).GetProperty("Status").GetString()!;
                 if (result.ToolName == "read_command_output") Output += Read(result).GetProperty("Text").GetString();
             }
         }
