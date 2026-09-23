@@ -38,6 +38,7 @@ internal static class H2AgentPluginLifecycleTests
     public static void Run(Action<string, Action> test)
     {
         H2AgentProviderRevocationTests.Run(test);
+        H2AgentPluginOutcomeBoundaryTests.Run(test);
         test("AR-064 registry duplicate registration cannot leak a new namespace", () =>
         {
             var registry = new ToolRegistry(); registry.Register(Descriptor("fixture.a")); var version = registry.Version;
@@ -313,15 +314,15 @@ internal static class H2AgentPluginLifecycleTests
         => manager.InstallFromArchive(package.Path, package.Entry, Policy, userApproved: true);
     internal static BuiltPackage Package(string root, string version, string id = Id, string toolName = "fixture.echo",
         bool selfTest = true, string minimum = "2.0.0", string[]? permissions = null, string? secondNamespace = null,
-        bool skillOnly = false, string? extraEntry = null)
+        bool skillOnly = false, string? extraEntry = null, bool mutating = false)
     {
         var path = Path.Combine(root, id + "-" + version + "-" + Guid.NewGuid().ToString("N") + ".zip");
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, true))
         {
             var definitions = new List<object>();
-            object Def(string name, string ns) => new { name, @namespace = ns, description = "AR064 local fixture", access = "ReadOnly",
-                risk = "Low", supportsParallel = false, schemaVersion = "v1", toolVersion = version, resourceScope = "fixture",
+            object Def(string name, string ns) => new { name, @namespace = ns, description = "AR064 local fixture", access = mutating ? "Mutating" : "ReadOnly",
+                risk = mutating ? "Medium" : "Low", supportsParallel = false, schemaVersion = "v1", toolVersion = version, resourceScope = "fixture",
                 serializationKey = "fixture", schema = new { type = "function", function = new { name,
                     parameters = new { type = "object", properties = new { }, additionalProperties = false } } } };
             if (!skillOnly) definitions.Add(Def(toolName, "fixture"));
@@ -334,7 +335,7 @@ internal static class H2AgentPluginLifecycleTests
         memory.Position = 0; string payload;
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Read, true)) payload = PluginManager.ComputePayloadHash(zip);
         var manifest = new H2PluginManifest(id, "AR064 fixture", version, minimum, "ar064.publisher", "sha256:" + payload,
-            skillOnly ? [] : secondNamespace is null ? [toolName] : [toolName, "fixture.second"], ["audit"], [], permissions ?? ["read"], SelfTestFile: "selftest.json");
+            skillOnly ? [] : secondNamespace is null ? [toolName] : [toolName, "fixture.second"], ["audit"], [], permissions ?? (mutating ? ["read", "write"] : ["read"]), SelfTestFile: "selftest.json");
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Update, true)) Write(zip, "manifest.json", JsonSerializer.Serialize(manifest));
         var bytes = memory.ToArray(); File.WriteAllBytes(path, bytes);
         return new(path, new(id, manifest.Name, version, "AR064 fixture", manifest.Publisher, ["fixture"], ["audit"], minimum,

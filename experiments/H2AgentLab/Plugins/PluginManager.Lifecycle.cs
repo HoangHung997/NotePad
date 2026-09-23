@@ -209,24 +209,66 @@ public sealed partial class PluginManager
         }
     }
 
+    private IAgentToolExecutor WrapVersionExecutor(H2PluginManifest manifest, string toolName,
+        long generation, IAgentToolExecutor inner)
+        => inner is IAgentToolOutcomeExecutor typed
+            ? new VersionOutcomeExecutor(this, manifest, toolName, generation, typed)
+            : new VersionExecutor(this, manifest, toolName, generation, inner);
+
+    private IDisposable EnterVersionCall(H2PluginManifest manifest, string toolName,
+        long generation, ToolCall call, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            if (!string.Equals(call.Name, toolName, StringComparison.Ordinal)
+                || _generations.GetValueOrDefault(manifest.Id) != generation)
+                throw new ToolPreflightException("provider_unavailable");
+            string? activeVersion;
+            try { activeVersion = GetActiveCore(manifest.Id)?.Manifest.Version; }
+            catch (Exception ex) when (ex is InvalidDataException or JsonException
+                or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+            {
+                // Integrity/activation checks are before the resolver and before a call lease.
+                // A corrupt package is a refused dispatch, not evidence that a new write occurred.
+                // Do not forward paths or exception bodies as provider instructions/diagnostics.
+                throw new ToolPreflightException("provider_unavailable");
+            }
+            if (activeVersion != manifest.Version)
+                throw new ToolPreflightException("provider_unavailable");
+            _versionCalls[manifest.Id] = _versionCalls.GetValueOrDefault(manifest.Id) + 1;
+        }
+        return new VersionScope(this, manifest.Id, pin: false);
+    }
+
     private sealed class VersionExecutor(PluginManager owner, H2PluginManifest manifest,
-        long generation, IAgentToolExecutor inner) : IAgentToolExecutor
+        string toolName, long generation, IAgentToolExecutor inner) : IAgentToolExecutor
     {
         public string ExecutorId => inner.ExecutorId;
         public async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            lock (owner._sync)
-            {
-                if (owner._generations.GetValueOrDefault(manifest.Id) != generation
-                    || owner.GetActiveCore(manifest.Id)?.Manifest.Version != manifest.Version)
-                    throw new InvalidOperationException("Plugin executor has been revoked or requires rebinding.");
-                owner._versionCalls[manifest.Id] = owner._versionCalls.GetValueOrDefault(manifest.Id) + 1;
-            }
-            using var lease = new VersionScope(owner, manifest.Id, pin: false);
+            using var lease = owner.EnterVersionCall(manifest, toolName, generation, call, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return await inner.ExecuteAsync(call, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // Preserve AR-011 out-of-band effect, job, pagination and evidence metadata. A version
+    // lease is not permission to turn Running/OutcomeUnknown into a successful string result.
+    // Ordinary callers retain exact domain bytes; the runtime still performs outcome validation.
+    private sealed class VersionOutcomeExecutor(PluginManager owner, H2PluginManifest manifest,
+        string toolName, long generation, IAgentToolOutcomeExecutor inner) : IAgentToolOutcomeExecutor
+    {
+        public string ExecutorId => inner.ExecutorId;
+        public async ValueTask<ToolExecutionOutput> ExecuteOutcomeAsync(ToolCall call, CancellationToken cancellationToken)
+        {
+            using var lease = owner.EnterVersionCall(manifest, toolName, generation, call, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return await inner.ExecuteOutcomeAsync(call, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken cancellationToken)
+            => (await ExecuteOutcomeAsync(call, cancellationToken).ConfigureAwait(false)).DomainPayload;
     }
 
     private sealed class VersionScope(PluginManager owner, string id, bool pin) : IDisposable

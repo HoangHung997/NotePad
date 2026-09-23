@@ -280,7 +280,8 @@ public sealed partial class PluginManager
             if (!string.IsNullOrWhiteSpace(activation.PreviousVersion))
             {
                 try { _ = VerifyVersion(pluginId, activation.PreviousVersion); }
-                catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+                catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException
+                    or InvalidOperationException or ArgumentException)
                 { return; }
                 _ = RollbackCore(pluginId);
             }
@@ -364,7 +365,7 @@ public sealed partial class PluginManager
                 tool.SupportsParallel,
                 tool.SchemaVersion,
                 tool.CallableSchema,
-                new VersionExecutor(this, manifest, generation, executor),
+                WrapVersionExecutor(manifest, tool.Name, generation, executor),
                 provenance: new ToolProvenance(
                     providerId,
                     manifest.Version,
