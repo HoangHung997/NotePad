@@ -7,6 +7,31 @@ namespace H2AgentLab.Integration;
 internal sealed partial class H2ProductionToolSession
 {
     private readonly H2AgentLiveResourceRequirement _liveRequirement;
+    private H2OfficeRuntimeTools? _liveOffice;
+
+    internal IAgentRuntimeHooks WithLiveSourceGuard(IAgentRuntimeHooks inner)
+        => !_liveRequirement.Required ? inner : new LiveSourceHooks(inner, this);
+
+    private sealed class LiveSourceHooks(IAgentRuntimeHooks inner, H2ProductionToolSession session) : IAgentRuntimeHooks
+    {
+        public ValueTask BeforeModelRequestAsync(AgentRuntimeModelRequestBoundary boundary, CancellationToken ct)
+            => inner.BeforeModelRequestAsync(boundary, ct);
+        public ValueTask AfterToolObservationAsync(AgentRuntimeObservationBoundary boundary, CancellationToken ct)
+            => inner.AfterToolObservationAsync(boundary, ct);
+        public ValueTask OnCheckpointAsync(AgentRuntimeCheckpointBoundary boundary, CancellationToken ct)
+            => inner.OnCheckpointAsync(boundary, ct);
+        public async ValueTask BeforeCompletionAsync(AgentRuntimeCompletionBoundary boundary, CancellationToken ct)
+        {
+            await inner.BeforeCompletionAsync(boundary, ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            // Preserve existing unresolved-effect diagnostics. This guard only adds the missing
+            // source-observation requirement; it does not award semantic/mutation verification.
+            if (boundary.UnresolvedCalls == 0 && !boundary.MutationAwaitingVerification
+                && session._liveOffice?.HasCompletedLiveObservation(session._liveRequirement.ApplicationKind) != true)
+                throw new AgentVerificationRequiredException("live_resource_required: No validated observation of the required live source is available. "
+                    + ToolOutcomeBridge.SafeMessage("live_resource_required"));
+        }
+    }
     internal string LiveResourceInstruction => !_liveRequirement.Required ? "" :
         "\nHost source requirement: LiveResource (" + _liveRequirement.ApplicationKind + "). "
         + ToolOutcomeBridge.SafeMessage("live_resource_required")

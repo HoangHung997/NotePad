@@ -59,7 +59,10 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             new StructuredOfficeRuntimeDomainVerifier()
         };
         if (tools.ProductionSession is { } session)
+        {
             registry = session.Configure(tools, registry, domainVerifiers);
+            hooks = session.WithLiveSourceGuard(hooks);
+        }
         var transport = _transportFactory.Create(profile, apiKey, telemetry);
         var verifier = new AgentRuntimeDomainVerifierRouter(domainVerifiers);
 

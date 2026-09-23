@@ -167,8 +167,11 @@ internal static class H2AgentLiveResourceTests
                         ActiveWorkContext: notice ? null : Capture(source)), readOnly: false);
                 original = await Wait(adapter, task);
                 if (notice)
+                {
+                    Check(original.Status == H2AgentTaskStatus.Blocked, "Readiness metadata cannot complete a live-resource task.");
                     Check(wire.Results.Any(r => r.Content.Contains(mode == "browser-notice" ? "browser.live_tab" : "autocad.live_drawing", StringComparison.Ordinal)
                         && r.Content.Contains("not an equivalent source", StringComparison.Ordinal)), "Missing truthful live-provider readiness notice.");
+                }
                 else if (mode == "disk-only")
                 {
                     Check(original.Status == H2AgentTaskStatus.Completed && client.Discoveries == 0,

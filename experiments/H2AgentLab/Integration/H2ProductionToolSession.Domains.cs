@@ -14,6 +14,7 @@ internal sealed partial class H2ProductionToolSession
             _targetPolicy, _context?.TargetIntent ?? H2Notes.Core.H2AgentTargetIntent.OpenDocument,
             _targetObserved, _officeClientFactory, _captureValidator);
         _owned.Add(office);
+        _liveOffice = office;
         if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace) office.Register(registry);
         verifiers.RemoveAll(item => item is StructuredOfficeRuntimeDomainVerifier);
         verifiers.Add(office);

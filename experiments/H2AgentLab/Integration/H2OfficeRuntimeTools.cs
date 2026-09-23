@@ -25,6 +25,11 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     private readonly Dictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
     private readonly Dictionary<string, H2AgentTargetResolution> _pins = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, AgentRuntimeDomainVerification> _reports = new();
+    // Disposable task-local observation, not another truth store or proof of the whole goal.
+    private readonly ConcurrentDictionary<H2ApplicationKind, string> _observedLiveSessions = new();
+    internal bool HasCompletedLiveObservation(H2ApplicationKind application)
+        => application is H2ApplicationKind.Word or H2ApplicationKind.Excel
+            && _observedLiveSessions.ContainsKey(application);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly OfficeRejectedMutationRecovery _wordRecovery = new();
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
@@ -125,6 +130,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 return JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode,
                     message = problem, mutationApplied = false });
         }
+        var application = call.Name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -132,7 +138,6 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             var name = call.Name;
             var session = H2ProductionToolSession.Arg(call, "session_id") ?? "";
             var token = H2ProductionToolSession.Arg(call, "state_token") ?? "";
-            var application = name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
             var listing = name is "excel.list_workbooks" or "word.list_documents";
             var observed = await DiscoverAsync(application, ct).ConfigureAwait(false);
             H2AgentTargetResolution? target = null;
@@ -299,9 +304,14 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     throw new ToolPreflightException("stale_resource");
                 await RevalidateAsync(application, target, ct, mutating).ConfigureAwait(false);
             }
-            return JsonSerializer.Serialize(result);
+            var serialized = JsonSerializer.Serialize(result);
+            // Discovery and provider readiness are metadata only. Mark a source only after the
+            // actual selected-session operation, identity validation and final reprobe succeeded.
+            if (!listing && target is not null && !name.EndsWith("save_copy", StringComparison.Ordinal))
+                _observedLiveSessions[application] = session;
+            return serialized;
         }
-        catch { _reports.TryRemove(call.Id, out _); throw; }
+        catch { _reports.TryRemove(call.Id, out _); _observedLiveSessions.TryRemove(application, out _); throw; }
         finally { _gate.Release(); }
     }
 
@@ -384,6 +394,13 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     private async Task RevalidateAsync(H2ApplicationKind application, H2AgentTargetResolution target, CancellationToken ct, bool afterPossibleWrite)
     {
         var observation = await DiscoverAsync(application, ct).ConfigureAwait(false);
+        var report = observation.Discovery is ExcelDiscovery excel ? excel.Report : ((WordDiscovery)observation.Discovery).Report;
+        if (report is { Complete: false })
+        {
+            var code = report.Issues.FirstOrDefault()?.Code ?? "native_object_unavailable";
+            if (afterPossibleWrite) throw new OfficeHostClientException(code, "Native revalidation is incomplete after dispatch; reconcile effects before retrying.");
+            throw new ToolPreflightException(code);
+        }
         var current = Resolve(application, observation.Resources, target.Binding!.DocumentSessionId);
         if (current.Resolved && target.Binding.MatchesObservation(current.Binding!, requireContentVersion: false)) return;
         if (afterPossibleWrite) throw new OfficeHostClientException("stale_resource", "Resource identity changed after dispatch; effects need reconciliation.");
