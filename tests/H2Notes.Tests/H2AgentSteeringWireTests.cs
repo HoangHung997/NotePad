@@ -11,6 +11,7 @@ internal static class H2AgentSteeringWireTests
         H2AgentOpenAiWireTests.Run(test);
         H2AgentOpenAiProductionTests.Run(test);
         H2AgentLiveResourceTests.Run(test);
+        H2AgentDiskOfficeSourceTests.Run(test);
         foreach (var kind in new[] { "ollama", "chat", "responses", "responses-stored" })
             test("Agent steering wire preserves user role and turn identity: " + kind, () => Task.Run(async () =>
             {

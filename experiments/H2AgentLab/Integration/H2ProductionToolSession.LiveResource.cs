@@ -25,7 +25,7 @@ internal sealed partial class H2ProductionToolSession
             return Deny();
         if (_fileTargets is null) return null;
         var paths = new List<string>();
-        if (descriptor.Namespace.Name is "files" or "autocad")
+        if (descriptor.Namespace.Name is "files" or "office" or "autocad")
         {
             // Directory discovery remains metadata, not a substitute document read.
             if (call.Name is "list_files" or "find_files") return null;
