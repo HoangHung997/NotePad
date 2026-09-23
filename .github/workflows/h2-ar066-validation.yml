@@ -1,0 +1,41 @@
+name: AR-066 live resource semantics validation
+run-name: AR-066 exact-source validation (${{ github.sha }})
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths:
+      - experiments/H2AgentLab/**
+      - experiments/H2AgentLab.OfficeHost/**
+      - src/H2Notes.Core/**
+      - tests/H2Notes.Tests/**
+      - tools/agent-reliability/*ar066*
+      - .github/workflows/h2-ar066-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar066-validation
+  cancel-in-progress: false
+jobs:
+  validation:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate exact AR-066 source and retain regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar066.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR066-LiveResource-Evidence
+          path: artifacts/ar066/
+          if-no-files-found: error
+          retention-days: 14
