@@ -31,7 +31,11 @@ internal static class H2AgentRequestBudgetPersistenceTests
             var window = new AiSettingsWindow(app); window.Show(); Pump(window);
             try
             {
-                window.GetVisualDescendants().OfType<TextBox>().Single(x => x.Text == profile.Name).Text = "AR050-SETTINGS-RENAMED";
+                var nameLabel = window.GetVisualDescendants().OfType<TextBlock>().Single(x => x.Text == "Tên kết nối");
+                var form = (StackPanel)nameLabel.Parent!;
+                var nameIndex = form.Children.IndexOf(nameLabel) + 1;
+                Check(form.Children[nameIndex] is TextBox, "Connection name field is not next to its label.");
+                ((TextBox)form.Children[nameIndex]).Text = "AR050-SETTINGS-RENAMED";
                 window.GetVisualDescendants().OfType<Button>().Single(x => Equals(x.Content, "Lưu kết nối")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 var clock = Stopwatch.StartNew();
                 while (clock.Elapsed < TimeSpan.FromSeconds(5) && app.LocalSettings.Ai.Profiles.Single().Name != "AR050-SETTINGS-RENAMED")
