@@ -103,7 +103,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER — test later; no E3/E4 PASS claim |
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
-| AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
+| AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER — final full-build real-environment test; NO_E4_PASS_CLAIM |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
@@ -483,9 +483,11 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task checkpoint is AR-068: Command Center attention collapse + acknowledgement is IMPLEMENTED with E1/E2/full CI. On 2026-09-24 the user explicitly authorized interactive/visual environment acceptance to be tested later from the final full build, so AR-068 E4 is DEFERRED_BY_USER for sequencing purposes, not PASS. AR-066 and AR-067 retain their own DEFERRED_BY_USER acceptance debts; AR-065 remains AWAITING_ENVIRONMENT.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**. AR-069 may start only in the next one-task turn. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+**Current task checkpoint is AR-069: the four critical user-reported repair paths are integrated on one exact SHA with E2/full CI evidence. On 2026-09-24 the user explicitly authorized real-environment acceptance to be tested later from the final full build, so AR-069 E4 is DEFERRED_BY_USER for sequencing purposes, not PASS. AR-065/066/067/068 keep their individual real-environment debts visible.** The critical repair implementation sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069** is now integration-green at E2, but not E4-certified. Resume the ordinary AR roadmap only in the next one-task turn. Do not discard AR-064 lifecycle/pin/RC-28 debt.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
+
+**AR-069 integration checkpoint — 2026-09-24:** exact integration-gate source `9f09e8d1205b83a9bce733da547acc0544599179`; product runtime remains the AR-068 validated tree `c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2`. Integration run `35952370470` / job `107483447785` SUCCESS: AR-065 **55/55**, AR-066 **134/134**, AR-067 **3/3**, AR-068 **3/3**, H2M-110 **1/1**, AR-067 runtime **6/6**, full H2 **1270/1270**, Agent **74/74**; no legacy generic host final. Evidence artifact `10789975231`, 3,549,611 bytes, SHA256 `1c2c60d5de38161a0fa20aa971a44a274ab8de029ba4eaf44ec02a4b02abd5ab`, was downloaded and inspected: `E4=DEFERRED_BY_USER`, `e4_pass_claim=false`, clean checkout/end, no credentials/personal documents/external side effects. All ten pull_request workflows on the same SHA are SUCCESS; Avalonia CI `35952374697` / job `107483460322` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. Portable artifact `10789372264` SHA256 `73520d427e25a0931faa198ede9775ecc8af318ee0965bbbfd7bb38a1d744ae9`; NAS probe `10789372241` SHA256 `bb59f999e56e8e76b487a853d825e0c3ea85f44fe66f1e98cf7dd0431a334090`. This is integrated E2 evidence only; real H2/OpenAI/native Office/interactive visual E4 remains NOT_RUN/DEFERRED_BY_USER for final full-build testing.
 
 Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
@@ -500,27 +502,50 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-068_ATTENTION_E2_PASS_E4_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
-  "active_task": "AR-068",
-  "implementation_status": "IMPLEMENTED",
+  "phase": "AR-069_CRITICAL_INTEGRATION_E2_PASS_E4_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
+  "active_task": "AR-069",
+  "implementation_status": "IMPLEMENTED_INTEGRATION_GATE",
   "acceptance_status": "DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar068-attention-2026-09-24",
-  "last_code_commit": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-  "last_validated_code_commit": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-  "last_validation_result": "AR068_FOCUSED3_PASS; FULL1270_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; WINDOWS_X64_PUBLISH_AND_HELPER_IPC_PASS; E4_INTERACTIVE_VISUAL_NOT_RUN_AND_DEFERRED_BY_USER_UNTIL_FINAL_FULL_BUILD_TEST; NO_E4_PASS_CLAIM",
-  "capture_checked_head": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
+  "owner_session": "chatgpt-ar069-critical-integration-2026-09-24",
+  "last_code_commit": "9f09e8d1205b83a9bce733da547acc0544599179",
+  "last_validated_code_commit": "9f09e8d1205b83a9bce733da547acc0544599179",
+  "last_validation_result": "AR069_AR065_55_PASS; AR066_134_PASS; AR067_3_PASS; AR068_3_PASS; H2M110_1_PASS; AR067_RUNTIME6_PASS; FULL1270_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; WINDOWS_X64_PUBLISH_AND_HELPER_IPC_PASS; E4_REAL_ENVIRONMENT_NOT_RUN_AND_DEFERRED_BY_USER_UNTIL_FINAL_FULL_BUILD_TEST; NO_E4_PASS_CLAIM",
+  "capture_checked_head": "9f09e8d1205b83a9bce733da547acc0544599179",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact AR-068 implementation/validated source is c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2. User-PC working tree NOT_ACCESSIBLE. GitHub Actions checkout was clean; AR-068 focused validator and all ten pull_request workflows on c8 completed SUCCESS, including full Avalonia publish/helper IPC. Full Avalonia test-merge checkout was 92655a7b7ab514fa9d0590ccabaaa8fc68b9129b and merged only c8 into unchanged main 1283bc13e07c3cd47d04886166de3dfc595422c0.",
+  "working_tree": "Exact AR-069 integration-gate source is 9f09e8d1205b83a9bce733da547acc0544599179; product runtime behavior remains from AR-068 code c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2. User-PC working tree NOT_ACCESSIBLE. GitHub Actions checkout/end CLEAN. AR-069 exact-SHA integration validator and all ten pull_request workflows completed SUCCESS, including full Avalonia Windows publish/helper IPC.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T03:14:04+00:00",
-  "completed_this_session": ["Implemented AR-068 collapse/expand with default collapsed state, bounded five-item preview and explicit Xem tất cả", "Added machine-local CommandCenterLocalSettings acknowledgement overlay without changing Agent/Project truth or shared NAS state", "Bound waiting-approval acknowledgement identity to ApprovalId and failed/blocked identity to source revision so only the selected event is hidden and new same-task failures reappear", "Repaired two stale pre-AR-068 UI assertions without weakening their operational intent", "Validated exact source c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2 with focused3/full1270/Agent74, 10/10 PR workflows and Windows publish/helper IPC", "User explicitly deferred AR-068 interactive/visual E4 until final full-build testing"],
+  "checkpoint_saved_at_utc": "2026-09-24T03:52:15+00:00",
+  "completed_this_session": [
+    "Added AR-069 exact-SHA four-defect integration validator/workflow without changing product runtime semantics",
+    "Validated AR-065/066/067/068 focused production regressions together on one checkout plus H2M-110",
+    "Validated AR-067 runtime recovery corpus, full H2 1270/1270 and Agent 74/74 on the same SHA",
+    "Inspected AR069-Critical-Integration-Evidence artifact and independently verified its SHA256 and machine-readable E4 deferred/no-pass-claim matrix",
+    "Validated all ten pull_request workflows plus Windows x64 publish/helper IPC on exact AR-069 SHA",
+    "User policy retains real-environment OpenAI/native Office/model/visual acceptance for final full-build testing"
+  ],
   "remaining_in_active_task": [
-    "No additional AR-068 implementation work is required by current E1/E2 evidence.",
-    "AR-068 E4 interactive/visual real-app acceptance is DEFERRED_BY_USER until a final full build is available for user testing; keep this debt visible and do not relabel it PASS."
+    "No additional AR-069 integration-harness implementation work is required by current E2 evidence.",
+    "AR-069 required E4 real H2/OpenAI/native Office/interactive visual integrated acceptance is DEFERRED_BY_USER until final full-build testing; this is NOT E4 PASS and all four underlying real-environment debts remain visible."
   ],
   "last_test_commands": [
+    {
+      "command": "tools/agent-reliability/validate_ar069.ps1",
+      "sha": "9f09e8d1205b83a9bce733da547acc0544599179",
+      "run_id": 35952370470,
+      "job_id": 107483447785,
+      "attempt": 1,
+      "result": "SUCCESS; AR065 55/55; AR066 134/134; AR067 3/3; AR068 3/3; H2M110 1/1; AR067 runtime 6/6; full H2 1270/1270; Agent 74/74; artifact 10789975231 sha256 1c2c60d5de38161a0fa20aa971a44a274ab8de029ba4eaf44ec02a4b02abd5ab; E4=DEFERRED_BY_USER; e4_pass_claim=false; clean_end=true"
+    },
+    {
+      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
+      "sha": "9f09e8d1205b83a9bce733da547acc0544599179",
+      "run_id": 35952374697,
+      "job_id": 107483460322,
+      "attempt": 1,
+      "result": "SUCCESS; all ten pull_request workflows SUCCESS; portable 10789372264 sha256 73520d427e25a0931faa198ede9775ecc8af318ee0965bbbfd7bb38a1d744ae9; NAS probe 10789372241 sha256 bb59f999e56e8e76b487a853d825e0c3ea85f44fe66f1e98cf7dd0431a334090"
+    },
     {
       "command": "tools/agent-reliability/validate_ar068.ps1",
       "sha": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
@@ -1264,17 +1289,17 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-069",
       "issue": "Integrated production acceptance of all four user-reported defects",
-      "status": "NOT_STARTED"
+      "status": "USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER / TEST_ON_FINAL_FULL_BUILD / NO_E4_PASS_CLAIM / gate=9f09e8d1205b83a9bce733da547acc0544599179"
     }
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [],
-  "next_exact_action": "AR-068 is sequenced forward with E4 explicitly DEFERRED_BY_USER until final full-build testing. Do not start AR-069 in this same turn. In the next one-task turn start only AR-069 critical production integration acceptance from the current branch/HEAD, while preserving all deferred/awaiting real-environment debts without relabelling them PASS.",
-  "next_task_if_active_done": "AR-069 is READY for the next one-task turn because AR-068 E4 was explicitly deferred/test-later by the user; one-task rule still applies.",
+  "next_exact_action": "AR-069 integration implementation is green and required E4 is explicitly DEFERRED_BY_USER until final full-build testing. Do not start AR-070 in this same turn. In the next one-task turn resume the ordinary roadmap with only AR-070, preserving AR-064 and all deferred/awaiting real-environment debts without relabelling them PASS.",
+  "next_task_if_active_done": "AR-070 is READY for the next one-task turn under the user's test-later sequencing policy; one-task rule still applies.",
   "last_runtime_source_commit": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
   "previous_saved_checkpoint_commit": "4c07ba22fcc737ceae370c9bab346087c8562cc9",
-  "finalization_checked_head": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-  "additional_ci_after_recorded_run": "Exact AR-068 source c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2: focused validation 35949185144 / job 107475651443 SUCCESS; artifact 10788441799 (415827 bytes, sha256 8842afd889d2f5354670108388e19ba28dd9e70b08760f343446c8e21c680923) downloaded and inspected: E4=DEFERRED_BY_USER, focused3/3, full1270/1270, Agent74/74, clean_end=true. All ten pull_request workflows on c8 SUCCESS. Avalonia CI 35949187730 / job 107473806859 SUCCESS through full H2/Agent/MB gates, Windows publish and packaged helper IPC; test-merge checkout 92655a7b7ab514fa9d0590ccabaaa8fc68b9129b; portable artifact 10787454520 (110244045 bytes, sha256 446f3f46ed4f9638634378453c0b395ecf17e1554222ad967aa35ecc4758b43c) and NAS probe artifact 10788157759 (39410848 bytes, sha256 03fe5dbe505f64332a372c8fd79d9bf32c408fe935e5b68d02f03052fbc2b1c4). Historical f8e57fe7f926794c0cc6313edc52dc07ca33fce9 focused/full runs failed only two retained UI assertions that assumed attention was always expanded; AR-068 focused cases themselves were 3/3. Those stale assertions were updated to preserve deep-link/five-second semantics under the approved collapsed UX, then c8 passed exact-SHA validation. This does not upgrade E4.",
+  "finalization_checked_head": "9f09e8d1205b83a9bce733da547acc0544599179",
+  "additional_ci_after_recorded_run": "Exact AR-069 integration gate 9f09e8d1205b83a9bce733da547acc0544599179: run 35952370470 / job 107483447785 SUCCESS; focused AR065 55/55, AR066 134/134, AR067 3/3, AR068 3/3, H2M110 1/1; AR067 runtime 6/6; full1270/1270; Agent74/74; artifact10789975231 (3549611 bytes, sha256 1c2c60d5de38161a0fa20aa971a44a274ab8de029ba4eaf44ec02a4b02abd5ab) independently downloaded/hashed/inspected with failed=[], clean_end=true, E4=DEFERRED_BY_USER and e4_pass_claim=false. All ten pull_request workflows on exact SHA SUCCESS. Avalonia CI35952374697/job107483460322 SUCCESS with Windows x64 publish/helper IPC; portable10789372264 sha256 73520d427e25a0931faa198ede9775ecc8af318ee0965bbbfd7bb38a1d744ae9; NAS probe10789372241 sha256 bb59f999e56e8e76b487a853d825e0c3ea85f44fe66f1e98cf7dd0431a334090. This is E2 integration evidence only and does not upgrade E4.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
     {
@@ -1365,24 +1390,25 @@ Do not claim these defects were already covered by historical Office/transport/U
       "classification": "AR066 regression maintenance only; all historical failures remain failures"
     }
   ],
-  "code_commit_lookup": "git log -1 --format=%H -- src/H2Notes.Avalonia/MainWindow.CommandCenter.cs src/H2Notes.Avalonia/LocalConfiguration.cs src/H2Notes.Core/H2ProductProjections.cs tests/H2Notes.Tests/H2CommandCenterUiTests.cs",
-  "previous_completed_task": "AR-067 USER_ACCEPTED_SEQUENCE / E2_PASS / E4_DEFERRED_BY_USER",
+  "code_commit_lookup": "git log -1 --format=%H -- tools/agent-reliability/validate_ar069.ps1 .github/workflows/h2-ar069-validation.yml",
+  "previous_completed_task": "AR-068 USER_ACCEPTED_SEQUENCE / E2_PASS / E4_DEFERRED_BY_USER",
   "last_full_ci_checkout_sha": "92655a7b7ab514fa9d0590ccabaaa8fc68b9129b",
   "implemented_this_session": [
     "AR-068 Command Center collapse/preview/local acknowledgement lifecycle only"
   ],
-  "next_ready_independent_task": "AR-069 NOT_STARTED; AR-068 E4 is explicitly DEFERRED_BY_USER for final full-build testing, so AR-069 is ready only for the next one-task turn. Deferred AR-066/067 and awaiting AR-065 debts remain visible, not passed.",
+  "next_ready_independent_task": "AR-070 NOT_STARTED; AR-069 required E4 is explicitly DEFERRED_BY_USER for final full-build testing, so resume only AR-070 in the next one-task turn. AR-064 and all real-environment debts remain visible, not passed.",
   "independent_dependency_assessment": {
-    "id": "AR-068",
-    "rule": "Tracker section 2.2: independent UI core may proceed with implemented dependencies and passed regressions while real E3/E4 gates await environment; acceptance level remains explicit.",
+    "id": "AR-069",
+    "rule": "Tracker section 2.2 + user test-later policy: integrated implementation/regression may sequence forward while required real E4 is explicitly deferred; no acceptance-level inflation.",
     "dependencies": [
-      "AR-032 DONE",
-      "AR-033 IMPLEMENTED/E2 with E3 parked",
-      "AR-067 USER_ACCEPTED_SEQUENCE / E2_PASS / E4_DEFERRED_BY_USER"
+      "AR-065 IMPLEMENTED/E2 with real OpenAI E4 parked",
+      "AR-066 USER_ACCEPTED_SEQUENCE/E1-E2 with E3-E4 deferred",
+      "AR-067 USER_ACCEPTED_SEQUENCE/E2 with E4 deferred",
+      "AR-068 USER_ACCEPTED_SEQUENCE/E2 with E4 deferred"
     ],
-    "reconciled_head": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-    "basis": "AR-068 focused3/full1270/Agent74 and all ten PR workflows are green. The local acknowledgement overlay is separate from authoritative Agent/project state, and new source revisions reappear as new attention events.",
-    "limits": "No interactive/visual final-build E4 claim. No AI Inbox/database, no shared/NAS acknowledgement state, no Agent task status mutation, and AR-069 is not started."
+    "reconciled_head": "9f09e8d1205b83a9bce733da547acc0544599179",
+    "basis": "One exact-SHA gate passes AR065 55/55, AR066 134/134, AR067 3/3 + runtime6/6, AR068 3/3, H2M110 1/1, full1270/1270, Agent74/74, 10/10 PR CI and Windows publish/helper IPC.",
+    "limits": "No real H2/OpenAI/native Office/model/interactive visual E4 claim; no credentials/personal files/external side effects; AR-070 not started."
   },
   "parked_acceptance": [
     {
@@ -1454,7 +1480,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "Unknown/ambiguous original live resources remain blocked; source approvals are exact-file, task-local, revision-bound and never restored as grants.",
     "AR064 PARTIAL, AR020/033 E3, AR051/065 E4, MB124-127 and AR083 DEFERRED_BY_USER remain unchanged."
   ],
-  "ar066_source_consent_evidence": "docs/agent-reliability/AR-066/source-consent-evidence.json"
+  "ar066_source_consent_evidence": "docs/agent-reliability/AR-066/source-consent-evidence.json",
+  "last_integration_gate_commit": "9f09e8d1205b83a9bce733da547acc0544599179"
 }
 ```
 
