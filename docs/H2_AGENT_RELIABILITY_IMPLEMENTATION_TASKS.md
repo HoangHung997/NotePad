@@ -104,7 +104,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER — final full-build real-environment test; NO_E4_PASS_CLAIM |
-| AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
+| AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | NOT_STARTED |
@@ -392,7 +392,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **Acceptance:** thêm plugin không sửa AgentRuntime; disabled tool không gọi được; refresh không invalidate task không liên quan; mã package/local profile không lọt secret vào repo.
 
-### [ ] AR-070 — Recovery chung, không đổi ngữ nghĩa để che lỗi
+### [~] AR-070 — Recovery chung, không đổi ngữ nghĩa để che lỗi
 
 **Sửa:** typed recovery policy trong existing execution boundary; provider-specific adapters cung cấp chẩn đoán; model nhận bounded context/recovery choices.
 
@@ -401,6 +401,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test E3/E4:** RC-13/14/21/25/27; modal, missing backend, expired handle, locked file, tool argument correction, alternative succeeds, no progress repeated input. Verify fallback làm đúng mục tiêu không chỉ “không lỗi”.
 
 **Acceptance:** model có thể tự xử lý lỗi thường mà không user gửi lại; blocker rõ nếu không có đường đúng; uncertain write luôn qua AR-041, không retry chung.
+
+**AR-070 implementation checkpoint — 2026-09-24:** core recovery policy implemented on exact source `566f634318192cf52699951ab4f55edd53a0d488`. Dedicated run `35957798526` / job `107500242184` SUCCESS: focused recovery-policy **5/5**, retained AR-020 **36/36**, AR-033 **42/42**, AR-066 **134/134**, AR-067 **3/3**, full H2 **1270/1270**, Agent **75/75**. Evidence artifact `10791402941`, SHA256 `1e6ba76db8fcbd2ad5b0e1856d0820495635f18fdf3f098820cdf0e1ff92a626`, independently downloaded/hashed/inspected: `failed=[]`, `clean_end=true`, E3/E4 both `DEFERRED_BY_USER`, no E3/E4 PASS claim. All ten pull_request workflows on the same source are SUCCESS; Avalonia CI `35957801240` / job `107499719591` includes full H2, the required AR-070 suite, Windows x64 publish and packaged-helper IPC. Portable artifact `10791113510` SHA256 `98f7f901adbf9f4697e89cb2d89ba43168a23790fbcf5676e4d1a32a55a84c25`; NAS probe `10790909138` SHA256 `0df8cb203eb7e5d4b2df31c0f5853056b84f7ac1020fb5f9d58e12094e6ca790`. The implementation blocks blind same-input transient retry without changed evidence, preserves same live/source identity, exposes bounded provider health/reobserve/backoff/alternate-backend choices, allows corrected arguments and fresh-state recovery, and leaves unknown/partial effects in reconcile-only handling. **AR-041/060/061 remain separate unfinished dependencies; real search/desktop/provider/model E3/E4 is deferred to final full-build testing and is not claimed passed.**
 
 ### [ ] AR-071 — Adapter thử theo environment [CÓ ĐIỀU KIỆN]
 
@@ -502,34 +504,51 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-069_CRITICAL_INTEGRATION_E2_PASS_E4_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
-  "active_task": "AR-069",
-  "implementation_status": "IMPLEMENTED_INTEGRATION_GATE",
+  "phase": "AR-070_RECOVERY_CORE_E2_PASS_E3_E4_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
+  "active_task": "AR-070",
+  "implementation_status": "IMPLEMENTED_CORE",
   "acceptance_status": "DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar069-critical-integration-2026-09-24",
-  "last_code_commit": "9f09e8d1205b83a9bce733da547acc0544599179",
-  "last_validated_code_commit": "9f09e8d1205b83a9bce733da547acc0544599179",
-  "last_validation_result": "AR069_AR065_55_PASS; AR066_134_PASS; AR067_3_PASS; AR068_3_PASS; H2M110_1_PASS; AR067_RUNTIME6_PASS; FULL1270_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; WINDOWS_X64_PUBLISH_AND_HELPER_IPC_PASS; E4_REAL_ENVIRONMENT_NOT_RUN_AND_DEFERRED_BY_USER_UNTIL_FINAL_FULL_BUILD_TEST; NO_E4_PASS_CLAIM",
-  "capture_checked_head": "9f09e8d1205b83a9bce733da547acc0544599179",
+  "owner_session": "chatgpt-ar070-provider-neutral-recovery-2026-09-24",
+  "last_code_commit": "566f634318192cf52699951ab4f55edd53a0d488",
+  "last_validated_code_commit": "566f634318192cf52699951ab4f55edd53a0d488",
+  "last_validation_result": "AR070_FOCUSED5_PASS; AR020_36_PASS; AR033_42_PASS; AR066_134_PASS; AR067_3_PASS; FULL1270_PASS; AGENT75_PASS; 10_OF_10_PR_CI_SUCCESS; WINDOWS_X64_PUBLISH_AND_HELPER_IPC_PASS; E3_E4_REAL_ENVIRONMENT_NOT_RUN_AND_DEFERRED_BY_USER; AR041_AR060_AR061_DEPENDENCY_DEBT_RETAINED; NO_E3_E4_PASS_CLAIM",
+  "capture_checked_head": "566f634318192cf52699951ab4f55edd53a0d488",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Exact AR-069 integration-gate source is 9f09e8d1205b83a9bce733da547acc0544599179; product runtime behavior remains from AR-068 code c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2. User-PC working tree NOT_ACCESSIBLE. GitHub Actions checkout/end CLEAN. AR-069 exact-SHA integration validator and all ten pull_request workflows completed SUCCESS, including full Avalonia Windows publish/helper IPC.",
+  "working_tree": "Exact AR-070 core recovery source is 566f634318192cf52699951ab4f55edd53a0d488. User-PC working tree NOT_ACCESSIBLE. GitHub Actions checkout/end CLEAN. Dedicated AR-070 validator, all ten pull_request workflows, full Avalonia publish/helper IPC and retained critical regressions completed SUCCESS. E3/E4 real provider/search/desktop/model acceptance remains deferred; AR-041/060/061 remain separate unfinished dependency debt.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T04:24:00+00:00",
+  "checkpoint_saved_at_utc": "2026-09-24T06:39:00+00:00",
   "completed_this_session": [
-    "Added AR-069 exact-SHA four-defect integration validator/workflow without changing product runtime semantics",
-    "Validated AR-065/066/067/068 focused production regressions together on one checkout plus H2M-110",
-    "Validated AR-067 runtime recovery corpus, full H2 1270/1270 and Agent 74/74 on the same SHA",
-    "Inspected AR069-Critical-Integration-Evidence artifact and independently verified its SHA256 and machine-readable E4 deferred/no-pass-claim matrix",
-    "Validated all ten pull_request workflows plus Windows x64 publish/helper IPC on exact AR-069 SHA",
-    "User policy retains real-environment OpenAI/native Office/model/visual acceptance for final full-build testing"
+    "Implemented provider-neutral typed recovery policy in the existing ToolOutcome/AgentRuntime execution boundary; no second planner or engine",
+    "Blocked unchanged transient retries until same-target/provider evidence changes; corrected arguments and fresh-state reobserve remain allowed",
+    "Preserved live/source identity and reconcile-only handling for unknown/partial mutation effects; alternate backends remain verifier-gated suggestions",
+    "Added required AR-070 focused suite to Avalonia CI and dedicated exact-SHA validator/workflow",
+    "Validated focused5, retained AR020/033/066/067, full H2 1270/1270, Agent 75/75, 10/10 PR CI and Windows publish/helper IPC",
+    "Independently downloaded/hashed/inspected AR070 evidence; E3/E4 are deferred by user and AR-041/060/061 dependency debt remains explicit"
   ],
   "remaining_in_active_task": [
-    "No additional AR-069 integration-harness implementation work is required by current E2 evidence.",
-    "AR-069 required E4 real H2/OpenAI/native Office/interactive visual integrated acceptance is DEFERRED_BY_USER until final full-build testing; this is NOT E4 PASS and all four underlying real-environment debts remain visible."
+    "No additional AR-070 core recovery-policy implementation work is required by current E1/E2 evidence.",
+    "AR-070 required E3/E4 real provider/search/desktop/model recovery corpus is DEFERRED_BY_USER until final full-build testing; this is NOT E3/E4 PASS.",
+    "AR-041 uncertain mutation/restart reconciliation, AR-060 real search/browser backend and AR-061 real desktop identity/capture/act remain separate unfinished dependencies and are not closed by AR-070."
   ],
   "last_test_commands": [
+    {
+      "command": "tools/agent-reliability/validate_ar070.ps1",
+      "sha": "566f634318192cf52699951ab4f55edd53a0d488",
+      "run_id": 35957798526,
+      "job_id": 107500242184,
+      "attempt": 1,
+      "result": "SUCCESS; focused 5/5; AR020 36/36; AR033 42/42; AR066 134/134; AR067 3/3; full H2 1270/1270; Agent 75/75; artifact 10791402941 sha256 1e6ba76db8fcbd2ad5b0e1856d0820495635f18fdf3f098820cdf0e1ff92a626; E3/E4 DEFERRED_BY_USER; no pass claim; clean_end=true"
+    },
+    {
+      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
+      "sha": "566f634318192cf52699951ab4f55edd53a0d488",
+      "run_id": 35957801240,
+      "job_id": 107499719591,
+      "attempt": 1,
+      "result": "SUCCESS; full H2 1270/1270; required AR070 suite 5/5; 10/10 pull_request workflows SUCCESS; merge checkout 58225be; portable 10791113510 sha256 98f7f901adbf9f4697e89cb2d89ba43168a23790fbcf5676e4d1a32a55a84c25; NAS probe 10790909138 sha256 0df8cb203eb7e5d4b2df31c0f5853056b84f7ac1020fb5f9d58e12094e6ca790"
+    },
     {
       "command": "tools/agent-reliability/validate_ar069.ps1",
       "sha": "9f09e8d1205b83a9bce733da547acc0544599179",
@@ -1294,12 +1313,12 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [],
-  "next_exact_action": "AR-069 integration implementation is green and required E4 is explicitly DEFERRED_BY_USER until final full-build testing. Do not start AR-070 in this same turn. In the next one-task turn resume the ordinary roadmap with only AR-070, preserving AR-064 and all deferred/awaiting real-environment debts without relabelling them PASS.",
-  "next_task_if_active_done": "AR-070 is READY for the next one-task turn under the user's test-later sequencing policy; one-task rule still applies.",
-  "last_runtime_source_commit": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-  "previous_saved_checkpoint_commit": "38b69ce686f21cb3f76fa53884a9164db872d984",
-  "finalization_checked_head": "9f09e8d1205b83a9bce733da547acc0544599179",
-  "additional_ci_after_recorded_run": "Exact AR-069 integration gate 9f09e8d1205b83a9bce733da547acc0544599179: run 35952370470 / job 107483447785 SUCCESS; focused AR065 55/55, AR066 134/134, AR067 3/3, AR068 3/3, H2M110 1/1; AR067 runtime 6/6; full1270/1270; Agent74/74; artifact10789975231 (3549611 bytes, sha256 1c2c60d5de38161a0fa20aa971a44a274ab8de029ba4eaf44ec02a4b02abd5ab) independently downloaded/hashed/inspected with failed=[], clean_end=true, E4=DEFERRED_BY_USER and e4_pass_claim=false. All ten pull_request workflows on exact SHA SUCCESS. Avalonia CI35952374697/job107483460322 SUCCESS with Windows x64 publish/helper IPC; portable10789372264 sha256 73520d427e25a0931faa198ede9775ecc8af318ee0965bbbfd7bb38a1d744ae9; NAS probe10789372241 sha256 bb59f999e56e8e76b487a853d825e0c3ea85f44fe66f1e98cf7dd0431a334090. This is E2 integration evidence only and does not upgrade E4.",
+  "next_exact_action": "AR-070 core implementation is green and E3/E4 are explicitly DEFERRED_BY_USER until final full-build testing. Do not start another task in this turn. In the next one-task turn resume ONLY the parked AR-064 plugin/provider lifecycle work from its saved checkpoint, because AR-071 depends on both AR-070 and AR-064; preserve AR-041/060/061 and all real-environment debts without relabelling them PASS.",
+  "next_task_if_active_done": "AR-064 is the next task to resume from its parked checkpoint; AR-071/072 remain optional/not selected and must not bypass unfinished AR-064. One-task rule still applies.",
+  "last_runtime_source_commit": "566f634318192cf52699951ab4f55edd53a0d488",
+  "previous_saved_checkpoint_commit": "80bb572b70ea84df6f5d00fedcfe70fc1d1b72d7",
+  "finalization_checked_head": "566f634318192cf52699951ab4f55edd53a0d488",
+  "additional_ci_after_recorded_run": "Exact AR-070 source 566f634318192cf52699951ab4f55edd53a0d488: dedicated run 35957798526 / job 107500242184 SUCCESS; focused5/5, AR020 36/36, AR033 42/42, AR066 134/134, AR067 3/3, full1270/1270, Agent75/75; artifact10791402941 (552171 bytes, sha256 1e6ba76db8fcbd2ad5b0e1856d0820495635f18fdf3f098820cdf0e1ff92a626) independently downloaded/hashed/inspected with failed=[], clean_end=true, E3=DEFERRED_BY_USER, E4=DEFERRED_BY_USER and e3_e4_pass_claim=false. All ten pull_request workflows on exact source SUCCESS. Avalonia CI35957801240/job107499719591 SUCCESS with merge checkout 58225be, full H2, required AR070 suite, Windows x64 publish/helper IPC; portable10791113510 sha256 98f7f901adbf9f4697e89cb2d89ba43168a23790fbcf5676e4d1a32a55a84c25; NAS probe10790909138 sha256 0df8cb203eb7e5d4b2df31c0f5853056b84f7ac1020fb5f9d58e12094e6ca790. Historical 251f1ca7 failed compile due only unescaped test JSON strings; 458e7524 focused3/5 exposed the same stale assertion representation; exact repaired 566f passes. This is E1/E2 core evidence only and does not upgrade E3/E4 or close AR-041/060/061.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
     {
@@ -1390,25 +1409,24 @@ Do not claim these defects were already covered by historical Office/transport/U
       "classification": "AR066 regression maintenance only; all historical failures remain failures"
     }
   ],
-  "code_commit_lookup": "git log -1 --format=%H -- tools/agent-reliability/validate_ar069.ps1 .github/workflows/h2-ar069-validation.yml",
-  "previous_completed_task": "AR-068 USER_ACCEPTED_SEQUENCE / E2_PASS / E4_DEFERRED_BY_USER",
-  "last_full_ci_checkout_sha": "1947d68434208be30c0c447f5ffbe7abe8452492",
+  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Tools/ToolRecoveryPolicy.cs experiments/H2AgentLab/Runtime/AgentRecoveryPolicy.cs experiments/H2AgentLab/Runtime/AgentRuntime.cs experiments/H2AgentLab/Runtime/MbRecoveryPolicyRuntimeTests.cs tools/agent-reliability/validate_ar070.ps1 .github/workflows/h2-ar070-validation.yml",
+  "previous_completed_task": "AR-069 USER_ACCEPTED_SEQUENCE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER",
+  "last_full_ci_checkout_sha": "58225be",
   "implemented_this_session": [
-    "AR-069 exact-SHA four-defect integration validator/workflow only; no product runtime semantics changed"
+    "AR-070 provider-neutral typed recovery policy/no-progress guard in the existing execution boundary; E3/E4 real-environment debt explicitly retained"
   ],
-  "next_ready_independent_task": "AR-070 NOT_STARTED; AR-069 required E4 is explicitly DEFERRED_BY_USER for final full-build testing, so resume only AR-070 in the next one-task turn. AR-064 and all real-environment debts remain visible, not passed.",
+  "next_ready_independent_task": "Resume parked AR-064 in the next one-task turn. AR-070 core is E2 green with E3/E4 deferred; AR-071 depends on AR-064+070 and remains optional/not selected. AR-041/060/061 and all real-environment debts remain visible, not passed.",
   "independent_dependency_assessment": {
-    "id": "AR-069",
-    "rule": "Tracker section 2.2 + user test-later policy: integrated implementation/regression may sequence forward while required real E4 is explicitly deferred; no acceptance-level inflation.",
+    "id": "AR-070",
+    "rule": "Tracker section 2.2 + user test-later policy: core recovery policy may sequence forward at E2 while its real-provider E3/E4 dependencies are explicitly deferred; no acceptance-level inflation.",
     "dependencies": [
-      "AR-065 IMPLEMENTED/E2 with real OpenAI E4 parked",
-      "AR-066 USER_ACCEPTED_SEQUENCE/E1-E2 with E3-E4 deferred",
-      "AR-067 USER_ACCEPTED_SEQUENCE/E2 with E4 deferred",
-      "AR-068 USER_ACCEPTED_SEQUENCE/E2 with E4 deferred"
+      "AR-041 NOT_STARTED — uncertain mutation/restart reconciliation remains separate and authoritative",
+      "AR-060 NOT_STARTED — real search/browser backend remains separate",
+      "AR-061 NOT_STARTED — real desktop identity/capture/act remains separate"
     ],
-    "reconciled_head": "9f09e8d1205b83a9bce733da547acc0544599179",
-    "basis": "One exact-SHA gate passes AR065 55/55, AR066 134/134, AR067 3/3 + runtime6/6, AR068 3/3, H2M110 1/1, full1270/1270, Agent74/74, 10/10 PR CI and Windows publish/helper IPC.",
-    "limits": "No real H2/OpenAI/native Office/model/interactive visual E4 claim; no credentials/personal files/external side effects; AR-070 not started."
+    "reconciled_head": "566f634318192cf52699951ab4f55edd53a0d488",
+    "basis": "Exact-SHA AR070 focused5/full1270/Agent75, retained AR020/033/066/067, 10/10 PR CI and Windows publish/helper IPC are green. Typed recovery policy blocks no-progress retry, preserves source identity, allows corrected/fresh-state recovery, and never auto-executes alternate backends.",
+    "limits": "No E3/E4 real search/desktop/provider/model recovery claim; unknown/partial effects remain reconcile-only and AR-041/060/061 are not closed."
   },
   "parked_acceptance": [
     {
@@ -1461,7 +1479,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   "parked_ar064": {
     "implementation": "PARTIAL",
     "acceptance": "E1/E2_PASS_FOR_INTEGRATED_FOUNDATION_ONLY; E3_NOT_RUN; NOT_DONE",
-    "reason": "Critical user report explicitly requires saving the current AR064 checkpoint before AR065-069. Not a waiver or completion.",
+    "reason": "Critical repair sequence plus AR-070 core checkpoint is now saved/green. Resume this parked AR-064 lifecycle task next; prior pause was not a waiver or completion.",
     "remaining": [
       "Product-used PluginManager/ProviderManager lifecycle management and task-version pin/journal composition.",
       "RC28 trusted concrete package/provider tool execution in production; skill-only/tool-only/provider package refresh and uninstall evidence.",
