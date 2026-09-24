@@ -151,9 +151,11 @@ public static class MbRepairRuntimeTests
                     CancellationToken.None);
                 throw new InvalidOperationException("Repair budget unexpectedly allowed completion.");
             }
-            catch (InvalidOperationException ex) when (
-                ex.Message.Contains("repair budget", StringComparison.OrdinalIgnoreCase))
+            catch (AgentVerificationRequiredException ex) when (
+                ex.Message.Contains("verification failure", StringComparison.OrdinalIgnoreCase))
             {
+                Check(ex.PublicText?.Contains("verification-still-failed", StringComparison.Ordinal) == true,
+                    "Exhausted verifier repair did not return to the Agent for a specific blocked final.");
             }
 
             Check(executions == 2,
@@ -186,6 +188,12 @@ public static class MbRepairRuntimeTests
             Check(executions == 2, "Recoverable failure was not corrected exactly once.");
             Check(transport.SawTypedFailure,
                 "Typed invalid_arguments failure did not return to the Agent before recovery.");
+            Check(transport.RecoveryState is { } recoverState
+                && recoverState.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
+                && recoverState.Contains("\"errorCode\":\"invalid_arguments\"", StringComparison.Ordinal)
+                && recoverState.Contains("\"retryClass\":\"CorrectInput\"", StringComparison.Ordinal)
+                && recoverState.Contains("\"attemptsAlreadyMade\":1", StringComparison.Ordinal),
+                "Recoverable failure lacked structured Agent recovery state on the existing tool continuation.");
             Check(result.Completion?.State.StartsWith("Completed", StringComparison.Ordinal) == true,
                 "Recovered failure remained in host completion state.");
         });
@@ -198,15 +206,25 @@ public static class MbRepairRuntimeTests
                 new AgentContextManager(),
                 Ar067Registry((call, ct) => throw new UnauthorizedAccessException("fixture denied")));
 
-            var result = await runtime.RunAsync(
-                Ar067Request("Create requested fixture report; preserve target identity.", maxRepairRounds: 2),
-                CancellationToken.None);
+            try
+            {
+                _ = await runtime.RunAsync(
+                    Ar067Request("Create requested fixture report; preserve target identity.", maxRepairRounds: 2),
+                    CancellationToken.None);
+                throw new InvalidOperationException("Non-recoverable failure unexpectedly completed.");
+            }
+            catch (AgentVerificationRequiredException ex) when (
+                ex.Message.Contains("permission_denied", StringComparison.Ordinal))
+            {
+                Check(ex.Completion?.State is "Blocked" or "PartiallyCompleted",
+                    "Non-recoverable failure was not retained as blocked/partial host state.");
+                Check(ex.PublicText?.Contains("permission_denied", StringComparison.Ordinal) == true
+                    && ex.PublicText.Contains("doc-1", StringComparison.Ordinal),
+                    "Blocked final was not the Agent's specific failure explanation.");
+                Check(!ex.PublicText.StartsWith("Chưa hoàn thành: công cụ vẫn còn lỗi", StringComparison.Ordinal),
+                    "Legacy generic host final leaked into the user-facing result.");
+            }
 
-            Check(result.Completion?.State is "Blocked" or "PartiallyCompleted",
-                "Non-recoverable failure was not retained as blocked/partial host state.");
-            Check(result.FinalText.Contains("permission_denied", StringComparison.Ordinal)
-                && result.FinalText.Contains("doc-1", StringComparison.Ordinal),
-                "Blocked final was not the Agent's specific failure explanation.");
             Check(transport.RecoveryState is { } state
                 && state.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
                 && state.Contains("\"stage\":\"Execution\"", StringComparison.Ordinal)
@@ -217,8 +235,6 @@ public static class MbRepairRuntimeTests
                 && state.Contains("\"unresolvedObligations\"", StringComparison.Ordinal)
                 && state.Contains("\"forbiddenSemanticFallbacks\"", StringComparison.Ordinal),
                 "Agent did not receive the required structured recovery facts.");
-            Check(!result.FinalText.StartsWith("Chưa hoàn thành: công cụ vẫn còn lỗi", StringComparison.Ordinal),
-                "Legacy generic host final leaked into the user-facing result.");
         });
 
         await Test("AR-067 model continuation outage returns bounded technical card instead of generic tool error", async () =>
@@ -324,6 +340,7 @@ public static class MbRepairRuntimeTests
     {
         private int _continuations;
         public bool SawTypedFailure { get; private set; }
+        public string? RecoveryState { get; private set; }
         public AgentTransportCapabilities Capabilities => AgentTransportCapabilities.Minimal;
 
         public async IAsyncEnumerable<AgentTransportEvent> StartAsync(
@@ -358,6 +375,7 @@ public static class MbRepairRuntimeTests
                 SawTypedFailure = failed.IsError
                     && failed.Outcome?.Error?.Code == "invalid_arguments"
                     && failed.Outcome.Error.RetryClass == ToolRetryClass.CorrectInput;
+                RecoveryState = failed.Content;
                 yield return AgentTransportEvent.Tool(new("ar067-good", "fixture.recover",
                     "{\"resource_id\":\"doc-1\",\"value\":\"good\"}"));
                 yield return AgentTransportEvent.Complete("ar067", "tool_calls");
@@ -413,30 +431,28 @@ public static class MbRepairRuntimeTests
             }
             if (_continuations == 2)
             {
-                if (!request.ToolResults.Single().IsError
-                    || request.ToolResults.Single().Outcome?.Error?.Code != "permission_denied")
+                var failed = request.ToolResults.Single();
+                if (!failed.IsError || failed.Outcome?.Error?.Code != "permission_denied")
                     throw new InvalidOperationException("Permission failure did not return to the Agent.");
-                yield return AgentTransportEvent.TextDeltaEvent("I need authoritative recovery state.");
+                RecoveryState = failed.Content;
+                if (!RecoveryState.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal))
+                    throw new InvalidOperationException("Structured AR-067 recovery state was not supplied.");
+                if (failRecoveryContinuation)
+                {
+                    await Task.Yield();
+                    throw new System.Net.Http.HttpRequestException("synthetic model continuation outage");
+                }
+
+                yield return AgentTransportEvent.TextDeltaEvent(
+                    "Không thể hoàn tất trên doc-1: fixture.recover bị permission_denied. "
+                    + "Tôi đã thử đúng tài nguyên được yêu cầu và không đổi sang nguồn khác; "
+                    + "cần cấp quyền cho tài nguyên này rồi tiếp tục.");
+                await Task.Yield();
                 yield return AgentTransportEvent.Complete("ar067", "stop");
                 yield break;
             }
 
-            RecoveryState = request.SupplementalUserMessages?.SingleOrDefault(x =>
-                x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal));
-            if (RecoveryState is null)
-                throw new InvalidOperationException("Structured AR-067 recovery state was not supplied.");
-            if (failRecoveryContinuation)
-            {
-                await Task.Yield();
-                throw new System.Net.Http.HttpRequestException("synthetic model continuation outage");
-            }
-
-            yield return AgentTransportEvent.TextDeltaEvent(
-                "Không thể hoàn tất trên doc-1: fixture.recover bị permission_denied. "
-                + "Tôi đã thử đúng tài nguyên được yêu cầu và không đổi sang nguồn khác; "
-                + "cần cấp quyền cho tài nguyên này rồi tiếp tục.");
-            await Task.Yield();
-            yield return AgentTransportEvent.Complete("ar067", "stop");
+            throw new InvalidOperationException("Unexpected AR-067 blocked continuation.");
         }
 
         public void Cancel() { }
@@ -703,7 +719,18 @@ public static class MbRepairRuntimeTests
                 yield break;
             }
 
-            throw new InvalidOperationException("Repair budget should stop before another continuation.");
+            if (Continuations == 3)
+            {
+                var failed = request.ToolResults.Single();
+                if (!failed.IsError || !failed.Content.Contains("Repair budget is exhausted", StringComparison.Ordinal))
+                    throw new InvalidOperationException("Exhausted repair state did not return to the Agent.");
+                yield return AgentTransportEvent.TextDeltaEvent("verification-still-failed");
+                await Task.Yield();
+                yield return AgentTransportEvent.Complete("blocked", "stop");
+                yield break;
+            }
+
+            throw new InvalidOperationException("Repair budget exceeded its single explanation continuation.");
         }
     }
 

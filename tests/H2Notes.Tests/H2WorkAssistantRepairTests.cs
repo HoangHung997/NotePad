@@ -259,10 +259,10 @@ internal static class H2WorkAssistantRepairTests
                     && string.IsNullOrWhiteSpace(done.Error), done.Error ?? done.FinalText ?? done.Status.ToString());
                 Check(!File.Exists(Path.Combine(root, "hello.txt")), "Unknown tool executed a write");
                 Check(script.Results.Single().IsError, "Failure was not sent to model");
-                Check(script.Supplemental.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
+                Check(script.RecoveryStates.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
                     && x.Contains("\"errorCode\":\"unknown_tool\"", StringComparison.Ordinal)
                     && x.Contains("\"safeRecoveryCandidates\"", StringComparison.Ordinal)),
-                    "Structured failure state was not returned to the production Agent.");
+                    "Structured failure state was not returned on the production tool-result continuation.");
             }));
 
         test("AR-067 Work Assistant model continuation outage exposes technical card without claiming completion", () => InWorkspace(root =>
@@ -277,8 +277,8 @@ internal static class H2WorkAssistantRepairTests
                 && done.FinalText.Contains("khôi phục kết nối/cấu hình model", StringComparison.Ordinal)
                 && string.IsNullOrWhiteSpace(done.Error),
                 done.Error ?? done.FinalText ?? done.Status.ToString());
-            Check(script.Supplemental.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)),
-                "Model outage fixture did not reach the recovery continuation boundary.");
+            Check(script.RecoveryStates.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)),
+                "Model outage fixture did not receive structured recovery state before continuation failed.");
         }));
 
         test("Work Assistant recovers qualified callable with selected-folder permission and verified write", () => InWorkspace(root =>
@@ -398,7 +398,7 @@ internal static class H2WorkAssistantRepairTests
         private readonly AgentTransportToolCall[] _calls = calls;
         private readonly string _finalText = finalText;
         private readonly bool _failRecoveryContinuation = failRecoveryContinuation;
-        public List<AgentToolResult> Results = []; public List<string> Loaded = []; public List<string> Supplemental = [];
+        public List<AgentToolResult> Results = []; public List<string> Loaded = []; public List<string> RecoveryStates = [];
         public IAgentTransport Create(AiProfile p, string key, AgentRunTelemetry t) => new Transport(this);
         private sealed class Transport(Script script) : IAgentTransport
         {
@@ -409,9 +409,10 @@ internal static class H2WorkAssistantRepairTests
             {
                 script.Results.AddRange(r.ToolResults);
                 script.Loaded.AddRange(r.NewlyLoadedTools?.Select(x => x.Name) ?? []);
-                script.Supplemental.AddRange(r.SupplementalUserMessages ?? []);
+                script.RecoveryStates.AddRange(r.ToolResults.Select(x => x.Content)
+                    .Where(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)));
                 if (script._failRecoveryContinuation
-                    && (r.SupplementalUserMessages?.Any(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)) ?? false))
+                    && r.ToolResults.Any(x => x.Content.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)))
                     return FailedRound(ct);
                 return Round(ct);
             }

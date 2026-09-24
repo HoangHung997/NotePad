@@ -273,12 +273,19 @@ public sealed class AgentOrchestratedRun
         {
             if (!session.StateMachine.IsTerminal)
                 _orchestrator.Block(session, ex.Message);
+            if (!string.IsNullOrWhiteSpace(ex.PublicText))
+            {
+                labSession.Add("assistant", ex.PublicText);
+                save();
+                Emit(trace, output, AgentProgressEventKind.Final, "runtime-blocked-final", Bound(ex.PublicText));
+                output("final", ex.PublicText);
+            }
             Emit(
                 trace,
                 output,
                 AgentProgressEventKind.Warning,
                 "verification-required",
-                "Tác vụ có thay đổi chưa được đánh dấu hoàn tất vì chưa có bằng chứng xác minh đạt yêu cầu.");
+                "Tác vụ chưa được đánh dấu hoàn tất; trạng thái host và bằng chứng được giữ để tiếp tục.");
 
             var blockedContext = _orchestrator.ContextManager.Build(contextInput);
             var blockedDiagnostics = AgentDiagnostics.FromContext(blockedContext);

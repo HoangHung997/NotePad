@@ -260,9 +260,6 @@ public sealed class AgentRuntime : IAsyncDisposable
         H2AgentCompletionAssessment? completion = null;
         var mutationAwaitingVerification = false;
         var unresolvedCalls = new List<RuntimeFailureObservation>();
-        var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
-        var recoveryPromptFingerprints = new HashSet<string>(StringComparer.Ordinal);
-        var blockedExplanationFingerprints = new HashSet<string>(StringComparer.Ordinal);
         var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
         var uncertainResources = new HashSet<string>(StringComparer.Ordinal);
         RuntimeFailureObservation ObserveFailure(global::H2AgentLab.ToolCall call, ToolOutcome? outcome,
@@ -375,13 +372,16 @@ public sealed class AgentRuntime : IAsyncDisposable
             catch (AgentVerificationRequiredException) { throw; }
             catch (Exception ex) when (ex is IOException or TimeoutException or System.Net.Http.HttpRequestException)
             {
+                // Initial transport failures remain owned by the provider/AR-065 path so exact
+                // provider diagnostics and retry policy are preserved. Only a continuation that
+                // was already carrying Agent-visible recovery state becomes this technical card.
+                if (start is not null) throw;
                 var blocked = assessment.Snapshot(effectiveContract, unresolvedCalls.Count,
                     pendingOperations.Count, latestVerification);
-                throw new AgentVerificationRequiredException(
-                    start is null ? "model_continuation_unavailable" : "model_start_unavailable", ex)
+                throw new AgentVerificationRequiredException("model_continuation_unavailable", ex)
                 {
-                    Completion = blocked,
-                    PublicText = BuildModelUnavailableCard(start is null ? "model_continuation" : "model_start",
+                    Completion = blocked with { State = blocked.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" },
+                    PublicText = BuildModelUnavailableCard("model_continuation",
                         effectiveContract, unresolvedCalls, pendingOperations, latestVerification)
                 };
             }
@@ -424,51 +424,44 @@ public sealed class AgentRuntime : IAsyncDisposable
                     unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId));
                     mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                     completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
-                    if (completion.State is "Blocked" or "PartiallyCompleted")
-                    {
-                        request.CompletionObserver?.Invoke(completion with { State = "Verifying" });
-                        var recoveryState = BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
-                            pendingOperations, latestVerification, explanationOnly: false);
-                        var fingerprint = RecoveryFingerprint(recoveryState);
-                        if (repairRounds < request.MaxRepairRounds && toolRounds < request.MaxToolRounds
-                            && recoveryPromptFingerprints.Add(fingerprint))
-                        {
-                            toolRounds++; repairRounds++;
-                            round = await SendModelAsync(null, new(taskId, turnId, [],
-                                SupplementalUserMessages: [recoveryState])).ConfigureAwait(false);
-                            continue;
-                        }
-                        if (recoveryPromptFingerprints.Contains(fingerprint)
-                            && !string.IsNullOrWhiteSpace(round.Text))
-                        {
-                            request.CompletionObserver?.Invoke(completion);
-                            return RuntimeResult(round, completion);
-                        }
-                        if (blockedExplanationFingerprints.Add(fingerprint))
-                        {
-                            var explain = BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
-                                pendingOperations, latestVerification, explanationOnly: true);
-                            round = await SendModelAsync(null, new(taskId, turnId, [],
-                                SupplementalUserMessages: [explain])).ConfigureAwait(false);
-                            continue;
-                        }
-                        if (!string.IsNullOrWhiteSpace(round.Text))
-                        {
-                            request.CompletionObserver?.Invoke(completion);
-                            return RuntimeResult(round, completion);
-                        }
-                        throw new AgentVerificationRequiredException("model_blocked_explanation_empty")
-                        {
-                            Completion = completion,
-                            PublicText = BuildModelUnavailableCard("blocked_explanation", effectiveContract,
-                                unresolvedCalls, pendingOperations, latestVerification)
-                        };
-                    }
-
                     request.CompletionObserver?.Invoke(completion with { State = "Verifying" });
                     await _hooks.BeforeCompletionAsync(new(hookScope, effectiveContract, round.Text,
                         latestVerification, unresolvedCalls.Count, mutationAwaitingVerification), cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    if (pendingOperations.Count > 0)
+                        throw new AgentVerificationRequiredException("Chưa thể hoàn tất: còn công việc đang chạy hoặc tác động cần đối soát. "
+                            + string.Join("; ", pendingOperations.Values.Take(8).Select(o => o.Status + (o.Error is null ? "" : " (" + o.Error.Code + ")")
+                                + (o.Job is null ? "" : " job=" + o.Job.JobId)))
+                            + ". Không tự lặp thao tác ghi.");
+
+                    if (unresolvedCalls.Count > 0)
+                    {
+                        var blocked = completion with { State = completion.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" };
+                        request.CompletionObserver?.Invoke(blocked);
+                        throw new AgentVerificationRequiredException(
+                            "Agent blocked after recovery: " + string.Join("; ",
+                                unresolvedCalls.Take(8).Select(f => f.Name + " (" + f.Code + ")")))
+                        {
+                            Completion = blocked,
+                            PublicText = string.IsNullOrWhiteSpace(round.Text) ? null : round.Text
+                        };
+                    }
+
+                    if (latestVerification is { Passed: false })
+                    {
+                        var blocked = completion with { State = completion.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" };
+                        request.CompletionObserver?.Invoke(blocked);
+                        throw new AgentVerificationRequiredException("Agent blocked after verification failure.")
+                        {
+                            Completion = blocked,
+                            PublicText = string.IsNullOrWhiteSpace(round.Text) ? null : round.Text
+                        };
+                    }
+
+                    if (mutationAwaitingVerification)
+                        throw new AgentVerificationRequiredException("The latest mutation has no verifier report.");
+
                     try { effectiveContract.Goals?.EnsureComplete(); }
                     catch (InvalidOperationException ex) { throw new AgentVerificationRequiredException(ex.Message, ex); }
                     EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
@@ -579,9 +572,9 @@ public sealed class AgentRuntime : IAsyncDisposable
                         catch (JsonException) { }
                         if (code != "repeated_failed_mutation")
                             unresolvedCalls.Add(ObserveFailure(executedCall, result.Outcome, code, recovery, failureId));
-                        var failedSignature = MutationSignature(executedCall) + ":" + code;
-                        repeatedFailures.TryGetValue(failedSignature, out var repeated);
-                        repeatedFailures[failedSignature] = repeated + 1;
+                        // Retry count is carried in RuntimeFailureObservation. Mutating duplicates
+                        // are still fail-closed before dispatch by failedMutationSignatures; all
+                        // work remains bounded by MaxToolRounds/MaxRepairRounds.
                     }
                     else if (executedName != DeferredToolDiscovery.SearchToolName
                         && _registry.TryGet(executedName, out var successful) && successful.Namespace.Name != "core")
@@ -685,6 +678,23 @@ public sealed class AgentRuntime : IAsyncDisposable
                 mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                 completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
                 request.CompletionObserver?.Invoke(completion);
+
+                // Attach the authoritative typed failure state to the SAME tool-result continuation
+                // the model already receives. This avoids a second hidden planning turn while making
+                // stage/provider/target/retry/effect/attempts/recovery/obligations visible to Agent.
+                if (unresolvedCalls.Count > 0 && results.Length > 0)
+                {
+                    var failureIndex = Array.FindIndex(results, r => r.IsError);
+                    if (failureIndex < 0) failureIndex = 0;
+                    var recoveryState = BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
+                        pendingOperations, latestVerification);
+                    results[failureIndex] = results[failureIndex] with
+                    {
+                        Content = BoundToolOutput(results[failureIndex].Content
+                            + Environment.NewLine + Environment.NewLine + recoveryState),
+                        IsError = true
+                    };
+                }
 
                 await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
                     contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
@@ -1157,7 +1167,7 @@ public sealed class AgentRuntime : IAsyncDisposable
 
     private static string BuildRecoveryState(AgentTaskContract contract, H2AgentCompletionAssessment completion,
         IReadOnlyList<RuntimeFailureObservation> failures, IReadOnlyDictionary<string, ToolOutcome> pending,
-        VerificationReport? verification, bool explanationOnly)
+        VerificationReport? verification)
     {
         var unresolved = contract.Goals!.Active.Where(x => x.Status != AgentObligationStatus.Verified)
             .Select(x => new { id = x.Id, status = x.Status.ToString(), requirement = x.Requirement }).ToArray();
@@ -1165,7 +1175,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         var payload = JsonSerializer.Serialize(new
         {
             schema = "h2-agent-recovery-state/v1",
-            state = explanationOnly ? "blocked_explanation_required" : "recovery_required",
+            state = "recovery_required",
             completion,
             failures = failures.TakeLast(8).Select(f => new
             {
@@ -1200,15 +1210,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                 { c.CriterionId, status = c.Status.ToString(), c.EvidenceIds, failure = c.Failure?.Message }).ToArray()
             }
         });
-        var instruction = explanationOnly
-            ? "No host repair budget remains for this unchanged state. Do not call tools. Write the user-facing blocked/partial answer from this authoritative state: what succeeded, what remains, exact known cause, attempts already made, unsafe/non-equivalent fallbacks not used, and the user/app/config change needed. Do not claim completion and do not use a generic 'tool error' paragraph."
-            : "Continue the original user goal without a new user prompt when a safe goal-preserving recovery remains. Do not blindly repeat the same call without changed evidence. Unknown/partial mutation effects require reconciliation before replay. If no allowed recovery remains, call no tool and write the specific user-facing blocked/partial explanation using the supplied facts. Do not claim completion.";
+        var instruction = "Continue the original user goal without a new user prompt when a safe goal-preserving recovery remains. "
+            + "Do not blindly repeat the same call without changed evidence. Unknown/partial mutation effects require reconciliation before replay. "
+            + "If no allowed recovery remains, call no tool and write the specific user-facing blocked/partial explanation: what succeeded, what remains, exact known cause, attempts already made, unsafe/non-equivalent fallbacks not used, and the user/app/config change needed. Do not claim completion.";
         return "[HOST RECOVERY STATE]" + Environment.NewLine + payload
             + Environment.NewLine + "[HOST RECOVERY INSTRUCTION]" + Environment.NewLine + instruction;
     }
-
-    private static string RecoveryFingerprint(string state)
-        => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(state))).ToLowerInvariant();
 
     private static string BuildModelUnavailableCard(string phase, AgentTaskContract contract,
         IReadOnlyList<RuntimeFailureObservation> failures, IReadOnlyDictionary<string, ToolOutcome> pending,
