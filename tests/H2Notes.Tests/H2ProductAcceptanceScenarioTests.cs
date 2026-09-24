@@ -57,16 +57,27 @@ internal static class H2ProductAcceptanceScenarioTests
             {
                 var items = window.FindControl<ListBox>("CommandCenterList")!.ItemsSource!
                     .Cast<object>().ToArray();
-                var attention = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!
-                    .Cast<object>().ToArray();
+                var attentionList = window.FindControl<ListBox>("CommandCenterAttentionList")!;
+                var attentionHeader = window.FindControl<TextBlock>("CommandCenterAttentionHeader")!;
                 var sync = window.FindControl<TextBlock>("CommandCenterSync")!.Text ?? "";
 
                 string Get(object item, string name)
                     => item.GetType().GetProperty(name)!.GetValue(item)?.ToString() ?? "";
 
                 Check(items.Length == 3, "Command Center did not present the realistic project set.");
-                Check(attention.Any(item => Get(item, "Title").Contains("Duyệt", StringComparison.Ordinal)),
-                    "User cannot see what needs attention.");
+                Check(attentionHeader.Text == "Cần bạn xử lý · 1" && !attentionList.IsVisible,
+                    "Collapsed Command Center did not expose the attention count without covering project cards.");
+                Check(items.Any(item => Get(item, "Name") == "Hồ sơ cần duyệt"
+                    && Get(item, "AttentionText") == "1 cần xem"),
+                    "Project card did not expose what needs attention while the section is collapsed.");
+
+                window.FindControl<Button>("CommandCenterAttentionToggle")!
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                var attention = attentionList.ItemsSource!.Cast<object>().ToArray();
+                Check(attentionList.IsVisible
+                    && attention.Any(item => Get(item, "Title").Contains("Duyệt", StringComparison.Ordinal)),
+                    "User cannot expand and see the concrete attention item.");
                 Check(items.Any(item => Get(item, "Name") == "Dự toán đang làm"
                     && Get(item, "AgentText").Contains("đang làm", StringComparison.OrdinalIgnoreCase)),
                     "User cannot see what is working.");
