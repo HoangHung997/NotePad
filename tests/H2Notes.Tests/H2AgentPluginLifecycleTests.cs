@@ -300,6 +300,106 @@ internal static class H2AgentPluginLifecycleTests
                 Reject(() => manager.Quarantine(Id, version, "test")); Reject(() => manager.Enable(Id, version));
                 Check(Directory.GetFiles(root, "*", SearchOption.AllDirectories).Length == 0, "Unsafe version wrote metadata.");
             }));
+        test("AR-064 production adapter lifecycle executes provider-backed package pins exact version and preserves evidence after restart", () => WithRoot(root =>
+        {
+            var state = Path.Combine(root, "agent-state");
+            var package = Package(root, "1.0.0", providers: ["provider.fixture"]);
+            var provider = new DefinitionProvider { Definitions = [PluginDefinition("fixture.echo", "1.0.0")] };
+            var transport = new PluginRuntimeTransportFactory();
+            Guid taskId;
+            string evidenceId;
+
+            using (var adapter = new H2AgentLab.Integration.H2ProductionAgentAdapter(
+                state,
+                () => new H2AgentLab.Integration.H2ProductionAgentModel(
+                    new H2Notes.Core.AiProfile { Name = "AR064 CI", Protocol = H2Notes.Core.AiProtocol.OpenAiChat,
+                        BaseUrl = "https://example.test/v1", Model = "ar064-ci" }, ""),
+                transportFactory: transport,
+                extensionProviders: [provider]))
+            {
+                var lifecycle = (H2Notes.Core.IH2AgentExtensionLifecycle)adapter;
+                var installed = lifecycle.InstallPlugin(ToProductPackage(package));
+                Check(installed.Enabled && installed.IntegrityValid
+                    && installed.Providers.SequenceEqual(["provider.fixture"]),
+                    "Product lifecycle did not activate the verified provider-backed package.");
+
+                taskId = adapter.StartTaskAsync(null, "Use the installed fixture echo capability.",
+                    new H2Notes.Core.H2AgentTaskContext(root, "AR064 production lifecycle"),
+                    readOnly: true).GetAwaiter().GetResult();
+                var done = WaitProduction(adapter, taskId);
+                Check(done.Status == H2Notes.Core.H2AgentTaskStatus.Completed
+                    && done.FinalText == "AR064 plugin production complete.",
+                    "Production adapter did not execute the installed package tool.");
+                var pin = done.Evidence.Single(x => x.Kind == "capability-pin");
+                Check(pin.Summary?.Contains(Id + "@1.0.0", StringComparison.Ordinal) == true
+                    && pin.Summary.Contains("provider.fixture@1.0.0", StringComparison.Ordinal),
+                    "Task capability evidence lost exact plugin/provider version pins.");
+                evidenceId = pin.EvidenceId;
+
+                provider.Definitions = [PluginDefinition("fixture.echo", "2.0.0")];
+                var v2 = Package(root, "2.0.0", providers: ["provider.fixture"]);
+                _ = lifecycle.InstallPlugin(ToProductPackage(v2));
+                Check(lifecycle.GetPlugins().Single(x => x.Id == Id && x.Version == "2.0.0").Enabled,
+                    "Safe-boundary update did not activate v2 without restarting H2.");
+
+                lifecycle.DisablePlugin(Id);
+                Check(lifecycle.GetPlugins().Any(x => x.Id == Id && x.Version == "2.0.0" && !x.Enabled),
+                    "Product command path did not persist disabled state.");
+                _ = lifecycle.EnablePlugin(Id, "2.0.0");
+            }
+
+            var providerAfterRestart = new DefinitionProvider { Definitions = [PluginDefinition("fixture.echo", "2.0.0")] };
+            using var restarted = new H2AgentLab.Integration.H2ProductionAgentAdapter(
+                state,
+                () => new H2AgentLab.Integration.H2ProductionAgentModel(
+                    new H2Notes.Core.AiProfile { Name = "AR064 CI", Protocol = H2Notes.Core.AiProtocol.OpenAiChat,
+                        BaseUrl = "https://example.test/v1", Model = "ar064-ci" }, ""),
+                transportFactory: new PluginRuntimeTransportFactory(),
+                extensionProviders: [providerAfterRestart]);
+            var after = ((H2Notes.Core.IH2AgentExtensionLifecycle)restarted).GetPlugins();
+            Check(after.Any(x => x.Id == Id && x.Version == "2.0.0" && x.Enabled && x.IntegrityValid),
+                "Active plugin was not restored into the production lifecycle after restart.");
+            Check(restarted.GetTaskSummary(taskId).Evidence.Any(x => x.EvidenceId == evidenceId),
+                "Historical task pin evidence was lost after plugin update/restart.");
+        }));
+
+        test("AR-064 production task pin blocks package update while provider tool is executing", () => WithRoot(root =>
+        {
+            var state = Path.Combine(root, "agent-state");
+            var provider = new DefinitionProvider
+            {
+                Definitions = [PluginDefinition("fixture.echo", "1.0.0")],
+                ExecuteRelease = new()
+            };
+            using var adapter = new H2AgentLab.Integration.H2ProductionAgentAdapter(
+                state,
+                () => new H2AgentLab.Integration.H2ProductionAgentModel(
+                    new H2Notes.Core.AiProfile { Name = "AR064 CI", Protocol = H2Notes.Core.AiProtocol.OpenAiChat,
+                        BaseUrl = "https://example.test/v1", Model = "ar064-ci" }, ""),
+                transportFactory: new PluginRuntimeTransportFactory(),
+                extensionProviders: [provider]);
+            var lifecycle = (H2Notes.Core.IH2AgentExtensionLifecycle)adapter;
+            _ = lifecycle.InstallPlugin(ToProductPackage(Package(root, "1.0.0", providers: ["provider.fixture"])));
+
+            var taskId = adapter.StartTaskAsync(null, "Use the installed fixture echo capability.",
+                new H2Notes.Core.H2AgentTaskContext(root, "AR064 pinned production lifecycle"),
+                readOnly: true).GetAwaiter().GetResult();
+            var deadline = Environment.TickCount64 + 5000;
+            while (provider.Calls == 0 && Environment.TickCount64 < deadline) Thread.Sleep(10);
+            Check(provider.Calls == 1, "Provider-backed package call did not start.");
+
+            Reject(() => lifecycle.InstallPlugin(ToProductPackage(Package(root, "2.0.0", providers: ["provider.fixture"]))));
+            Check(lifecycle.GetPlugins().Any(x => x.Id == Id && x.Version == "1.0.0" && x.Enabled),
+                "Blocked update changed the task-pinned active version.");
+
+            provider.ExecuteRelease.SetResult();
+            var done = WaitProduction(adapter, taskId);
+            Check(done.Status == H2Notes.Core.H2AgentTaskStatus.Completed,
+                "Pinned provider task did not finish after release.");
+            provider.Definitions = [PluginDefinition("fixture.echo", "2.0.0")];
+            _ = lifecycle.InstallPlugin(ToProductPackage(Package(root, "2.0.0", providers: ["provider.fixture"])));
+        }));
+
         foreach (var entry in new[] { "ADMISSION.JSON", "../outside.txt", "/rooted.txt", "folder./file.txt" })
             test("AR-064 package rejects reserved or escaping archive entry " + entry, () => WithRoot(root =>
             {
@@ -314,7 +414,7 @@ internal static class H2AgentPluginLifecycleTests
         => manager.InstallFromArchive(package.Path, package.Entry, Policy, userApproved: true);
     internal static BuiltPackage Package(string root, string version, string id = Id, string toolName = "fixture.echo",
         bool selfTest = true, string minimum = "2.0.0", string[]? permissions = null, string? secondNamespace = null,
-        bool skillOnly = false, string? extraEntry = null, bool mutating = false)
+        bool skillOnly = false, string? extraEntry = null, bool mutating = false, string[]? providers = null)
     {
         var path = Path.Combine(root, id + "-" + version + "-" + Guid.NewGuid().ToString("N") + ".zip");
         using var memory = new MemoryStream();
@@ -335,7 +435,7 @@ internal static class H2AgentPluginLifecycleTests
         memory.Position = 0; string payload;
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Read, true)) payload = PluginManager.ComputePayloadHash(zip);
         var manifest = new H2PluginManifest(id, "AR064 fixture", version, minimum, "ar064.publisher", "sha256:" + payload,
-            skillOnly ? [] : secondNamespace is null ? [toolName] : [toolName, "fixture.second"], ["audit"], [], permissions ?? (mutating ? ["read", "write"] : ["read"]), SelfTestFile: "selftest.json");
+            skillOnly ? [] : secondNamespace is null ? [toolName] : [toolName, "fixture.second"], ["audit"], providers ?? [], permissions ?? (mutating ? ["read", "write"] : ["read"]), SelfTestFile: "selftest.json");
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Update, true)) Write(zip, "manifest.json", JsonSerializer.Serialize(manifest));
         var bytes = memory.ToArray(); File.WriteAllBytes(path, bytes);
         return new(path, new(id, manifest.Name, version, "AR064 fixture", manifest.Publisher, ["fixture"], ["audit"], minimum,
@@ -355,6 +455,89 @@ internal static class H2AgentPluginLifecycleTests
                 return JsonSerializer.Serialize(new { version = manifest.Version });
             });
     }
+    private static H2Notes.Core.H2AgentPluginPackage ToProductPackage(BuiltPackage package)
+        => new(package.Path, package.Entry.Id, package.Entry.Name, package.Entry.Version, package.Entry.Summary,
+            package.Entry.Publisher, package.Entry.MinAgentVersion, H2Notes.Core.H2AgentPluginTrust.LocalDeveloper,
+            package.Entry.ArchiveSha256, UserApproved: true);
+
+    private static H2Notes.Core.H2AgentTaskSummary WaitProduction(H2Notes.Core.IH2AgentAdapter adapter, Guid taskId)
+    {
+        var deadline = Environment.TickCount64 + 8000;
+        while (Environment.TickCount64 < deadline)
+        {
+            var summary = adapter.GetTaskSummary(taskId);
+            if (summary.Status is H2Notes.Core.H2AgentTaskStatus.Completed or H2Notes.Core.H2AgentTaskStatus.Blocked
+                or H2Notes.Core.H2AgentTaskStatus.Cancelled or H2Notes.Core.H2AgentTaskStatus.Failed)
+                return summary;
+            Thread.Sleep(20);
+        }
+        throw new TimeoutException("Timed out waiting for AR-064 production plugin task.");
+    }
+
+    private static ProviderToolDefinition PluginDefinition(string name, string version)
+    {
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "function",
+            function = new
+            {
+                name,
+                parameters = new { type = "object", properties = new { }, additionalProperties = false }
+            }
+        });
+        return new(new(name, "fixture", "AR064 local fixture", AgentToolAccess.ReadOnly,
+            AgentToolRisk.Low, false, "v1", "fixture", "fixture", version), schema);
+    }
+
+    private sealed class PluginRuntimeTransportFactory : H2AgentLab.Transport.IAgentTransportFactory
+    {
+        public H2AgentLab.Transport.IAgentTransport Create(H2Notes.Core.AiProfile profile, string apiKey,
+            H2AgentLab.Metrics.AgentRunTelemetry telemetry) => new Transport();
+
+        private sealed class Transport : H2AgentLab.Transport.IAgentTransport
+        {
+            private int _continuations;
+            public H2AgentLab.Transport.AgentTransportCapabilities Capabilities
+                => H2AgentLab.Transport.AgentTransportCapabilities.ChatCompletionsFallback;
+
+            public async IAsyncEnumerable<H2AgentLab.Transport.AgentTransportEvent> StartAsync(
+                H2AgentLab.Transport.AgentTransportStartRequest request,
+                [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return H2AgentLab.Transport.AgentTransportEvent.Tool(
+                    new("search-plugin", "tool_search", "{\"query\":\"fixture echo\"}"));
+                yield return H2AgentLab.Transport.AgentTransportEvent.Complete("ar064", "tool_calls");
+                await Task.CompletedTask;
+            }
+
+            public async IAsyncEnumerable<H2AgentLab.Transport.AgentTransportEvent> ContinueAsync(
+                H2AgentLab.Transport.AgentTransportContinuationRequest request,
+                [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _continuations++;
+                if (_continuations == 1)
+                {
+                    Check(request.NewlyLoadedTools?.Any(x => x.Name == "fixture.echo") == true,
+                        "Production tool_search did not discover the active plugin tool.");
+                    yield return H2AgentLab.Transport.AgentTransportEvent.Tool(
+                        new("plugin-call", "fixture.echo", "{}"));
+                    yield return H2AgentLab.Transport.AgentTransportEvent.Complete("ar064", "tool_calls");
+                    yield break;
+                }
+                Check(request.ToolResults.Single().IsError == false,
+                    "Provider-backed plugin tool returned an error.");
+                yield return H2AgentLab.Transport.AgentTransportEvent.TextDeltaEvent("AR064 plugin production complete.");
+                yield return H2AgentLab.Transport.AgentTransportEvent.Complete("ar064", "stop");
+                await Task.CompletedTask;
+            }
+
+            public void Cancel() { }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     private static ProviderToolDefinition Definition(string name) => new(new(name, "fixture", "Fixture", AgentToolAccess.ReadOnly,
         AgentToolRisk.Low, true, "v1", "fixture", "fixture", "1.0.0"), Json("{}"));
     private sealed class DefinitionProvider : ICapabilityProvider

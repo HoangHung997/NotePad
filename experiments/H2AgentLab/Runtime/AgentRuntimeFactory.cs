@@ -58,6 +58,7 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             new PythonRuntimeDomainVerifier(tools.Workspace, tools.StateRoot),
             new StructuredOfficeRuntimeDomainVerifier()
         };
+        tools.RuntimeExtensions?.Populate(registry);
         if (tools.ProductionSession is { } session)
         {
             registry = session.Configure(tools, registry, domainVerifiers);

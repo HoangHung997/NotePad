@@ -12,6 +12,104 @@ public sealed partial class PluginManager
     private readonly Dictionary<string, int> _versionCalls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _versionPins = new(StringComparer.Ordinal);
 
+    public sealed record InstalledVersionState(
+        string PluginId,
+        string Version,
+        string Publisher,
+        bool Enabled,
+        bool Quarantined,
+        bool IntegrityValid,
+        IReadOnlyList<string> Tools,
+        IReadOnlyList<string> Skills,
+        IReadOnlyList<string> Providers,
+        string? ProblemCode);
+
+    public sealed record RestoreResult(
+        string PluginId,
+        string Version,
+        bool Restored,
+        string? ProblemCode);
+
+    public IReadOnlyList<InstalledVersionState> InstalledVersions()
+    {
+        lock (_sync)
+        {
+            var result = new List<InstalledVersionState>();
+            foreach (var pluginRoot in Directory.EnumerateDirectories(_root).OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var pluginId = Path.GetFileName(pluginRoot);
+                PluginActivationRecord? activation;
+                try { activation = ReadActivation(pluginRoot); }
+                catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+                {
+                    result.Add(new(pluginId, "unknown", "", false, false, false, [], [], [], "activation_" + ex.GetType().Name));
+                    continue;
+                }
+
+                foreach (var versionRoot in Directory.EnumerateDirectories(pluginRoot).OrderBy(x => x, StringComparer.Ordinal))
+                {
+                    var version = Path.GetFileName(versionRoot);
+                    if (!Version.TryParse(version, out var parsed) || parsed.ToString() != version)
+                        continue;
+                    var quarantined = File.Exists(Path.Combine(versionRoot, "quarantine.json"));
+                    try
+                    {
+                        var manifest = quarantined ? ReadManifest(versionRoot) : VerifyVersion(pluginId, version);
+                        result.Add(new(
+                            pluginId,
+                            version,
+                            manifest.Publisher,
+                            activation?.Enabled == true && activation.ActiveVersion == version && !quarantined,
+                            quarantined,
+                            !quarantined,
+                            manifest.Capabilities.ToArray(),
+                            manifest.Skills.ToArray(),
+                            manifest.Providers.ToArray(),
+                            quarantined ? "quarantined" : null));
+                    }
+                    catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException
+                        or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
+                    {
+                        result.Add(new(pluginId, version, "", false, quarantined, false, [], [], [],
+                            "integrity_" + ex.GetType().Name));
+                    }
+                }
+            }
+            return result.ToArray();
+        }
+    }
+
+    public IReadOnlyList<RestoreResult> RestoreActivePlugins()
+    {
+        lock (_sync)
+        {
+            var result = new List<RestoreResult>();
+            foreach (var pluginRoot in Directory.EnumerateDirectories(_root).OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var pluginId = Path.GetFileName(pluginRoot);
+                PluginActivationRecord? activation = null;
+                try
+                {
+                    activation = ReadActivation(pluginRoot);
+                    if (activation is null || !activation.Enabled)
+                        continue;
+                    var manifest = VerifyVersion(pluginId, activation.ActiveVersion);
+                    var versionRoot = VersionRoot(pluginId, activation.ActiveVersion);
+                    _ = ActivateIntoRegistry(manifest, versionRoot, static () => { });
+                    result.Add(new(pluginId, manifest.Version, true, null));
+                }
+                catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException
+                    or InvalidOperationException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    _registry.UnregisterWhere(x => x.Provenance?.ProviderId == "plugin." + pluginId);
+                    result.Add(new(pluginId, activation?.ActiveVersion ?? "unknown", false,
+                        "restore_" + ex.GetType().Name));
+                }
+            }
+            return result.ToArray();
+        }
+    }
+
     public PluginInstallResult InstallFromArchive(string archivePath, PluginCatalogEntry entry,
         PluginInstallPolicy policy, bool userApproved)
     {

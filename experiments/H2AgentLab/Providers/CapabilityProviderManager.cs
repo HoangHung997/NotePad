@@ -149,7 +149,7 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
         return true;
     }
 
-    private ICapabilityProvider Provider(string providerId)
+    internal ICapabilityProvider Provider(string providerId)
     {
         var normalized = Normalize(providerId);
         return _providers.TryGetValue(normalized, out var provider)

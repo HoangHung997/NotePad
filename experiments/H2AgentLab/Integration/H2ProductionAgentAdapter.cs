@@ -52,7 +52,9 @@ public sealed partial class H2ProductionAgentAdapter :
         Func<Guid?, string?, H2ProductionAgentModel>? requestModelResolver = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null,
-        AgentArchiveOptions? archiveOptions = null)
+        AgentArchiveOptions? archiveOptions = null,
+        IEnumerable<Providers.ICapabilityProvider>? extensionProviders = null,
+        Plugins.IPluginToolExecutorResolver? trustedPluginToolResolver = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateRoot);
         _stateRoot = Path.GetFullPath(stateRoot);
@@ -62,9 +64,18 @@ public sealed partial class H2ProductionAgentAdapter :
         _captureValidator = captureValidator;
         _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory(
             transportFactory ?? new AgentTransportFactory());
+        _extensionLifecycle = new H2AgentExtensionLifecycleHost(
+            _stateRoot,
+            extensionProviders,
+            trustedPluginToolResolver);
         _archive = new AgentIntegrationTaskArchive(Path.Combine(_stateRoot, "integration"), archiveOptions);
         try { InitializeChatArchive(); }
-        catch { _archive.Dispose(); throw; }
+        catch
+        {
+            _extensionLifecycle.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _archive.Dispose();
+            throw;
+        }
     }
 
     public H2AgentArchiveStatus GetArchiveStatus() => _archive.Status;
@@ -406,6 +417,11 @@ public sealed partial class H2ProductionAgentAdapter :
                 ReadOnly = live.ReadOnly,
                 ProductionSession = toolSession
             };
+            using var extensionTask = _extensionLifecycle.CreateTaskSession(
+                live.TaskId,
+                tools,
+                snapshot => ObserveCapabilitySnapshot(live, snapshot));
+            tools.RuntimeExtensions = extensionTask;
             await toolSession.PrepareDesktopAsync(tools, live.Cancellation.Token).ConfigureAwait(false);
 
             var orchestrator = new AgentOrchestrator(
@@ -873,6 +889,8 @@ public sealed partial class H2ProductionAgentAdapter :
             await Task.WhenAll(tasks.Select(task => task.Finished.Task)).ConfigureAwait(false);
             foreach (var task in tasks) task.Cancellation.Dispose();
             DisposeCaptureClient();
+            try { await _extensionLifecycle.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception ex) { errors.Add(ex); }
             _archive.Dispose();
             if (errors.Count > 0) completion.TrySetException(new AggregateException(errors));
             else completion.TrySetResult();

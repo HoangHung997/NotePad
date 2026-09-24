@@ -25,6 +25,7 @@ public sealed class AgentTools(SafeWorkspace workspace, string stateRoot,
     private static readonly JsonSerializerOptions ToolJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All) };
     public bool ReadOnly { get; set; } = true;
     internal Integration.H2ProductionToolSession? ProductionSession { get; set; }
+    internal Runtime.IAgentRuntimeExtensionSession? RuntimeExtensions { get; set; }
     public H2AgentLab.Desktop.SelectedDesktopWindowController? Desktop { get; set; }
     public H2AgentLab.Skills.SkillCatalog Skills { get; } = H2AgentLab.Skills.SkillCatalog.CreateBuiltIn();
     public string SkillDiscovery
