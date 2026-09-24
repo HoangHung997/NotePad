@@ -6,8 +6,6 @@ using H2AgentLab.OfficeHost;
 using H2AgentLab.OfficeProtocol;
 using H2AgentLab.Tools;
 
-namespace H2Notes.Tests;
-
 internal static class H2ExcelRangeReadTests
 {
     public static void Run(Action<string, Action> test)
