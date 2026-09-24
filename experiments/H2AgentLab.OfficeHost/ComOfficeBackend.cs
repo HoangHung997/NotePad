@@ -91,7 +91,15 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         try
         {
             try { sheet = workbook.Worksheets[request.SheetName]; }
-            catch { throw new OfficeHostFaultException("sheet_not_found", $"Excel sheet '{request.SheetName}' is not available.", true); }
+            catch
+            {
+                if (!string.IsNullOrWhiteSpace(request.Cursor) || !string.IsNullOrWhiteSpace(request.ContentVersion))
+                    throw new OfficeHostFaultException(
+                        "stale_content",
+                        $"Excel sheet '{request.SheetName}' changed or is no longer available; restart the range read.",
+                        true);
+                throw new OfficeHostFaultException("sheet_not_found", $"Excel sheet '{request.SheetName}' is not available.", true);
+            }
 
             var needsContentTracking = !plan.Complete
                 || !string.IsNullOrWhiteSpace(request.Cursor)
@@ -232,12 +240,13 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             // advances it after worksheet recalculation; H2 writes also bump it explicitly. A post-page
             // token check rejects changes that race the current page.
             var afterExtent = ReadExcelExtent(sheet);
+            var afterSheetName = SafeString(() => sheet.Name, sheetName);
             var afterVersion = ExcelContentVersion(
                 bound.SessionId,
                 SafeString(() => workbook.Name, name),
                 SafeString(() => workbook.FullName, fullName),
                 SafeBool(() => workbook.Saved),
-                sheetName,
+                afterSheetName,
                 afterExtent,
                 trackingGeneration,
                 requested.Address,

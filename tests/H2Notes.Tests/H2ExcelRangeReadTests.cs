@@ -124,6 +124,54 @@ internal static class H2ExcelRangeReadTests
             Check(stale?.Code == "stale_content" && stale.NoEffect, "Changed content was silently mixed into the old cursor.");
         });
 
+        test("AR-021 E2 sheet rename invalidates continuation as stale content", () =>
+        {
+            var backend = new FixtureOfficeBackend(extraExcelRows: 900);
+            var reader = (IExcelRangeReadBackend)backend;
+            var session = backend.DiscoverExcel().ActiveSessionId!;
+            var first = reader.ReadExcelRange(new(
+                session,
+                "Data",
+                "A1:A902",
+                [ExcelRangeReadFields.Value],
+                128));
+            Check(first.NextCursor is not null, "Sheet-rename fixture did not create a multi-page read.");
+
+            backend.RenameExcelSheetForFixture("RenamedData");
+
+            OfficeHostFaultException? oldNameStale = null;
+            try
+            {
+                _ = reader.ReadExcelRange(new(
+                    session,
+                    "Data",
+                    "A1:A902",
+                    [ExcelRangeReadFields.Value],
+                    128,
+                    first.NextCursor,
+                    first.ContentVersion));
+            }
+            catch (OfficeHostFaultException ex) { oldNameStale = ex; }
+            Check(oldNameStale?.Code == "stale_content" && oldNameStale.NoEffect,
+                "A continuation targeting the pre-rename sheet returned a fresh lookup error instead of stale_content.");
+
+            OfficeHostFaultException? newNameStale = null;
+            try
+            {
+                _ = reader.ReadExcelRange(new(
+                    session,
+                    "RenamedData",
+                    "A1:A902",
+                    [ExcelRangeReadFields.Value],
+                    128,
+                    first.NextCursor,
+                    first.ContentVersion));
+            }
+            catch (OfficeHostFaultException ex) { newNameStale = ex; }
+            Check(newNameStale?.Code == "stale_content" && newNameStale.NoEffect,
+                "A continuation was allowed to cross a sheet rename.");
+        });
+
         test("AR-021 E2 continuation token is bound to range fields and page size", () =>
         {
             var backend = new FixtureOfficeBackend(extraExcelRows: 900);

@@ -46,6 +46,14 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         _excel.SelectionAddress = bounds.Address;
     }
 
+    public void RenameExcelSheetForFixture(string sheetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sheetName);
+        _excel.SheetName = sheetName.Trim();
+        _excel.Saved = false;
+        _excelRevision++;
+    }
+
     public void SetExcelValueForFixture(string address, string value, string formula = "")
     {
         var bounds = ExcelRangeReadRules.ParseRange(address);
@@ -74,7 +82,14 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         ArgumentNullException.ThrowIfNull(request);
         RequireSession(request.SessionId, _excel.SessionId, "Excel workbook");
         if (!string.Equals(request.SheetName, _excel.SheetName, StringComparison.Ordinal))
+        {
+            if (!string.IsNullOrWhiteSpace(request.Cursor) || !string.IsNullOrWhiteSpace(request.ContentVersion))
+                throw new OfficeHostFaultException(
+                    "stale_content",
+                    "Fixture Excel sheet changed or is no longer available; restart the range read.",
+                    true);
             throw new OfficeHostFaultException("sheet_not_found", "Fixture Excel sheet not found.", true);
+        }
 
         ExcelRangeBounds requested;
         IReadOnlyList<string> fields;
@@ -522,7 +537,7 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         public string SessionId { get; } = "excel-fixture-1";
         public string Name { get; } = "UnsavedFixture.xlsx";
         public string FullName { get; } = Path.Combine(Path.GetTempPath(), "H2AgentLab", "UnsavedFixture.xlsx");
-        public string SheetName { get; } = "Data";
+        public string SheetName { get; set; } = "Data";
         public string SelectionAddress { get; set; } = "A1";
         public bool Saved { get; set; }
         public Dictionary<string, ExcelCellFixture> Cells { get; } = new(StringComparer.Ordinal)
