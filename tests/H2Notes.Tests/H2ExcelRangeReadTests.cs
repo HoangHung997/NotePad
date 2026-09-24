@@ -124,6 +124,46 @@ internal static class H2ExcelRangeReadTests
             Check(stale?.Code == "stale_content" && stale.NoEffect, "Changed content was silently mixed into the old cursor.");
         });
 
+        test("AR-021 E2 recalculation invalidates an existing paged content version", () =>
+        {
+            var backend = new FixtureOfficeBackend(extraExcelRows: 900);
+            var reader = (IExcelRangeReadBackend)backend;
+            var session = backend.DiscoverExcel().ActiveSessionId!;
+
+            // Keep Saved=false before page 1 so invalidation cannot rely on a dirty-state transition.
+            backend.SetExcelValueForFixture("A650", "BASELINE-UNSAVED");
+            var first = reader.ReadExcelRange(new(
+                session,
+                "Data",
+                "A1:A902",
+                [ExcelRangeReadFields.Value],
+                128));
+            Check(!first.Saved && first.NextCursor is not null, "Recalculation fixture did not establish a paged unsaved read.");
+
+            var snapshot = backend.SnapshotExcel(session);
+            _ = backend.RecalculateExcel(new ExcelRecalculateRequest(
+                session,
+                snapshot.StateToken,
+                PermissionGranted: true));
+
+            OfficeHostFaultException? stale = null;
+            try
+            {
+                _ = reader.ReadExcelRange(new(
+                    session,
+                    "Data",
+                    "A1:A902",
+                    [ExcelRangeReadFields.Value],
+                    128,
+                    first.NextCursor,
+                    first.ContentVersion));
+            }
+            catch (OfficeHostFaultException ex) { stale = ex; }
+
+            Check(stale?.Code == "stale_content" && stale.NoEffect,
+                "Recalculation was allowed to mix a new value generation into an old cursor.");
+        });
+
         test("AR-021 E2 range fields keep formatting and structure on demand", () =>
         {
             var backend = new FixtureOfficeBackend();

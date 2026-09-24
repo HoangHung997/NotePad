@@ -19,6 +19,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly Guid ExcelWorkbookEventsIid = new("00024412-0000-0000-C000-000000000046");
+    private const int ExcelWorkbookSheetCalculateDispId = 0x0000061B;
     private const int ExcelWorkbookSheetChangeDispId = 0x0000061C;
 
     private readonly OfficeWindowCatalog _catalog;
@@ -26,10 +27,12 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
     private readonly Dictionary<string, ExcelWorkbookEventSubscription> _excelWorkbookSubscriptions = new(StringComparer.Ordinal);
     private long _excelTrackingGeneration;
 
+    private delegate void ExcelWorkbookSheetCalculateHandler(object sheet);
     private delegate void ExcelWorkbookSheetChangeHandler(object sheet, object target);
     private sealed record ExcelWorkbookEventSubscription(
         object Workbook,
-        ExcelWorkbookSheetChangeHandler Handler,
+        ExcelWorkbookSheetCalculateHandler CalculateHandler,
+        ExcelWorkbookSheetChangeHandler ChangeHandler,
         long Generation);
 
     public ComOfficeBackend(IOfficeWindowProbe? probe = null) => _catalog = new(probe ?? new OfficeNativeWindowProbe());
@@ -39,17 +42,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         lock (_excelWorkbookSubscriptions)
         {
             foreach (var subscription in _excelWorkbookSubscriptions.Values)
-            {
-                try
-                {
-                    ComEventsHelper.Remove(
-                        subscription.Workbook,
-                        ExcelWorkbookEventsIid,
-                        ExcelWorkbookSheetChangeDispId,
-                        subscription.Handler);
-                }
-                catch { }
-            }
+                RemoveExcelWorkbookSubscription(subscription);
             _excelWorkbookSubscriptions.Clear();
         }
         _catalog.Dispose();
@@ -231,9 +224,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             finally { Release(pageRange); }
 
             // Re-read only lightweight workbook/extent metadata after the page. The version is
-            // deliberately independent of ActiveSheet/Selection. For paged reads a Workbook.SheetChange
-            // COM event advances the session revision for direct user/external-link edits as well as
-            // H2 writes; a post-page token check rejects changes that race the current page.
+            // deliberately independent of ActiveSheet/Selection. For paged reads Workbook.SheetChange
+            // advances the session revision for direct user/external-link edits and Workbook.SheetCalculate
+            // advances it after worksheet recalculation; H2 writes also bump it explicitly. A post-page
+            // token check rejects changes that race the current page.
             var afterExtent = ReadExcelExtent(sheet);
             var afterVersion = ExcelContentVersion(
                 bound.SessionId,
@@ -605,31 +599,131 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         lock (_excelWorkbookSubscriptions)
         {
             if (_excelWorkbookSubscriptions.TryGetValue(sessionId, out var existing))
-                return existing.Generation;
+            {
+                if (SameComIdentity(existing.Workbook, workbook))
+                    return existing.Generation;
 
-            ExcelWorkbookSheetChangeHandler handler = (_, _) => BumpExcelRevision(sessionId);
+                // A refreshed catalog may bind the same logical session to a replacement workbook RCW.
+                // Never keep listening to the stale workbook: detach it and advance the generation so
+                // any continuation token minted before the rebind is rejected.
+                RemoveExcelWorkbookSubscription(existing);
+                _excelWorkbookSubscriptions.Remove(sessionId);
+                _excelRevisions.TryRemove(sessionId, out _);
+            }
+
+            ExcelWorkbookSheetCalculateHandler calculateHandler = _ => BumpExcelRevision(sessionId);
+            ExcelWorkbookSheetChangeHandler changeHandler = (_, _) => BumpExcelRevision(sessionId);
+            var calculateAttached = false;
+            var changeAttached = false;
             try
             {
                 ComEventsHelper.Combine(
                     workbook,
                     ExcelWorkbookEventsIid,
+                    ExcelWorkbookSheetCalculateDispId,
+                    calculateHandler);
+                calculateAttached = true;
+
+                ComEventsHelper.Combine(
+                    workbook,
+                    ExcelWorkbookEventsIid,
                     ExcelWorkbookSheetChangeDispId,
-                    handler);
+                    changeHandler);
+                changeAttached = true;
             }
             catch (Exception ex)
             {
+                if (changeAttached)
+                {
+                    try
+                    {
+                        ComEventsHelper.Remove(
+                            workbook,
+                            ExcelWorkbookEventsIid,
+                            ExcelWorkbookSheetChangeDispId,
+                            changeHandler);
+                    }
+                    catch { }
+                }
+                if (calculateAttached)
+                {
+                    try
+                    {
+                        ComEventsHelper.Remove(
+                            workbook,
+                            ExcelWorkbookEventsIid,
+                            ExcelWorkbookSheetCalculateDispId,
+                            calculateHandler);
+                    }
+                    catch { }
+                }
+
                 throw new OfficeHostFaultException(
                     "content_tracking_unavailable",
-                    $"Excel Workbook.SheetChange tracking could not be attached ({ex.GetType().Name}).",
+                    $"Excel Workbook.SheetChange/SheetCalculate tracking could not be attached ({ex.GetType().Name}).",
                     true);
             }
 
             var generation = Interlocked.Increment(ref _excelTrackingGeneration);
             _excelWorkbookSubscriptions[sessionId] = new ExcelWorkbookEventSubscription(
                 workbook,
-                handler,
+                calculateHandler,
+                changeHandler,
                 generation);
             return generation;
+        }
+    }
+
+    private static void RemoveExcelWorkbookSubscription(ExcelWorkbookEventSubscription subscription)
+    {
+        try
+        {
+            ComEventsHelper.Remove(
+                subscription.Workbook,
+                ExcelWorkbookEventsIid,
+                ExcelWorkbookSheetChangeDispId,
+                subscription.ChangeHandler);
+        }
+        catch { }
+
+        try
+        {
+            ComEventsHelper.Remove(
+                subscription.Workbook,
+                ExcelWorkbookEventsIid,
+                ExcelWorkbookSheetCalculateDispId,
+                subscription.CalculateHandler);
+        }
+        catch { }
+    }
+
+    private static bool SameComIdentity(object left, object right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (!Marshal.IsComObject(left) || !Marshal.IsComObject(right)) return false;
+
+        nint leftIdentity = 0;
+        nint rightIdentity = 0;
+        try
+        {
+            leftIdentity = Marshal.GetIUnknownForObject(left);
+            rightIdentity = Marshal.GetIUnknownForObject(right);
+            return leftIdentity == rightIdentity;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (rightIdentity != 0)
+            {
+                try { Marshal.Release(rightIdentity); } catch { }
+            }
+            if (leftIdentity != 0)
+            {
+                try { Marshal.Release(leftIdentity); } catch { }
+            }
         }
     }
 
