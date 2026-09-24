@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "task": "AR-021",
+  "code_sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "completed_evidence_level": "E2",
+  "required_evidence_level": "E3",
+  "behavior": {
+    "max_page_cells": 512,
+    "supports": [
+      "resource+sheet+range",
+      "values",
+      "formulas",
+      "format-on-demand",
+      "merge-on-demand",
+      "hidden-state-on-demand",
+      "cursor",
+      "content-version",
+      "completeness",
+      "used-extent metadata",
+      "cells/bytes/latency metrics"
+    ],
+    "selection_affects_content_version": false,
+    "stale_continuation_error": "stale_content",
+    "production_full_snapshot_fallback": "only for legacy injected clients without additive IExcelRangeReadClient; packaged production OfficeHost implements bounded range reads"
+  },
+  "validation": {
+    "dedicated": {
+      "run_id": 35986970929,
+      "job_id": 107591824435,
+      "result": "SUCCESS",
+      "focused": "6/6",
+      "office_host": "17/17",
+      "retained_ar020": "36/36",
+      "retained_ar012": "44/44",
+      "retained_ar001": "13/13",
+      "full_h2": "1278/1278",
+      "artifact_id": 10802524268,
+      "artifact_bytes": 36069,
+      "artifact_sha256": "89e6d3e610f66438a96ab11b2ec8098b017aaaf83f0e92c17f04db1ddadfc08a"
+    },
+    "avalonia": {
+      "run_id": 35986970938,
+      "job_id": 107591824824,
+      "result": "SUCCESS",
+      "full_h2": "1278/1278",
+      "all_agent_mb_office_transport_steps": "PASS",
+      "windows_x64_publish": "PASS",
+      "packaged_helper_ipc": "PASS"
+    },
+    "exact_sha_workflows": {
+      "count": 11,
+      "success": 11,
+      "failed": 0
+    }
+  },
+  "build": {
+    "artifact_id": 10803285991,
+    "name": "H2Notes-Avalonia-Portable-win-x64",
+    "bytes": 110304466,
+    "sha256": "1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44",
+    "independently_downloaded": true,
+    "zip_crc": "PASS",
+    "zip_entries": 482
+  },
+  "not_claimed": {
+    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN",
+    "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
+    "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
+    "full_workbook_support": "NOT_CLAIMED from bounded range implementation"
+  },
+  "historical_failures": [
+    {
+      "sha": "a5e9b76c8e5518de170eed6615165f639f8ab1dc",
+      "run_id": 35985389076,
+      "result": "FAILURE",
+      "repair": "1fca3a506a8b40d1955c910fa2135a49797332b3"
+    },
+    {
+      "sha": "1fca3a506a8b40d1955c910fa2135a49797332b3",
+      "run_id": 35986730031,
+      "result": "FAILURE",
+      "repair": "e7dba71f76e36fc73aee7509e8f39416b8f7296a"
+    }
+  ]
+}

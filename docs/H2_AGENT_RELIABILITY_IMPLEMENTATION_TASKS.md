@@ -80,7 +80,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
-| AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | NOT_STARTED |
+| AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
@@ -196,7 +196,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 **AR-020 enumeration repair checkpoint:** code `b270de5c22bfe880055975aaa35fbeebd6934f09`; E1/E2 and full CI PASS, native E3 remains NOT_RUN. [Repair evidence](agent-reliability/AR-020/enumeration-repair-evidence.json). The previous local patch is superseded. Per section 2.2, AR-030 is READY independently via DONE AR-010/011; this does not close AR-020 or waive any Office/model gate.
 
-### [ ] AR-021 — Excel read range/pagination và token nội dung
+### [~] AR-021 — Excel read range/pagination và token nội dung
 
 **Dependency:** discovery đúng. **Sửa:** Office read protocol/backend/runtime tools, không sửa engine nghiệp vụ.
 
@@ -205,6 +205,10 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 **Test E3:** RC-06/07; workbook >5.000 populated cells, sparse UsedRange rộng, nhiều sheets, formulas, hidden/merged cells; yêu cầu range nhỏ phải đọc bounded actual range. Thay nội dung giữa pages invalidates/restarts có nhãn; không ghép phiên bản.
 
 **Acceptance:** tool tên read_range thực sự đọc range; model đọc tiếp bằng cursor tới phạm vi yêu cầu; không nâng limit tổng thay cho thiết kế paging. Báo metrics số cell/bytes/latency, không tự tuyên bố full-workbook support từ file nhỏ.
+
+**AR-021 implementation checkpoint — 2026-09-24:** **IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT, not DONE**. Exact validated code `e7dba71f76e36fc73aee7509e8f39416b8f7296a`; focused validator run `35986970929` / job `107591824435` SUCCESS: AR-021 **6/6**, concrete OfficeHost **17/17** including bounded named-pipe range paging, retained AR-020 **36/36**, AR-012 **44/44**, AR-001 **13/13**, and full H2 **1278/1278**. Evidence artifact `10802524268`, 36,069 bytes, SHA256 `89e6d3e610f66438a96ab11b2ec8098b017aaaf83f0e92c17f04db1ddadfc08a`. All **11/11 pull_request workflows** on the same code SHA completed SUCCESS. Avalonia CI `35986970938` / job `107591824824` passed full H2/Agent/MB/Office/transport gates, Windows x64 publish and packaged-helper IPC. Portable artifact `10803285991`, 110,304,466 bytes, SHA256 `1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44`; NAS probe `10802887675`, SHA256 `db9b4786a7aaea31a6c115fedde7d36df06d270113fb1d9d69ec8a10af7537e3`.
+
+Implemented production behavior: additive Office protocol/client/backend range-read contract; `resource + sheet + range + fields + page_size + cursor + content_version`; page limit max 512 cells; value/formula bulk page reads; formatting/merge/hidden state on demand; metadata-only discovery/active-sheet/selection; sparse UsedRange only supplies extent metadata; selection changes do not change the content token; stale content is refused before mixing continuation pages; production H2OfficeRuntimeTools uses the bounded range client and legacy injected clients remain compatible. Native Excel E3 RC-06/07 is still **NOT_RUN / AWAITING_ENVIRONMENT**; fixture/scripted E2 does not certify a real Excel build, especially external edits between pages. [Implementation evidence](agent-reliability/AR-021/evidence.json). [Native test instructions](agent-reliability/AR-021/native-acceptance.md).
 
 ### [ ] AR-022 — Excel batch writes và hậu điều kiện
 
@@ -487,7 +491,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task checkpoint is AR-064: production plugin/provider lifecycle is IMPLEMENTED with E2/full CI evidence; required E3 external/native trusted provider-package acceptance is DEFERRED_BY_USER for final full-build testing, not PASS.** The critical repair sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069** and AR-070 core remain sequenced forward with their recorded real-environment debts visible. AR-064 lifecycle/pin/RC-28 debt is now implemented at E2; continue the ordinary mandatory roadmap only in the next one-task turn.
+**Current task checkpoint is AR-021: bounded Excel range/paging/content-token implementation is E1/E2 green on exact code `e7dba71f76e36fc73aee7509e8f39416b8f7296a`; native Excel E3 is AWAITING_ENVIRONMENT and is NOT PASS.** The user's requested downloadable Windows build is available from the same validated code. Do not start AR-022 in this one-task turn; first use the build for AR-021 real Excel RC-06/07 and repair any observed regression inside AR-021. Prior AR-020/033/051/064/065/066/067/068/069/070 real-environment debts remain recorded at their existing evidence levels; AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
@@ -506,1018 +510,187 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-064_PRODUCTION_LIFECYCLE_E2_PASS_E3_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
-  "active_task": "AR-064",
+  "phase": "AR-021_IMPLEMENTED_E2_PASS_E3_AWAITING_ENVIRONMENT_BUILD_READY_FOR_USER_TEST",
+  "active_task": "AR-021",
   "implementation_status": "IMPLEMENTED",
-  "acceptance_status": "DEFERRED_BY_USER",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "completed_evidence_level": "E2",
+  "required_evidence_level": "E3",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar064-production-plugin-lifecycle-2026-09-24",
-  "last_code_commit": "a956f9d7d1c9c23f0a7587570b933a25edb7efbb",
-  "last_validated_code_commit": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
-  "last_validation_result": "AR064_77_PASS_X3; CHAT10_PASS_X3; AR051_37_PASS; AR050_50_PASS; AR040_57_PASS; AR033_42_PASS; AR032_19_PASS; AR031_39_PASS; AR030_39_PASS; AR020_36_PASS; AR012_44_PASS; AR011_25_PASS; AR010_11_PASS; AR001_13_PASS; FULL1272_PASS; AGENT75_PASS; 10_OF_10_PR_CI_SUCCESS; WINDOWS_X64_PUBLISH_AND_HELPER_IPC_PASS; E3_EXTERNAL_NATIVE_PROVIDER_NOT_RUN_AND_DEFERRED_BY_USER; NO_E3_PASS_CLAIM",
-  "capture_checked_head": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
+  "owner_session": "chatgpt-ar021-excel-range-read-2026-09-24",
+  "last_code_commit": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+  "last_validated_code_commit": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+  "last_validation_result": "AR021_6_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1278_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "AR-064 product/runtime source a956f9d7d1c9c23f0a7587570b933a25edb7efbb; final evidence/CI head 56276acb7fa64fbe7afa3cc2c9346e8651b597fc. User-PC working tree NOT_ACCESSIBLE. GitHub Actions checkout/end CLEAN. Production H2 adapter provider-backed package execution, durable task pins, 10/10 PR CI and Windows publish/helper IPC are green. E3 external/native provider-package acceptance remains deferred.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA dedicated validator and Avalonia CI used clean isolated checkouts. Final validated application/test source is e7dba71f76e36fc73aee7509e8f39416b8f7296a. No reset/force-push/main merge occurred.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T08:45:00+00:00",
+  "checkpoint_saved_at_utc": "2026-09-24T10:38:14Z",
   "completed_this_session": [
-    "Composed existing PluginManager/CapabilityProviderManager/plugin skill source into the normal H2ProductionAgentAdapter single-runtime path",
-    "Added provider-neutral H2 lifecycle command contract for install/enable/disable/self-test/rollback/quarantine/uninstall without exposing runtime internals",
-    "Added task-used plugin/provider/tool version pinning and durable capability-pin evidence in the existing AgentIntegrationTaskArchive",
-    "Added restart restoration and provider-backed package execution contract verification; update is fenced while a task-held plugin version is active",
-    "Fixed historical wrapper negative control for new production lifecycle composition without weakening its required seven counterfactual failures",
-    "Validated AR064 77/77 x3, retained corpora, full H2 1272/1272, Agent75/75, 10/10 PR CI and Windows publish/helper IPC",
-    "Independently downloaded/hashed/inspected final AR064 artifact; E3 is deferred by user and no E3 pass is claimed"
+    "Reconciled AR-064 checkpoint and selected only AR-021 as the next mandatory roadmap task.",
+    "Added additive Excel bounded range protocol with A1 validation, fields, max-512 page size, cursor, contentVersion, completeness, used-extent metadata and read metrics.",
+    "Implemented concrete FixtureOfficeBackend and native ComOfficeBackend range readers without lifting the legacy 5000-cell full-snapshot limit.",
+    "Changed production H2OfficeRuntimeTools range/formula/style/merge/hidden/verify operations to use bounded range pages when the production client supports AR-021; old injected clients remain compatible.",
+    "Made Excel discovery/active-sheet/selection metadata-only so captured selection no longer forces a full workbook snapshot.",
+    "Added E1/E2 tests for >5000 populated cells, sparse UsedRange, row-major paging, field laziness, selection-stable content token, stale continuation rejection, production no-snapshot dispatch and named-pipe OfficeHost IPC.",
+    "Repaired historical compile failures inside AR-021, preserving failed run history rather than relabelling it.",
+    "Validated exact SHA through dedicated AR-021 gate, full Avalonia CI, all Agent/Office/transport gates, Windows x64 publish and packaged helper IPC.",
+    "Downloaded the portable artifact and independently verified ZIP CRC and SHA256 against GitHub artifact metadata."
   ],
   "remaining_in_active_task": [
-    "No additional AR-064 product lifecycle implementation work is required by current E1/E2 evidence.",
-    "AR-064 required E3 external/native trusted provider-package acceptance is DEFERRED_BY_USER until final full-build testing; this is NOT E3 PASS.",
-    "AR-071/072 remain optional/not selected and were not activated by AR-064."
+    "Run AR-021 E3 RC-06/07 on an authorized Windows PC with real Microsoft Excel using only synthetic test workbooks.",
+    "Use a workbook with >5000 populated cells and a sparse wide UsedRange; verify small range reads remain bounded and metrics match actual returned cells.",
+    "Verify formulas, multiple sheets, merged/hidden state and pagination across multiple pages.",
+    "Change selection/focus between pages and confirm contentVersion remains valid; edit workbook content between pages and confirm stale_content/restart behavior on the actual Excel build.",
+    "If any native regression appears, repair and re-run exact-SHA AR-021/full CI before moving to AR-022."
   ],
   "last_test_commands": [
     {
-      "command": "AR-064 plugin provider lifecycle validation",
-      "sha": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
-      "run_id": 35975537267,
-      "job_id": 107555015315,
+      "command": "tools/agent-reliability/validate_ar021.ps1",
+      "sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+      "run_id": 35986970929,
+      "job_id": 107591824435,
       "attempt": 1,
-      "result": "SUCCESS; AR064 77/77 x3; CHAT10/10 x3; retained AR051/050/040/033/032/031/030/020/012/011/010/001 all PASS; Agent75/75; artifact10797804518 sha256 1cdf4af85c3ffdd929455b6f4f10d8f4a0856133857e9e18a67881f067463c27; E3 DEFERRED_BY_USER/no-pass-claim; CLEAN"
+      "result": "SUCCESS; AR021 6/6; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1278/1278; artifact 10802524268 sha256 89e6d3e610f66438a96ab11b2ec8098b017aaaf83f0e92c17f04db1ddadfc08a"
     },
     {
       "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
-      "run_id": 35975543458,
-      "job_id": 107555035332,
+      "sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+      "run_id": 35986970938,
+      "job_id": 107591824824,
       "attempt": 1,
-      "result": "SUCCESS; full H2 1272/1272; 10/10 pull_request workflows SUCCESS; merge checkout 14861ccea69ea10db4d073ec3b9cccc0ea3fc338; workspace-save 5048.69ms; portable10798556271 sha256 23c359453e20f896eb497b2dd551b4f100c19a6340df0f632e0e61a9b6a1cbaa; NAS probe10798506395 sha256 327e412e50784c37b1e415bf4b438bbb164aa3c4430231b70b96d71d3e2c40e5"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar070.ps1",
-      "sha": "566f634318192cf52699951ab4f55edd53a0d488",
-      "run_id": 35957798526,
-      "job_id": 107500242184,
-      "attempt": 1,
-      "result": "SUCCESS; focused 5/5; AR020 36/36; AR033 42/42; AR066 134/134; AR067 3/3; full H2 1270/1270; Agent 75/75; artifact 10791402941 sha256 1e6ba76db8fcbd2ad5b0e1856d0820495635f18fdf3f098820cdf0e1ff92a626; E3/E4 DEFERRED_BY_USER; no pass claim; clean_end=true"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "566f634318192cf52699951ab4f55edd53a0d488",
-      "run_id": 35957801240,
-      "job_id": 107499719591,
-      "attempt": 1,
-      "result": "SUCCESS; full H2 1270/1270; required AR070 suite 5/5; 10/10 pull_request workflows SUCCESS; merge checkout 58225be; portable 10791113510 sha256 98f7f901adbf9f4697e89cb2d89ba43168a23790fbcf5676e4d1a32a55a84c25; NAS probe 10790909138 sha256 0df8cb203eb7e5d4b2df31c0f5853056b84f7ac1020fb5f9d58e12094e6ca790"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar069.ps1",
-      "sha": "9f09e8d1205b83a9bce733da547acc0544599179",
-      "run_id": 35952370470,
-      "job_id": 107483447785,
-      "attempt": 1,
-      "result": "SUCCESS; AR065 55/55; AR066 134/134; AR067 3/3; AR068 3/3; H2M110 1/1; AR067 runtime 6/6; full H2 1270/1270; Agent 74/74; artifact 10789975231 sha256 1c2c60d5de38161a0fa20aa971a44a274ab8de029ba4eaf44ec02a4b02abd5ab; E4=DEFERRED_BY_USER; e4_pass_claim=false; clean_end=true"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "9f09e8d1205b83a9bce733da547acc0544599179",
-      "run_id": 35952374697,
-      "job_id": 107483460322,
-      "attempt": 1,
-      "result": "SUCCESS; all ten pull_request workflows SUCCESS; portable 10789372264 sha256 73520d427e25a0931faa198ede9775ecc8af318ee0965bbbfd7bb38a1d744ae9; NAS probe 10789372241 sha256 bb59f999e56e8e76b487a853d825e0c3ea85f44fe66f1e98cf7dd0431a334090"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar068.ps1",
-      "sha": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-      "run_id": 35949185144,
-      "job_id": 107475651443,
-      "attempt": 1,
-      "result": "AR068 focused 3/3; full H2 1270/1270; Agent 74/74; SUCCESS; artifact 10788441799 sha256 8842afd889d2f5354670108388e19ba28dd9e70b08760f343446c8e21c680923"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2",
-      "run_id": 35949187730,
-      "job_id": 107473806859,
-      "attempt": 1,
-      "result": "SUCCESS; full H2 1270/1270; 10/10 pull_request workflows SUCCESS; merge checkout 92655a7b7ab514fa9d0590ccabaaa8fc68b9129b; portable 10787454520; NAS probe 10788157759"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar067.ps1 after evidence-status correction",
-      "sha": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
-      "run_id": 35944207377,
-      "job_id": 107458445267,
-      "attempt": 1,
-      "result": "runtime 6/6; production/UI focused 3/3; full H2 1267/1267; Agent 74/74; identity E4=AWAITING_ENVIRONMENT; SUCCESS; artifact 10786436619 sha256 21a3e0f6420a0e3caec8116edbf7ededf151ef793de260cb935ca0d0275f8d64"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
-      "run_id": 35944210291,
-      "job_id": 107458453641,
-      "attempt": 1,
-      "result": "SUCCESS; full H2 1267/1267; all ten pull_request workflows on exact head SUCCESS; portable 10785909451; NAS probe 10786282901"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar067.ps1",
-      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-      "run_id": 35940799654,
-      "job_id": 107448023895,
-      "attempt": 1,
-      "result": "AR067 runtime 6/6; production/UI focused 3/3; full H2 1267/1267; Agent 74/74; SUCCESS"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-      "run_id": 35940802619,
-      "job_id": 107448032605,
-      "attempt": 1,
-      "result": "SUCCESS; all ten pull_request workflows on exact head SUCCESS"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar065.ps1 retained regression",
-      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-      "run_id": 35940799761,
-      "job_id": 107448474958,
-      "attempt": 1,
-      "result": "AR065 55/55; full H2 1267/1267; Agent 74/74; SUCCESS"
-    },
-    {
-      "command": "tools/agent-reliability/validate_ar066.ps1",
-      "sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-      "run_id": 35908748336,
-      "job_id": 107342940138,
-      "attempt": 1,
-      "result": "134/134 x3; retained44/36/55; full1266/1266; Agent74/74;432E2 receipts including232 consent"
-    },
-    {
-      "command": "Avalonia CI: full build/test/independent gates/win-x64 publish/packaged helper IPC",
-      "sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
-      "head_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-      "run_id": 35908755287,
-      "job_id": 107342963072,
-      "attempt": 1,
-      "result": "All mandatory stages SUCCESS; full1266/1266; test-merge tree equals focused; not main merge"
+      "result": "SUCCESS; full H2 1278/1278; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10803285991 sha256 1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44; NAS probe 10802887675 sha256 db9b4786a7aaea31a6c115fedde7d36df06d270113fb1d9d69ec8a10af7537e3"
     }
   ],
   "ci_runs": [
     {
-      "id": 35687637186,
-      "code_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
-      "result": "FAILURE",
-      "owner": "AR-001"
-    },
-    {
-      "url": "https://github.com/HoangHung997/NotePad/actions/runs/35689629807",
-      "checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
-      "source_checks": "E0_CAPTURED",
-      "job_final_status": "SUCCESS_VERIFIED"
-    },
-    {
-      "id": 35689629766,
-      "head_sha": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
-      "tested_checkout_sha": "c62851a76351028906d495ba3c00b4401e8f4831",
-      "result": "FAILURE",
-      "h2_tests": "589 passed / 1 failed",
-      "architecture_guard": "SKIPPED",
-      "owner": "AR-001"
-    },
-    {
-      "run_id": 35691748431,
-      "code_sha": "88cc6241d9488e26e0652751a7c14c26df4aecb3",
-      "kind": "focused",
-      "passed": 9,
-      "failed": 4,
-      "artifact_id": 10679446309,
-      "artifact_sha256": "a96c330edf9746d1a36f9f3cd662f973c058ba2a7dc1ac263c05e307d1ffa2bd",
-      "issues": [
-        "UI-context-dependent executor/provider disposal",
-        "Test parsed evidence footer as raw JSON"
-      ]
-    },
-    {
-      "run_id": 35692162013,
-      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
-      "kind": "focused",
-      "repetitions": [
-        {
-          "passed": 13,
-          "failed": 0
-        },
-        {
-          "passed": 13,
-          "failed": 0
-        },
-        {
-          "passed": 13,
-          "failed": 0
-        }
-      ],
-      "artifact_id": 10679422208,
-      "artifact_sha256": "b26040954154ed315355978edcad3e09e8267c85be2855a7cb863f8735cf79f8"
-    },
-    {
-      "run_id": 35692347728,
-      "job_id": 106631823690,
-      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
-      "kind": "full",
-      "conclusion": "failure",
-      "h2_tests": {
-        "passed": 603,
-        "failed": 0
-      },
-      "architecture": {
-        "passed": 35,
-        "failed": 0
-      },
-      "phase11": {
-        "passed": 14,
-        "failed": 1
-      },
-      "failure": "1108 exact WebResearchHost tool set omitted existing web.read_feed",
-      "later_suites_and_publish": "NOT_RUN"
-    },
-    {
-      "run_id": 35692802913,
-      "code_sha": "82af106655358fa4f27d60f3da2a53e35341f1cb",
-      "kind": "focused-build",
-      "conclusion": "failure",
-      "error": "CS8852 at V2Phase11Tests.cs:251: FeedObserved is init-only; test assigned it after construction",
-      "tests": "NOT_RUN",
-      "artifact_id": 10678948191,
-      "artifact_sha256": "e5264e73d4f255e9afa06e3e04b0e5e88d24ba7e862b22b827ad785ec07c7b74"
-    },
-    {
-      "id": 35693115516,
-      "code_sha": "f023b611b0d03d55c11c257babcfa5529893f5bb",
-      "result": "FAILURE",
-      "h2_tests": "603/603",
-      "architecture": "35/35",
-      "phase11": "15/15",
-      "mb33": "3 passed / 1 failed: fixture missing verifier",
-      "publish": "NOT_RUN"
-    },
-    {
-      "id": 35693929260,
-      "code_sha": "74418bee6c3b12c2be6fffa68a121a4ce36aa294",
-      "result": "FAILURE",
-      "AR001": "13/13 x3",
-      "Agent_suites": 74,
-      "failed_flags": [
-        "--mb-runtime-capability-install-test",
-        "--mb-minimum-bootable-agent-acceptance-test"
-      ],
-      "harness_missing_helper_flags": 6,
-      "artifact_id": 10679995582,
-      "artifact_sha256": "9a83822aab1f870d2bafd25842787abc76ea79ce00ac6dc0022318b90859cce7"
-    },
-    {
-      "id": 35694729061,
-      "tested_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
-      "result": "SUCCESS",
-      "AR001": "13/13 x3",
-      "Agent_suites": "74/74"
-    },
-    {
-      "id": 35694774117,
-      "tested_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
-      "result": "SUCCESS",
-      "all_required_steps": "PASS",
-      "packaged_helper_IPC": "PASS",
-      "nonempty_artifacts": 2
-    },
-    {
-      "id": 35698496546,
-      "tested_code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-      "result": "SUCCESS",
-      "all_required_steps": "PASS",
-      "h2_tests": {
-        "passed": 614,
-        "failed": 0
-      },
-      "packaged_helper_IPC": "PASS"
-    },
-    {
-      "run_id": 35698479792,
-      "trigger_head": "d9ea0e0d0f276f7a01170c353e79348139664e43",
-      "tested_code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
-      "artifact_id": 10680529565,
-      "artifact_sha256": "34928dd7e2a8466bcbb08e6f83df6ce39869731db9d3c05ec2502fb1b33e0afe",
-      "AR010": "11/11 in each of 3 iterations",
-      "AR001_regression": "13/13",
-      "required_Agent_suites": "74/74",
-      "verification": "Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization."
-    },
-    {
-      "run_id": 35698742558,
-      "trigger_head": "d9c3831e65f2616dabbd9a69643bbfd4e2cf265a",
-      "tested_code_sha": "d9c3831e65f2616dabbd9a69643bbfd4e2cf265a",
-      "artifact_id": 10681393961,
-      "artifact_sha256": "60b785cb60cee3ce34283b0dc66b2e57c3ef368ac3b3e3eaa67a1098e866e883",
-      "AR010": "11/11 in each of 3 iterations",
-      "AR001_regression": "13/13",
-      "required_Agent_suites": "74/74",
-      "verification": "Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization."
-    },
-    {
-      "id": 35703236866,
-      "code_sha": "4459be5d0e2a0c22e466c1b5a52785a64ce2a2e5",
-      "AR011": "18/18 x3",
-      "independent_Agent": "72/74",
-      "result": "REPAIR_REQUIRED",
-      "artifact_id": 10683975729
-    },
-    {
-      "id": 35704689725,
-      "tested_code_sha": "4eef57a1a6fc4c0014516c1215fd1d5fd22945b3",
-      "AR011": "22/22 x3",
-      "AR010": "11/11",
-      "AR001": "13/13",
-      "Agent_suites": "74/74",
-      "artifact_id": 10684530320,
-      "artifact_sha256": "6e6a3ab4e09a97d405d01b5a5ee914dc41c9ee55c2ad6fd5040430efd98e349b",
-      "qualification": "Existing subset passed before additional review; not acceptance of newly repaired code"
-    },
-    {
-      "id": 35709818021,
-      "tested_code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-      "result": "SUCCESS",
-      "h2_tests": {
-        "passed": 639,
-        "failed": 0
-      },
-      "all_required_steps": "PASS",
-      "publish_and_helper_IPC": "PASS"
-    },
-    {
-      "id": 35709753515,
-      "tested_code_sha": "38a29aa6ed8b4a2d7d717b22fa7d6b93e22c22a7",
-      "result": "SUCCESS",
-      "negative_control": "21 passed, 4 expected failures on old runtime + new tests",
-      "positive": "25/25 x3, AR010 11/11, AR001 13/13, Agent 74/74",
-      "artifact_id": 10686570321
-    },
-    {
-      "id": 35720746799,
-      "tested_code_sha": "3ee09035e06bb8a02a483d684e141419769b5160",
-      "AR012": "39/39 x3",
-      "AR011": "25/25",
-      "AR010": "11/11",
-      "AR001": "13/13",
-      "Agent": "74/74",
-      "artifact_id": 10690789503,
-      "sha256": "f300e623a1bf876490c01cdbee2d8ddee453a7fa94119a4870a42e5a70a71dbd"
-    },
-    {
-      "id": 35724401082,
-      "code_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "SUCCESS",
-      "h2_tests": {
-        "passed": 683,
-        "failed": 0
-      },
-      "publish_helper_smoke": "PASS"
-    },
-    {
-      "id": 35724340135,
-      "actual_tested_sha": "ed46ab820c5b084c64a11c5c171d2ca0dbee5adf",
-      "result": "SUCCESS",
-      "AR012": "44/44 x3",
-      "retained": "25/25 + 11/11 + 13/13",
-      "Agent_suites": "74/74",
-      "negative": "2 passed / 3 expected old-runtime failures",
-      "artifact_id": 10693511176,
-      "artifact_sha256": "a5e4de1a41d72247faeba39036ec8c7bd43cc468d00f0625e9a21ff0ac32a6e3"
-    },
-    {
-      "id": 35734416863,
-      "code_sha": "577a5237375257c147bddcd6a96b039b620df966",
-      "result": "FAILURE",
-      "stage": "Negative-control clean-restore guard; positives NOT_RUN"
-    },
-    {
-      "id": 35735271906,
-      "code_sha": "3486e6badb38c8984aa756696e2a113f49bc3d15",
-      "result": "SUCCESS",
-      "evidence_level": "E2",
-      "AR020": "28/28 x3",
-      "Agent_suites": "74/74"
-    },
-    {
-      "id": 35735271912,
-      "source_head": "3486e6badb38c8984aa756696e2a113f49bc3d15",
-      "actual_checkout_sha": "d7a0b5d88b38be37445c4b8bef24431b57b4c1ff",
-      "result": "SUCCESS",
-      "H2_tests": "711/711",
-      "publish_helper_IPC": "PASS",
-      "native_E3": "NOT_RUN"
-    },
-    {
-      "id": 35743581894,
-      "head_sha": "b270de5c22bfe880055975aaa35fbeebd6934f09",
-      "url": "https://github.com/HoangHung997/NotePad/actions/runs/35743581894",
-      "job_id": 106799291357,
-      "conclusion": "success",
-      "AR020": "36/36 x3",
-      "enumeration_control": "3 expected semantic failures",
-      "validated_level": "E2"
-    },
-    {
-      "id": 35743581725,
-      "head_sha": "b270de5c22bfe880055975aaa35fbeebd6934f09",
-      "url": "https://github.com/HoangHung997/NotePad/actions/runs/35743581725",
-      "job_id": 106799298598,
-      "conclusion": "success",
-      "actual_checkout_sha": "11754bda798e13e0311ec7d0c763ca52afa97fa1",
-      "H2": "719/719",
-      "native_E3": "NOT_RUN"
-    },
-    {
-      "id": 35766312352,
-      "job_id": 106876620967,
-      "head_sha": "b5060f877616f28bc3903df69585ac419f9a8d1e",
-      "result": "SUCCESS",
-      "applies_to": "PRE_REPAIR_SOURCE_ONLY"
-    },
-    {
-      "id": 35766312391,
-      "job_id": 106876620469,
-      "head_sha": "b5060f877616f28bc3903df69585ac419f9a8d1e",
-      "result": "SUCCESS",
-      "applies_to": "PRE_REPAIR_SOURCE_ONLY",
-      "actual_checkout_sha": "b5904d005324d92ccc3cab3d571fc8b284996a5a",
-      "H2_passed": 749,
-      "H2_failed": 0,
-      "log_sha256": "0fe361f28b54810e6f0ba96863efeb0782c50a730ca9d63e550bd8ebc88be916"
-    },
-    {
-      "id": 35767850106,
-      "result": "FAILURE",
-      "scope": "DOCUMENTATION_ONLY",
-      "reason": "gh refused raw terminal escape sequences before any tracker write; capture-only log reader corrected"
-    },
-    {
-      "id": 35771775587,
-      "job_id": 106894985151,
-      "head_sha": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-      "result": "SUCCESS",
-      "applies_to": "POLICY_SUBFIX_ONLY_EVIDENCE_REPAIR_PENDING"
-    },
-    {
-      "id": 35771775450,
-      "job_id": 106894991292,
-      "head_sha": "c9162ad7422b58dc8475d711e9b6fc3b2c3a1980",
-      "result": "SUCCESS",
-      "applies_to": "POLICY_SUBFIX_ONLY_EVIDENCE_REPAIR_PENDING"
-    },
-    {
-      "id": 35774591898,
-      "job_id": 106904461163,
-      "head_sha": "44959a651d08fa363ab8adf65196d54269432a26",
-      "result": "FAILURE"
-    },
-    {
-      "id": 35774591845,
-      "job_id": 106904460006,
-      "head_sha": "44959a651d08fa363ab8adf65196d54269432a26",
-      "result": "FAILURE"
-    },
-    {
-      "id": 35776861064,
-      "job_id": 106912171589,
-      "head_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
+      "id": 35986971466,
+      "name": "AR-000 baseline capture",
       "result": "SUCCESS"
     },
     {
-      "id": 35776861177,
-      "job_id": 106912171543,
-      "head_sha": "cc6ce2e80afafc25a48c4bed5b9045be5df96083",
+      "id": 35986970921,
+      "name": "AR-010 shared runtime validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35785572999,
-      "job_id": 106941639193,
-      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "id": 35986970886,
+      "name": "AR-011 outcome contract validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35785633670,
-      "job_id": 106941632110,
-      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "id": 35986970896,
+      "name": "AR-012 scoped binding validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35790136052,
-      "trigger_head_sha": "6368ba1d9271e790bf88921d37322f5800f8ec84",
-      "actual_code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
+      "id": 35986970985,
+      "name": "AR-020 native discovery implementation validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35790200054,
-      "actual_code_sha": "044bc7c0e6481e8e4f54b477616b42a0870721c0",
-      "result": "SUCCESS",
-      "h2_tests": "816/816",
-      "publish_helper_IPC": "PASS"
+      "id": 35986970929,
+      "name": "AR-021 bounded Excel range validation",
+      "result": "SUCCESS"
     },
     {
-      "id": 35799370449,
-      "head_sha": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
-      "result": "SUCCESS",
-      "owner": "AR-033"
+      "id": 35986971098,
+      "name": "AR-030 outcome and revision validation",
+      "result": "SUCCESS"
     },
     {
-      "id": 35799079473,
-      "head_sha": "c1825d615502f95c5ce3420611e3fd6a3fa51448",
-      "result": "SUCCESS",
-      "owner": "AR-033"
+      "id": 35986971095,
+      "name": "AR-031 journal and cancellation regression",
+      "result": "SUCCESS"
     },
     {
-      "id": 35816609055,
-      "code_sha": "462ab1dec0d0c723920283b0b3b9142b46d6796a",
-      "result": "SUCCESS",
-      "owner": "AR-040",
-      "artifact_id": 10732032165
+      "id": 35986970914,
+      "name": "AR-032 scoped history validation",
+      "result": "SUCCESS"
     },
     {
-      "id": 35816612945,
-      "code_sha": "462ab1dec0d0c723920283b0b3b9142b46d6796a",
-      "checkout_sha": "a8144d5cab714399468988c42603adb34fbc07f0",
-      "result": "SUCCESS",
-      "owner": "AR-040"
+      "id": 35986971330,
+      "name": "AR-001 isolated implementation workspace",
+      "result": "SUCCESS"
     },
     {
-      "run_id": 35819745122,
-      "sha": "97b7d6d16e20bb083dd4f5445c00aa4219de81c5",
-      "status": "FAILURE",
-      "stage": "source delivery",
-      "reason": "Malformed compressed carrier; zlib invalid block type; no application source committed by that attempt."
-    },
-    {
-      "run_id": 35821300963,
-      "sha": "b19c86556589c811fa4dfab7dd665d1f9cd4da2c",
-      "status": "FAILURE",
-      "stage": "settings control harness",
-      "reason": "Ambiguous TextBox selector failed before budget assertion; positive corpus/suites skipped.",
-      "artifact_id": 10733896669,
-      "artifact_sha256": "04bac089bcdd2cff02f4343571580e57854060d51751653d4d7e2d871027ff81"
-    },
-    {
-      "run_id": 35821305458,
-      "sha": "b19c86556589c811fa4dfab7dd665d1f9cd4da2c",
-      "status": "FAILURE",
-      "h2_passed": 964,
-      "h2_failed": 1,
-      "reason": "Same UI selector failure; post-effect cases passed; later mandatory stages and publish skipped."
-    },
-    {
-      "run_id": 35820429024,
-      "sha": "33fc0a09346dd8816860d48e9ec01369c60d6dc9",
-      "ar050": "47/47 x3",
-      "agent_suites": "74/74",
-      "artifact_id": 10733082642,
-      "artifact_sha256": "da76de58935d756afa3ee907d553ad25d36763689350386f6f0d5dea7185de6f"
-    },
-    {
-      "id": 35821961122,
-      "code_sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-      "result": "SUCCESS_VERIFIED",
-      "ar050": "50/50 x3",
-      "artifact_id": 10733529300,
-      "artifact_sha256": "d0becccfd43e71e1691d41fae346417eebe3ddd49737d9f0d2795da238207da1"
-    },
-    {
-      "id": 35821963881,
-      "code_sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
-      "actual_checkout_sha": "e40011dd4f02d8a900f658368678934c4a5d52e3",
-      "result": "SUCCESS_VERIFIED",
-      "h2_tests": "965 passed / 0 failed",
-      "raw_log_sha256": "445868b628572868ab71a1202e74ade3df05d96319a99715a5a8fa7f84c170af"
-    },
-    {
-      "id": 35835063919,
-      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
-      "result": "SUCCESS",
-      "AR051": "37/37 x3",
-      "old_class_control": "0/6 expected failures",
-      "agent_suites": "74/74"
-    },
-    {
-      "id": 35835069955,
-      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
-      "tested_checkout_sha": "e3d4aff418c1de80eb5ec98a683848d08d1f96fe",
-      "result": "SUCCESS",
-      "h2_tests": "1002/1002",
-      "publish_and_helper_ipc": "SUCCESS",
-      "build_warnings": 38
-    },
-    {
-      "run_id": 35864935194,
-      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
-      "result": "SUCCESS",
-      "owner": "AR-064 typed outcome checkpoint",
-      "artifact": {
-        "id": 10751613347,
-        "name": "AR064-Lifecycle-Evidence",
-        "size_in_bytes": 3024593,
-        "digest": "sha256:51c4309607c63130acc99d5ef73b0e62dd24e80cd7fbae64ac514e2a14eba5ba"
-      }
-    },
-    {
-      "run_id": 35864940427,
-      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
-      "actual_checkout": "f1eb0d19e80b535b25574a6c95a72cbec3255ea0",
-      "result": "SUCCESS",
-      "h2_passed": 1077,
-      "h2_failed": 0
-    },
-    {
-      "id": 35874131889,
-      "sha": "0a75675e73ad7567e458b41bafe0e57b91363f87",
-      "result": "FAILURE before source mutation",
-      "reason": "Damaged transfer zlib bytes; other worker later removed payload/workflow.",
-      "attempt": 1
-    },
-    {
-      "id": 35875731324,
-      "sha": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
-      "result": "1120 passed / 2 failed; later stages skipped",
-      "reason": "Retained AR050 scripted lookup omitted from advertised tools.",
-      "attempt": 1
-    },
-    {
-      "id": 35878985021,
-      "sha": "8ba51247dc74522a752acf434317e8c053171018",
-      "result": "BUILD_FAILURE; tests NOT_RUN",
-      "reason": "New test missing H2Notes.Avalonia namespace import.",
-      "attempt": 1
-    },
-    {
-      "id": 35879547779,
-      "sha": "d5be56c91039bdd4ec0696acccd41c91c12d34f9",
-      "result": "AR065 51/4 x3; full1127/5; Agent74 passed; NOT acceptance",
-      "artifact_id": 10760388238,
-      "digest": "a061fe29e18e602f1ec6cdedf47dacb0131605d2c6e1801731a64b692aa23c2d",
-      "reason": "Four new read fixtures omitted offset; one retained AR040 two-poll timing assumption.",
-      "attempt": 1
-    },
-    {
-      "id": 35881691347,
-      "sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-      "attempt": 1,
-      "job_id": 107251468701,
-      "result": "SUCCESS; E1/E2 only",
-      "artifact_id": 10761303971,
-      "artifact_sha256": "c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2"
-    },
-    {
-      "id": 35881698306,
-      "head_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-      "actual_checkout_sha": "011cd407fa2c604aa895cc8c7f267f3914f9ddde",
-      "attempt": 1,
-      "job_id": 107251491366,
-      "result": "SUCCESS; H2 1132/0, all mandatory stages and publish/helper IPC"
-    },
-    {
-      "id": 35895544765,
-      "code_sha": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-      "attempt": 1,
-      "result": "SUCCESS_VERIFIED",
-      "task": "AR-066"
-    },
-    {
-      "id": 35895550449,
-      "head_sha": "95d9aa2d0566a8e93d2b2be17a052fbb1182014f",
-      "checkout_sha": "b20deecb9c80e6e5882e4d994b0b0a8d06f2496d",
-      "attempt": 1,
-      "result": "SUCCESS_VERIFIED",
-      "task": "AR-066"
-    },
-    {
-      "run": 35889363009,
-      "sha": "ad1cec00c8c8cebd2cf15c7634eaec9e33af1734",
-      "result": "40/42 AR066 x3; full1172/1174; wrong write_file fixture; Agent74/74",
-      "artifact": 10765670041,
-      "artifact_sha256": "df82f172bdb1b993c8f83681db7d2bb662b916e67670833d6bb999daee968d45"
-    },
-    {
-      "run": 35889368390,
-      "sha": "ad1cec00c8c8cebd2cf15c7634eaec9e33af1734",
-      "result": "Full1172/1174; two incorrect write_file fixtures"
-    },
-    {
-      "run": 35889368749,
-      "sha": "ad1cec00c8c8cebd2cf15c7634eaec9e33af1734",
-      "result": "Retained MB94 DesktopHost timeout; separate same-SHA Agent74 corpus passed; no timeout/assertion weakened",
-      "artifact": 10764367112,
-      "artifact_sha256": "d123e31c226e3764344ce3012ab93772b4fda2f352d9a414bd0f8e678e0188d3"
-    },
-    {
-      "id": 35908748336,
-      "code_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-      "result": "SUCCESS_VERIFIED",
-      "owner": "AR-066 source consent"
-    },
-    {
-      "id": 35908755287,
-      "code_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-      "tested_checkout_sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
-      "result": "SUCCESS_VERIFIED",
-      "owner": "AR-066 full regression"
+      "id": 35986970938,
+      "name": "Avalonia CI",
+      "result": "SUCCESS"
     }
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-000/baseline.json",
-    "docs/agent-reliability/AR-000/baseline.md",
-    "docs/agent-reliability/AR-000/ci-final-review.json",
-    "docs/agent-reliability/AR-001/implementation.md",
-    "docs/agent-reliability/AR-001/ci-attempts.json",
-    "docs/agent-reliability/AR-001/acceptance.json",
-    "docs/agent-reliability/AR-010/acceptance.json",
-    "docs/agent-reliability/AR-010/implementation.md",
-    "docs/agent-reliability/AR-011/acceptance.json",
-    "docs/agent-reliability/AR-011/implementation.md",
-    "docs/agent-reliability/AR-012/acceptance.json",
-    "docs/agent-reliability/AR-012/implementation.md",
-    "docs/agent-reliability/AR-020/implementation-evidence.json",
-    "docs/agent-reliability/AR-020/implementation.md",
-    "docs/agent-reliability/AR-020/native-runbook.md",
-    "docs/agent-reliability/AR-020/enumeration-failure-review.md",
-    "docs/agent-reliability/AR-020/enumeration-repair-evidence.json",
-    "docs/agent-reliability/AR-030/integrity-review-pending.md",
-    "conversation artifact: H2_AR030_Integrity_Repair.zip (LOCAL_ONLY, source patch NOT_PUSHED)",
-    "docs/agent-reliability/AR-030/mutation-policy-review.md",
-    "docs/agent-reliability/AR-030/mutation-policy-evidence.json",
-    "conversation: H2_AR030_Remaining_Evidence_Repair.zip (LOCAL_ONLY)",
-    "docs/agent-reliability/AR-030/evidence-regression-observation.json",
-    "docs/agent-reliability/AR-030/evidence-regression-observation.md",
-    "docs/agent-reliability/AR-030/acceptance.json",
-    "docs/agent-reliability/AR-030/implementation.md",
-    "docs/agent-reliability/AR-031/implementation.md",
-    "docs/agent-reliability/AR-031/acceptance.json",
-    "docs/agent-reliability/AR-032/acceptance.json",
-    "docs/agent-reliability/AR-032/implementation.md",
-    "docs/agent-reliability/AR-033/acceptance.json",
-    "docs/agent-reliability/AR-033/verdict-consistency-review.md",
-    "docs/agent-reliability/AR-040/acceptance.json",
-    "docs/agent-reliability/AR-040/implementation.md",
-    "docs/agent-reliability/AR-050/acceptance.json",
-    "docs/agent-reliability/AR-050/implementation.md",
-    "docs/agent-reliability/AR-051/acceptance.json",
-    "docs/agent-reliability/AR-051/implementation.md",
-    "Actions 35835063919 AR051-Work-Compaction-Evidence",
-    "Actions 35835069955 H2Notes-Avalonia-Portable-win-x64",
-    "docs/agent-reliability/AR-065/evidence.json",
-    "docs/agent-reliability/AR-065/implementation-review.md",
-    "docs/agent-reliability/AR-065/real-h2-acceptance.md",
-    "Actions run 35881691347 artifact 10761303971 SHA256 c7480e019584e702d89ef18398f9651e6d75bb994f5b1f18837845ec764e55c2",
-    "docs/agent-reliability/AR-066/source-consent-evidence.json"
+    "docs/agent-reliability/AR-021/evidence.json",
+    "docs/agent-reliability/AR-021/implementation.md",
+    "docs/agent-reliability/AR-021/native-acceptance.md",
+    "GitHub artifact 10802524268 AR021-E1-E2-Evidence",
+    "GitHub artifact 10803285991 H2Notes-Avalonia-Portable-win-x64"
   ],
-  "known_failures": [],
-  "user_test_policy": "Environment/model acceptance that cannot be run in the implementation session may be DEFERRED_BY_USER and retested from the final full build. Deferred means NOT_RUN/NO_PASS_CLAIM; it does not waive the acceptance debt.",
+  "known_failures": [
+    {
+      "sha": "a5e9b76c8e5518de170eed6615165f639f8ab1dc",
+      "run_id": 35985389076,
+      "status": "FAILURE",
+      "reason": "Three ComOfficeBackend compile errors: wrong ValidateCurrent named argument and target-typed ExcelRangeReadMetrics construction. Repaired in 1fca3a506a8b40d1955c910fa2135a49797332b3."
+    },
+    {
+      "sha": "1fca3a506a8b40d1955c910fa2135a49797332b3",
+      "run_id": 35986730031,
+      "status": "FAILURE",
+      "reason": "AR-021 test file referenced ToolCall without global H2AgentLab qualification. Repaired in e7dba71f76e36fc73aee7509e8f39416b8f7296a."
+    }
+  ],
   "external_blockers": [
-    "AR-020/033 native E3 and AR-051 real-model E4 remain AWAITING_ENVIRONMENT; AR-083 stays DEFERRED_BY_USER. No acceptance waiver.",
     {
-      "id": "AR-051-E4",
-      "missing_evidence": "Actual authorized H2 UI/model/tools semantic recall subset",
+      "id": "AR-021-E3",
       "status": "AWAITING_ENVIRONMENT",
-      "blocks_independent_implementation": false
-    },
-    {
-      "id": "AR-065-E4",
-      "status": "AWAITING_ENVIRONMENT",
-      "missing_evidence": "Authorized Windows/H2/model profile and finite live-test budget; Remote Desktop Commander was not installed when checked. No new credential, endpoint or personal-document test authorized."
+      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus; fixture/scripted E2 is not native acceptance."
     }
   ],
-  "deferred_acceptance": [
-    {
-      "id": "AR-083",
-      "status": "DEFERRED_BY_USER",
-      "scope": "Physical two-PC/NAS acceptance",
-      "blocks_independent_implementation": false,
-      "blocks_claim_of_certified_multi_pc": true
-    },
-    {
-      "id": "AR-033",
-      "implementation": "IMPLEMENTED",
-      "status": "AWAITING_ENVIRONMENT",
-      "completed_evidence": "E1/E2",
-      "missing_evidence": "E3 real app/provider; E4 remains separate",
-      "blocks_independent_implementation": false
-    }
-  ],
-  "critical_user_reported_repairs": [
-    {
-      "id": "AR-065",
-      "issue": "GPT-5.6 Luna text chat works but Agent tool task HTTP 400",
-      "status": "IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT / NOT_DONE"
-    },
-    {
-      "id": "AR-066",
-      "issue": "Live app resource/native Word-Excel-AutoCAD-Browser semantics",
-      "status": "USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER / TEST_LATER / NO_E3_E4_PASS_CLAIM"
-    },
-    {
-      "id": "AR-067",
-      "issue": "Every meaningful failure returns to Agent for recovery or specific explanation",
-      "status": "USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER / TEST_ON_FINAL_FULL_BUILD / NO_E4_PASS_CLAIM / runtime=9be3ac78072bd3b43910a5af7f33dec67625e6f1 / revalidated_tree=1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183"
-    },
-    {
-      "id": "AR-068",
-      "issue": "Command Center attention collapse and acknowledgement lifecycle",
-      "status": "USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER / TEST_ON_FINAL_FULL_BUILD / NO_E4_PASS_CLAIM / code=c8cfddf7ee22c37a6abdf1f739b8a7652d038dd2"
-    },
-    {
-      "id": "AR-069",
-      "issue": "Integrated production acceptance of all four user-reported defects",
-      "status": "USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER / TEST_ON_FINAL_FULL_BUILD / NO_E4_PASS_CLAIM / gate=9f09e8d1205b83a9bce733da547acc0544599179"
-    }
-  ],
-  "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
-  "pending_user_decisions": [],
-  "next_exact_action": "AR-064 implementation is green and required E3 is explicitly DEFERRED_BY_USER until final full-build testing. Do not start another task in this turn. In the next one-task turn start ONLY AR-021 Excel region/paging/content-token work, the first mandatory roadmap task after AR-020 under the user's test-later sequencing policy. Do not start optional AR-071/072 unless separately activated.",
-  "next_task_if_active_done": "AR-021 is READY for the next one-task turn because AR-020 implementation exists and its real E3 is deferred under the user's test-later policy. AR-071/072 remain optional/not selected. One-task rule still applies.",
-  "last_runtime_source_commit": "a956f9d7d1c9c23f0a7587570b933a25edb7efbb",
-  "previous_saved_checkpoint_commit": "e7a7bc36e9d45871bf1762bf976f86a224750d3e",
-  "finalization_checked_head": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
-  "additional_ci_after_recorded_run": "AR-064 product source a956f9d7d1c9c23f0a7587570b933a25edb7efbb: dedicated run 35972350946/job107547131204 SUCCESS with AR064 77/77 x3, retained corpora and Agent75/75; initial artifact10796439541 sha256 753faf35a2a41fb22f92c5edab47893f8cc07b907ae959f43c0691c155b344e3 independently inspected. Avalonia run35972351892 attempt1 had one H2M132 workspace-save >30s runner outlier and no AR064 failure; same-code attempt2/job107552440903 SUCCESS full H2 1272/1272 with workspace save 4436.23ms, Windows publish/helper IPC; portable10798290870 sha256 25b9229444e6b9b4d7db6bd1d363310f4213b49773fdc030f56cb86ad4d9b236; NAS probe10798146583 sha256 acf842661cd34f7af4f938c3408c2ede77abcf95c96b8edb9932841ad27e9542. Final evidence/CI head 56276acb7fa64fbe7afa3cc2c9346e8651b597fc: dedicated AR064 run35975537267/job107555015315 SUCCESS; artifact10797804518 sha256 1cdf4af85c3ffdd929455b6f4f10d8f4a0856133857e9e18a67881f067463c27 independently downloaded/hashed/inspected with failed=[], CLEAN, E3=DEFERRED_BY_USER and E3_pass_claim=false. All 10 pull_request workflows SUCCESS. Avalonia run35975543458/job107555035332 SUCCESS, merge checkout14861ccea69ea10db4d073ec3b9cccc0ea3fc338, full H2 1272/1272, workspace save 5048.69ms, Windows publish/helper IPC; portable10798556271 sha256 23c359453e20f896eb497b2dd551b4f100c19a6340df0f632e0e61a9b6a1cbaa; NAS probe10798506395 sha256 327e412e50784c37b1e415bf4b438bbb164aa3c4430231b70b96d71d3e2c40e5. This is E1/E2 implementation evidence only and does not upgrade E3.",
-  "last_completed_task": "AR-050",
-  "historical_failure_notes_retained": [
-    {
-      "task": "AR-068",
-      "sha": "f8e57fe7f926794c0cc6313edc52dc07ca33fce9",
-      "focused_run": 35948267595,
-      "full_run": 35948271521,
-      "classification": "EXPECTED_RETAINED_TEST_DRIFT_AFTER_APPROVED_COLLAPSED_UX",
-      "details": "AR-068 focused cases passed 3/3; full H2 failed only the old deep-link and H2M-110 assertions because they assumed the attention list was always expanded. Assertions were repaired to expand explicitly while preserving deep-link/five-second semantics. Exact repaired SHA c8cfddf7... passes focused/full/CI."
-    },
-    "B01 skill-name drift",
-    "B02 200/128 Excel contract drift",
-    "B03 architecture guard failure; downstream suites and publish did not run",
-    "B04-B10 remain open source-observed limitations/risks; see baseline",
-    "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions.",
-    {
-      "sha": "8b1505c62e7764286b4185876098ed6e0dafaf04",
-      "run_id": 35813690068,
-      "passed": 43,
-      "failed": 11,
-      "repetitions": 3,
-      "artifact_id": 10730734029,
-      "digest": "72b62f2cd66bea4bfacd71b089476feb66791674275317a12b4a98616f071629",
-      "cause": "Conflicting shell namespace metadata blocked production composition"
-    },
-    {
-      "sha": "5d17d348416c3ffcb27bad33318a091914837ef5",
-      "run_id": 35815606847,
-      "passed": 53,
-      "failed": 1,
-      "repetitions": 3,
-      "artifact_id": 10731951890,
-      "digest": "f0755145e252ad281a40d0957dad47d788fcef5c6c1866177b0a9bbf7ab38da9",
-      "full_run_id": 35815609566,
-      "full_passed": 911,
-      "full_failed": 1,
-      "cause": "Exact-output fixture also received native PowerShell progress; production stderr was not stripped"
-    },
-    {
-      "sha": "6ac81cb8cd18b6d8124bdd97fc3b9bc541e7b78a",
-      "focused_run": 35903219588,
-      "full_run": 35903224947,
-      "focused_each": {
-        "passed": 132,
-        "failed": 2,
-        "repetitions": 3
-      },
-      "full": {
-        "passed": 1264,
-        "failed": 2
-      },
-      "artifact_id": 10770393061,
-      "artifact_sha256": "982ae4ce14870e21691050f9ef89e9f30b4d7938cff231fac9185161373c6241",
-      "cause": "Two new fixtures demanded unchanged error text after unknown effect; existing archive projects ReconcileRequired. Test-only repair retains and strengthens exact receipt/no-replay checks. Historical run remains FAILURE."
-    },
-    {
-      "sha": "2f2dda5f6207f948ed56e30ca5cd2c50cb811948",
-      "focused_run": 35904844689,
-      "focused_result": "134/134 x3; full1266; Agent74 PASS",
-      "full_run": 35904851797,
-      "full_result": "SUCCESS",
-      "focused_artifact": {
-        "id": 10771238823,
-        "bytes": 3744736,
-        "sha256": "850edd77e59935d3474484a1ec9b043ac9d54fb8df116b0b047ff71c0a30deaa"
-      },
-      "failed_peer_runs": [
-        {
-          "id": 35904844588,
-          "artifact_id": 10770523381,
-          "artifact_sha256": "2dd9f9ce3e7a4add426adf76cd9bfad0ed89a1c0767e27f49ee908ce882f5d00",
-          "reason": "Historical AR033 control pinned an obsolete current-assessment hash and stopped before source substitution. All current AR03342 x3 and Agent74 passed. Original executed control artifact10725382259 was independently CRC/hash checked and preserved read-only; identical six contradiction regression sources still run in every current42 corpus. No new negative-control execution claimed."
-        },
-        {
-          "id": 35904844594,
-          "artifact_id": 10770753527,
-          "artifact_sha256": "895c42e286a39ec0faa460252abe23735e2e3e4c44ab8c444a066855fd553318",
-          "reason": "Resilience cancellation assumed a dispatch before a prearmed40ms timer; actual count was not logged. Replaced timing assumption with a bounded observed-dispatch handshake and four separate precancel-zero-send tests; exact one-send/no-fallback assertions retained. Runtime transport unchanged."
-        }
-      ],
-      "failed_checkpoint": {
-        "id": 35906863619,
-        "sha": "9e1dddd1cf9f957b6a29e90a974bbd112a0e984c",
-        "result": "FAILURE_BEFORE_DOCUMENT_WRITE_OR_COMMIT_OR_PUSH",
-        "reason": "Refused to checkpoint while exact-SHA peer workflows were red."
-      },
-      "repair_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-      "classification": "AR066 regression maintenance only; all historical failures remain failures"
-    }
-  ],
-  "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Integration/H2AgentExtensionLifecycleHost.cs experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Extensions.cs experiments/H2AgentLab/Plugins/PluginManager.Lifecycle.cs src/H2Notes.Core/H2AgentExtensionLifecycle.cs tests/H2Notes.Tests/H2AgentPluginLifecycleTests.cs .github/workflows/h2-ar064-validation.yml",
-  "previous_completed_task": "AR-070 USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER",
-  "last_full_ci_checkout_sha": "14861ccea69ea10db4d073ec3b9cccc0ea3fc338",
-  "implemented_this_session": [
-    "AR-064 production plugin/provider lifecycle composition in H2ProductionAgentAdapter, task-used version pins and durable archive evidence; E3 external/native provider acceptance explicitly deferred"
-  ],
-  "next_ready_independent_task": "AR-021 is the next mandatory roadmap task to implement in the next one-task turn under the user test-later policy. AR-071/072 remain optional/not selected. AR-020 E3 and AR-064 E3 remain deferred, not passed.",
-  "independent_dependency_assessment": {
-    "id": "AR-064",
-    "rule": "Tracker section 2.2 + user test-later policy: product lifecycle implementation may sequence forward at E2 while required real external/native provider E3 is explicitly deferred; no acceptance-level inflation.",
-    "dependencies": [
-      "AR-010 DONE",
-      "AR-011 DONE",
-      "AR-031 DONE"
-    ],
-    "reconciled_head": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc",
-    "basis": "Production H2 adapter executes a real temporary ZIP provider-backed plugin tool, task pins exact plugin/provider/tool versions into the existing archive, safe-boundary update/restart/disable/enable/uninstall evidence pass; AR064 77/77 x3, full H2 1272/1272, Agent75/75, 10/10 PR CI and Windows publish/helper IPC are green.",
-    "limits": "No E3 external/native trusted provider package claim; no marketplace or second runtime/store; optional AR-071/072 remain not selected."
-  },
   "parked_acceptance": [
     {
       "id": "AR-020",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "AWAITING_ENVIRONMENT",
-      "required_level": "E3",
-      "done": false
+      "status": "AWAITING_ENVIRONMENT",
+      "required": "E3"
     },
     {
       "id": "AR-033",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "AWAITING_ENVIRONMENT",
-      "completed_level": "E2",
-      "required_level": "E3",
-      "done": false
+      "status": "AWAITING_ENVIRONMENT",
+      "required": "E3"
     },
     {
       "id": "AR-051",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "AWAITING_ENVIRONMENT",
-      "completed_level": "E2",
-      "required_level": "E4",
-      "done": false,
-      "code_sha": "28e34454c7f44deebaa867121e661739a79470b5",
-      "missing_evidence": "Actual H2 UI/model/tools semantic recall and failure subset under authorized configured model budget",
-      "blocks_independent_implementation": false
+      "status": "AWAITING_ENVIRONMENT",
+      "required": "E4"
+    },
+    {
+      "id": "AR-064",
+      "status": "DEFERRED_BY_USER",
+      "required": "E3 external/native provider"
     },
     {
       "id": "AR-065",
-      "implementation_status": "IMPLEMENTED",
-      "acceptance_status": "AWAITING_ENVIRONMENT",
-      "completed_level": "E2",
-      "required_level": "E4",
-      "done": false,
-      "code_sha": "26d79367392a1f7f02d6acaef116e420ac9125dc",
-      "evidence": "docs/agent-reliability/AR-065/evidence.json",
-      "blocks_independent_implementation": false
+      "status": "AWAITING_ENVIRONMENT",
+      "required": "E4"
+    },
+    {
+      "id": "AR-083",
+      "status": "DEFERRED_BY_USER",
+      "required": "E5 physical two-PC/NAS"
     }
   ],
-  "resolved_in_this_session": [
-    "Exact-file reference/output/replacement/live-reselection via existing approval and journal, with no execution permission expansion.",
-    "Current source decisions invalidated by queued/accepted user revision, expiry, cancellation, stale capture or changed pending file.",
-    "Fresh actual content/hash observation required after source selection; metadata, earlier pages and old native proof do not complete the source gate.",
-    "Unknown-effect restart fixture follows existing ReconcileRequired authority and proves exact effect/receipt/no replay; archive runtime unchanged.",
-    "AR066 retained-CI maintenance: bounded dispatch cancellation with four precancel regressions; read-only original AR033 control provenance plus unchanged current42 x3, no historical source replacement."
-  ],
-  "last_test_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-  "last_native_acceptance": "AR-020/033 E3 and AR-065 E4 AWAITING_ENVIRONMENT; AR-083 DEFERRED_BY_USER",
-  "parked_ar064": {
-    "implementation": "IMPLEMENTED",
-    "acceptance": "E2_PASS; E3_DEFERRED_BY_USER; NO_E3_PASS_CLAIM",
-    "reason": "The parked lifecycle work was resumed after AR-070 and completed at E2 on the normal H2 production path. Real external/native provider package acceptance is intentionally deferred to final full-build testing.",
-    "remaining": [
-      "E3 external/native trusted provider package acceptance on final full build only."
-    ],
-    "product_source": "a956f9d7d1c9c23f0a7587570b933a25edb7efbb",
-    "validated_head": "56276acb7fa64fbe7afa3cc2c9346e8651b597fc"
+  "pending_user_decisions": [],
+  "downloadable_build": {
+    "artifact_id": 10803285991,
+    "name": "H2Notes-Avalonia-Portable-win-x64",
+    "bytes": 110304466,
+    "sha256": "1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44",
+    "zip_entries": 482,
+    "local_verified_copy": "/mnt/data/H2Notes-Avalonia-Portable-win-x64.zip",
+    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate as documented by README."
   },
-  "ar065_reconciled_base": "6d6fd8427498b00ba50a2273ded1af8d9467f5e5",
-  "core_followup_status": "EXACT_BOUND_MIXED_SOURCE_CONSENT_IMPLEMENTED_E2_PASS",
-  "native_acceptance_status": "AWAITING_ENVIRONMENT",
-  "user_pc_working_tree": "NOT_ACCESSIBLE",
-  "ar066_evidence": "docs/agent-reliability/AR-066/evidence.json",
-  "ar066_core_limits": [
-    "No real native Office/H2/model acceptance; no new provider, credentials or personal-document test.",
-    "Source consent changes meaning only, not file grounding, mutation permission, goal verification or unknown-effect fences.",
-    "Unknown/ambiguous original live resources remain blocked; source approvals are exact-file, task-local, revision-bound and never restored as grants.",
-    "AR064 PARTIAL, AR020/033 E3, AR051/065 E4, MB124-127 and AR083 DEFERRED_BY_USER remain unchanged."
-  ],
-  "ar066_source_consent_evidence": "docs/agent-reliability/AR-066/source-consent-evidence.json",
-  "last_integration_gate_commit": "9f09e8d1205b83a9bce733da547acc0544599179"
+  "next_exact_action": "Use portable artifact 10803285991 on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
+  "next_task_if_active_done": "AR-022"
 }
 ```
 
