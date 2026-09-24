@@ -268,8 +268,11 @@ public sealed class AgentRuntime : IAsyncDisposable
             var target = AgentCompletionAssessment.Target(call, outcome?.Resource?.Id);
             var observedVersion = outcome?.Resource?.ObservedVersion;
             var previous = unresolvedCalls.LastOrDefault(f => f.Name == call.Name && f.TargetId == target);
-            var changed = previous is null ? (bool?)null
-                : !string.Equals(previous.ObservedVersion, observedVersion, StringComparison.Ordinal);
+            var changed = previous is null
+                || string.IsNullOrWhiteSpace(previous.ObservedVersion)
+                || string.IsNullOrWhiteSpace(observedVersion)
+                    ? (bool?)null
+                    : !string.Equals(previous.ObservedVersion, observedVersion, StringComparison.Ordinal);
             var attempt = unresolvedCalls.Count(f => f.Name == call.Name && f.TargetId == target && f.Code == code) + 1;
             var recovery = (recoveryTools ?? []).Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.Ordinal).Take(8).ToList();
@@ -542,7 +545,7 @@ public sealed class AgentRuntime : IAsyncDisposable
                     if (result.IsError)
                     {
                         var code = result.Outcome?.Error?.Code ?? "tool_error";
-                        var recovery = new HashSet<string>(StringComparer.Ordinal) { executedName };
+                        var recovery = new HashSet<string>(StringComparer.Ordinal);
                         if (result.Outcome?.Error is { } typedError)
                         {
                             code = typedError.Code;
