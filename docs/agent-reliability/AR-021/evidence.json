@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "AR-021",
-  "code_sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
+  "code_sha": "ad843b075bccd0f5967464ec380717d9fe7dfeea",
   "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
@@ -23,12 +23,15 @@
     ],
     "selection_affects_content_version": false,
     "stale_continuation_error": "stale_content",
-    "production_full_snapshot_fallback": "only for legacy injected clients without additive IExcelRangeReadClient; packaged production OfficeHost implements bounded range reads"
+    "production_full_snapshot_fallback": "only for legacy injected clients without additive IExcelRangeReadClient; packaged production OfficeHost implements bounded range reads",
+    "native_direct_edit_tracking": "Workbook.SheetChange COM event advances the per-session revision for paged reads; direct user/external-link cell edits participate in the content token.",
+    "content_tracking_fail_closed": "Multi-page reads return content_tracking_unavailable if Excel events are disabled or the native Workbook.SheetChange event sink cannot attach.",
+    "already_unsaved_edit_regression": "The E2 stale-content case starts page 1 with Saved=false and then mutates another cell; invalidation therefore depends on the content revision, not a Saved true-to-false transition."
   },
   "validation": {
     "dedicated": {
-      "run_id": 35986970929,
-      "job_id": 107591824435,
+      "run_id": 35990959399,
+      "job_id": 107604651591,
       "result": "SUCCESS",
       "focused": "6/6",
       "office_host": "17/17",
@@ -36,13 +39,13 @@
       "retained_ar012": "44/44",
       "retained_ar001": "13/13",
       "full_h2": "1278/1278",
-      "artifact_id": 10802524268,
-      "artifact_bytes": 36069,
-      "artifact_sha256": "89e6d3e610f66438a96ab11b2ec8098b017aaaf83f0e92c17f04db1ddadfc08a"
+      "artifact_id": 10803594991,
+      "artifact_bytes": 36081,
+      "artifact_sha256": "8b697703c2c7db86aac3fe6d5dbf45899d09624743fd6fdfc7f5f5d348cfad0e"
     },
     "avalonia": {
-      "run_id": 35986970938,
-      "job_id": 107591824824,
+      "run_id": 35990959453,
+      "job_id": 107608667783,
       "result": "SUCCESS",
       "full_h2": "1278/1278",
       "all_agent_mb_office_transport_steps": "PASS",
@@ -56,16 +59,16 @@
     }
   },
   "build": {
-    "artifact_id": 10803285991,
+    "artifact_id": 10804717701,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110304466,
-    "sha256": "1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44",
+    "bytes": 110306213,
+    "sha256": "a6fbcbfd977f98853180fc85a6e37f5731bd01f3db46b05dcc4a5ae74d26a080",
     "independently_downloaded": true,
     "zip_crc": "PASS",
     "zip_entries": 482
   },
   "not_claimed": {
-    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN",
+    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN; the COM SheetChange implementation compiled and E2 revision semantics pass, but real Excel event delivery/reconnection still requires native RC-06/07.",
     "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
     "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
     "full_workbook_support": "NOT_CLAIMED from bounded range implementation"

@@ -491,7 +491,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task checkpoint is AR-021: bounded Excel range/paging/content-token implementation is E1/E2 green on exact code `e7dba71f76e36fc73aee7509e8f39416b8f7296a`; native Excel E3 is AWAITING_ENVIRONMENT and is NOT PASS.** The user's requested downloadable Windows build is available from the same validated code. Do not start AR-022 in this one-task turn; first use the build for AR-021 real Excel RC-06/07 and repair any observed regression inside AR-021. Prior AR-020/033/051/064/065/066/067/068/069/070 real-environment debts remain recorded at their existing evidence levels; AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
+**Current task checkpoint is AR-021: bounded Excel range/paging/content-token implementation is E1/E2 green on exact code `ad843b075bccd0f5967464ec380717d9fe7dfeea`; native paged reads now track direct cell edits via Workbook.SheetChange and fail closed when event tracking is unavailable; native Excel E3 is AWAITING_ENVIRONMENT and is NOT PASS.** The user's requested downloadable Windows build is available from the same validated code. Do not start AR-022 in this one-task turn; first use the build for AR-021 real Excel RC-06/07 and repair any observed regression inside AR-021. Prior AR-020/033/051/064/065/066/067/068/069/070 real-environment debts remain recorded at their existing evidence levels; AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
@@ -518,103 +518,103 @@ Do not claim these defects were already covered by historical Office/transport/U
   "required_evidence_level": "E3",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar021-excel-range-read-2026-09-24",
-  "last_code_commit": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
-  "last_validated_code_commit": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
-  "last_validation_result": "AR021_6_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1278_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
+  "owner_session": "chatgpt-ar021-native-edit-tracking-2026-09-24",
+  "last_code_commit": "ad843b075bccd0f5967464ec380717d9fe7dfeea",
+  "last_validated_code_commit": "ad843b075bccd0f5967464ec380717d9fe7dfeea",
+  "last_validation_result": "AR021_6_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1278_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; NATIVE_DIRECT_EDIT_TRACKING_HARDENED; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA dedicated validator and Avalonia CI used clean isolated checkouts. Final validated application/test source is e7dba71f76e36fc73aee7509e8f39416b8f7296a. No reset/force-push/main merge occurred.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is ad843b075bccd0f5967464ec380717d9fe7dfeea. No reset/force-push/main merge occurred.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T10:38:14Z",
+  "checkpoint_saved_at_utc": "2026-09-24T11:43:31.900Z",
   "completed_this_session": [
-    "Reconciled AR-064 checkpoint and selected only AR-021 as the next mandatory roadmap task.",
-    "Added additive Excel bounded range protocol with A1 validation, fields, max-512 page size, cursor, contentVersion, completeness, used-extent metadata and read metrics.",
-    "Implemented concrete FixtureOfficeBackend and native ComOfficeBackend range readers without lifting the legacy 5000-cell full-snapshot limit.",
-    "Changed production H2OfficeRuntimeTools range/formula/style/merge/hidden/verify operations to use bounded range pages when the production client supports AR-021; old injected clients remain compatible.",
-    "Made Excel discovery/active-sheet/selection metadata-only so captured selection no longer forces a full workbook snapshot.",
-    "Added E1/E2 tests for >5000 populated cells, sparse UsedRange, row-major paging, field laziness, selection-stable content token, stale continuation rejection, production no-snapshot dispatch and named-pipe OfficeHost IPC.",
-    "Repaired historical compile failures inside AR-021, preserving failed run history rather than relabelling it.",
-    "Validated exact SHA through dedicated AR-021 gate, full Avalonia CI, all Agent/Office/transport gates, Windows x64 publish and packaged helper IPC.",
-    "Downloaded the portable artifact and independently verified ZIP CRC and SHA256 against GitHub artifact metadata."
+    "Reconciled the prior AR-021 checkpoint and kept AR-021 as the only active task.",
+    "Identified that the native content token could miss a second direct Excel edit when the workbook was already unsaved because Saved/UsedRange/internal revision might remain unchanged.",
+    "Hardened native paged reads by attaching Workbook.SheetChange through ComEventsHelper and advancing a per-session revision for direct user/external-link cell edits as well as H2 writes.",
+    "Made multi-page reads fail closed with content_tracking_unavailable when Excel events are disabled or the Workbook.SheetChange sink cannot attach.",
+    "Strengthened the E2 stale-content regression so page 1 starts from an already-unsaved workbook, then another cell edit must invalidate continuation through the content revision rather than Saved changing true-to-false.",
+    "Validated exact SHA through the dedicated AR-021 gate and full Avalonia CI; all 11 pull-request workflows succeeded.",
+    "Downloaded the exact-SHA AR-021 evidence and Windows x64 portable build; independently verified ZIP integrity and SHA256."
   ],
   "remaining_in_active_task": [
     "Run AR-021 E3 RC-06/07 on an authorized Windows PC with real Microsoft Excel using only synthetic test workbooks.",
     "Use a workbook with >5000 populated cells and a sparse wide UsedRange; verify small range reads remain bounded and metrics match actual returned cells.",
     "Verify formulas, multiple sheets, merged/hidden state and pagination across multiple pages.",
-    "Change selection/focus between pages and confirm contentVersion remains valid; edit workbook content between pages and confirm stale_content/restart behavior on the actual Excel build.",
+    "Change selection/focus between pages and confirm contentVersion remains valid and the bound workbook/range does not redirect.",
+    "Put the workbook into an already-unsaved state, edit a cell directly in Excel between pages, and confirm the old continuation is rejected as stale_content through native Workbook.SheetChange delivery.",
+    "Temporarily disable Excel events in the synthetic test and confirm a multi-page read fails closed with content_tracking_unavailable rather than trusting a weak token.",
     "If any native regression appears, repair and re-run exact-SHA AR-021/full CI before moving to AR-022."
   ],
   "last_test_commands": [
     {
       "command": "tools/agent-reliability/validate_ar021.ps1",
-      "sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
-      "run_id": 35986970929,
-      "job_id": 107591824435,
+      "sha": "ad843b075bccd0f5967464ec380717d9fe7dfeea",
+      "run_id": 35990959399,
+      "job_id": 107604651591,
       "attempt": 1,
-      "result": "SUCCESS; AR021 6/6; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1278/1278; artifact 10802524268 sha256 89e6d3e610f66438a96ab11b2ec8098b017aaaf83f0e92c17f04db1ddadfc08a"
+      "result": "SUCCESS; AR021 6/6; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1278/1278; artifact 10803594991 sha256 8b697703c2c7db86aac3fe6d5dbf45899d09624743fd6fdfc7f5f5d348cfad0e"
     },
     {
       "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "e7dba71f76e36fc73aee7509e8f39416b8f7296a",
-      "run_id": 35986970938,
-      "job_id": 107591824824,
+      "sha": "ad843b075bccd0f5967464ec380717d9fe7dfeea",
+      "run_id": 35990959453,
+      "job_id": 107608667783,
       "attempt": 1,
-      "result": "SUCCESS; full H2 1278/1278; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10803285991 sha256 1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44; NAS probe 10802887675 sha256 db9b4786a7aaea31a6c115fedde7d36df06d270113fb1d9d69ec8a10af7537e3"
+      "result": "SUCCESS; full H2 1278/1278; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10804717701 sha256 a6fbcbfd977f98853180fc85a6e37f5731bd01f3db46b05dcc4a5ae74d26a080; NAS probe 10804423285 sha256 c1e70ee838123463d1933c1f8baf9b3b36999df445b3f18d01711a3c8eeb7298"
     }
   ],
   "ci_runs": [
     {
-      "id": 35986971466,
+      "id": 35990959609,
       "name": "AR-000 baseline capture",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970921,
+      "id": 35990959409,
       "name": "AR-010 shared runtime validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970886,
+      "id": 35990959377,
       "name": "AR-011 outcome contract validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970896,
+      "id": 35990959366,
       "name": "AR-012 scoped binding validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970985,
+      "id": 35990959558,
       "name": "AR-020 native discovery implementation validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970929,
+      "id": 35990959399,
       "name": "AR-021 bounded Excel range validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986971098,
+      "id": 35990959345,
       "name": "AR-030 outcome and revision validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986971095,
+      "id": 35990959349,
       "name": "AR-031 journal and cancellation regression",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970914,
+      "id": 35990959335,
       "name": "AR-032 scoped history validation",
       "result": "SUCCESS"
     },
     {
-      "id": 35986971330,
+      "id": 35990959336,
       "name": "AR-001 isolated implementation workspace",
       "result": "SUCCESS"
     },
     {
-      "id": 35986970938,
+      "id": 35990959453,
       "name": "Avalonia CI",
       "result": "SUCCESS"
     }
@@ -623,8 +623,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-021/evidence.json",
     "docs/agent-reliability/AR-021/implementation.md",
     "docs/agent-reliability/AR-021/native-acceptance.md",
-    "GitHub artifact 10802524268 AR021-E1-E2-Evidence",
-    "GitHub artifact 10803285991 H2Notes-Avalonia-Portable-win-x64"
+    "GitHub artifact 10803594991 AR021-E1-E2-Evidence",
+    "GitHub artifact 10804717701 H2Notes-Avalonia-Portable-win-x64"
   ],
   "known_failures": [
     {
@@ -644,7 +644,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-021-E3",
       "status": "AWAITING_ENVIRONMENT",
-      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus; fixture/scripted E2 is not native acceptance."
+      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus, including direct edits while already unsaved and fail-closed behavior when Excel events are unavailable; fixture/scripted E2 is not native acceptance."
     }
   ],
   "parked_acceptance": [
@@ -681,15 +681,15 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "pending_user_decisions": [],
   "downloadable_build": {
-    "artifact_id": 10803285991,
+    "artifact_id": 10804717701,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110304466,
-    "sha256": "1455b8659fe440c37e3198b4d52cd78b226c723036bf8c3c5d0da3d98c82ec44",
+    "bytes": 110306213,
+    "sha256": "a6fbcbfd977f98853180fc85a6e37f5731bd01f3db46b05dcc4a5ae74d26a080",
     "zip_entries": 482,
-    "local_verified_copy": "/mnt/data/H2Notes-Avalonia-Portable-win-x64.zip",
-    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate as documented by README."
+    "local_verified_copy": "/mnt/data/H2Notes-Avalonia-Portable-win-x64-ad843b07.zip",
+    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code with native Excel direct-edit tracking hardening; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate as documented by README."
   },
-  "next_exact_action": "Use portable artifact 10803285991 on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
+  "next_exact_action": "Use portable artifact 10804717701 on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Specifically test a direct Excel cell edit while the workbook is already unsaved and verify stale_content, plus fail-closed content_tracking_unavailable when Excel events are disabled. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
   "next_task_if_active_done": "AR-022"
 }
 ```

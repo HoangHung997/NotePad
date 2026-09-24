@@ -4,7 +4,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Preconditions
 
-- Run the portable build produced from code `e7dba71f76e36fc73aee7509e8f39416b8f7296a`.
+- Run the portable build produced from code `ad843b075bccd0f5967464ec380717d9fe7dfeea`.
 - Microsoft Excel is installed and can be discovered by H2 OfficeHost.
 - Create a synthetic workbook with: more than 5,000 populated cells; at least two sheets; formulas; one merged range; hidden row and column; and a deliberately sparse UsedRange extending far beyond the small range used for the first read.
 - Keep API/model credentials out of the workbook and evidence. A model is not required for the E3 helper/provider boundary.
@@ -15,7 +15,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 2. Read a range larger than one page and follow `nextCursor` with the same `contentVersion` until complete. Confirm no duplicates/gaps and each page has at most 512 cells.
 3. Request formulas only, then formatting/merge/hidden evidence on demand. Confirm unrequested heavy fields are not materialized.
 4. Change only selection/focus between pages. The continuation must remain valid and must not redirect to the new selection.
-5. Change workbook cell content between pages. The old continuation must be rejected as `stale_content` or an equally explicit native invalidation; H2 must not concatenate old/new pages.
+5. Put the workbook into an already-unsaved state, read page 1, then directly edit another workbook cell in Excel before requesting page 2. The old continuation must be rejected as `stale_content` through the native content revision; H2 must not concatenate old/new pages. Also confirm that disabling Excel events makes a multi-page read fail closed with `content_tracking_unavailable` rather than silently trusting a weak token.
 6. Repeat the boundary at least three independent times where applicable, including a fresh OfficeHost process.
 7. Record Excel build/version, exact H2 code/build SHA, session/resource identity, page metrics, result and any failure. Do not call fixture evidence E3.
 
