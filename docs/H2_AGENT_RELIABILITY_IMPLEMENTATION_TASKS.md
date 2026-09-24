@@ -101,7 +101,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
 | AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER — test later; no E3/E4 PASS claim |
-| AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT — NOT_DONE |
+| AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
@@ -483,7 +483,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task is AR-067: Error→Agent recovery and specific blocked-final behavior is IMPLEMENTED with E2/full CI. Real H2 UI + authorized model/tool E4 remains AWAITING_ENVIRONMENT, so AR-067 is NOT DONE under its E2/E4 acceptance. The user explicitly directed AR-066 native/model acceptance to be tested later and allowed the critical sequence to continue; this is recorded as USER_ACCEPTED_SEQUENCE / E3-E4_DEFERRED_BY_USER, not as E3/E4 PASS.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**. Do not start AR-068 in the same one-task turn without an explicit AR-067 E4/defer decision. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+**Current task checkpoint is AR-067: Error→Agent recovery and specific blocked-final behavior is IMPLEMENTED with E2/full CI. On 2026-09-24 the user explicitly directed that environment/model acceptance may be tested later after a full build is available, so AR-067 E4 is DEFERRED_BY_USER for sequencing purposes, not PASS. AR-066 remains USER_ACCEPTED_SEQUENCE / E3-E4_DEFERRED_BY_USER.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**. AR-068 may start only in the next one-task turn; do not retroactively call AR-067 E4 passed. Do not discard AR-064 lifecycle/pin/RC-28 debt.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
@@ -500,25 +500,25 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-067_RECOVERY_E2_PASS_AWAITING_REAL_H2_MODEL_E4",
+  "phase": "AR-067_RECOVERY_E2_PASS_E4_DEFERRED_BY_USER_FOR_FINAL_BUILD_TEST",
   "active_task": "AR-067",
   "implementation_status": "IMPLEMENTED",
-  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "acceptance_status": "DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "owner_session": "chatgpt-ar067-recovery-audit-2026-09-24",
   "last_code_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
   "last_validated_code_commit": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
-  "last_validation_result": "AR067_RUNTIME6_PASS; AR067_PRODUCTION_UI3_PASS; FULL1267_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; AR067_EVIDENCE_LABEL_AWAITING_ENVIRONMENT_VERIFIED; AR065_55_PASS_REGRESSION_RETAINED; E4_REAL_H2_MODEL_NOT_RUN; NOT_DONE",
+  "last_validation_result": "AR067_RUNTIME6_PASS; AR067_PRODUCTION_UI3_PASS; FULL1267_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; E4_REAL_H2_MODEL_NOT_RUN_AND_DEFERRED_BY_USER_UNTIL_FINAL_FULL_BUILD_TEST; NO_E4_PASS_CLAIM",
   "capture_checked_head": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
   "working_tree": "Runtime implementation source remains 9be3ac78072bd3b43910a5af7f33dec67625e6f1. Exact revalidated tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183 differs only by the AR-067 validation evidence-status correction after docs checkpoint 92c9cd76f6d33d8384f02baa0cbf7202f6cf2178. User-PC working tree NOT_ACCESSIBLE. AR-067 validator and all ten pull_request workflows on 1ebe completed SUCCESS, including full Avalonia publish/helper IPC.",
   "uncommitted_files": [],
   "checkpoint_saved_at_utc": "2026-09-24T01:57:59+00:00",
-  "completed_this_session": ["Reconciled AR-067 checkpoint against branch/PR/exact-SHA CI", "Corrected AR-067 validator evidence label from DEFERRED to AWAITING_ENVIRONMENT without changing runtime semantics", "Revalidated AR-067 E1/E2 and full regression/publish on exact tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183", "AR-066 user-directed sequence transition remains E3/E4 DEFERRED_BY_USER"],
+  "completed_this_session": ["Reconciled AR-067 checkpoint against branch/PR/exact-SHA CI", "Corrected AR-067 validator evidence label from premature DEFERRED to AWAITING_ENVIRONMENT before user decision", "Revalidated AR-067 E1/E2 and full regression/publish on exact tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183", "User explicitly deferred AR-067 E4 until final full-build testing and allowed sequencing to continue", "AR-066 user-directed sequence transition remains E3/E4 DEFERRED_BY_USER"],
   "remaining_in_active_task": [
-    "Run AR-067 E4 through actual H2 UI with an already-authorized model and real tool failure/recovery path; this is NOT_RUN because no authorized H2/model environment is connected in this session.",
-    "User decision required before AR-068: either explicitly defer AR-067 E4/test-later as was done for AR-066, or connect/provide the authorized H2/model environment and finite permitted model-test budget."
+    "No additional AR-067 implementation work is required by current E1/E2 evidence.",
+    "AR-067 E4 real H2 UI + authorized model/tool failure-recovery acceptance is DEFERRED_BY_USER until a final full build is available for user testing; keep this debt visible and do not relabel it PASS."
   ],
   "last_test_commands": [
     {
@@ -1192,6 +1192,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-066/source-consent-evidence.json"
   ],
   "known_failures": [],
+  "user_test_policy": "Environment/model acceptance that cannot be run in the implementation session may be DEFERRED_BY_USER and retested from the final full build. Deferred means NOT_RUN/NO_PASS_CLAIM; it does not waive the acceptance debt.",
   "external_blockers": [
     "AR-020/033 native E3 and AR-051 real-model E4 remain AWAITING_ENVIRONMENT; AR-083 stays DEFERRED_BY_USER. No acceptance waiver.",
     {
@@ -1237,7 +1238,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-067",
       "issue": "Every meaningful failure returns to Agent for recovery or specific explanation",
-      "status": "IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT / NOT_DONE / runtime=9be3ac78072bd3b43910a5af7f33dec67625e6f1 / revalidated_tree=1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183"
+      "status": "USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER / TEST_ON_FINAL_FULL_BUILD / NO_E4_PASS_CLAIM / runtime=9be3ac78072bd3b43910a5af7f33dec67625e6f1 / revalidated_tree=1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183"
     },
     {
       "id": "AR-068",
@@ -1251,11 +1252,9 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
-  "pending_user_decisions": [
-    "Choose AR-067 E4 disposition: explicitly defer/test later and allow AR-068 next turn, or connect/provide an authorized H2/model test environment plus finite permitted model-test budget. Credentials remain on that machine."
-  ],
-  "next_exact_action": "Continue ONLY AR-067 until the user decides its E4 disposition. If the user says test later/defer AR-067 E4, record DEFERRED_BY_USER and only then start AR-068 in the next one-task turn. If the user supplies an authorized H2/model environment and finite budget, run the real E4 failure→recovery/blocked-final corpus first. Do not start AR-068 in this turn.",
-  "next_task_if_active_done": "AR-068 only after AR-067 E4 is passed or explicitly deferred/test-later by the user; one-task rule still applies.",
+  "pending_user_decisions": [],
+  "next_exact_action": "AR-067 is sequenced forward with E4 explicitly DEFERRED_BY_USER until final full-build testing. Do not start AR-068 in this same turn. In the next one-task turn start only AR-068 from current branch/HEAD, then preserve the deferred AR-067 E4 debt for final integrated acceptance.",
+  "next_task_if_active_done": "AR-068 is READY for the next one-task turn because AR-067 E4 was explicitly deferred/test-later by the user; one-task rule still applies.",
   "last_runtime_source_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
   "previous_saved_checkpoint_commit": "92c9cd76f6d33d8384f02baa0cbf7202f6cf2178",
   "finalization_checked_head": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
