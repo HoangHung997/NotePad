@@ -1411,7 +1411,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "code_commit_lookup": "git log -1 --format=%H -- experiments/H2AgentLab/Tools/ToolRecoveryPolicy.cs experiments/H2AgentLab/Runtime/AgentRecoveryPolicy.cs experiments/H2AgentLab/Runtime/AgentRuntime.cs experiments/H2AgentLab/Runtime/MbRecoveryPolicyRuntimeTests.cs tools/agent-reliability/validate_ar070.ps1 .github/workflows/h2-ar070-validation.yml",
   "previous_completed_task": "AR-069 USER_ACCEPTED_SEQUENCE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER",
-  "last_full_ci_checkout_sha": "58225be",
+  "last_full_ci_checkout_sha": "58225bef3ceeb1b7f71d64943b649be4121c4b2d",
   "implemented_this_session": [
     "AR-070 provider-neutral typed recovery policy/no-progress guard in the existing execution boundary; E3/E4 real-environment debt explicitly retained"
   ],
