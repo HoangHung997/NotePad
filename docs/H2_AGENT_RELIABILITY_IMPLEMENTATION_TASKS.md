@@ -100,8 +100,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | PARTIAL / E2 foundation PASS / NOT_DONE — critical-priority handoff |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
-| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | IMPLEMENTED (exact-bound source roles) / E1-E2_PASS / E3-E4_AWAITING_ENVIRONMENT — NOT_DONE |
-| AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | NOT_STARTED — CRITICAL |
+| AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER — test later; no E3/E4 PASS claim |
+| AR-067 | Error→Agent recovery + explainable blocked final | 011/033/040 + 065/066 | E2/E4 | IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT — NOT_DONE |
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | NOT_STARTED — CRITICAL |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | NOT_STARTED — BLOCKING GATE |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | NOT_STARTED |
@@ -483,7 +483,9 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task remains AR-066: exact-bound mixed live/disk source roles and same-task source approval are now implemented with E1/E2/full CI. Real native E3/H2 E4 remain AWAITING_ENVIRONMENT; AR-066 is NOT DONE. AR-065 E4, AR-064 PARTIAL and all prior debts remain unchanged.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**, with explicit dependency/evidence assessment before any next task. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+**Current task is AR-067: Error→Agent recovery and specific blocked-final behavior is IMPLEMENTED with E2/full CI. Real H2 UI + authorized model/tool E4 remains AWAITING_ENVIRONMENT, so AR-067 is NOT DONE under its E2/E4 acceptance. The user explicitly directed AR-066 native/model acceptance to be tested later and allowed the critical sequence to continue; this is recorded as USER_ACCEPTED_SEQUENCE / E3-E4_DEFERRED_BY_USER, not as E3/E4 PASS.** Keep critical sequence **AR-065 → AR-066 → AR-067 → AR-068 → AR-069**. Do not start AR-068 in the same one-task turn without an explicit AR-067 E4/defer decision. Do not discard AR-064 lifecycle/pin/RC-28 debt.
+
+**AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
 Do not claim these defects were already covered by historical Office/transport/UI fixture gates. Their acceptance must include the exact user-observed production paths described in the critical issue document.
 
@@ -498,27 +500,51 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-066_SOURCE_CONSENT_E2_PASS_AWAITING_NATIVE_E3_REAL_H2_E4",
-  "active_task": "AR-066",
+  "phase": "AR-067_RECOVERY_E2_PASS_AWAITING_REAL_H2_MODEL_E4",
+  "active_task": "AR-067",
   "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar066-source-consent-2026-09-24",
-  "last_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-  "last_validated_code_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
-  "last_validation_result": "AR066134_PASS_X3; NEW_CONSENT58; FULL1266_PASS; AGENT74_PASS; CONSENT232_AND_TOTAL432_E2_RECEIPTS; ALL_EXACT_SHA_CI_PASS; NATIVE_E3_E4_AWAITING; NOT_DONE",
-  "capture_checked_head": "3cb65cbf9d889f33583688e920ce20e0de51351a",
+  "owner_session": "chatgpt-ar067-recovery-2026-09-24",
+  "last_code_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+  "last_validated_code_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+  "last_validation_result": "AR067_RUNTIME6_PASS; AR067_PRODUCTION_UI3_PASS; FULL1267_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; AR065_55_PASS_REGRESSION; E4_REAL_H2_MODEL_NOT_RUN; NOT_DONE",
+  "capture_checked_head": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Validated runtime/test code remains 17af5676bcfb397441a4a8aae264c6088a5701e1. HEAD 3cb65cbf9d889f33583688e920ce20e0de51351a differs from that code only by AR-066 documentation/tracker changes. User-PC working tree NOT_ACCESSIBLE. All ten pull_request workflows on 3cb65cb completed SUCCESS, including full Avalonia publish/helper IPC.",
+  "working_tree": "Validated runtime/test code is 9be3ac78072bd3b43910a5af7f33dec67625e6f1. User-PC working tree NOT_ACCESSIBLE. All ten pull_request workflows on this exact SHA completed SUCCESS, including full Avalonia publish/helper IPC. The pending tracker closeout is docs-only.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-23T20:28:00+00:00",
-  "completed_this_session": [],
+  "checkpoint_saved_at_utc": "2026-09-24T01:15:31+00:00",
+  "completed_this_session": ["AR-067 implementation and E2 validation", "AR-066 user-directed sequence transition with E3/E4 deferred"],
   "remaining_in_active_task": [
-    "Execute authorized real native E3 and real H2/model/UI E4 corpus including source-approval rendering and live/disk differing content. No real environment available in this session.",
-    "Retain conservative exact-resource limitations; unknown/multiple ambiguous live sources are not guessed. Any observed native/production regression stays in AR-066."
+    "Run AR-067 E4 through actual H2 UI with an already-authorized model and real tool failure/recovery path; this is NOT_RUN because no authorized H2/model environment is connected in this session.",
+    "User decision required before AR-068: either explicitly defer AR-067 E4/test-later as was done for AR-066, or connect/provide the authorized H2/model environment and finite permitted model-test budget."
   ],
   "last_test_commands": [
+    {
+      "command": "tools/agent-reliability/validate_ar067.ps1",
+      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+      "run_id": 35940799654,
+      "job_id": 107448023895,
+      "attempt": 1,
+      "result": "AR067 runtime 6/6; production/UI focused 3/3; full H2 1267/1267; Agent 74/74; SUCCESS"
+    },
+    {
+      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
+      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+      "run_id": 35940802619,
+      "job_id": 107448032605,
+      "attempt": 1,
+      "result": "SUCCESS; all ten pull_request workflows on exact head SUCCESS"
+    },
+    {
+      "command": "tools/agent-reliability/validate_ar065.ps1 retained regression",
+      "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+      "run_id": 35940799761,
+      "job_id": 107448474958,
+      "attempt": 1,
+      "result": "AR065 55/55; full H2 1267/1267; Agent 74/74; SUCCESS"
+    },
     {
       "command": "tools/agent-reliability/validate_ar066.ps1",
       "sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
@@ -1190,12 +1216,12 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-066",
       "issue": "Live app resource/native Word-Excel-AutoCAD-Browser semantics",
-      "status": "IMPLEMENTED_EXACT_BOUND_SOURCE_ROLES / E1-E2_PASS / E3-E4_AWAITING_ENVIRONMENT / NOT_DONE"
+      "status": "USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER / TEST_LATER / NO_E3_E4_PASS_CLAIM"
     },
     {
       "id": "AR-067",
       "issue": "Every meaningful failure returns to Agent for recovery or specific explanation",
-      "status": "NOT_STARTED"
+      "status": "IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT / NOT_DONE / code=9be3ac78072bd3b43910a5af7f33dec67625e6f1"
     },
     {
       "id": "AR-068",
@@ -1210,14 +1236,14 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "critical_issue_doc": "docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md",
   "pending_user_decisions": [
-    "Provide/connect an authorized isolated Windows/H2/Office test environment and finite permitted model-test budget. Credentials remain on that machine."
+    "Choose AR-067 E4 disposition: explicitly defer/test later and allow AR-068 next turn, or connect/provide an authorized H2/model test environment plus finite permitted model-test budget. Credentials remain on that machine."
   ],
-  "next_exact_action": "Continue ONLY AR-066. Connect/provide an authorized isolated Windows/H2/Office environment, verify exact source/binary/journal first, then run native E3 using real-native-acceptance.md with disposable fixtures. Run real H2/model E4 only with an already authorized model profile and finite operator budget. Inspect journal/postconditions before repeating uncertain work; repair any observed regression inside AR-066 and rerun exact-SHA CI. Do not start AR-067.",
-  "next_task_if_active_done": "AR-067 after AR-066 acceptance or a separately recorded section 2.2 independent-core dependency decision; no AR-067 implementation this turn.",
-  "last_runtime_source_commit": "4c6a96ee39116c431dcd7d69a620c6c4f5bb94e2",
+  "next_exact_action": "Continue ONLY AR-067 until the user decides its E4 disposition. If the user says test later/defer AR-067 E4, record DEFERRED_BY_USER and only then start AR-068 in the next one-task turn. If the user supplies an authorized H2/model environment and finite budget, run the real E4 failure→recovery/blocked-final corpus first. Do not start AR-068 in this turn.",
+  "next_task_if_active_done": "AR-068 only after AR-067 E4 is passed or explicitly deferred/test-later by the user; one-task rule still applies.",
+  "last_runtime_source_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
   "previous_saved_checkpoint_commit": "3b3a2f31c7e353faef6187c194f0eeb4d6eee296",
-  "finalization_checked_head": "7df767dc1b50d24e97e5906be457cde90a216d10",
-  "additional_ci_after_recorded_run": "Docs-only HEAD 3cb65cbf9d889f33583688e920ce20e0de51351a independently inspected: all ten associated pull_request workflows SUCCESS. Avalonia CI 35914444213 / job 107362241166 SUCCESS with full H2/Agent/MB gates, Windows publish and packaged helper IPC; portable artifact 10774913357 (110223348 bytes, sha256 142d7f9263a44779aa6560bfefe8aad89aefdc38ca3f0a6429b3123e3b07f26b) and NAS probe artifact 10774149933 (39410384 bytes, sha256 7bba71c0f49262bd5af6e613f635c4e90c26b66dd22bdc804319b4b4c69c8343). This does not upgrade native E3/E4.",
+  "finalization_checked_head": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+  "additional_ci_after_recorded_run": "Exact runtime/test HEAD 9be3ac78072bd3b43910a5af7f33dec67625e6f1: all ten pull_request workflows SUCCESS. Avalonia CI 35940802619 / job 107448032605 SUCCESS with full H2/Agent/MB gates, Windows publish and packaged helper IPC; portable artifact 10785485583 (110240471 bytes, sha256 7cd616e63208b02ec5ace08a51ed4361d289c88eeffbb5adbe0cb0e89ba807db) and NAS probe artifact 10785430728 (39410366 bytes, sha256 8142b968d037e42e6f8f2f8853e7c88046849073dc714aca3ed0fd5161e2ef2f). Focused AR067 artifact 10785630429 sha256 911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d. This does not upgrade E4.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
     "B01 skill-name drift",
@@ -1306,17 +1332,20 @@ Do not claim these defects were already covered by historical Office/transport/U
   "implemented_this_session": [
     "AR-066 exact-bound source-consent core only"
   ],
-  "next_ready_independent_task": "AR-067 NOT_STARTED; assess separately under tracker 2.2 after this checkpoint. Native AR-066 debt is not waived.",
+  "next_ready_independent_task": "AR-068 NOT_STARTED; do not begin until AR-067 E4 is either passed or explicitly deferred/test-later by user. AR-066 native/model debt remains deferred, not passed.",
   "independent_dependency_assessment": {
-    "id": "AR-066",
-    "rule": "Tracker section 2.2: independent core may proceed with implemented dependencies and passed regressions while real E3/E4 gates await environment.",
+    "id": "AR-067",
+    "rule": "Tracker section 2.2: independent core may proceed with implemented dependencies and passed regressions while real E3/E4 gates await environment; acceptance level is still explicit.",
     "dependencies": [
-      "AR-012 DONE",
-      "AR-020 IMPLEMENTED with passed E2 regression; native E3 remains open"
+      "AR-011 DONE",
+      "AR-033 IMPLEMENTED/E2 with E3 parked",
+      "AR-040 DONE",
+      "AR-065 IMPLEMENTED/E2 with E4 parked",
+      "AR-066 USER_ACCEPTED_SEQUENCE with E3/E4 deferred by user"
     ],
-    "reconciled_head": "05fe85d07083862943b2d60e0e299b1de09fd0f9",
-    "basis": "AR065 has passing E1/E2/full CI and no unresolved code failure. Its E4 is parked, not waived. AR066 core has no AR065 E4 dependency. Latest user continue requests exactly one task.",
-    "limits": "This is only AR066. No real native/model acceptance, no new engine/store, no personal side effects."
+    "reconciled_head": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+    "basis": "User explicitly directed AR-066 test-later and continuation. AR-067 implementation now has focused E2, full H2 1267/1267, Agent74/74 and all ten PR workflows green. No unresolved code regression remains.",
+    "limits": "This checkpoint is AR-067 E2 only. No real H2/model E4 claim, no new engine/store, no personal side effects, and AR-068 is not started."
   },
   "parked_acceptance": [
     {
