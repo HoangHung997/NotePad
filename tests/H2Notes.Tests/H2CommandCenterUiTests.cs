@@ -220,7 +220,7 @@ internal static class H2CommandCenterUiTests
             var now = DateTime.UtcNow;
             var project = Project("Acknowledgement project", now, 0, 1);
             var board = new NoteRecord { Title = "Attention board", NoteKind = "project-hub", Projects = [project] };
-            var agent = new CommandCenterAttentionAgentFake(project.Id, now.AddMinutes(5), 1);
+            var agent = new CommandCenterAttentionAgentFake(project.Id, now.AddMinutes(5), 2);
             var app = new App { AgentAdapter = agent };
             app.LocalSettings.DeviceId = "ar068-ack-device";
             app.LocalSettings.CommandCenter.AttentionCollapsed = false;
@@ -232,8 +232,12 @@ internal static class H2CommandCenterUiTests
             try
             {
                 var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
-                var item = list.ItemsSource!.Cast<object>().Single();
+                var items = list.ItemsSource!.Cast<object>().ToArray();
+                Check(items.Length == 2, "Acknowledgement fixture did not expose two independent attention events.");
+                var item = items.Single(value => (Guid?)Value(value, "AgentTaskId") == agent.PrimaryTaskId);
+                var other = items.Single(value => (Guid?)Value(value, "AgentTaskId") != agent.PrimaryTaskId);
                 var attentionId = Text(item, "AttentionId");
+                var otherAttentionId = Text(other, "AttentionId");
 
                 list.SelectedItem = item;
                 Pump();
@@ -245,22 +249,29 @@ internal static class H2CommandCenterUiTests
 
                 window.FindControl<Button>("ProjectsNavButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Pump();
-                Check(!window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
-                    "Acknowledged attention event remained active.");
-                Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("0 cần xem", StringComparison.Ordinal),
-                    "Acknowledged event remained in active attention count.");
+                Check(window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Acknowledging one event incorrectly hid the remaining independent event.");
+                var remaining = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(remaining.Length == 1 && Text(remaining[0], "AttentionId") == otherAttentionId,
+                    "Acknowledgement removed or replaced an unrelated attention event.");
+                Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("1 cần xem", StringComparison.Ordinal),
+                    "Acknowledged event did not decrement active attention count by exactly one.");
 
                 agent.TouchPrimaryWaiting(now.AddMinutes(10));
                 window.RefreshAfterSave();
                 Pump();
-                Check(!window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                remaining = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(remaining.Length == 1 && Text(remaining[0], "AttentionId") == otherAttentionId,
                     "Same pending approval resurfaced only because task UpdatedUtc changed.");
 
                 agent.FailPrimary(now.AddMinutes(30));
                 window.RefreshAfterSave();
                 Pump();
 
-                var replacement = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().Single();
+                var replacementItems = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(replacementItems.Length == 2,
+                    "New same-task failure did not reappear alongside the unrelated event.");
+                var replacement = replacementItems.Single(value => (Guid?)Value(value, "AgentTaskId") == agent.PrimaryTaskId);
                 var replacementId = Text(replacement, "AttentionId");
                 Check(replacementId != attentionId,
                     "New failure revision reused an acknowledged attention identity.");
