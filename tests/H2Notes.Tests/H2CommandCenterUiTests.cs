@@ -113,6 +113,10 @@ internal static class H2CommandCenterUiTests
                 var section = window.FindControl<Border>("CommandCenterAttentionSection")!;
                 var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
                 Check(section.IsVisible, "Needs-attention section is hidden despite a waiting approval.");
+                window.FindControl<Button>("CommandCenterAttentionToggle")!
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(list.IsVisible, "Needs-attention section did not expand for deep-link selection.");
                 var item = list.ItemsSource!.Cast<object>().Single();
 
                 Check((Guid?)Value(item, "ProjectId") == project.Id, "Attention item lost ProjectId source.");
