@@ -10,6 +10,7 @@ on:
       - src/H2Notes.Avalonia/MainWindow.axaml
       - src/H2Notes.Core/H2ProductProjections.cs
       - tests/H2Notes.Tests/H2CommandCenterUiTests.cs
+      - tests/H2Notes.Tests/H2ProductAcceptanceScenarioTests.cs
       - tests/H2Notes.Tests/H2ProductArchitectureGuardTests.cs
       - tools/agent-reliability/validate_ar068.ps1
       - .github/workflows/h2-ar068-validation.yml
