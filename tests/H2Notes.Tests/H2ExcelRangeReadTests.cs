@@ -162,7 +162,7 @@ internal static class H2ExcelRangeReadTests
                 var pageSchema = parameters.GetProperty("properties").GetProperty("page_size");
                 Check(pageSchema.GetProperty("maximum").GetInt32() == ExcelRangeReadLimits.MaxPageCells, "Tool schema drifted from protocol page limit.");
 
-                var call = new ToolCall(
+                var call = new global::H2AgentLab.ToolCall(
                     "ar021-range",
                     "excel.read_range",
                     JsonSerializer.SerializeToElement(new
