@@ -4,7 +4,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Preconditions
 
-- Run the portable build produced from code `228403a47e53632ce00ae6bd6f7614b869fd8450` or a later docs-only checkpoint whose runtime tree contains that code.
+- Run the portable build produced from code `f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f` or a later docs-only checkpoint whose runtime tree contains that code.
 - Microsoft Excel is installed and can be discovered by H2 OfficeHost.
 - Create a synthetic workbook with: more than 5,000 populated cells; at least two sheets; formulas (including at least one formula whose displayed value can change on recalculation); one merged range; hidden row and column; and a deliberately sparse UsedRange extending far beyond the small range used for the first read.
 - Keep API/model credentials out of the workbook and evidence. A model is not required for the E3 helper/provider boundary.
@@ -17,13 +17,14 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 4. Change only selection/focus between pages. The continuation must remain valid and must not redirect to the new selection.
 5. Put the workbook into an already-unsaved state, read page 1, then directly edit another workbook cell in Excel before requesting page 2. The old continuation must be rejected as `stale_content` through native `Workbook.SheetChange`; H2 must not concatenate old/new pages.
 6. With a multi-page read active, trigger a real worksheet recalculation that changes or can change a displayed formula value. The old continuation must be rejected as `stale_content` through native `Workbook.SheetCalculate`.
-7. Temporarily disable Excel events in the synthetic test and confirm a multi-page read fails closed with `content_tracking_unavailable` rather than silently trusting a weak token. Re-enable events before continuing unrelated checks.
-8. Close/reopen the synthetic workbook or otherwise force a fresh OfficeHost/catalog binding where practical; confirm a prior continuation cannot be reused against a replacement workbook binding. Also repeat the core boundary checks with a fresh OfficeHost process.
-9. Repeat the key direct-edit and recalculation boundaries at least three independent times where applicable.
-10. Record Excel build/version, exact H2 code/build SHA, session/resource identity, page metrics, result and any failure. Do not call fixture evidence E3.
+7. Reuse page 1's cursor/contentVersion while deliberately changing exactly one item at a time: requested range, normalized field set, or page size. Every replay must fail `stale_content`/no-effect; it must never redirect the continuation to the changed read contract.
+8. Temporarily disable Excel events in the synthetic test and confirm a multi-page read fails closed with `content_tracking_unavailable` rather than silently trusting a weak token. Re-enable events before continuing unrelated checks.
+9. Close/reopen the synthetic workbook or otherwise force a fresh OfficeHost/catalog binding where practical; confirm a prior continuation cannot be reused against a replacement workbook binding. Also repeat the core boundary checks with a fresh OfficeHost process.
+10. Repeat the key direct-edit, recalculation, and continuation-contract boundaries at least three independent times where applicable.
+11. Record Excel build/version, exact H2 code/build SHA, session/resource identity, page metrics, result and any failure. Do not call fixture evidence E3.
 
 ## Pass condition
 
-RC-06/07 pass only when the real Excel provider reads the exact requested bounded ranges, cursor/version behavior is consistent, selection-only changes do not invalidate content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
+RC-06/07 pass only when the real Excel provider reads the exact requested bounded ranges, cursor/version behavior is consistent and bound to the original range/fields/page size, selection-only changes do not invalidate content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
 
 If a case fails, keep AR-021 active, save the failure evidence, repair on the same branch, and rerun focused + full CI before moving to AR-022.
