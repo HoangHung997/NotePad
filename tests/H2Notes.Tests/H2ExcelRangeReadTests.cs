@@ -87,7 +87,13 @@ internal static class H2ExcelRangeReadTests
             var backend = new FixtureOfficeBackend(extraExcelRows: 900);
             var reader = (IExcelRangeReadBackend)backend;
             var session = backend.DiscoverExcel().ActiveSessionId!;
+
+            // Put the workbook into an already-unsaved state before page 1. The second edit below
+            // therefore cannot be detected merely by Saved flipping from true to false; it requires
+            // a genuine content revision signal, matching the native Workbook.SheetChange contract.
+            backend.SetExcelValueForFixture("A650", "BASELINE-UNSAVED");
             var first = reader.ReadExcelRange(new(session, "Data", "A1:A902", [ExcelRangeReadFields.Value], 128));
+            Check(!first.Saved, "Fixture precondition did not create an already-unsaved workbook.");
             Check(first.NextCursor is not null, "Fixture did not create a multi-page read.");
 
             backend.MoveExcelSelectionForFixture("B2");

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -17,10 +18,42 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         @"\b(?:Luật|Nghị định|Thông tư|Quyết định)\s+(?:số\s+)?(?<id>[0-9]+(?:/[0-9]{4})?/[A-ZĐ0-9-]+(?:-[A-ZĐ0-9]+)?)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private static readonly Guid ExcelWorkbookEventsIid = new("00024412-0000-0000-C000-000000000046");
+    private const int ExcelWorkbookSheetChangeDispId = 0x0000061C;
+
     private readonly OfficeWindowCatalog _catalog;
-    private readonly Dictionary<string, long> _excelRevisions = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _excelRevisions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ExcelWorkbookEventSubscription> _excelWorkbookSubscriptions = new(StringComparer.Ordinal);
+    private long _excelTrackingGeneration;
+
+    private delegate void ExcelWorkbookSheetChangeHandler(object sheet, object target);
+    private sealed record ExcelWorkbookEventSubscription(
+        object Workbook,
+        ExcelWorkbookSheetChangeHandler Handler,
+        long Generation);
+
     public ComOfficeBackend(IOfficeWindowProbe? probe = null) => _catalog = new(probe ?? new OfficeNativeWindowProbe());
-    public void Dispose() => _catalog.Dispose();
+
+    public void Dispose()
+    {
+        lock (_excelWorkbookSubscriptions)
+        {
+            foreach (var subscription in _excelWorkbookSubscriptions.Values)
+            {
+                try
+                {
+                    ComEventsHelper.Remove(
+                        subscription.Workbook,
+                        ExcelWorkbookEventsIid,
+                        ExcelWorkbookSheetChangeDispId,
+                        subscription.Handler);
+                }
+                catch { }
+            }
+            _excelWorkbookSubscriptions.Clear();
+        }
+        _catalog.Dispose();
+    }
     public OfficeCaptureResult Capture(OfficeCaptureRequest request) => _catalog.Capture(request);
 
     public ExcelDiscovery DiscoverExcel()
@@ -43,15 +76,18 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         var bound = _catalog.Require("excel", request.SessionId);
         _catalog.ValidateCurrent(bound, noEffect: true);
         dynamic workbook = bound.Document;
+        dynamic app = bound.App;
 
         ExcelRangeBounds requested;
         IReadOnlyList<string> fields;
         int pageSize;
+        ExcelRangePagePlan plan;
         try
         {
             requested = ExcelRangeReadRules.ParseRange(request.Range);
             fields = ExcelRangeReadFields.Normalize(request.Fields);
             pageSize = ExcelRangeReadLimits.NormalizePageSize(request.PageSize);
+            plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor);
         }
         catch (Exception ex) when (ex is ArgumentException)
         {
@@ -64,22 +100,36 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             try { sheet = workbook.Worksheets[request.SheetName]; }
             catch { throw new OfficeHostFaultException("sheet_not_found", $"Excel sheet '{request.SheetName}' is not available.", true); }
 
+            var needsContentTracking = !plan.Complete
+                || !string.IsNullOrWhiteSpace(request.Cursor)
+                || !string.IsNullOrWhiteSpace(request.ContentVersion);
+            var trackingGeneration = needsContentTracking
+                ? EnsureExcelWorkbookChangeTracking(bound.SessionId, workbook)
+                : 0L;
+            if (needsContentTracking && !SafeBool(() => app.EnableEvents))
+                throw new OfficeHostFaultException(
+                    "content_tracking_unavailable",
+                    "Excel events are disabled; paged range reads cannot safely detect workbook edits.",
+                    true);
+
             var sheetName = SafeString(() => sheet.Name, request.SheetName);
             var name = SafeString(() => workbook.Name);
             var fullName = SafeString(() => workbook.FullName, name);
             var saved = SafeBool(() => workbook.Saved);
             var extent = ReadExcelExtent(sheet);
-            var contentVersion = ExcelContentVersion(bound.SessionId, name, fullName, saved, sheetName, extent);
+            var contentVersion = ExcelContentVersion(
+                bound.SessionId,
+                name,
+                fullName,
+                saved,
+                sheetName,
+                extent,
+                trackingGeneration);
             if (!string.IsNullOrWhiteSpace(request.Cursor) && string.IsNullOrWhiteSpace(request.ContentVersion))
                 throw new OfficeHostFaultException("invalid_request", "A continuation cursor requires content_version.", true);
             if (!string.IsNullOrWhiteSpace(request.ContentVersion)
                 && !string.Equals(request.ContentVersion, contentVersion, StringComparison.Ordinal))
                 throw new OfficeHostFaultException("stale_content", "Excel content changed after the previous page; restart the range read.", true);
-
-            ExcelRangePagePlan plan;
-            try { plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor); }
-            catch (Exception ex) when (ex is ArgumentException)
-            { throw new OfficeHostFaultException("invalid_cursor", ex.Message, true); }
 
             var started = Environment.TickCount64;
             var wantValue = fields.Contains(ExcelRangeReadFields.Value, StringComparer.Ordinal);
@@ -181,8 +231,9 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             finally { Release(pageRange); }
 
             // Re-read only lightweight workbook/extent metadata after the page. The version is
-            // deliberately independent of ActiveSheet/Selection; H2-originating writes bump a
-            // session revision. Native E3 must still validate external-edit detection on target Office builds.
+            // deliberately independent of ActiveSheet/Selection. For paged reads a Workbook.SheetChange
+            // COM event advances the session revision for direct user/external-link edits as well as
+            // H2 writes; a post-page token check rejects changes that race the current page.
             var afterExtent = ReadExcelExtent(sheet);
             var afterVersion = ExcelContentVersion(
                 bound.SessionId,
@@ -190,7 +241,8 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
                 SafeString(() => workbook.FullName, fullName),
                 SafeBool(() => workbook.Saved),
                 sheetName,
-                afterExtent);
+                afterExtent,
+                trackingGeneration);
             if (!string.Equals(contentVersion, afterVersion, StringComparison.Ordinal))
                 throw new OfficeHostFaultException("stale_content", "Excel content metadata changed while reading this page; restart the range read.", true);
 
@@ -548,13 +600,47 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         finally { Release(used); }
     }
 
+    private long EnsureExcelWorkbookChangeTracking(string sessionId, object workbook)
+    {
+        lock (_excelWorkbookSubscriptions)
+        {
+            if (_excelWorkbookSubscriptions.TryGetValue(sessionId, out var existing))
+                return existing.Generation;
+
+            ExcelWorkbookSheetChangeHandler handler = (_, _) => BumpExcelRevision(sessionId);
+            try
+            {
+                ComEventsHelper.Combine(
+                    workbook,
+                    ExcelWorkbookEventsIid,
+                    ExcelWorkbookSheetChangeDispId,
+                    handler);
+            }
+            catch (Exception ex)
+            {
+                throw new OfficeHostFaultException(
+                    "content_tracking_unavailable",
+                    $"Excel Workbook.SheetChange tracking could not be attached ({ex.GetType().Name}).",
+                    true);
+            }
+
+            var generation = Interlocked.Increment(ref _excelTrackingGeneration);
+            _excelWorkbookSubscriptions[sessionId] = new ExcelWorkbookEventSubscription(
+                workbook,
+                handler,
+                generation);
+            return generation;
+        }
+    }
+
     private string ExcelContentVersion(
         string sessionId,
         string name,
         string fullName,
         bool saved,
         string sheetName,
-        ExcelSheetExtent extent)
+        ExcelSheetExtent extent,
+        long trackingGeneration)
     {
         _excelRevisions.TryGetValue(sessionId, out var revision);
         return OfficeHostSafety.StableToken(new
@@ -569,15 +655,16 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             extent.FirstColumn,
             extent.LastRow,
             extent.LastColumn,
+            trackingGeneration,
             revision
         });
     }
 
     private void BumpExcelRevision(string sessionId)
-    {
-        _excelRevisions.TryGetValue(sessionId, out var revision);
-        _excelRevisions[sessionId] = checked(revision + 1);
-    }
+        => _excelRevisions.AddOrUpdate(
+            sessionId,
+            1,
+            static (_, revision) => checked(revision + 1));
 
     private static object? MatrixValue(object? value, int rowOffset, int columnOffset)
     {
