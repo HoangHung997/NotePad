@@ -380,10 +380,11 @@ public sealed class AgentRuntime : IAsyncDisposable
             catch (AgentVerificationRequiredException) { throw; }
             catch (Exception ex) when (ex is IOException or TimeoutException or System.Net.Http.HttpRequestException)
             {
-                // Initial transport failures remain owned by the provider/AR-065 path so exact
-                // provider diagnostics and retry policy are preserved. Only a continuation that
-                // was already carrying Agent-visible recovery state becomes this technical card.
-                if (start is not null) throw;
+                // Initial failures and ordinary continuation failures remain owned by the provider/
+                // AR-065 path. AR-067 emits a technical fallback only when the failed continuation
+                // was already attempting to recover/explain an authoritative unresolved failure.
+                var hasRecoveryState = unresolvedCalls.Count > 0 || latestVerification is { Passed: false };
+                if (start is not null || !hasRecoveryState) throw;
                 var blocked = assessment.Snapshot(effectiveContract, unresolvedCalls.Count,
                     pendingOperations.Count, latestVerification);
                 throw new AgentVerificationRequiredException("model_continuation_unavailable", ex)
