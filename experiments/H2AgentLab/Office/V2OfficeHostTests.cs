@@ -120,6 +120,56 @@ public static class V2OfficeHostTests
             Check(snapshot.StateToken.Length == 64, "Excel state token is not a SHA-256 identity.");
         });
 
+        await Test("0804B AR-021 bounded Excel range page crosses OfficeHost IPC and invalidates stale continuation", async () =>
+        {
+            using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);
+            var session = (await client.DiscoverExcelAsync()).ActiveSessionId!;
+            var first = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B2",
+                [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula, ExcelRangeReadFields.Format],
+                2));
+
+            Check(first.PageRange == "A1:B1"
+                && first.Cells.Count == 2
+                && first.Metrics.CellsRead == 2
+                && !first.Complete
+                && first.NextCursor is not null,
+                "Bounded range page did not cross the named-pipe protocol correctly.");
+            Check(first.Cells.Single(x => x.Address == "B1").Formula == "=A1",
+                "Range page lost formula evidence.");
+
+            var second = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B2",
+                [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula, ExcelRangeReadFields.Format],
+                2,
+                first.NextCursor,
+                first.ContentVersion));
+            Check(second.PageRange == "A2:B2" && second.Complete && second.NextCursor is null,
+                "Range continuation skipped, duplicated or failed to terminate.");
+
+            var snapshot = await client.SnapshotExcelAsync(session);
+            _ = await client.PatchExcelAsync(new ExcelPatchRequest(
+                session,
+                snapshot.StateToken,
+                true,
+                "Data",
+                [new ExcelCellPatch("A2", Value: "CHANGED-AFTER-PAGE")]));
+            await ExpectCode(
+                "stale_content",
+                () => client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                    session,
+                    "Data",
+                    "A1:B2",
+                    [ExcelRangeReadFields.Value],
+                    1,
+                    first.NextCursor,
+                    first.ContentVersion)));
+        });
+
         await Test("0805 Excel structured patch returns before/after and rejects stale or denied mutation", async () =>
         {
             using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);

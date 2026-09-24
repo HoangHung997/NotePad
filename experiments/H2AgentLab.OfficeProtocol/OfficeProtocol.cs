@@ -237,6 +237,6 @@ public sealed record OfficePingResult(
 
 public static class OfficeProtocolConstants
 {
-    public const string Version = "1.0";
+    public const string Version = "1.1";
     public const int MaxMessageBytes = 4 * 1024 * 1024;
 }

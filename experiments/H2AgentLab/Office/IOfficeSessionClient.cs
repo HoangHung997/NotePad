@@ -25,3 +25,11 @@ public interface IOfficeCaptureClient
 {
     Task<OfficeCaptureResult> CaptureAsync(OfficeCaptureRequest request, CancellationToken cancellationToken = default);
 }
+
+/// <summary>Additive AR-021 client contract for bounded, versioned Excel range pages.</summary>
+public interface IExcelRangeReadClient
+{
+    Task<ExcelRangeReadPage> ReadExcelRangeAsync(
+        ExcelReadRangeRequest request,
+        CancellationToken cancellationToken = default);
+}

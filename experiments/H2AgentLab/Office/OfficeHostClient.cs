@@ -17,7 +17,7 @@ public sealed class OfficeHostClientException : IOException
     public bool NoEffect { get; }
 }
 
-public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient
+public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient, IExcelRangeReadClient
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -68,6 +68,15 @@ public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClien
             new ExcelSnapshotRequest(sessionId),
             null,
             cancellationToken);
+
+    public Task<ExcelRangeReadPage> ReadExcelRangeAsync(
+        ExcelReadRangeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return CallAsync<ExcelRangeReadPage>("excel.readRange", request, null, cancellationToken);
+    }
 
     public Task<ExcelPatchResult> PatchExcelAsync(ExcelPatchRequest request, CancellationToken cancellationToken = default)
     {

@@ -1,11 +1,12 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
 
-public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IDisposable
+public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IExcelRangeReadBackend, IDisposable
 {
     private const int MaxExcelCells = 5_000;
     private const int MaxWordParagraphs = 2_000;
@@ -17,6 +18,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly OfficeWindowCatalog _catalog;
+    private readonly Dictionary<string, long> _excelRevisions = new(StringComparer.Ordinal);
     public ComOfficeBackend(IOfficeWindowProbe? probe = null) => _catalog = new(probe ?? new OfficeNativeWindowProbe());
     public void Dispose() => _catalog.Dispose();
     public OfficeCaptureResult Capture(OfficeCaptureRequest request) => _catalog.Capture(request);
@@ -24,8 +26,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
     public ExcelDiscovery DiscoverExcel()
     {
         var views = _catalog.Refresh("excel");
-        return new(views.Select(v => new ExcelWorkbookInfo(v.SessionId,v.Name,v.FullName,v.Saved,"","","")
-            { NativeIdentity=v.Identity }).ToArray(), _catalog.ActiveSession(views)) { Report=_catalog.LastReport };
+        return new(views.Select(ExcelInfo).ToArray(), _catalog.ActiveSession(views)) { Report=_catalog.LastReport };
     }
 
     public ExcelLiveSnapshot SnapshotExcel(string sessionId)
@@ -34,6 +35,195 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
         dynamic app = bound.App; dynamic workbook = bound.Document;
         try { return SnapshotExcelInternal(bound); }
         finally { /* Native references remain owned by the bounded STA catalog. */ }
+    }
+
+    public ExcelRangeReadPage ReadExcelRange(ExcelReadRangeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var bound = _catalog.Require("excel", request.SessionId);
+        _catalog.ValidateCurrent(bound, beforeMutation: false);
+        dynamic workbook = bound.Document;
+
+        ExcelRangeBounds requested;
+        IReadOnlyList<string> fields;
+        int pageSize;
+        try
+        {
+            requested = ExcelRangeReadRules.ParseRange(request.Range);
+            fields = ExcelRangeReadFields.Normalize(request.Fields);
+            pageSize = ExcelRangeReadLimits.NormalizePageSize(request.PageSize);
+        }
+        catch (Exception ex) when (ex is ArgumentException)
+        {
+            throw new OfficeHostFaultException("invalid_request", ex.Message, true);
+        }
+
+        dynamic? sheet = null;
+        try
+        {
+            try { sheet = workbook.Worksheets[request.SheetName]; }
+            catch { throw new OfficeHostFaultException("sheet_not_found", $"Excel sheet '{request.SheetName}' is not available.", true); }
+
+            var sheetName = SafeString(() => sheet.Name, request.SheetName);
+            var name = SafeString(() => workbook.Name);
+            var fullName = SafeString(() => workbook.FullName, name);
+            var saved = SafeBool(() => workbook.Saved);
+            var extent = ReadExcelExtent(sheet);
+            var contentVersion = ExcelContentVersion(bound.SessionId, name, fullName, saved, sheetName, extent);
+            if (!string.IsNullOrWhiteSpace(request.Cursor) && string.IsNullOrWhiteSpace(request.ContentVersion))
+                throw new OfficeHostFaultException("invalid_request", "A continuation cursor requires content_version.", true);
+            if (!string.IsNullOrWhiteSpace(request.ContentVersion)
+                && !string.Equals(request.ContentVersion, contentVersion, StringComparison.Ordinal))
+                throw new OfficeHostFaultException("stale_content", "Excel content changed after the previous page; restart the range read.", true);
+
+            ExcelRangePagePlan plan;
+            try { plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor); }
+            catch (Exception ex) when (ex is ArgumentException)
+            { throw new OfficeHostFaultException("invalid_cursor", ex.Message, true); }
+
+            var started = Environment.TickCount64;
+            var wantValue = fields.Contains(ExcelRangeReadFields.Value, StringComparer.Ordinal);
+            var wantFormula = fields.Contains(ExcelRangeReadFields.Formula, StringComparer.Ordinal);
+            var wantFormat = fields.Contains(ExcelRangeReadFields.Format, StringComparer.Ordinal);
+            var wantMerge = fields.Contains(ExcelRangeReadFields.Merge, StringComparer.Ordinal);
+            var wantHidden = fields.Contains(ExcelRangeReadFields.Hidden, StringComparer.Ordinal);
+            dynamic? pageRange = null;
+            object? values = null;
+            object? formulas = null;
+            var cells = new List<ExcelRangeCellState>(plan.CellCount);
+            var merges = new HashSet<string>(StringComparer.Ordinal);
+            var hiddenRows = new List<int>();
+            var hiddenColumns = new List<int>();
+            try
+            {
+                pageRange = sheet.Range[plan.Bounds.Address];
+                if (wantValue) values = SafeObject(() => pageRange.Value2);
+                if (wantFormula) formulas = SafeObject(() => pageRange.Formula);
+
+                for (var rowOffset = 0; rowOffset < plan.Bounds.RowCount; rowOffset++)
+                for (var columnOffset = 0; columnOffset < plan.Bounds.ColumnCount; columnOffset++)
+                {
+                    var row = plan.Bounds.StartRow + rowOffset;
+                    var column = plan.Bounds.StartColumn + columnOffset;
+                    var address = ExcelRangeReadRules.CellAddress(row, column);
+                    bool? bold = null;
+                    bool? italic = null;
+                    long? fill = null;
+                    string? numberFormat = null;
+                    string? horizontal = null;
+                    string? vertical = null;
+                    dynamic? cell = null;
+                    try
+                    {
+                        if (wantFormat || wantMerge)
+                        {
+                            cell = sheet.Cells[row, column];
+                            if (wantFormat)
+                            {
+                                bold = SafeBool(() => cell.Font.Bold);
+                                italic = SafeBool(() => cell.Font.Italic);
+                                fill = SafeLong(() => cell.Interior.Color);
+                                numberFormat = SafeString(() => cell.NumberFormat);
+                                horizontal = ConvertOfficeValue(SafeObject(() => cell.HorizontalAlignment));
+                                vertical = ConvertOfficeValue(SafeObject(() => cell.VerticalAlignment));
+                            }
+                            if (wantMerge && SafeBool(() => cell.MergeCells))
+                            {
+                                dynamic? area = null;
+                                try
+                                {
+                                    area = cell.MergeArea;
+                                    var mergeAddress = SafeString(() => area.Address[false, false]);
+                                    if (mergeAddress.Length > 0) merges.Add(mergeAddress);
+                                }
+                                finally { Release(area); }
+                            }
+                        }
+
+                        cells.Add(new ExcelRangeCellState(
+                            address,
+                            wantValue ? ConvertOfficeValue(MatrixValue(values, rowOffset, columnOffset)) : null,
+                            wantFormula ? ConvertOfficeValue(MatrixValue(formulas, rowOffset, columnOffset)) : null,
+                            bold,
+                            italic,
+                            fill,
+                            numberFormat,
+                            horizontal,
+                            vertical));
+                    }
+                    finally { Release(cell); }
+                }
+
+                if (wantHidden)
+                {
+                    for (var row = plan.Bounds.StartRow; row <= plan.Bounds.EndRow; row++)
+                    {
+                        dynamic? rowRange = null;
+                        try
+                        {
+                            rowRange = sheet.Rows[row];
+                            if (SafeBool(() => rowRange.Hidden)) hiddenRows.Add(row);
+                        }
+                        finally { Release(rowRange); }
+                    }
+                    for (var column = plan.Bounds.StartColumn; column <= plan.Bounds.EndColumn; column++)
+                    {
+                        dynamic? columnRange = null;
+                        try
+                        {
+                            columnRange = sheet.Columns[column];
+                            if (SafeBool(() => columnRange.Hidden)) hiddenColumns.Add(column);
+                        }
+                        finally { Release(columnRange); }
+                    }
+                }
+            }
+            finally { Release(pageRange); }
+
+            // Re-read only lightweight workbook/extent metadata after the page. The version is
+            // deliberately independent of ActiveSheet/Selection; H2-originating writes bump a
+            // session revision. Native E3 must still validate external-edit detection on target Office builds.
+            var afterExtent = ReadExcelExtent(sheet);
+            var afterVersion = ExcelContentVersion(
+                bound.SessionId,
+                SafeString(() => workbook.Name, name),
+                SafeString(() => workbook.FullName, fullName),
+                SafeBool(() => workbook.Saved),
+                sheetName,
+                afterExtent);
+            if (!string.Equals(contentVersion, afterVersion, StringComparison.Ordinal))
+                throw new OfficeHostFaultException("stale_content", "Excel content metadata changed while reading this page; restart the range read.", true);
+
+            _catalog.ValidateCurrent(bound, beforeMutation: false);
+            var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                cells,
+                MergedRanges = merges,
+                hiddenRows,
+                hiddenColumns
+            }).Length;
+            return new ExcelRangeReadPage(
+                bound.SessionId,
+                name,
+                fullName,
+                saved,
+                sheetName,
+                requested.Address,
+                plan.Bounds.Address,
+                fields,
+                cells,
+                merges.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+                hiddenRows.ToArray(),
+                hiddenColumns.ToArray(),
+                afterExtent,
+                contentVersion,
+                plan.NextCursor,
+                plan.Complete,
+                "LiveDocument",
+                new(plan.CellCount, payloadBytes, Math.Max(0, Environment.TickCount64 - started)))
+            { NativeIdentity = bound.Identity };
+        }
+        finally { Release(sheet); }
     }
 
     public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
@@ -90,6 +280,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
                     finally { Release(cell); }
                 }
 
+                BumpExcelRevision(request.SessionId);
                 var after = SnapshotExcelInternal(bound);
                 return new ExcelPatchResult(
                     before,
@@ -112,6 +303,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             var before = SnapshotExcelInternal(bound, beforeMutation: true);
             OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
             app.Calculate();
+            BumpExcelRevision(request.SessionId);
             return SnapshotExcelInternal(bound);
         }
         finally { /* Native references remain owned by the bounded STA catalog. */ }
@@ -286,6 +478,116 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, ID
             Release(copy);
             // Native source references are borrowed from the catalog, not owned here.
         }
+    }
+
+    private ExcelWorkbookInfo ExcelInfo(OfficeViewLease bound)
+    {
+        dynamic workbook = bound.Document;
+        dynamic view = bound.View;
+        var name = SafeString(() => workbook.Name, bound.Name);
+        var fullName = SafeString(() => workbook.FullName, bound.FullName);
+        var saved = SafeBool(() => workbook.Saved);
+        var activeSheetName = "";
+        var selectionAddress = "";
+        dynamic? activeSheet = null;
+        dynamic? selection = null;
+        try
+        {
+            try
+            {
+                activeSheet = view.ActiveSheet;
+                activeSheetName = SafeString(() => activeSheet.Name);
+            }
+            catch { }
+            try
+            {
+                selection = view.Selection;
+                selectionAddress = SafeString(() => selection.Address[false, false]);
+            }
+            catch { }
+        }
+        finally
+        {
+            Release(selection);
+            Release(activeSheet);
+        }
+        return new ExcelWorkbookInfo(
+            bound.SessionId,
+            name,
+            fullName,
+            saved,
+            activeSheetName,
+            selectionAddress,
+            "")
+        { NativeIdentity = bound.Identity };
+    }
+
+    private ExcelSheetExtent ReadExcelExtent(dynamic sheet)
+    {
+        dynamic? used = null;
+        try
+        {
+            used = sheet.UsedRange;
+            var firstRow = Convert.ToInt32(used.Row, CultureInfo.InvariantCulture);
+            var firstColumn = Convert.ToInt32(used.Column, CultureInfo.InvariantCulture);
+            var rowCount = Math.Max(1, Convert.ToInt32(used.Rows.Count, CultureInfo.InvariantCulture));
+            var columnCount = Math.Max(1, Convert.ToInt32(used.Columns.Count, CultureInfo.InvariantCulture));
+            var bounds = new ExcelRangeBounds(
+                firstRow,
+                firstColumn,
+                checked(firstRow + rowCount - 1),
+                checked(firstColumn + columnCount - 1));
+            return new ExcelSheetExtent(
+                bounds.Address,
+                bounds.StartRow,
+                bounds.StartColumn,
+                bounds.EndRow,
+                bounds.EndColumn,
+                bounds.CellCount);
+        }
+        finally { Release(used); }
+    }
+
+    private string ExcelContentVersion(
+        string sessionId,
+        string name,
+        string fullName,
+        bool saved,
+        string sheetName,
+        ExcelSheetExtent extent)
+    {
+        _excelRevisions.TryGetValue(sessionId, out var revision);
+        return OfficeHostSafety.StableToken(new
+        {
+            sessionId,
+            name,
+            fullName,
+            saved,
+            sheetName,
+            extent.Address,
+            extent.FirstRow,
+            extent.FirstColumn,
+            extent.LastRow,
+            extent.LastColumn,
+            revision
+        });
+    }
+
+    private void BumpExcelRevision(string sessionId)
+    {
+        _excelRevisions.TryGetValue(sessionId, out var revision);
+        _excelRevisions[sessionId] = checked(revision + 1);
+    }
+
+    private static object? MatrixValue(object? value, int rowOffset, int columnOffset)
+    {
+        if (value is not Array array || array.Rank != 2)
+            return rowOffset == 0 && columnOffset == 0 ? value : null;
+        var row = array.GetLowerBound(0) + rowOffset;
+        var column = array.GetLowerBound(1) + columnOffset;
+        return row <= array.GetUpperBound(0) && column <= array.GetUpperBound(1)
+            ? array.GetValue(row, column)
+            : null;
     }
 
     private ExcelLiveSnapshot SnapshotExcelInternal(OfficeViewLease bound, bool beforeMutation = false)

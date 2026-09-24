@@ -68,6 +68,21 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             if (!discovery) { properties["session_id"] = new { type = "string", description = "Exact SessionId from discovery." }; required.Add("session_id"); }
             if (capability.Access == AgentToolAccess.Mutating || name is "word.get_spelling_errors" or "word.get_grammar_candidates" or "word.extract_legal_citations")
             { properties["state_token"] = new { type = "string", description = "Latest observed StateToken. Stale values are rejected." }; required.Add("state_token"); }
+            if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles"
+                or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
+            {
+                properties["sheet_name"] = new { type = "string", description = "Exact worksheet name in the bound workbook." };
+                properties["range"] = new { type = "string", description = "Rectangular A1 range, for example A1:D2000. Never use a whole-workbook snapshot for large reads." };
+                properties["page_size"] = new { type = "integer", minimum = 1, maximum = ExcelRangeReadLimits.MaxPageCells,
+                    description = $"Maximum cells returned in this page (1..{ExcelRangeReadLimits.MaxPageCells})." };
+                properties["cursor"] = new { type = "string", description = "nextCursor from the previous page." };
+                properties["content_version"] = new { type = "string", description = "contentVersion from the previous page; required with cursor." };
+                required.AddRange(["sheet_name", "range"]);
+                if (name == "excel.read_range")
+                    properties["fields"] = new { type = "array", minItems = 1, maxItems = 5, uniqueItems = true,
+                        items = new { type = "string", @enum = new[] { "value", "formula", "format", "merge", "hidden" } },
+                        description = "Fields to materialize. Defaults to value + formula; formatting/merge/hidden are on-demand." };
+            }
             if (name.StartsWith("excel.") && name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
             {
                 properties["sheet_name"] = new { type = "string" };
@@ -95,6 +110,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             { properties["destination"] = new { type = "string", description = "New file path under the approved output workspace. Existing files are never overwritten." }; required.Add("destination"); }
             if (name == "word.find_text") { properties["query"] = new { type = "string" }; required.Add("query"); }
             var description = capability.Description + " Discovery lists metadata only, with no usable state token. Get the host-bound document or an explicit session snapshot before any mutation. A model-supplied session cannot resolve ambiguous targets or override captured active/selection intent. Word replacement/format uses paragraph indexes; Excel patches use observed cell addresses.";
+            if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles" or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
+                description += " Read only the requested range page. Continue with both nextCursor and contentVersion. If stale_content is returned, restart from page 1; never combine pages from different content versions. Selection/focus changes alone do not invalidate contentVersion.";
             if (name is "word.replace_range" or "word.insert_text")
                 description += " Newlines in text create real Word paragraphs and inherit the original paragraph style/format. All paragraph indexes refer to the BEFORE snapshot, even when earlier replacements add paragraphs. To rewrite a CV, use newline-separated text on existing paragraphs, never invent new paragraph indexes. Mixed character formatting requires a separate explicit formatting operation. Read back the new snapshot before further edits.";
             registry.Register(new ToolDescriptor(name, new(capability.Namespace, "Structured live OfficeHost operations."), description,
@@ -176,8 +193,17 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     // session, then compare the original UI precondition; never query another foreground.
                     if (application == H2ApplicationKind.Excel)
                     {
-                        var view = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                        ValidateSnapshot(target, view.SessionId, view.FullName, view.ActiveSheet + "!" + view.SelectionAddress, false, true, native: view.NativeIdentity);
+                        var excel = (ExcelDiscovery)observed.Discovery;
+                        var info = excel.Workbooks.SingleOrDefault(item => item.SessionId == session);
+                        if (info is not null && info.ActiveSheet.Length > 0 && info.SelectionAddress.Length > 0)
+                            ValidateSnapshot(target, info.SessionId, info.FullName, info.ActiveSheet + "!" + info.SelectionAddress, false, true, native: info.NativeIdentity);
+                        else
+                        {
+                            // Compatibility only for older injected test/session clients. Production
+                            // OfficeHost discovery supplies active sheet + selection without reading cells.
+                            var view = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                            ValidateSnapshot(target, view.SessionId, view.FullName, view.ActiveSheet + "!" + view.SelectionAddress, false, true, native: view.NativeIdentity);
+                        }
                     }
                     else
                     {
@@ -185,7 +211,14 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         ValidateSnapshot(target, view.SessionId, view.FullName, WordSelection(view), false, true, native: view.NativeIdentity);
                     }
                 }
-                if (name == "excel.get_active_workbook") result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                if (name is "excel.get_active_sheet" or "excel.get_selection")
+                {
+                    var info = ((ExcelDiscovery)observed.Discovery).Workbooks.Single(item => item.SessionId == session);
+                    result = name == "excel.get_active_sheet"
+                        ? new { info.SessionId, info.Name, info.FullName, info.ActiveSheet, info.Saved, info.NativeIdentity, provenance = "LiveDocumentMetadata" }
+                        : new { info.SessionId, info.Name, info.FullName, info.ActiveSheet, info.SelectionAddress, info.Saved, info.NativeIdentity, provenance = "LiveDocumentMetadata" };
+                }
+                else if (name == "excel.get_active_workbook") result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
                 else if (name == "word.get_active_document") result = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
             else if (name.EndsWith("save_copy", StringComparison.Ordinal))
             {
@@ -204,7 +237,37 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             }
             else if (name.StartsWith("excel.", StringComparison.Ordinal))
             {
-                if (name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
+                if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles"
+                    or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
+                {
+                    if (Client is IExcelRangeReadClient rangeClient)
+                    {
+                        var sheetName = H2ProductionToolSession.Arg(call, "sheet_name") ?? "";
+                        var range = H2ProductionToolSession.Arg(call, "range") ?? "";
+                        if (string.IsNullOrWhiteSpace(sheetName) || string.IsNullOrWhiteSpace(range))
+                            throw new ArgumentException("Excel range reads require sheet_name and range.");
+                        var fields = ExcelReadFieldsFor(name, call.Arguments);
+                        var pageSize = call.Arguments.TryGetProperty("page_size", out var pageSizeElement)
+                            && pageSizeElement.TryGetInt32(out var parsedPageSize) ? parsedPageSize : 0;
+                        var page = await rangeClient.ReadExcelRangeAsync(new(
+                            session,
+                            sheetName,
+                            range,
+                            fields,
+                            pageSize,
+                            H2ProductionToolSession.Arg(call, "cursor"),
+                            H2ProductionToolSession.Arg(call, "content_version")), ct).ConfigureAwait(false);
+                        ValidateRangePage(target, page);
+                        result = page;
+                    }
+                    else
+                    {
+                        // Legacy injected fixtures used by already-accepted AR-012/020 tests do
+                        // not implement the additive AR-021 interface. Production OfficeHost does.
+                        result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
+                    }
+                }
+                else if (name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
                 {
                     RequireAuthorization();
                     var cells = call.Arguments.GetProperty("cells").Deserialize<ExcelCellPatch[]>(Json) ?? [];
@@ -301,6 +364,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 // mutation a mismatch is an execution error with Unknown effect, never a preflight reject.
                 var mutating = StructuredOfficeCapabilityCatalog.All.Any(item => item.Name == name && item.Access == AgentToolAccess.Mutating);
                 if (result is ExcelLiveSnapshot x) ValidateSnapshot(target, x.SessionId, x.FullName, x.ActiveSheet + "!" + x.SelectionAddress, mutating, native: x.NativeIdentity);
+                else if (result is ExcelRangeReadPage page) ValidateRangePage(target, page);
                 else if (result is WordLiveSnapshot w) ValidateSnapshot(target, w.SessionId, w.FullName, WordSelection(w), mutating, native: w.NativeIdentity);
                 else if (result is WordLanguageEvidenceResult language && language.SessionId != session)
                     throw new ToolPreflightException("stale_resource");
@@ -336,6 +400,21 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             providerVersion: native?.ProviderVersion, processId: native?.ProcessId,
             processStartUtcTicks: native?.ProcessStartUtcTicks, windowIdentity: native?.WindowIdentity,
             viewIdentity: native?.ViewIdentity, dirty: dirty);
+
+    private static IReadOnlyList<string> ExcelReadFieldsFor(string name, JsonElement arguments)
+    {
+        if (name == "excel.read_formulas") return [ExcelRangeReadFields.Formula];
+        if (name == "excel.read_styles") return [ExcelRangeReadFields.Format];
+        if (name == "excel.read_merges") return [ExcelRangeReadFields.Merge];
+        if (name == "excel.read_hidden_state") return [ExcelRangeReadFields.Hidden];
+        if (name == "excel.verify_range") return [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula];
+        if (arguments.TryGetProperty("fields", out var fields) && fields.ValueKind == JsonValueKind.Array)
+            return ExcelRangeReadFields.Normalize(fields.Deserialize<string[]>(Json));
+        return [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula];
+    }
+
+    private void ValidateRangePage(H2AgentTargetResolution target, ExcelRangeReadPage page)
+        => ValidateSnapshot(target, page.SessionId, page.FullName, null, false, native: page.NativeIdentity);
 
     private static string WordSelection(WordLiveSnapshot snapshot) => snapshot.NativeIdentity is null ? snapshot.SelectionText
         : $"word-range:{snapshot.SelectionStart}:{snapshot.SelectionEnd}";

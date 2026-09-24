@@ -164,6 +164,9 @@ public sealed class OfficeHostServer
                 : new OfficeCaptureResult("Unavailable","unsupported_operation",null,null,null,null,0),
             "excel.discover" => _backend.DiscoverExcel(),
             "excel.snapshot" => _backend.SnapshotExcel(Parameters<ExcelSnapshotRequest>(request).SessionId),
+            "excel.readRange" => _backend is IExcelRangeReadBackend rangeReader
+                ? rangeReader.ReadExcelRange(Parameters<ExcelReadRangeRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Excel range reads.", true),
             "excel.patch" => PatchExcel(Parameters<ExcelPatchRequest>(request)),
             "excel.recalculate" => _backend.RecalculateExcel(Parameters<ExcelRecalculateRequest>(request)),
             "excel.saveCopy" => _backend.SaveExcelCopy(Parameters<OfficeSaveCopyRequest>(request)),

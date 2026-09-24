@@ -22,6 +22,14 @@ public interface IOfficeCaptureBackend
     OfficeCaptureResult Capture(OfficeCaptureRequest request);
 }
 
+/// <summary>Additive bounded Excel range reader. Keeping this separate from IOfficeBackend
+/// preserves compatibility with older injected fixtures while production COM/fixture backends
+/// opt into the AR-021 paged read contract.</summary>
+public interface IExcelRangeReadBackend
+{
+    ExcelRangeReadPage ReadExcelRange(ExcelReadRangeRequest request);
+}
+
 public sealed class OfficeHostFaultException : Exception
 {
     public OfficeHostFaultException(string code, string message, bool noEffect = false) : base(message)
