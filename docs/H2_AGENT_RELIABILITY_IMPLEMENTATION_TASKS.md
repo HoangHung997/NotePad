@@ -506,21 +506,37 @@ Do not claim these defects were already covered by historical Office/transport/U
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar067-recovery-2026-09-24",
+  "owner_session": "chatgpt-ar067-recovery-audit-2026-09-24",
   "last_code_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-  "last_validated_code_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-  "last_validation_result": "AR067_RUNTIME6_PASS; AR067_PRODUCTION_UI3_PASS; FULL1267_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; AR065_55_PASS_REGRESSION; E4_REAL_H2_MODEL_NOT_RUN; NOT_DONE",
-  "capture_checked_head": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
+  "last_validated_code_commit": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
+  "last_validation_result": "AR067_RUNTIME6_PASS; AR067_PRODUCTION_UI3_PASS; FULL1267_PASS; AGENT74_PASS; 10_OF_10_PR_CI_SUCCESS; AR067_EVIDENCE_LABEL_AWAITING_ENVIRONMENT_VERIFIED; AR065_55_PASS_REGRESSION_RETAINED; E4_REAL_H2_MODEL_NOT_RUN; NOT_DONE",
+  "capture_checked_head": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "Validated runtime/test code is 9be3ac78072bd3b43910a5af7f33dec67625e6f1. User-PC working tree NOT_ACCESSIBLE. All ten pull_request workflows on this exact SHA completed SUCCESS, including full Avalonia publish/helper IPC. The pending tracker closeout is docs-only.",
+  "working_tree": "Runtime implementation source remains 9be3ac78072bd3b43910a5af7f33dec67625e6f1. Exact revalidated tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183 differs only by the AR-067 validation evidence-status correction after docs checkpoint 92c9cd76f6d33d8384f02baa0cbf7202f6cf2178. User-PC working tree NOT_ACCESSIBLE. AR-067 validator and all ten pull_request workflows on 1ebe completed SUCCESS, including full Avalonia publish/helper IPC.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T01:15:31+00:00",
-  "completed_this_session": ["AR-067 implementation and E2 validation", "AR-066 user-directed sequence transition with E3/E4 deferred"],
+  "checkpoint_saved_at_utc": "2026-09-24T01:57:59+00:00",
+  "completed_this_session": ["Reconciled AR-067 checkpoint against branch/PR/exact-SHA CI", "Corrected AR-067 validator evidence label from DEFERRED to AWAITING_ENVIRONMENT without changing runtime semantics", "Revalidated AR-067 E1/E2 and full regression/publish on exact tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183", "AR-066 user-directed sequence transition remains E3/E4 DEFERRED_BY_USER"],
   "remaining_in_active_task": [
     "Run AR-067 E4 through actual H2 UI with an already-authorized model and real tool failure/recovery path; this is NOT_RUN because no authorized H2/model environment is connected in this session.",
     "User decision required before AR-068: either explicitly defer AR-067 E4/test-later as was done for AR-066, or connect/provide the authorized H2/model environment and finite permitted model-test budget."
   ],
   "last_test_commands": [
+    {
+      "command": "tools/agent-reliability/validate_ar067.ps1 after evidence-status correction",
+      "sha": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
+      "run_id": 35944207377,
+      "job_id": 107458445267,
+      "attempt": 1,
+      "result": "runtime 6/6; production/UI focused 3/3; full H2 1267/1267; Agent 74/74; identity E4=AWAITING_ENVIRONMENT; SUCCESS; artifact 10786436619 sha256 21a3e0f6420a0e3caec8116edbf7ededf151ef793de260cb935ca0d0275f8d64"
+    },
+    {
+      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
+      "sha": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
+      "run_id": 35944210291,
+      "job_id": 107458453641,
+      "attempt": 1,
+      "result": "SUCCESS; full H2 1267/1267; all ten pull_request workflows on exact head SUCCESS; portable 10785909451; NAS probe 10786282901"
+    },
     {
       "command": "tools/agent-reliability/validate_ar067.ps1",
       "sha": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
@@ -1221,7 +1237,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-067",
       "issue": "Every meaningful failure returns to Agent for recovery or specific explanation",
-      "status": "IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT / NOT_DONE / code=9be3ac78072bd3b43910a5af7f33dec67625e6f1"
+      "status": "IMPLEMENTED / E2_PASS / E4_AWAITING_ENVIRONMENT / NOT_DONE / runtime=9be3ac78072bd3b43910a5af7f33dec67625e6f1 / revalidated_tree=1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183"
     },
     {
       "id": "AR-068",
@@ -1241,9 +1257,9 @@ Do not claim these defects were already covered by historical Office/transport/U
   "next_exact_action": "Continue ONLY AR-067 until the user decides its E4 disposition. If the user says test later/defer AR-067 E4, record DEFERRED_BY_USER and only then start AR-068 in the next one-task turn. If the user supplies an authorized H2/model environment and finite budget, run the real E4 failure→recovery/blocked-final corpus first. Do not start AR-068 in this turn.",
   "next_task_if_active_done": "AR-068 only after AR-067 E4 is passed or explicitly deferred/test-later by the user; one-task rule still applies.",
   "last_runtime_source_commit": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-  "previous_saved_checkpoint_commit": "3b3a2f31c7e353faef6187c194f0eeb4d6eee296",
-  "finalization_checked_head": "9be3ac78072bd3b43910a5af7f33dec67625e6f1",
-  "additional_ci_after_recorded_run": "Exact runtime/test HEAD 9be3ac78072bd3b43910a5af7f33dec67625e6f1: all ten pull_request workflows SUCCESS. Avalonia CI 35940802619 / job 107448032605 SUCCESS with full H2/Agent/MB gates, Windows publish and packaged helper IPC; portable artifact 10785485583 (110240471 bytes, sha256 7cd616e63208b02ec5ace08a51ed4361d289c88eeffbb5adbe0cb0e89ba807db) and NAS probe artifact 10785430728 (39410366 bytes, sha256 8142b968d037e42e6f8f2f8853e7c88046849073dc714aca3ed0fd5161e2ef2f). Focused AR067 artifact 10785630429 sha256 911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d. This does not upgrade E4.",
+  "previous_saved_checkpoint_commit": "92c9cd76f6d33d8384f02baa0cbf7202f6cf2178",
+  "finalization_checked_head": "1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183",
+  "additional_ci_after_recorded_run": "Exact revalidated tree 1ebe4f1c11aefa5b83a5211e6b07f26e8fe0d183: AR-067 push validation 35944207377 / job 107458445267 SUCCESS; artifact 10786436619 (416738 bytes, sha256 21a3e0f6420a0e3caec8116edbf7ededf151ef793de260cb935ca0d0275f8d64) was downloaded and its identity.json/validation.json inspected: E4=AWAITING_ENVIRONMENT, runtime6/6, production-UI3/3, full1267/1267, Agent74/74, generic_host_final_present=false, clean_end=true. All ten pull_request workflows on 1ebe SUCCESS. Avalonia CI 35944210291 / job 107458453641 SUCCESS with full H2/Agent/MB gates, Windows publish and packaged helper IPC; portable artifact 10785909451 (110240490 bytes, sha256 782aaef3e9c3f32057500b97f161274bc539ffc294ac8975544b1b8758ff6e79) and NAS probe artifact 10786282901 (39410379 bytes, sha256 427c4823477f0d7d1686777ce34430d75e6dd597c79f9cba1c87eeba461008a2). This is E1/E2 evidence only and does not upgrade E4.",
   "last_completed_task": "AR-050",
   "historical_failure_notes_retained": [
     "B01 skill-name drift",
