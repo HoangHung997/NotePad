@@ -33,6 +33,39 @@ public sealed class LocalProjectLayout
     }
 }
 
+public sealed class CommandCenterLocalSettings
+{
+    public bool AttentionCollapsed { get; set; } = true;
+    public Dictionary<string, DateTime> AttentionAcknowledgedUtc { get; set; } = [];
+
+    internal void Normalize()
+    {
+        AttentionAcknowledgedUtc ??= [];
+        var normalized = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        foreach (var pair in AttentionAcknowledgedUtc
+                     .Where(pair => ValidAttentionId(pair.Key))
+                     .OrderByDescending(pair => ToUtc(pair.Value))
+                     .Take(512))
+            normalized[pair.Key] = ToUtc(pair.Value);
+        AttentionAcknowledgedUtc = normalized;
+    }
+
+    private static bool ValidAttentionId(string? value)
+        => value is { Length: 64 }
+           && value.All(c => (c >= '0' && c <= '9')
+                             || (c >= 'a' && c <= 'f')
+                             || (c >= 'A' && c <= 'F'));
+
+    private static DateTime ToUtc(DateTime value)
+        => value == default
+            ? DateTime.UnixEpoch
+            : value.Kind == DateTimeKind.Utc
+                ? value
+                : value.Kind == DateTimeKind.Local
+                    ? value.ToUniversalTime()
+                    : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+}
+
 public sealed class WorkAssistantSettings
 {
     public bool Enabled { get; set; }
@@ -83,6 +116,7 @@ public sealed class LocalConfiguration
     public DesktopSessionState? DesktopSession { get; set; }
     public AiConnectionSettings Ai { get; set; } = new();
     public WorkAssistantSettings WorkAssistant { get; set; } = new();
+    public CommandCenterLocalSettings CommandCenter { get; set; } = new();
     public Dictionary<Guid, LocalProjectLayout> ProjectLayouts { get; set; } = [];
 
     public const string SettingsDirectoryEnvironmentVariable = "H2_NOTES_SETTINGS_DIRECTORY";
@@ -99,6 +133,8 @@ public sealed class LocalConfiguration
             : new LocalConfiguration();
         config.WorkAssistant ??= new WorkAssistantSettings();
         config.WorkAssistant.Normalize();
+        config.CommandCenter ??= new CommandCenterLocalSettings();
+        config.CommandCenter.Normalize();
         config.ProjectLayouts ??= [];
         foreach (var key in config.ProjectLayouts
                      .Where(pair => pair.Key == Guid.Empty || pair.Value is null)

@@ -1,0 +1,43 @@
+name: AR-068 Command Center attention validation
+run-name: AR-068 collapse and acknowledgement validation (${{ github.sha }})
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths:
+      - src/H2Notes.Avalonia/LocalConfiguration.cs
+      - src/H2Notes.Avalonia/MainWindow.CommandCenter.cs
+      - src/H2Notes.Avalonia/MainWindow.axaml
+      - src/H2Notes.Core/H2ProductProjections.cs
+      - tests/H2Notes.Tests/H2CommandCenterUiTests.cs
+      - tests/H2Notes.Tests/H2ProductArchitectureGuardTests.cs
+      - tools/agent-reliability/validate_ar068.ps1
+      - .github/workflows/h2-ar068-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar068-validation
+  cancel-in-progress: false
+jobs:
+  validation:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-068 Command Center attention behavior
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar068.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR068-Attention-Evidence
+          path: artifacts/ar068/
+          if-no-files-found: error
+          retention-days: 14

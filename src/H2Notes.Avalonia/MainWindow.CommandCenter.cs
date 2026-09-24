@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using System.Security.Cryptography;
+using System.Text;
 using H2Notes.Core;
 
 namespace H2Notes.Avalonia;
@@ -13,6 +15,8 @@ public partial class MainWindow
     private bool _updatingCommandCenterAttention;
     private string _commandCenterSignature = "";
     private string _commandCenterAttentionSignature = "";
+    private const int CommandCenterAttentionPreviewLimit = 5;
+    private bool _commandCenterAttentionShowAll;
     private readonly DispatcherTimer _commandCenterRefreshTimer = new()
     {
         Interval = TimeSpan.FromSeconds(1)
@@ -32,6 +36,21 @@ public partial class MainWindow
         };
 
         CommandCenterAddProjectButton.Click += async (_, _) => await AddProject();
+        CommandCenterAttentionToggle.Click += (_, _) =>
+        {
+            var local = _app.LocalSettings.CommandCenter;
+            local.AttentionCollapsed = !local.AttentionCollapsed;
+            _commandCenterAttentionShowAll = false;
+            PersistCommandCenterLocalState();
+            _commandCenterAttentionSignature = "";
+            RefreshCommandCenter();
+        };
+        CommandCenterAttentionShowAllButton.Click += (_, _) =>
+        {
+            _commandCenterAttentionShowAll = true;
+            _commandCenterAttentionSignature = "";
+            RefreshCommandCenter();
+        };
         CommandCenterList.SelectionChanged += (_, _) =>
         {
             if (_updatingCommandCenter || CommandCenterList.SelectedItem is not CommandCenterProjectItem item)
@@ -46,6 +65,9 @@ public partial class MainWindow
                 return;
 
             CommandCenterAttentionList.SelectedItem = null;
+            AcknowledgeAttention(item);
+            RefreshCommandCenter();
+
             if (item.Board is not null && item.Project is not null)
             {
                 OpenProjectWorkspace(item.Board, item.Project);
@@ -67,6 +89,40 @@ public partial class MainWindow
         };
         _commandCenterRefreshTimer.Start();
         Closed += (_, _) => _commandCenterRefreshTimer.Stop();
+    }
+
+    private void AcknowledgeAttention(CommandCenterAttentionItem item)
+    {
+        var local = _app.LocalSettings.CommandCenter;
+        local.Normalize();
+        local.AttentionAcknowledgedUtc[item.AttentionId] = DateTime.UtcNow;
+        local.Normalize();
+        PersistCommandCenterLocalState();
+        _commandCenterAttentionSignature = "";
+    }
+
+    private void ReconcileAttentionAcknowledgements(IReadOnlyList<CommandCenterAttentionItem> current)
+    {
+        var local = _app.LocalSettings.CommandCenter;
+        local.Normalize();
+        var active = current.Select(item => item.AttentionId).ToHashSet(StringComparer.Ordinal);
+        var stale = local.AttentionAcknowledgedUtc.Keys.Where(id => !active.Contains(id)).ToArray();
+        if (stale.Length == 0) return;
+        foreach (var id in stale) local.AttentionAcknowledgedUtc.Remove(id);
+        PersistCommandCenterLocalState();
+    }
+
+    private void PersistCommandCenterLocalState()
+    {
+        try
+        {
+            _app.LocalSettings.CommandCenter.Normalize();
+            _app.LocalSettings.Save();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetSaveStatus("Chưa lưu được trạng thái Command Center trên máy này: " + ex.Message);
+        }
     }
 
     private IReadOnlyList<NoteRecord> CommandCenterBoards()
@@ -109,7 +165,7 @@ public partial class MainWindow
 
         items = items.Where(item => _overviewSearch.Length == 0 || (item.Name + item.Project.NotesText
             + string.Join(" ", item.Project.ChecklistItems.Select(t => t.DisplayText))).Contains(_overviewSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
-        var attentionItems = _commandCenterQuery.GetNeedsAttention(
+        var sourceAttentionItems = _commandCenterQuery.GetNeedsAttention(
                 pairs.Select(pair => pair.Project),
                 health)
             .Select(projection =>
@@ -120,17 +176,36 @@ public partial class MainWindow
             })
             .ToArray();
 
-        var attentionSignature = string.Join("|", attentionItems.Select(item => item.Signature));
+        ReconcileAttentionAcknowledgements(sourceAttentionItems);
+        var localAttention = _app.LocalSettings.CommandCenter;
+        var attentionItems = sourceAttentionItems
+            .Where(item => !localAttention.AttentionAcknowledgedUtc.ContainsKey(item.AttentionId))
+            .ToArray();
+        var collapsed = localAttention.AttentionCollapsed;
+        var displayedAttention = collapsed
+            ? Array.Empty<CommandCenterAttentionItem>()
+            : _commandCenterAttentionShowAll
+                ? attentionItems
+                : attentionItems.Take(CommandCenterAttentionPreviewLimit).ToArray();
+
+        var attentionSignature = string.Join("|", displayedAttention.Select(item => item.Signature))
+            + $"|count={attentionItems.Length}|collapsed={collapsed}|all={_commandCenterAttentionShowAll}";
         if (attentionSignature != _commandCenterAttentionSignature)
         {
             _commandCenterAttentionSignature = attentionSignature;
             _updatingCommandCenterAttention = true;
-            CommandCenterAttentionList.ItemsSource = attentionItems;
+            CommandCenterAttentionList.ItemsSource = displayedAttention;
             CommandCenterAttentionList.SelectedItem = null;
             _updatingCommandCenterAttention = false;
         }
         CommandCenterAttentionSection.IsVisible = attentionItems.Length != 0;
         CommandCenterAttentionHeader.Text = $"Cần bạn xử lý · {attentionItems.Length}";
+        CommandCenterAttentionChevron.Kind = collapsed ? Controls.IconKind.ChevronDown : Controls.IconKind.ChevronUp;
+        CommandCenterAttentionList.IsVisible = !collapsed && attentionItems.Length != 0;
+        CommandCenterAttentionShowAllButton.IsVisible = !collapsed
+            && !_commandCenterAttentionShowAll
+            && attentionItems.Length > CommandCenterAttentionPreviewLimit;
+        CommandCenterAttentionShowAllButton.Content = $"Xem tất cả · {attentionItems.Length}";
 
         var signature = string.Join("|", items.Select(item => item.Signature))
             + "|" + health.State + "|" + health.Code + "|" + health.HasPendingChanges;
@@ -226,6 +301,7 @@ public partial class MainWindow
             Board = board;
             Project = project;
             Projection = projection;
+            AttentionId = BuildAttentionId(projection);
         }
 
         public NoteRecord? Board { get; }
@@ -234,6 +310,7 @@ public partial class MainWindow
 
         public Guid? ProjectId => Projection.ProjectId;
         public Guid? AgentTaskId => Projection.AgentTaskId;
+        public string AttentionId { get; }
         public string Kind => Projection.Kind;
         public string Code => Projection.Code;
         public string Title => Projection.Title;
@@ -247,7 +324,18 @@ public partial class MainWindow
             ? (at.Kind == DateTimeKind.Utc ? at.ToLocalTime() : at).ToString("dd/MM HH:mm")
             : "";
         public string Signature =>
-            $"{ProjectId}:{AgentTaskId}:{Kind}:{Code}:{Title}:{Projection.AtUtc:O}";
+            $"{AttentionId}:{Title}:{Projection.AtUtc:O}";
+
+        private static string BuildAttentionId(NeedsAttentionProjection projection)
+        {
+            var canonical = string.Join("|",
+                projection.Kind,
+                projection.ProjectId?.ToString("N") ?? "",
+                projection.AgentTaskId?.ToString("N") ?? "",
+                projection.Code,
+                projection.SourceRevision ?? "condition");
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+        }
 
         private static string ProjectName(ProjectRecord project)
             => project.NameRich?.Text ?? RichDocument.FromLegacy(project.Name ?? "").Text;
