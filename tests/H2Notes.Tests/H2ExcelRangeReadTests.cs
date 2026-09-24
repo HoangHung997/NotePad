@@ -124,6 +124,58 @@ internal static class H2ExcelRangeReadTests
             Check(stale?.Code == "stale_content" && stale.NoEffect, "Changed content was silently mixed into the old cursor.");
         });
 
+        test("AR-021 E2 continuation token is bound to range fields and page size", () =>
+        {
+            var backend = new FixtureOfficeBackend(extraExcelRows: 900);
+            var reader = (IExcelRangeReadBackend)backend;
+            var session = backend.DiscoverExcel().ActiveSessionId!;
+            var first = reader.ReadExcelRange(new(
+                session,
+                "Data",
+                "A1:A902",
+                [ExcelRangeReadFields.Value],
+                128));
+            Check(first.NextCursor is not null, "Continuation-binding fixture did not create a multi-page read.");
+
+            void ExpectStale(ExcelReadRangeRequest request, string message)
+            {
+                OfficeHostFaultException? stale = null;
+                try { _ = reader.ReadExcelRange(request); }
+                catch (OfficeHostFaultException ex) { stale = ex; }
+                Check(stale?.Code == "stale_content" && stale.NoEffect, message);
+            }
+
+            ExpectStale(new(
+                session,
+                "Data",
+                "B1:B902",
+                [ExcelRangeReadFields.Value],
+                128,
+                first.NextCursor,
+                first.ContentVersion),
+                "Continuation token was accepted for a different range.");
+
+            ExpectStale(new(
+                session,
+                "Data",
+                "A1:A902",
+                [ExcelRangeReadFields.Formula],
+                128,
+                first.NextCursor,
+                first.ContentVersion),
+                "Continuation token was accepted for different requested fields.");
+
+            ExpectStale(new(
+                session,
+                "Data",
+                "A1:A902",
+                [ExcelRangeReadFields.Value],
+                64,
+                first.NextCursor,
+                first.ContentVersion),
+                "Continuation token was accepted for a different page size.");
+        });
+
         test("AR-021 E2 recalculation invalidates an existing paged content version", () =>
         {
             var backend = new FixtureOfficeBackend(extraExcelRows: 900);

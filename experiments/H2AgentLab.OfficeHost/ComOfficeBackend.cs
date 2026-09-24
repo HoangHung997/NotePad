@@ -117,7 +117,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
                 saved,
                 sheetName,
                 extent,
-                trackingGeneration);
+                trackingGeneration,
+                requested.Address,
+                fields,
+                pageSize);
             if (!string.IsNullOrWhiteSpace(request.Cursor) && string.IsNullOrWhiteSpace(request.ContentVersion))
                 throw new OfficeHostFaultException("invalid_request", "A continuation cursor requires content_version.", true);
             if (!string.IsNullOrWhiteSpace(request.ContentVersion)
@@ -236,7 +239,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
                 SafeBool(() => workbook.Saved),
                 sheetName,
                 afterExtent,
-                trackingGeneration);
+                trackingGeneration,
+                requested.Address,
+                fields,
+                pageSize);
             if (!string.Equals(contentVersion, afterVersion, StringComparison.Ordinal))
                 throw new OfficeHostFaultException("stale_content", "Excel content metadata changed while reading this page; restart the range read.", true);
 
@@ -734,7 +740,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         bool saved,
         string sheetName,
         ExcelSheetExtent extent,
-        long trackingGeneration)
+        long trackingGeneration,
+        string requestedRange,
+        IReadOnlyList<string> fields,
+        int pageSize)
     {
         _excelRevisions.TryGetValue(sessionId, out var revision);
         return OfficeHostSafety.StableToken(new
@@ -750,7 +759,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             extent.LastRow,
             extent.LastColumn,
             trackingGeneration,
-            revision
+            revision,
+            requestedRange,
+            fields = fields.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            pageSize
         });
     }
 

@@ -99,7 +99,10 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             _excel.Saved,
             _excel.SheetName,
             extent.Address,
-            _excelRevision
+            _excelRevision,
+            requestedRange = requested.Address,
+            fields = fields.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            pageSize
         });
         if (!string.IsNullOrWhiteSpace(request.Cursor) && string.IsNullOrWhiteSpace(request.ContentVersion))
             throw new OfficeHostFaultException("invalid_request", "A continuation cursor requires content_version.", true);
