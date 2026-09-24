@@ -250,6 +250,12 @@ internal static class H2CommandCenterUiTests
                 Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("0 cần xem", StringComparison.Ordinal),
                     "Acknowledged event remained in active attention count.");
 
+                agent.TouchPrimaryWaiting(now.AddMinutes(10));
+                window.RefreshAfterSave();
+                Pump();
+                Check(!window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Same pending approval resurfaced only because task UpdatedUtc changed.");
+
                 agent.FailPrimary(now.AddMinutes(30));
                 window.RefreshAfterSave();
                 Pump();
@@ -626,6 +632,11 @@ internal static class H2CommandCenterUiTests
 
         public H2AgentEvidence? GetEvidence(string evidenceId) => null;
         public bool AttachProject(Guid taskId, Guid projectId) => false;
+
+        public void TouchPrimaryWaiting(DateTime updated)
+        {
+            _tasks[0] = _tasks[0] with { UpdatedUtc = updated };
+        }
 
         public void ResolvePrimary()
         {

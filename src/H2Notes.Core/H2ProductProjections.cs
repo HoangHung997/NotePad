@@ -325,7 +325,9 @@ public sealed class H2ProductProjectionService
                 code,
                 Bound(title, 300),
                 task.UpdatedUtc,
-                task.UpdatedUtc.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)));
+                task.Status == H2AgentTaskStatus.WaitingForApproval && task.PendingApproval is { } approval
+                    ? approval.ApprovalId.ToString("N")
+                    : task.UpdatedUtc.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)));
         }
 
         if (health is { State: not H2WorkspaceSyncState.Healthy })
