@@ -387,15 +387,6 @@ public sealed class AgentRuntime : IAsyncDisposable
             }
         }
 
-        AgentRuntimeResult RuntimeResult(RuntimeRound current, H2AgentCompletionAssessment state)
-            => new(current.Text, toolRounds, toolCalls, repairRounds, usage.Snapshot(), contextSnapshot,
-                verificationHistory.ToArray(), _discovery.LoadedSchemaNames, promptCacheIdentity)
-            {
-                Evidence = evidenceHistory.ToArray(),
-                EffectiveContract = effectiveContract,
-                Completion = state
-            };
-
         try
         {
             await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ContextPrepared,
