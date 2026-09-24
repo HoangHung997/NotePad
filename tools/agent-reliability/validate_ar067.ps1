@@ -10,7 +10,7 @@ if (git status --porcelain) { throw 'Dirty checkout: validation refused' }
   E1='Typed outcome and bounded recovery logic'
   E2='Scripted AgentRuntime + production adapter + H2 surfaces'
   E3='Not required for AR-067 focused recovery semantics'
-  E4='DEFERRED: live model acceptance can be run later; model-unavailable path is scripted'
+  E4='AWAITING_ENVIRONMENT: real H2 UI + authorized model/tool failure-recovery acceptance has not run; scripted model-unavailable coverage is E2 only'
   network='No external provider calls; no credentials or personal files'
   run=$env:GITHUB_RUN_ID
   attempt=$env:GITHUB_RUN_ATTEMPT
