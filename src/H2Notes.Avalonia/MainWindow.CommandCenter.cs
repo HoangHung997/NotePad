@@ -241,6 +241,8 @@ public partial class MainWindow
     private void ShowCommandCenter()
     {
         Flush();
+        _commandCenterAttentionShowAll = false;
+        _commandCenterAttentionSignature = "";
         _showCommandCenter = true;
         _drawerOpen = false;
         RefreshCommandCenter();

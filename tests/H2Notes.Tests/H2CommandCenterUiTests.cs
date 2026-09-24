@@ -191,6 +191,14 @@ internal static class H2CommandCenterUiTests
                 Check(list.ItemsSource!.Cast<object>().Count() == 21 && !showAll.IsVisible,
                     "Xem tất cả did not reveal exactly the active attention rows.");
 
+                var projectItem = window.FindControl<ListBox>("CommandCenterList")!.ItemsSource!.Cast<object>().Single();
+                window.FindControl<ListBox>("CommandCenterList")!.SelectedItem = projectItem;
+                Pump();
+                window.FindControl<Button>("ProjectsNavButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(list.IsVisible && list.ItemsSource!.Cast<object>().Count() == 5 && showAll.IsVisible,
+                    "Returning to Command Center did not restore the bounded attention preview.");
+
                 var reloaded = LocalConfiguration.Read();
                 Check(!reloaded.CommandCenter.AttentionCollapsed,
                     "Expanded/collapsed preference was not persisted machine-locally.");
