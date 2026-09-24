@@ -134,10 +134,11 @@ internal static class H2AgentRuntimeHookTests
                 var done = Wait(adapter, id);
                 Check(done.Status is H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Failed, "Hook accepted an unresolved failure.");
                 var wire = transport.Sessions.Single();
-                Check(wire.Continuations.Any(c => c.ToolResults.Any(r =>
-                    r.Content.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
-                    && r.Content.Contains("\"UnresolvedAttempts\":1", StringComparison.Ordinal))),
-                    "Structured recovery state was not attached to the existing tool-result continuation.");
+                Check(wire.Continuations.Any(c => c.ToolResults.Count > 0
+                    && c.SupplementalUserMessages?.Any(message =>
+                        message.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
+                        && message.Contains("\"UnresolvedAttempts\":1", StringComparison.Ordinal)) == true),
+                    "Structured recovery state was not supplied inside the existing tool-result continuation.");
                 Check(traces.Count(e => e.Kind == AgentRuntimeHookKind.BeforeModelRequest) == wire.Sends,
                     "Recovery-state continuation bypassed pre-request hook.");
                 Check(!traces.Any(e => e.CheckpointKind == AgentRuntimeCheckpointKind.CompletionValidated), "Failed completion was recorded as validated.");

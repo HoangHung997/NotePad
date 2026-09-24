@@ -233,8 +233,10 @@ public static class MbRepairRuntimeTests
                 && state.Contains("\"targetResourceId\"", StringComparison.Ordinal)
                 && state.Contains("\"attemptsAlreadyMade\":1", StringComparison.Ordinal)
                 && state.Contains("\"unresolvedObligations\"", StringComparison.Ordinal)
-                && state.Contains("\"forbiddenSemanticFallbacks\"", StringComparison.Ordinal),
-                "Agent did not receive the required structured recovery facts.");
+                && state.Contains("\"forbiddenSemanticFallbacks\"", StringComparison.Ordinal)
+                && state.Contains("\"safeRecoveryCandidates\":[]", StringComparison.Ordinal)
+                && !state.Contains("\"safeRecoveryCandidates\":[\"fixture.recover\"]", StringComparison.Ordinal),
+                "Agent did not receive the required structured recovery facts or RetryClass=Never suggested an unsafe retry.");
         });
 
         await Test("AR-067 model continuation outage returns bounded technical card instead of generic tool error", async () =>
@@ -375,7 +377,8 @@ public static class MbRepairRuntimeTests
                 SawTypedFailure = failed.IsError
                     && failed.Outcome?.Error?.Code == "invalid_arguments"
                     && failed.Outcome.Error.RetryClass == ToolRetryClass.CorrectInput;
-                RecoveryState = failed.Content;
+                RecoveryState = request.SupplementalUserMessages?.SingleOrDefault(x =>
+                    x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal));
                 yield return AgentTransportEvent.Tool(new("ar067-good", "fixture.recover",
                     "{\"resource_id\":\"doc-1\",\"value\":\"good\"}"));
                 yield return AgentTransportEvent.Complete("ar067", "tool_calls");
@@ -434,8 +437,9 @@ public static class MbRepairRuntimeTests
                 var failed = request.ToolResults.Single();
                 if (!failed.IsError || failed.Outcome?.Error?.Code != "permission_denied")
                     throw new InvalidOperationException("Permission failure did not return to the Agent.");
-                RecoveryState = failed.Content;
-                if (!RecoveryState.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal))
+                RecoveryState = request.SupplementalUserMessages?.SingleOrDefault(x =>
+                    x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal));
+                if (RecoveryState is null)
                     throw new InvalidOperationException("Structured AR-067 recovery state was not supplied.");
                 if (failRecoveryContinuation)
                 {

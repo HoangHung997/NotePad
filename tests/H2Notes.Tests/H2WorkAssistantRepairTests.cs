@@ -409,10 +409,11 @@ internal static class H2WorkAssistantRepairTests
             {
                 script.Results.AddRange(r.ToolResults);
                 script.Loaded.AddRange(r.NewlyLoadedTools?.Select(x => x.Name) ?? []);
-                script.RecoveryStates.AddRange(r.ToolResults.Select(x => x.Content)
+                script.RecoveryStates.AddRange((r.SupplementalUserMessages ?? [])
                     .Where(x => x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)));
                 if (script._failRecoveryContinuation
-                    && r.ToolResults.Any(x => x.Content.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)))
+                    && (r.SupplementalUserMessages?.Any(x =>
+                        x.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)) ?? false))
                     return FailedRound(ct);
                 return Round(ct);
             }

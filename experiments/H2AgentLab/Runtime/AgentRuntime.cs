@@ -272,8 +272,13 @@ public sealed class AgentRuntime : IAsyncDisposable
                 : !string.Equals(previous.ObservedVersion, observedVersion, StringComparison.Ordinal);
             var attempt = unresolvedCalls.Count(f => f.Name == call.Name && f.TargetId == target && f.Code == code) + 1;
             var recovery = (recoveryTools ?? []).Where(x => !string.IsNullOrWhiteSpace(x))
-                .Append(call.Name).Distinct(StringComparer.Ordinal).Take(8).ToArray();
-            return new(call.Name, code, recovery, call.Arguments.Clone(), failureId,
+                .Distinct(StringComparer.Ordinal).Take(8).ToList();
+            var retryClass = outcome?.Error?.RetryClass;
+            if (code == "tool_not_loaded"
+                || retryClass is ToolRetryClass.CorrectInput or ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
+                if (!recovery.Contains(call.Name, StringComparer.Ordinal))
+                    recovery.Add(call.Name);
+            return new(call.Name, code, recovery.ToArray(), call.Arguments.Clone(), failureId,
                 call.Invocation!.InvocationId, outcome, target, observedVersion, changed, attempt);
         }
         var jobs = new AgentRuntimeJobs(request.JournalObserver);
@@ -670,29 +675,20 @@ public sealed class AgentRuntime : IAsyncDisposable
                 completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
                 request.CompletionObserver?.Invoke(completion);
 
-                // Attach the authoritative typed failure state to the SAME tool-result continuation
-                // the model already receives. This avoids a second hidden planning turn while making
-                // stage/provider/target/retry/effect/attempts/recovery/obligations visible to Agent.
-                if (unresolvedCalls.Count > 0 && results.Length > 0)
-                {
-                    var failureIndex = Array.FindIndex(results, r => r.IsError);
-                    if (failureIndex < 0) failureIndex = 0;
-                    var recoveryState = BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
-                        pendingOperations, latestVerification);
-                    results[failureIndex] = results[failureIndex] with
-                    {
-                        Content = BoundToolOutput(results[failureIndex].Content
-                            + Environment.NewLine + Environment.NewLine + recoveryState),
-                        IsError = true
-                    };
-                }
+                // Keep domain/tool result bytes intact (MCP content blocks, JSON schemas, etc.).
+                // Recovery facts travel as a host supplemental message in the SAME continuation request,
+                // so there is no extra model turn and no flattening/wrapping of provider payloads.
+                var continuationMessages = TakeInput(false).ToList();
+                if ((unresolvedCalls.Count > 0 || latestVerification is { Passed: false }) && results.Length > 0)
+                    continuationMessages.Add(BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
+                        pendingOperations, latestVerification));
 
                 await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
                     contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
                 round = await SendModelAsync(null,
                     new AgentTransportContinuationRequest(taskId, turnId, results,
                         execution.NewlyLoadedTools.Count == 0 ? null : execution.NewlyLoadedTools,
-                        TakeInput(false))).ConfigureAwait(false);
+                        continuationMessages.Count == 0 ? null : continuationMessages)).ConfigureAwait(false);
             }
         }
         catch (AgentVerificationRequiredException ex) when (ex.Completion is null)
