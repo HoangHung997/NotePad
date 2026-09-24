@@ -199,20 +199,9 @@ public static class ToolOutcomeBridge
         string code, ToolErrorPhase phase, ToolMutationEffect effect, string? originalPayload = null)
     {
         code = NormalizeCode(code);
-        var retry = effect is ToolMutationEffect.Unknown or ToolMutationEffect.PartiallyApplied
-            ? ToolRetryClass.ReconcileRequired : code switch {
-                "invalid_arguments" => ToolRetryClass.CorrectInput,
-                "needs_configuration" or "provider_unavailable" => ToolRetryClass.Configure,
-                "stale_resource" or "resource_not_found" or "ambiguous_target" or "target_not_grounded" => ToolRetryClass.Reobserve,
-                "provider_busy" or "modal_blocked" or "rate_limited" or "deadline_exceeded" or "connection_lost" => ToolRetryClass.WaitThenReobserve,
-                _ => ToolRetryClass.Never };
-        var candidates = retry switch {
-            ToolRetryClass.ReconcileRequired => new[] { "inspect_effects_without_repeating_write" },
-            ToolRetryClass.Configure => ["configure_existing_provider"],
-            ToolRetryClass.CorrectInput => ["inspect_advertised_schema"],
-            ToolRetryClass.Reobserve => ["read_current_resource"],
-            ToolRetryClass.WaitThenReobserve => ["wait_then_read_current_state"],
-            _ => Array.Empty<string>() };
+        var recovery = ToolRecoveryPolicy.For(code, effect);
+        var retry = recovery.RetryClass;
+        var candidates = recovery.RecoveryCandidates;
         var status = effect switch {
             ToolMutationEffect.PartiallyApplied => ToolOutcomeStatus.PartiallyApplied,
             ToolMutationEffect.Unknown => ToolOutcomeStatus.OutcomeUnknown,
@@ -346,7 +335,7 @@ public static class ToolOutcomeBridge
         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
         "timeout" => "deadline_exceeded", "validation_failed" => "verification_failed",
         "live_resource_required" or "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
-            or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
+            or "recovery_no_progress" or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"
             or "deadline_exceeded" or "rate_limited" or "partial_result" or "verification_failed"
             or "partially_applied" or "outcome_unknown" or "invalid_result" or "provider_unavailable" or "cancelled" => code,
@@ -376,6 +365,7 @@ public static class ToolOutcomeBridge
             "invalid_result" => "The executor returned malformed or inconsistent result metadata.",
             "cancelled" => "Cancellation was requested; effect and verification remain separate.",
             "partial_result" => "Only a bounded part of the requested data is available.",
+            "recovery_no_progress" => "The retry was blocked because no changed evidence justified repeating the same operation.",
             _ => "The operation failed. Inspect typed effect metadata and existing evidence before proceeding." } };
     private static string? String(JsonElement root, string key)
         => root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;

@@ -268,6 +268,13 @@ jobs:
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-repair-runtime-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-repair-runtime-tests.txt')
 
+      - name: Run H2 Agent AR-070 typed recovery policy tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-ar070-recovery-policy'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --ar070-recovery-policy-test $out
+          Get-Content -LiteralPath (Join-Path $out 'ar070-recovery-policy-tests.txt')
+
       - name: Run H2 Agent MB-44 host completion gate tests
         shell: pwsh
         run: |

@@ -260,6 +260,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         H2AgentCompletionAssessment? completion = null;
         var mutationAwaitingVerification = false;
         var unresolvedCalls = new List<RuntimeFailureObservation>();
+        var recoveryProgress = new Dictionary<Guid, int>();
         var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
         var uncertainResources = new HashSet<string>(StringComparer.Ordinal);
         RuntimeFailureObservation ObserveFailure(global::H2AgentLab.ToolCall call, ToolOutcome? outcome,
@@ -274,15 +275,17 @@ public sealed class AgentRuntime : IAsyncDisposable
                     ? (bool?)null
                     : !string.Equals(previous.ObservedVersion, observedVersion, StringComparison.Ordinal);
             var attempt = unresolvedCalls.Count(f => f.Name == call.Name && f.TargetId == target && f.Code == code) + 1;
-            var recovery = (recoveryTools ?? []).Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.Ordinal).Take(8).ToList();
-            var retryClass = outcome?.Error?.RetryClass;
-            if (code == "tool_not_loaded"
-                || retryClass is ToolRetryClass.CorrectInput or ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
-                if (!recovery.Contains(call.Name, StringComparer.Ordinal))
-                    recovery.Add(call.Name);
-            return new(call.Name, code, recovery.ToArray(), call.Arguments.Clone(), failureId,
-                call.Invocation!.InvocationId, outcome, target, observedVersion, changed, attempt);
+            _registry.TryGet(call.Name, out var descriptor);
+            var directive = AgentRecoveryPolicy.Describe(_registry, descriptor, outcome, code, recoveryTools);
+            var retryTools = new List<string>();
+            if (code is "unknown_tool" or "tool_not_loaded")
+                retryTools.AddRange(directive.ProviderToolCandidates);
+            if (descriptor is not null && directive.Plan.RetryClass is
+                ToolRetryClass.CorrectInput or ToolRetryClass.Configure or ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
+                retryTools.Add(call.Name);
+            return new(call.Name, code, retryTools.Distinct(StringComparer.Ordinal).Take(8).ToArray(),
+                call.Arguments.Clone(), failureId, call.Invocation!.InvocationId, outcome, target,
+                observedVersion, changed, attempt, directive);
         }
         var jobs = new AgentRuntimeJobs(request.JournalObserver);
         async Task ObserveFinishedJobsAsync()
@@ -319,8 +322,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                     _scheduler.ObserveCompletedJob(outcome);
                 }
                 if (outcome.IsError)
-                    unresolvedCalls.Add(ObserveFailure(call, outcome, outcome.Error?.Code ?? "outcome_unknown",
-                        outcome.Error?.RecoveryCandidates, null));
+                {
+                    var failure = ObserveFailure(call, outcome, outcome.Error?.Code ?? "outcome_unknown",
+                        outcome.Error?.RecoveryCandidates, null);
+                    unresolvedCalls.Add(failure);
+                    recoveryProgress[failure.InvocationId] = 0;
+                }
                 await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
                 if (_verifier is not null)
                 {
@@ -503,6 +510,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                     round.ToolCalls,
                     failedMutationSignatures,
                     uncertainResources,
+                    unresolvedCalls,
+                    recoveryProgress,
                     request.JournalObserver is null ? null : jobs.Record,
                     cancellationToken).ConfigureAwait(false);
 
@@ -570,8 +579,12 @@ public sealed class AgentRuntime : IAsyncDisposable
                                 failureId = id.GetString();
                         }
                         catch (JsonException) { }
-                        if (code != "repeated_failed_mutation")
-                            unresolvedCalls.Add(ObserveFailure(executedCall, result.Outcome, code, recovery, failureId));
+                        if (code is not ("repeated_failed_mutation" or "recovery_no_progress"))
+                        {
+                            var failure = ObserveFailure(executedCall, result.Outcome, code, recovery, failureId);
+                            unresolvedCalls.Add(failure);
+                            recoveryProgress[failure.InvocationId] = 0;
+                        }
                         // Retry count is carried in RuntimeFailureObservation. Mutating duplicates
                         // are still fail-closed before dispatch by failedMutationSignatures; all
                         // work remains bounded by MaxToolRounds/MaxRepairRounds.
@@ -579,12 +592,28 @@ public sealed class AgentRuntime : IAsyncDisposable
                     else if (executedName != DeferredToolDiscovery.SearchToolName
                         && _registry.TryGet(executedName, out var successful) && successful.Namespace.Name != "core")
                     {
+                        foreach (var failure in unresolvedCalls)
+                            if (AgentRecoveryPolicy.CountsAsProgress(
+                                failure.Name,
+                                failure.Arguments,
+                                failure.Outcome?.Error?.ProviderId,
+                                failure.Recovery.ProviderToolCandidates,
+                                failure.Recovery.Plan.RetryClass,
+                                executedCall,
+                                result.Outcome,
+                                successful))
+                                recoveryProgress[failure.InvocationId] =
+                                    recoveryProgress.GetValueOrDefault(failure.InvocationId) + 1;
+
                         // Recovery must match a discovered candidate and the original supplied
                         // arguments. A successful unrelated operation cannot clear earlier errors.
-                        foreach (var failure in unresolvedCalls.Where(f => f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
+                        foreach (var failure in unresolvedCalls.Where(f =>
+                            f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
+                            && (f.Name == executedName || f.Code is "unknown_tool" or "tool_not_loaded")
                             && (CompatibleRetryArguments(f.Arguments, executedCall.Arguments, f.Code,
-                                f.Outcome?.Error?.RetryClass)
-                                || f.Code == "stale_state" && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments))))
+                                f.Recovery.Plan.RetryClass)
+                                || ToolOutcomeBridge.NormalizeCode(f.Code) == "stale_resource"
+                                    && AgentRecoveryPolicy.FreshTokenOnly(f.Arguments, executedCall.Arguments))))
                             retryCandidates.Add((failure.InvocationId, executedCall.Invocation!.InvocationId));
                         // Recovery references come from the executor after checking its recorded
                         // failed attempt and resource identity, not from the model's final text.
@@ -757,6 +786,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         IReadOnlySet<string> failedMutationSignatures,
         IReadOnlySet<string> uncertainResources,
+        IReadOnlyList<RuntimeFailureObservation> unresolvedFailures,
+        IReadOnlyDictionary<Guid, int> recoveryProgress,
         Action<H2AgentOperationRecord>? journalObserver,
         CancellationToken cancellationToken)
     {
@@ -877,6 +908,40 @@ public sealed class AgentRuntime : IAsyncDisposable
                     }),
                     IsError: true);
                 continue;
+            }
+
+            var priorFailure = unresolvedFailures.LastOrDefault(f =>
+                f.Name == call.Name && AgentRecoveryPolicy.SameRecoveryTarget(f.Arguments, call.Arguments));
+            if (priorFailure is not null)
+            {
+                var progress = recoveryProgress.GetValueOrDefault(priorFailure.InvocationId);
+                var blockedReason = AgentRecoveryPolicy.BlockRetry(
+                    priorFailure.Code,
+                    priorFailure.Recovery.Plan,
+                    priorFailure.Arguments,
+                    call.Arguments,
+                    progress);
+                if (blockedReason is not null)
+                {
+                    var rejected = ToolOutcomeBridge.Failure(call, descriptor, "recovery_no_progress",
+                        ToolErrorPhase.Preflight, ToolMutationEffect.None,
+                        JsonSerializer.Serialize(new
+                        {
+                            ok = false,
+                            error = "recovery_no_progress",
+                            previousError = priorFailure.Code,
+                            message = blockedReason,
+                            retryClass = ToolRetryClass.Never,
+                            next = priorFailure.Recovery.SafeChoices
+                        }));
+                    results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true)
+                    { Outcome = rejected.Outcome };
+                    continue;
+                }
+                if (priorFailure.Recovery.Plan.MinimumBackoffMilliseconds > 0)
+                    await Task.Delay(
+                        Math.Min(priorFailure.Recovery.Plan.MinimumBackoffMilliseconds, 250),
+                        cancellationToken).ConfigureAwait(false);
             }
 
             var resourceKey = ResourceKey(descriptor);
@@ -1103,6 +1168,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         }
         if (retryClass == ToolRetryClass.CorrectInput)
             return SameTargetSelectors(failed, retry);
+        if (retryClass is ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
+            return AgentRecoveryPolicy.FreshTokenOnly(failed, retry);
         return false;
     }
 
@@ -1154,7 +1221,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     private sealed record RuntimeFailureObservation(
         string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId,
         Guid InvocationId, ToolOutcome? Outcome, string TargetId, string? ObservedVersion,
-        bool? StateChangedSincePrevious, int Attempt);
+        bool? StateChangedSincePrevious, int Attempt, AgentRecoveryDirective Recovery);
 
     private static string BuildRecoveryState(AgentTaskContract contract, H2AgentCompletionAssessment completion,
         IReadOnlyList<RuntimeFailureObservation> failures, IReadOnlyDictionary<string, ToolOutcome> pending,
@@ -1175,10 +1242,20 @@ public sealed class AgentRuntime : IAsyncDisposable
                 providerId = f.Outcome?.Error?.ProviderId, providerVersion = f.Outcome?.Error?.ProviderVersion,
                 errorCode = f.Code, safeMessage = f.Outcome?.Error?.SafeMessage,
                 targetResourceId = f.Outcome?.Resource?.Id ?? f.TargetId, observedVersion = f.ObservedVersion,
-                retryClass = f.Outcome?.Error?.RetryClass.ToString() ?? ToolRetryClass.Never.ToString(),
+                retryClass = f.Recovery.Plan.RetryClass.ToString(),
                 stateChangedSinceLastAttempt = f.StateChangedSincePrevious,
                 mutationEffect = (f.Outcome?.Effect ?? ToolMutationEffect.None).ToString(),
-                attemptsAlreadyMade = f.Attempt, safeRecoveryCandidates = f.RecoveryTools,
+                attemptsAlreadyMade = f.Attempt,
+                safeRecoveryCandidates = f.Recovery.SafeChoices,
+                providerRecoveryTools = f.Recovery.ProviderToolCandidates,
+                alternateToolCandidates = f.Recovery.AlternateToolCandidates,
+                providerReadiness = f.Recovery.ProviderReadiness?.ToString(),
+                providerReadinessReason = f.Recovery.ProviderReadinessReason,
+                minimumBackoffMilliseconds = f.Recovery.Plan.MinimumBackoffMilliseconds,
+                requiresChangedEvidence = f.Recovery.Plan.RequiresChangedEvidence,
+                requiresReconciliation = f.Recovery.Plan.RequiresReconciliation,
+                preserveTargetIdentity = f.Recovery.Plan.PreserveTargetIdentity,
+                alternateBackendRequiresEquivalentTargetProof = f.Recovery.Plan.AllowsAlternateBackend,
                 forbiddenSemanticFallbacks = (f.Outcome?.Effect is ToolMutationEffect.Unknown or ToolMutationEffect.PartiallyApplied)
                     ? new[] { "Do not replay a mutation until effects are reconciled.",
                         "Do not change resource/source identity or broaden permission without explicit user approval." }
@@ -1202,7 +1279,8 @@ public sealed class AgentRuntime : IAsyncDisposable
             }
         });
         var instruction = "Continue the original user goal without a new user prompt when a safe goal-preserving recovery remains. "
-            + "Do not blindly repeat the same call without changed evidence. Unknown/partial mutation effects require reconciliation before replay. "
+            + "Do not blindly repeat the same call without changed evidence. Respect minimumBackoffMilliseconds and reobserve/provider-health choices before retry. "
+            + "Unknown/partial mutation effects require reconciliation before replay. Alternate tools are suggestions only: use them only when exact target/source semantics remain equivalent and host verification can prove the same postcondition. "
             + "If no allowed recovery remains, call no tool and write the specific user-facing blocked/partial explanation: what succeeded, what remains, exact known cause, attempts already made, unsafe/non-equivalent fallbacks not used, and the user/app/config change needed. Do not claim completion.";
         return "[HOST RECOVERY STATE]" + Environment.NewLine + payload
             + Environment.NewLine + "[HOST RECOVERY INSTRUCTION]" + Environment.NewLine + instruction;
