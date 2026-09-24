@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "AR-021",
-  "code_sha": "228403a47e53632ce00ae6bd6f7614b869fd8450",
+  "code_sha": "f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f",
   "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
@@ -29,28 +29,29 @@
     "workbook_rebind_tracking": "If the same logical session is rebound to a replacement workbook COM identity, old event sinks are detached and tracking generation changes so prior continuation tokens become stale.",
     "content_tracking_fail_closed": "Multi-page reads return content_tracking_unavailable if Excel events are disabled or required Workbook.SheetChange/SheetCalculate event sinks cannot attach.",
     "already_unsaved_edit_regression": "The E2 direct-edit stale-content case starts page 1 with Saved=false and then mutates another cell; invalidation depends on the content revision, not a Saved transition.",
-    "already_unsaved_recalculate_regression": "The E2 recalculation stale-content case starts page 1 with Saved=false and recalculates before continuation; the old token must be rejected."
+    "already_unsaved_recalculate_regression": "The E2 recalculation stale-content case starts page 1 with Saved=false and recalculates before continuation; the old token must be rejected.",
+    "continuation_contract_binding": "contentVersion is bound to normalized requested range, canonical normalized fields and page size; cursor/version replay with a drifted contract is rejected stale_content/no-effect."
   },
   "validation": {
     "dedicated": {
-      "run_id": 36003582856,
-      "job_id": 107645945118,
+      "run_id": 36008612093,
+      "job_id": 107663176044,
       "result": "SUCCESS",
-      "focused": "7/7",
+      "focused": "8/8",
       "office_host": "17/17",
       "retained_ar020": "36/36",
       "retained_ar012": "44/44",
       "retained_ar001": "13/13",
-      "full_h2": "1279/1279",
-      "artifact_id": 10810237920,
-      "artifact_bytes": 36122,
-      "artifact_sha256": "45595fb9d8785591520fe7656f74fa02e09f5cc1642488d894c36b92217dae1f"
+      "full_h2": "1280/1280",
+      "artifact_id": 10811574511,
+      "artifact_bytes": 36155,
+      "artifact_sha256": "2518853c3d0f74a283c7a8bf02b6c23ef3a522adcaa406a2e576c62b0a1a61b7"
     },
     "avalonia": {
-      "run_id": 36003582843,
-      "job_id": 107645944504,
+      "run_id": 36008612174,
+      "job_id": 107663175598,
       "result": "SUCCESS",
-      "full_h2": "1279/1279",
+      "full_h2": "1280/1280",
       "all_agent_mb_office_transport_steps": "PASS",
       "windows_x64_publish": "PASS",
       "packaged_helper_ipc": "PASS"
@@ -62,13 +63,16 @@
     }
   },
   "build": {
-    "artifact_id": 10809482318,
+    "artifact_id": 10811603810,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110306705,
-    "sha256": "c8a2a584ca864dce774fda94472e4bdef564721fbab2a5aba3f28e2b8c61705f"
+    "bytes": 110307477,
+    "sha256": "928153a6375d617ce29a3547693cda434f9882b67f30af542c004b2dfcd3bf5e",
+    "independently_downloaded": false,
+    "zip_crc": "PENDING_FINAL_CHECKPOINT_COPY",
+    "zip_entries": null
   },
   "not_claimed": {
-    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN; event wiring compiled and E2 revision semantics pass, but real Excel SheetChange/SheetCalculate delivery, events-disabled behavior and rebind behavior still require RC-06/07.",
+    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN; E2 covers direct edit/recalculation/rebind semantics and continuation-contract binding, but real Excel event delivery and packaged production behavior still require RC-06/07.",
     "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
     "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
     "full_workbook_support": "NOT_CLAIMED from bounded range implementation"
