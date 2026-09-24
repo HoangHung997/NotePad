@@ -292,7 +292,7 @@ public static class MbRecoveryPolicyRuntimeTests
             {
                 SawRecoveryState = request.SupplementalUserMessages?.Any(message =>
                     message.Contains("[HOST RECOVERY STATE]", StringComparison.Ordinal)
-                    && message.Contains("\\\"requiresChangedEvidence\\\":true", StringComparison.Ordinal)
+                    && message.Contains("\"requiresChangedEvidence\":true", StringComparison.Ordinal)
                     && message.Contains("check_provider_health", StringComparison.Ordinal)) == true;
                 yield return AgentTransportEvent.Tool(Tool("fetch-2", "fixture.fetch", new { resource_id = "doc-1", value = "same" }));
                 yield return AgentTransportEvent.Complete("ar070", "tool_calls");
@@ -398,7 +398,7 @@ public static class MbRecoveryPolicyRuntimeTests
                     SawBusyRecovery = request.ToolResults.Single().Outcome?.Error?.RetryClass == ToolRetryClass.WaitThenReobserve
                         && request.SupplementalUserMessages?.Any(message =>
                             message.Contains("tool:fixture.inspect", StringComparison.Ordinal)
-                            && message.Contains("\\\"minimumBackoffMilliseconds\\\":150", StringComparison.Ordinal)) == true;
+                            && message.Contains("\"minimumBackoffMilliseconds\":150", StringComparison.Ordinal)) == true;
                     yield return AgentTransportEvent.Tool(Search("search-inspect", "fixture inspect"));
                     yield return AgentTransportEvent.Complete("ar070", "tool_calls");
                     yield break;
