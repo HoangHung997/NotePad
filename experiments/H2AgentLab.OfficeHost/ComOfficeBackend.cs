@@ -41,7 +41,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
     {
         ArgumentNullException.ThrowIfNull(request);
         var bound = _catalog.Require("excel", request.SessionId);
-        _catalog.ValidateCurrent(bound, beforeMutation: false);
+        _catalog.ValidateCurrent(bound, noEffect: true);
         dynamic workbook = bound.Document;
 
         ExcelRangeBounds requested;
@@ -194,7 +194,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             if (!string.Equals(contentVersion, afterVersion, StringComparison.Ordinal))
                 throw new OfficeHostFaultException("stale_content", "Excel content metadata changed while reading this page; restart the range read.", true);
 
-            _catalog.ValidateCurrent(bound, beforeMutation: false);
+            _catalog.ValidateCurrent(bound, noEffect: true);
             var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 cells,
@@ -220,7 +220,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
                 plan.NextCursor,
                 plan.Complete,
                 "LiveDocument",
-                new(plan.CellCount, payloadBytes, Math.Max(0, Environment.TickCount64 - started)))
+                new ExcelRangeReadMetrics(plan.CellCount, payloadBytes, Math.Max(0, Environment.TickCount64 - started)))
             { NativeIdentity = bound.Identity };
         }
         finally { Release(sheet); }
