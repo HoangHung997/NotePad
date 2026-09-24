@@ -15,10 +15,44 @@ import subprocess
 import sys
 
 BASE = "1aef7d3386ea22ae1f8dd30e6ff1ad4948a6016e"
-FILES = (
+LEGACY_FILES = (
     "experiments/H2AgentLab/Plugins/PluginManager.cs",
     "experiments/H2AgentLab/Plugins/PluginManager.Lifecycle.cs",
 )
+HOST_FILE = "experiments/H2AgentLab/Integration/H2AgentExtensionLifecycleHost.cs"
+FILES = LEGACY_FILES + (HOST_FILE,)
+HOST_STUB = r"""using H2AgentLab.Capabilities;
+using H2AgentLab.Plugins;
+using H2AgentLab.Providers;
+using H2AgentLab.Runtime;
+using H2AgentLab.Tools;
+using H2Notes.Core;
+
+namespace H2AgentLab.Integration;
+
+internal sealed class H2AgentExtensionLifecycleHost : IAsyncDisposable
+{
+    public H2AgentExtensionLifecycleHost(string stateRoot,
+        IEnumerable<ICapabilityProvider>? providers = null,
+        IPluginToolExecutorResolver? trustedFallbackResolver = null) { }
+    public IReadOnlyList<H2AgentPluginState> GetPlugins() => Array.Empty<H2AgentPluginState>();
+    public H2AgentPluginState Install(H2AgentPluginPackage package) => throw new NotSupportedException();
+    public H2AgentPluginState Enable(string pluginId, string version) => throw new NotSupportedException();
+    public void Disable(string pluginId) => throw new NotSupportedException();
+    public H2AgentPluginState SelfTest(string pluginId, string version) => throw new NotSupportedException();
+    public H2AgentPluginState Rollback(string pluginId) => throw new NotSupportedException();
+    public void Quarantine(string pluginId, string version, string reason) => throw new NotSupportedException();
+    public void Uninstall(string pluginId, string version) => throw new NotSupportedException();
+    public IAgentRuntimeExtensionSession CreateTaskSession(Guid taskId, global::H2AgentLab.AgentTools tools,
+        Action<TaskCapabilitySnapshot> snapshotObserved) => new NoopSession();
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    private sealed class NoopSession : IAgentRuntimeExtensionSession
+    {
+        public void Populate(ToolRegistry registry) { }
+        public void Dispose() { }
+    }
+}
+"""
 FILTER = "AR-064 outcome wrapper preserves typed metadata before host validation"
 MESSAGE = "Version wrapper downgraded the typed executor to its legacy string method."
 
@@ -52,7 +86,7 @@ def main() -> int:
     if not re.fullmatch(r"[0-9a-f]{40}", code_sha):
         raise RuntimeError("Missing exact source identity.")
     original = {name: (root / name).read_bytes() for name in FILES}
-    previous = {name: git(root, "show", BASE + ":" + name) for name in FILES}
+    previous = {name: git(root, "show", BASE + ":" + name) for name in LEGACY_FILES}
     if "WrapVersionExecutor" not in original[FILES[0]].decode("utf-8-sig"):
         raise RuntimeError("Current source does not contain the reviewed wrapper fix.")
     if "VersionOutcomeExecutor" in previous[FILES[1]].decode("utf-8-sig"):
@@ -69,6 +103,10 @@ def main() -> int:
     try:
         for name, data in previous.items():
             (root / name).write_bytes(data)
+        # AR-064 now composes lifecycle APIs into the product bridge. The historical wrapper source
+        # predates those APIs, so use a compile-only no-op host in this isolated counterfactual.
+        # The filtered test still exercises only the old version wrapper and must reproduce 7/7 failures.
+        (root / HOST_FILE).write_text(HOST_STUB, encoding="utf-8")
         built = run(root, build, timeout=240)
         (evidence / "old-build.log").write_bytes(built.stdout)
         status["old_build_exit"] = built.returncode
