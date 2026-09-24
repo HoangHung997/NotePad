@@ -34,8 +34,8 @@ public sealed record H2AgentPluginState(
     string? ProblemCode);
 
 /// <summary>
-/// Product-facing extension lifecycle command path. H2 never receives ToolRegistry/provider internals;
-/// the concrete Agent bridge owns package verification, activation and task pinning.
+/// Product-facing extension lifecycle command path. H2 sees only bounded package/status data;
+/// the concrete Agent bridge owns extension verification, activation and task pinning.
 /// </summary>
 public interface IH2AgentExtensionLifecycle
 {
