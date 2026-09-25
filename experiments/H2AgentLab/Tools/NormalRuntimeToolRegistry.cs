@@ -1159,8 +1159,8 @@ public static class NormalRuntimeToolRegistry
                     {
                         application = launched.ApplicationId,
                         process = launched.ProcessName,
-                        launched.NewWindowObserved,
-                        launched.ReusedExistingWindow,
+                        newWindowObserved = launched.NewWindowObserved,
+                        reusedExistingWindow = launched.ReusedExistingWindow,
                         window = WindowProjection(launched.Window),
                         verifiedByHostObservation = true
                     };
