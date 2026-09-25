@@ -88,7 +88,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         // If exactly one safe target is already running, "open/start app" is satisfied by
         // activating that exact observed window. Do not start the executable again and risk
         // creating an extra blank document/window.
-        if (before.Length == 1)
+        if (!request.RequireNewWindow && before.Length == 1)
         {
             var reused = ActivateWindow(new DesktopApplicationActivateRequest(
                 before[0].SessionId,
@@ -137,11 +137,14 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             if (created is not null)
                 return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created);
 
-            var promoted = current.FirstOrDefault(x => x.Foreground && !beforeForeground.Contains(x.SessionId));
-            if (promoted is not null)
-                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
+            if (!request.RequireNewWindow)
+            {
+                var promoted = current.FirstOrDefault(x => x.Foreground && !beforeForeground.Contains(x.SessionId));
+                if (promoted is not null)
+                    return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
+            }
 
-            if (before.Length > 1
+            if (!request.RequireNewWindow && before.Length > 1
                 && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
                 && current.All(x => beforeSessions.Contains(x.SessionId)))
                 throw new DesktopHostFaultException(
@@ -154,7 +157,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
         throw new DesktopHostFaultException(
             "launch_unverified",
-            "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
+            request.RequireNewWindow
+                ? "A distinct new application window was requested, but no new safe HWND/session was observed."
+                : "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
     }
 
     public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)

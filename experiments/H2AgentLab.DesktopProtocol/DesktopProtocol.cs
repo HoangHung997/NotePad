@@ -26,7 +26,8 @@ public sealed record DesktopWindowInfo(
 public sealed record DesktopApplicationLaunchRequest(
     string Application,
     bool PermissionGranted,
-    int WaitMilliseconds = 20000);
+    int WaitMilliseconds = 20000,
+    bool RequireNewWindow = false);
 
 public sealed record DesktopApplicationWaitRequest(
     string Application,

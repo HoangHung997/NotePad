@@ -180,11 +180,13 @@ public static class NormalRuntimeToolRegistry
         new(
             "launch_app",
             "app",
-            "Open/start/launch an app by name, including File Explorer (also called File Explore/explore), Word, Excel or AutoCAD. For File Explorer intent, use this launcher: open File Explorer, start File Explorer, launch Explorer application. Vietnamese intent: mở ứng dụng, mở app. Arbitrary executable paths and shell commands are rejected; success requires a newly observed or newly activated safe window.",
+            "Open/start/launch an app by name, including File Explorer (also called File Explore/explore), Word, Excel or AutoCAD. mode=reuse_or_launch activates the single exact running app when safe or starts it; mode=new_window requires a distinct new HWND/session and MUST be used when the user explicitly asks for a new/blank Word, Excel, Explorer or other app window. Vietnamese intent: mở ứng dụng, mở app, mở Word/Excel trắng/mới. Arbitrary executable paths and shell commands are rejected.",
             AgentToolRisk.High,
             AgentToolAccess.Mutating,
             false,
-            Args(("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name")),
+            Args(
+                ("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name"),
+                ("mode", "Exactly reuse_or_launch or new_window. Use new_window for explicit new/blank/trắng/mới window requests.")),
             Evidence: true,
             Preference: Accessibility()),
         new(
@@ -1149,16 +1151,27 @@ public static class NormalRuntimeToolRegistry
                 if (call.Name == "launch_app")
                 {
                     var application = Arg(call, "application");
+                    var mode = Arg(call, "mode");
+                    var requireNewWindow = mode switch
+                    {
+                        "reuse_or_launch" => false,
+                        "new_window" => true,
+                        _ => throw new global::H2AgentLab.AgentFaultException(
+                            "invalid_arguments",
+                            "launch_app mode must be exactly reuse_or_launch or new_window.",
+                            false)
+                    };
                     await PermitOutsideProductionAsync(
                         "Mở ứng dụng",
                         "Ứng dụng: " + application + "\nDesktopHost chỉ cho phép tên ứng dụng/App Paths đã đăng ký; không chạy command line hoặc đường dẫn executable tùy ý.",
                         cancellationToken).ConfigureAwait(false);
                     var launched = await client.LaunchApplicationAsync(
-                        new DesktopApplicationLaunchRequest(application, true, 20_000),
+                        new DesktopApplicationLaunchRequest(application, true, 20_000, requireNewWindow),
                         cancellationToken).ConfigureAwait(false);
                     return new
                     {
                         requestedApplication = launched.RequestedApplication,
+                        requestedMode = mode,
                         application = launched.ApplicationId,
                         process = launched.ProcessName,
                         newWindowObserved = launched.NewWindowObserved,

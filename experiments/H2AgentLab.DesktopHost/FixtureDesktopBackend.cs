@@ -47,7 +47,8 @@ public sealed class FixtureDesktopBackend : IDesktopBackend
 
         // Simulate a single-instance app for acceptance coverage: a second Notepad launch
         // reuses the exact already-observed safe window rather than inventing another target.
-        if (string.Equals(process, "notepad", StringComparison.OrdinalIgnoreCase))
+        if (!request.RequireNewWindow
+            && string.Equals(process, "notepad", StringComparison.OrdinalIgnoreCase))
         {
             var existing = ListWindows()
                 .Where(x => string.Equals(x.ProcessName, process, StringComparison.OrdinalIgnoreCase))

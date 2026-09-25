@@ -70,14 +70,23 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
             var semantic = call.Name == "launch_app"
                 ? call.Arguments.TryGetProperty("application", out var requestedArgument)
                     && requestedArgument.ValueKind == JsonValueKind.String
+                    && call.Arguments.TryGetProperty("mode", out var requestedModeArgument)
+                    && requestedModeArgument.ValueKind == JsonValueKind.String
                     && root.TryGetProperty("requestedApplication", out var requestedApplication)
                     && requestedApplication.ValueKind == JsonValueKind.String
                     && string.Equals(
                         requestedArgument.GetString()?.Trim(),
                         requestedApplication.GetString()?.Trim(),
                         StringComparison.OrdinalIgnoreCase)
-                    && ((root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
-                        || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True))
+                    && root.TryGetProperty("requestedMode", out var requestedMode)
+                    && requestedMode.ValueKind == JsonValueKind.String
+                    && string.Equals(
+                        requestedModeArgument.GetString(),
+                        requestedMode.GetString(),
+                        StringComparison.Ordinal)
+                    && LaunchModeSatisfied(
+                        requestedMode.GetString(),
+                        root)
                     && root.TryGetProperty("application", out var applicationId)
                     && applicationId.ValueKind == JsonValueKind.String
                     && !string.IsNullOrWhiteSpace(applicationId.GetString())
@@ -105,5 +114,19 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
             false,
             [],
             "Desktop click has no verified resulting task state. Inspect it before claiming success."));
+    }
+
+    private static bool LaunchModeSatisfied(string? mode, JsonElement root)
+    {
+        var created = root.TryGetProperty("newWindowObserved", out var createdValue)
+            && createdValue.ValueKind == JsonValueKind.True;
+        var reused = root.TryGetProperty("reusedExistingWindow", out var reusedValue)
+            && reusedValue.ValueKind == JsonValueKind.True;
+        return mode switch
+        {
+            "new_window" => created && !reused,
+            "reuse_or_launch" => created || reused,
+            _ => false
+        };
     }
 }

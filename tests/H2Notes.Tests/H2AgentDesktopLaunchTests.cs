@@ -25,7 +25,7 @@ internal static class H2AgentDesktopLaunchTests
 
         test("AR-061 application retry guard requires changed evidence for the same application",()=>{
             var supervisor=new RecoverySupervisor();
-            var launch=new ToolCall("launch-1","launch_app",JsonSerializer.SerializeToElement(new{application="Word"}));
+            var launch=new ToolCall("launch-1","launch_app",JsonSerializer.SerializeToElement(new{application="Word",mode="reuse_or_launch"}));
             supervisor.Observe(launch,JsonSerializer.Serialize(new{
                 success=false,
                 recovery=new{
@@ -72,13 +72,14 @@ internal static class H2AgentDesktopLaunchTests
                 var parameters=function.GetProperty("parameters");
                 var properties=parameters.GetProperty("properties");
                 Check(properties.TryGetProperty("application",out _),"launch_app lacks application argument.");
+                Check(properties.TryGetProperty("mode",out _),"launch_app lacks explicit launch mode.");
                 Check(!properties.TryGetProperty("path",out _)
                     && !properties.TryGetProperty("command",out _)
                     && !properties.TryGetProperty("arguments",out _),
                     "launch_app exposed arbitrary executable/shell arguments.");
                 Check(parameters.GetProperty("required").EnumerateArray()
-                    .Select(x=>x.GetString()).SequenceEqual(new[]{"application"}),
-                    "launch_app application argument is not required.");
+                    .Select(x=>x.GetString()).SequenceEqual(new[]{"application","mode"}),
+                    "launch_app application/mode arguments are not required.");
             });
         });
     }

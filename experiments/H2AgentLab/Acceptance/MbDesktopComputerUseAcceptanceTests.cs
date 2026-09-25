@@ -207,16 +207,35 @@ public static class MbDesktopComputerUseAcceptanceTests
                 "Activate did not verify the exact observed window as foreground.");
         }).ConfigureAwait(false);
 
+        await Case("application-new-window-mode-never-reuses-existing", async () =>
+        {
+            using var client = Client();
+            var first = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest("notepad", true, 1000)).ConfigureAwait(false);
+            var second = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest(
+                    "notepad",
+                    true,
+                    1000,
+                    RequireNewWindow: true)).ConfigureAwait(false);
+            Check(second.NewWindowObserved
+                && !second.ReusedExistingWindow
+                && second.Window.SessionId != first.Window.SessionId,
+                "new_window mode reused the existing application window.");
+        }).ConfigureAwait(false);
+
         await Case("application-lifecycle-verifier", async () =>
         {
             var verifier = new H2DesktopRuntimeVerifier();
             var launch = new ToolCall(
                 "launch",
                 "launch_app",
-                JsonSerializer.SerializeToElement(new { application = "notepad" }));
+                JsonSerializer.SerializeToElement(new { application = "notepad", mode = "new_window" }));
             var good = JsonSerializer.Serialize(new
             {
                 requestedApplication = "notepad",
+                requestedApplication = "notepad",
+                requestedMode = "new_window",
                 application = "notepad",
                 process = "notepad",
                 newWindowObserved = true,
@@ -245,10 +264,12 @@ public static class MbDesktopComputerUseAcceptanceTests
 
             var weak = JsonSerializer.Serialize(new
             {
+                requestedApplication = "notepad",
+                requestedMode = "new_window",
                 application = "notepad",
                 process = "notepad",
                 newWindowObserved = false,
-                reusedExistingWindow = false,
+                reusedExistingWindow = true,
                 window = new { session_id = "win-1", pid = 22 },
                 verifiedByHostObservation = true
             });
