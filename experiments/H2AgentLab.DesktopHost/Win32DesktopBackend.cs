@@ -85,6 +85,23 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         var beforeSessions = before.Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
         var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
 
+        // If exactly one safe target is already running, "open/start app" is satisfied by
+        // activating that exact observed window. Do not start the executable again and risk
+        // creating an extra blank document/window.
+        if (before.Length == 1)
+        {
+            var reused = ActivateWindow(new DesktopApplicationActivateRequest(
+                before[0].SessionId,
+                PermissionGranted: true));
+            return new(
+                request.Application,
+                resolved.ApplicationId,
+                resolved.ProcessName,
+                NewWindowObserved: false,
+                ReusedExistingWindow: true,
+                reused);
+        }
+
         try
         {
             using var started = Process.Start(new ProcessStartInfo(resolved.ExecutablePath)
@@ -123,15 +140,6 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             var promoted = current.FirstOrDefault(x => x.Foreground && !beforeForeground.Contains(x.SessionId));
             if (promoted is not null)
                 return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
-
-            // Give the application a short grace period to create/activate a new window first.
-            // If it was already open as exactly one safe target and remains observable, the user's
-            // "open/start app" goal is already satisfied; do not turn that into an unknown outcome.
-            if (before.Length == 1
-                && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
-                && current.Length == 1
-                && string.Equals(current[0].SessionId, before[0].SessionId, StringComparison.Ordinal))
-                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, current[0]);
 
             if (before.Length > 1
                 && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
