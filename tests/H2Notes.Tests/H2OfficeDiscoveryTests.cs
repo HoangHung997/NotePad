@@ -158,8 +158,8 @@ internal static class H2OfficeDiscoveryTests
                 "Non-transient targeted scan failure was retried.");
         });
         test("AR-021 ROT fallback binds only the exact observed Word HWND and process identity",()=>{
-            var documentA=new RotWordDocument("A.docx",@"C:\\A","A.docx",saved:false);
-            var documentB=new RotWordDocument("B.docx",@"C:\\B","B.docx",saved:false);
+            var documentA=new RotWordDocument("A.docx",@"C:\A","A.docx",saved:false);
+            var documentB=new RotWordDocument("B.docx",@"C:\B","B.docx",saved:false);
             var windowA=new RotWordWindow(1001,documentA,3,9);
             var windowB=new RotWordWindow(2001,documentB,10,12);
             var app=new RotWordApplication(windowA,windowB);
@@ -176,7 +176,7 @@ internal static class H2OfficeDiscoveryTests
                 "ROT fallback did not produce an exact-root candidate.");
             using(var lease=fallback.OpenExact(candidate!))
             {
-                Check(lease.FullName==@"C:\\A\\A.docx"
+                Check(lease.FullName==@"C:\A\A.docx"
                     && lease.ViewHandle==1001
                     && lease.ReadSelection()=="word-range:3:9",
                     "ROT fallback bound the wrong Word document/window.");
