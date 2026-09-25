@@ -23,6 +23,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     private readonly Func<H2ActiveWorkContext, bool> _captureValidator;
     private readonly Func<H2AgentResourceBinding, bool>? _taskLaunchedCandidate;
     private readonly Action<H2AgentResourceBinding>? _taskLaunchedObserved;
+    private readonly Func<H2ApplicationKind, bool>? _taskLaunchedRequired;
     private readonly bool _taskLaunchedOnly;
     private IOfficeSessionClient? _client;
     private readonly ConcurrentDictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
@@ -46,7 +47,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     // arbitrary global sessions; a selected workspace or explicit target is still required.
     public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
         IReadOnlyList<H2AgentTargetPath>? projectTargets = null)
-        : this(authorized, outputRoot, scope, projectTargets, null, H2AgentTargetIntent.OpenDocument, null, null, null, null, null, false) { }
+        : this(authorized, outputRoot, scope, projectTargets, null, H2AgentTargetIntent.OpenDocument, null, null, null, null, null, null, false) { }
 
     public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
         IReadOnlyList<H2AgentTargetPath>? projectTargets, H2AgentTargetBindingPolicy? binding,
@@ -54,6 +55,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         Func<IOfficeSessionClient>? clientFactory, Func<H2ActiveWorkContext, bool>? captureValidator,
         Func<H2AgentResourceBinding, bool>? taskLaunchedCandidate = null,
         Action<H2AgentResourceBinding>? taskLaunchedObserved = null,
+        Func<H2ApplicationKind, bool>? taskLaunchedRequired = null,
         bool taskLaunchedOnly = false)
     {
         this.authorized = authorized; this.outputRoot = outputRoot; this.scope = scope;
@@ -62,6 +64,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         _captureValidator = captureValidator ?? H2CapturedWindowIdentity.IsCurrent;
         _taskLaunchedCandidate = taskLaunchedCandidate;
         _taskLaunchedObserved = taskLaunchedObserved;
+        _taskLaunchedRequired = taskLaunchedRequired;
         _taskLaunchedOnly = taskLaunchedOnly;
     }
     public string DomainId => "h2-office-live";
@@ -456,7 +459,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 result = new(launched[0], "resolved", false, "task-launched-window");
             else if (launched.Length > 1)
                 result = new(null, "ambiguous_target", false, "task-launched-window");
-            else if (_taskLaunchedOnly)
+            else if (RequiresTaskLaunchedSource(application))
                 result = new(null, intent == H2AgentTargetIntent.OpenDocument ? "resource_not_found" : "stale_resource",
                     false, "task-launched-window");
             else
@@ -471,9 +474,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         return result;
     }
 
+    private bool RequiresTaskLaunchedSource(H2ApplicationKind application)
+        => _taskLaunchedOnly || _taskLaunchedRequired?.Invoke(application) == true;
+
     private bool CandidateAllowed(H2AgentResourceBinding item, DateTime utcNow)
         => _taskLaunchedCandidate?.Invoke(item) == true
-            || !_taskLaunchedOnly && _binding.IsCandidate(item, utcNow);
+            || !RequiresTaskLaunchedSource(item.ApplicationKind) && _binding.IsCandidate(item, utcNow);
 
     private bool ScopeContains(string session, string? path)
     {

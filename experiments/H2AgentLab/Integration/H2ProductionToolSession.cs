@@ -98,6 +98,12 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 && MatchesLaunchedAuthority(binding, authority);
     }
 
+    internal bool HasTaskLaunchedOfficeAuthority(H2ApplicationKind application)
+    {
+        if (application is not (H2ApplicationKind.Excel or H2ApplicationKind.Word)) return false;
+        lock (_launchedOfficeGate) return _launchedOfficeWindows.ContainsKey(application);
+    }
+
     internal void PinTaskLaunchedOfficeBinding(H2AgentResourceBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);

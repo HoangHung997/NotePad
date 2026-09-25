@@ -523,6 +523,104 @@ public static class MbDesktopComputerUseAcceptanceTests
                 "A different HWND was accepted as the task-launched Office target.");
         }).ConfigureAwait(false);
 
+        await Case("full-access-launched-office-never-falls-back-to-another-window", async () =>
+        {
+            var workspace = Path.Combine(root, "full-access-launched-office-workspace");
+            var state = Path.Combine(root, "full-access-launched-office-state");
+            Directory.CreateDirectory(workspace);
+            Directory.CreateDirectory(state);
+
+            var now = DateTime.UtcNow;
+            var scope = new H2AgentPermissionScope(
+                H2AgentPermissionMode.FullAccess,
+                H2AgentResourceScopeKind.Machine,
+                H2AgentPermissionScope.CurrentMachineResourceKey,
+                mutationAllowed: true,
+                approvalRequired: false,
+                issuedUtc: now,
+                expiresUtc: now.AddMinutes(30));
+            var context = new H2AgentTaskContext(
+                workspace,
+                "",
+                PermissionScope: scope,
+                TargetIntent: H2AgentTargetIntent.OpenDocument);
+            var binding = new H2AgentTargetBindingPolicy(null, workspace);
+            using var fakeOffice = new TaskLaunchedExcelClient();
+            using var session = new H2ProductionToolSession(
+                Guid.NewGuid(),
+                null,
+                readOnly: false,
+                context,
+                projects: null,
+                approve: (_, _, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(true);
+                },
+                targetPolicy: binding,
+                officeClientFactory: () => fakeOffice,
+                userGoal: "Mở Excel trắng mới rồi điền Xin chào vào A1");
+            using var tools = new global::H2AgentLab.AgentTools(
+                new global::H2AgentLab.SafeWorkspace(
+                    workspace,
+                    () => scope.HasFullAccessAt(DateTime.UtcNow)),
+                state,
+                (_, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(true);
+                },
+                (_, _) => { })
+            {
+                ReadOnly = false,
+                ProductionSession = session
+            };
+
+            var registry = NormalRuntimeToolRegistry.Create(tools);
+            var verifiers = new List<IAgentRuntimeDomainVerifier>();
+            registry = session.Configure(tools, registry, verifiers);
+            Check(registry.TryGet("excel.get_active_workbook", out var getWorkbook),
+                "FullAccess did not expose live Excel tools.");
+
+            var launchedWindow = new DesktopWindowInfo(
+                "desktop-full-access-launched-excel",
+                0x12345,
+                7001,
+                638943000000000000L,
+                "EXCEL",
+                "Book1 - Excel",
+                new DesktopBounds(100, 100, 900, 700),
+                96,
+                true);
+            session.ObserveLaunchedApplicationWindow(new DesktopApplicationLaunchResult(
+                "Excel",
+                "excel",
+                "EXCEL",
+                true,
+                false,
+                launchedWindow));
+
+            // OfficeHost sees only a different pre-existing workbook/window. FullAccess is execution
+            // permission, not authority to substitute that workbook for the task-created blank Excel.
+            fakeOffice.Bind(launchedWindow with
+            {
+                SessionId = "desktop-old-excel",
+                Handle = launchedWindow.Handle + 1,
+                Title = "Old.xlsx - Excel"
+            });
+
+            var output = await getWorkbook.Executor.ExecuteAsync(
+                new ToolCall(
+                    "full-access-wrong-office",
+                    "excel.get_active_workbook",
+                    JsonSerializer.SerializeToElement(new { })),
+                CancellationToken.None).ConfigureAwait(false);
+            using var parsed = JsonDocument.Parse(output);
+            Check(parsed.RootElement.TryGetProperty("error", out var error)
+                && error.GetString() == "resource_not_found",
+                "FullAccess silently fell back from the task-created Excel HWND to another workbook: " + output);
+        }).ConfigureAwait(false);
+
         await Case("sensitive-app-blocks", async () =>
         {
             var policyDir = Path.Combine(root, "desktop-host-policy");

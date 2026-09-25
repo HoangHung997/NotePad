@@ -15,7 +15,8 @@ internal sealed partial class H2ProductionToolSession
             _projectId.HasValue ? (_context?.TargetPaths ?? []).Append(new H2Notes.Core.H2AgentTargetPath(tools.Workspace.Root, true, "project-workspace")).ToArray() : null,
             _targetPolicy, _context?.TargetIntent ?? H2Notes.Core.H2AgentTargetIntent.OpenDocument,
             _targetObserved, _officeClientFactory, _captureValidator,
-            IsTaskLaunchedOfficeCandidate, PinTaskLaunchedOfficeBinding, workspaceLaunchHandoff);
+            IsTaskLaunchedOfficeCandidate, PinTaskLaunchedOfficeBinding,
+            HasTaskLaunchedOfficeAuthority, workspaceLaunchHandoff);
         _owned.Add(office);
         _liveOffice = office;
         if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace || workspaceLaunchHandoff)
