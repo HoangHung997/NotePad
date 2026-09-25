@@ -27,16 +27,21 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
 
         if (call.Name == "type_control")
         {
-            var passed = root.TryGetProperty("mutationVerifiedByNewObservation", out var observed)
-                && observed.ValueKind == JsonValueKind.True
-                && root.TryGetProperty("valueObserved", out var value)
-                && value.ValueKind == JsonValueKind.True
-                && root.TryGetProperty("postStateId", out var state)
-                && !string.IsNullOrWhiteSpace(state.GetString());
+            var observedMutation = root.TryGetProperty("mutationVerifiedByNewObservation", out var observed)
+                && observed.ValueKind == JsonValueKind.True;
+            var observedValue = root.TryGetProperty("valueObserved", out var value)
+                && value.ValueKind == JsonValueKind.True;
+            var stateId = root.TryGetProperty("postStateId", out var state)
+                && state.ValueKind == JsonValueKind.String
+                ? state.GetString()
+                : null;
+            var passed = observedMutation
+                && observedValue
+                && !string.IsNullOrWhiteSpace(stateId);
             return Task.FromResult(new AgentRuntimeDomainVerification(
                 DomainId,
                 passed,
-                passed ? ["desktop-state:" + state.GetString()] : [],
+                passed ? ["desktop-state:" + stateId] : [],
                 passed ? null : "Desktop text action has no verified resulting state. Inspect it before claiming success."));
         }
 
