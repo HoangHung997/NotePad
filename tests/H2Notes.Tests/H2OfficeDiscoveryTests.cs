@@ -340,7 +340,7 @@ internal static class H2OfficeDiscoveryTests
     private sealed class RotWordDocument
     {
         public RotWordDocument(string name,string path,string fullName,bool saved)
-        {Name=name;Path=path;FullName=Path.Combine(path,fullName);Saved=saved;}
+        {Name=name;Path=path;FullName=System.IO.Path.Combine(path,fullName);Saved=saved;}
         public string Name{get;}
         public string Path{get;}
         public string FullName{get;}
@@ -387,7 +387,7 @@ internal static class H2OfficeDiscoveryTests
     private sealed class RotExcelWorkbook
     {
         public RotExcelWorkbook(string name,string path,string fullName,bool saved)
-        {Name=name;Path=path;FullName=Path.Combine(path,fullName);Saved=saved;}
+        {Name=name;Path=path;FullName=System.IO.Path.Combine(path,fullName);Saved=saved;}
         public string Name{get;}
         public string Path{get;}
         public string FullName{get;}
