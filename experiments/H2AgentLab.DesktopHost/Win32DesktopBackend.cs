@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Automation;
 using H2AgentLab.DesktopProtocol;
 using System.Windows.Forms;
@@ -80,7 +81,8 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
         var resolved = DesktopApplicationResolver.ResolveForLaunch(request.Application);
         var before = ListWindows()
-            .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase))
+            .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
+                && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
             .ToArray();
         var beforeSessions = before.Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
         var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
@@ -174,7 +176,8 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         do
         {
             var found = ListWindows()
-                .Where(x => string.Equals(x.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+                .Where(x => string.Equals(x.ProcessName, processName, StringComparison.OrdinalIgnoreCase)
+                    && IsApplicationLaunchWindow(processName, x.Handle))
                 .ToArray();
             if (found.Length == 1) return found[0];
             if (found.Length > 1)
@@ -189,6 +192,30 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         throw new DesktopHostFaultException(
             "app_not_found",
             "No safe visible window for the requested application was observed.");
+    }
+
+    private static bool IsApplicationLaunchWindow(string processName, long handle)
+    {
+        var className = WindowClass(new IntPtr(handle));
+        return IsApplicationLaunchWindowClass(processName, className);
+    }
+
+    internal static bool IsApplicationLaunchWindowClass(string processName, string className)
+        => processName switch
+        {
+            var name when name.Equals("WINWORD", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("OpusApp", StringComparison.Ordinal),
+            var name when name.Equals("EXCEL", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("XLMAIN", StringComparison.Ordinal),
+            _ => true
+        };
+
+    private static string WindowClass(IntPtr handle)
+    {
+        var buffer = new StringBuilder(256);
+        return GetClassName(handle, buffer, buffer.Capacity) > 0
+            ? buffer.ToString()
+            : "";
     }
 
     public DesktopWindowInfo ActivateWindow(DesktopApplicationActivateRequest request)
@@ -808,6 +835,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);

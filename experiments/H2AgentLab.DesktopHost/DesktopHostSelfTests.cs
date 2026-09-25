@@ -74,6 +74,20 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("App Paths executable identity accepted another executable stem.");
         });
 
+        Test("Office launch recognition ignores splash and dialog windows", () =>
+        {
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("WINWORD", "OpusApp"))
+                throw new InvalidOperationException("Word main window class was rejected.");
+            if (Win32DesktopBackend.IsApplicationLaunchWindowClass("WINWORD", "NUIDialog"))
+                throw new InvalidOperationException("Word dialog/splash class was accepted as launch completion.");
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("EXCEL", "XLMAIN"))
+                throw new InvalidOperationException("Excel main window class was rejected.");
+            if (Win32DesktopBackend.IsApplicationLaunchWindowClass("EXCEL", "bosa_sdm_XL9"))
+                throw new InvalidOperationException("Excel dialog class was accepted as launch completion.");
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("notepad", "Notepad"))
+                throw new InvalidOperationException("Ordinary application launch window was rejected.");
+        });
+
         Test("Office new-window mode uses only host-owned safe switches", () =>
         {
             if (DesktopApplicationResolver.NewWindowArgumentsForProcess("WINWORD") != "/w")
