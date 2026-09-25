@@ -1168,6 +1168,7 @@ public static class NormalRuntimeToolRegistry
                     var launched = await client.LaunchApplicationAsync(
                         new DesktopApplicationLaunchRequest(application, true, 20_000, requireNewWindow),
                         cancellationToken).ConfigureAwait(false);
+                    Host.ProductionSession?.ObserveLaunchedApplicationWindow(launched);
                     return new
                     {
                         requestedApplication = launched.RequestedApplication,

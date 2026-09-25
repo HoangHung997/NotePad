@@ -1,4 +1,5 @@
 using System.Text.Json;
+using H2AgentLab.DesktopProtocol;
 using H2AgentLab.Runtime;
 using H2AgentLab.Tools;
 using H2Notes.Core;
@@ -31,6 +32,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly Action<H2AgentTargetResolution>? _targetObserved;
     private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
     private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
+    private readonly object _launchedOfficeGate = new();
+    private readonly Dictionary<H2ApplicationKind, TaskLaunchedOfficeWindow> _launchedOfficeWindows = [];
+    private readonly Dictionary<string, H2AgentResourceBinding> _launchedOfficeSessions = new(StringComparer.Ordinal);
 
     public H2ProductionToolSession(Guid taskId, Guid? projectId, bool readOnly,
         H2AgentTaskContext? context, IH2ProjectToolHost? projects,
@@ -54,6 +58,109 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     }
 
     public bool IsExecutingAuthorizedCall => _executingAuthorizedCall.Value;
+
+    internal void ObserveLaunchedApplicationWindow(DesktopApplicationLaunchResult launched)
+    {
+        ArgumentNullException.ThrowIfNull(launched);
+        var kind = LaunchedOfficeKind(launched.ApplicationId, launched.ProcessName, launched.Window.ProcessName);
+        if (kind == H2ApplicationKind.Unknown) return;
+        if (launched.Window.Handle <= 0
+            || launched.Window.ProcessId <= 0
+            || launched.Window.ProcessStartedUtcTicks <= 0
+            || !string.Equals(launched.ProcessName, launched.Window.ProcessName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Verified app launch returned an incomplete Office window identity.");
+
+        var authority = new TaskLaunchedOfficeWindow(
+            kind,
+            launched.Window.ProcessId,
+            launched.Window.ProcessStartedUtcTicks,
+            $"win32:{launched.Window.Handle:x}:{launched.Window.ProcessId}:{launched.Window.ProcessStartedUtcTicks}",
+            DateTime.UtcNow);
+
+        lock (_launchedOfficeGate)
+        {
+            _launchedOfficeWindows[kind] = authority;
+            foreach (var key in _launchedOfficeSessions
+                .Where(pair => pair.Value.ApplicationKind == kind)
+                .Select(pair => pair.Key)
+                .ToArray())
+                _launchedOfficeSessions.Remove(key);
+        }
+    }
+
+    internal bool IsTaskLaunchedOfficeCandidate(H2AgentResourceBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        lock (_launchedOfficeGate)
+            return _launchedOfficeWindows.TryGetValue(binding.ApplicationKind, out var authority)
+                && MatchesLaunchedAuthority(binding, authority);
+    }
+
+    internal void PinTaskLaunchedOfficeBinding(H2AgentResourceBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        if (string.IsNullOrWhiteSpace(binding.DocumentSessionId))
+            throw new InvalidOperationException("Task-launched Office binding has no document session.");
+        lock (_launchedOfficeGate)
+        {
+            if (!_launchedOfficeWindows.TryGetValue(binding.ApplicationKind, out var authority)
+                || !MatchesLaunchedAuthority(binding, authority))
+                throw new InvalidOperationException("Office binding does not match the exact task-launched window.");
+            _launchedOfficeSessions[OfficeSessionKey(binding.ApplicationKind, binding.DocumentSessionId)] = binding;
+        }
+    }
+
+    private bool IsTaskLaunchedOfficeSession(string toolNamespace, string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return false;
+        var kind = toolNamespace switch
+        {
+            "excel" => H2ApplicationKind.Excel,
+            "word" => H2ApplicationKind.Word,
+            _ => H2ApplicationKind.Unknown
+        };
+        if (kind == H2ApplicationKind.Unknown) return false;
+        lock (_launchedOfficeGate)
+        {
+            return _launchedOfficeSessions.TryGetValue(OfficeSessionKey(kind, sessionId), out var binding)
+                && _launchedOfficeWindows.TryGetValue(kind, out var authority)
+                && MatchesLaunchedAuthority(binding, authority);
+        }
+    }
+
+    private static H2ApplicationKind LaunchedOfficeKind(string applicationId, string resultProcess, string windowProcess)
+    {
+        if (!string.Equals(resultProcess, windowProcess, StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Unknown;
+        if (applicationId.Equals("excel", StringComparison.OrdinalIgnoreCase)
+            && resultProcess.Equals("EXCEL", StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Excel;
+        if ((applicationId.Equals("winword", StringComparison.OrdinalIgnoreCase)
+                || applicationId.Equals("word", StringComparison.OrdinalIgnoreCase))
+            && resultProcess.Equals("WINWORD", StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Word;
+        return H2ApplicationKind.Unknown;
+    }
+
+    private static bool MatchesLaunchedAuthority(H2AgentResourceBinding binding, TaskLaunchedOfficeWindow authority)
+        => binding.Kind == H2AgentResourceKind.LiveDocument
+            && binding.ApplicationKind == authority.ApplicationKind
+            && binding.ProcessId == authority.ProcessId
+            && binding.ProcessStartUtcTicks == authority.ProcessStartUtcTicks
+            && string.Equals(binding.WindowIdentity, authority.WindowIdentity, StringComparison.Ordinal)
+            && binding.ObservedUtc.Kind == DateTimeKind.Utc
+            && binding.ObservedUtc >= authority.ObservedUtc
+            && DateTime.UtcNow - authority.ObservedUtc <= H2AgentTargetBindingPolicy.MaxCaptureAge;
+
+    private static string OfficeSessionKey(H2ApplicationKind kind, string sessionId)
+        => kind + ":" + sessionId;
+
+    private sealed record TaskLaunchedOfficeWindow(
+        H2ApplicationKind ApplicationKind,
+        int ProcessId,
+        long ProcessStartUtcTicks,
+        string WindowIdentity,
+        DateTime ObservedUtc);
 
     public ToolRegistry Configure(AgentTools tools, ToolRegistry registry,
         List<IAgentRuntimeDomainVerifier> verifiers)
@@ -238,6 +345,12 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
                 _ => true
             };
+        }
+        if (descriptor.Namespace.Name is "excel" or "word"
+            && IsTaskLaunchedOfficeSession(descriptor.Namespace.Name, Arg(call, "session_id")))
+        {
+            return _scope.Mode is H2AgentPermissionMode.AskBeforeChanges
+                or H2AgentPermissionMode.UseProjectPolicy;
         }
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Workspace)
         {

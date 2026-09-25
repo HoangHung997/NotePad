@@ -3,7 +3,12 @@ using System.Text.Json;
 using H2AgentLab.Desktop;
 using H2AgentLab.DesktopProtocol;
 using H2AgentLab.Integration;
+using H2AgentLab.Office;
+using H2AgentLab.OfficeProtocol;
+using H2AgentLab.Runtime;
+using H2AgentLab.Tools;
 using H2AgentLab.Transport;
+using H2Notes.Core;
 
 namespace H2AgentLab.Acceptance;
 
@@ -369,6 +374,157 @@ public static class MbDesktopComputerUseAcceptanceTests
                     new DesktopApplicationActivateRequest("not-observed", true))).ConfigureAwait(false);
         }).ConfigureAwait(false);
 
+        await Case("task-launched-excel-binds-and-writes-through-production-office-runtime", async () =>
+        {
+            var workspace = Path.Combine(root, "launched-office-workspace");
+            var state = Path.Combine(root, "launched-office-state");
+            Directory.CreateDirectory(workspace);
+            Directory.CreateDirectory(state);
+
+            var now = DateTime.UtcNow;
+            var scope = new H2AgentPermissionScope(
+                H2AgentPermissionMode.AskBeforeChanges,
+                H2AgentResourceScopeKind.Workspace,
+                "workspace:" + Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace)),
+                mutationAllowed: true,
+                approvalRequired: true,
+                issuedUtc: now,
+                expiresUtc: now.AddMinutes(30),
+                documentPath: workspace);
+            var context = new H2AgentTaskContext(
+                workspace,
+                "",
+                PermissionScope: scope,
+                TargetIntent: H2AgentTargetIntent.OpenDocument);
+            var binding = new H2AgentTargetBindingPolicy(null, workspace);
+            using var fakeOffice = new TaskLaunchedExcelClient();
+            using var session = new H2ProductionToolSession(
+                Guid.NewGuid(),
+                null,
+                readOnly: false,
+                context,
+                projects: null,
+                approve: (_, _, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(true);
+                },
+                targetPolicy: binding,
+                officeClientFactory: () => fakeOffice,
+                userGoal: "Mở Excel trắng mới rồi điền Xin chào vào A1");
+            using var tools = new global::H2AgentLab.AgentTools(
+                new global::H2AgentLab.SafeWorkspace(workspace),
+                state,
+                (_, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(true);
+                },
+                (_, _) => { })
+            {
+                ReadOnly = false,
+                ProductionSession = session
+            };
+
+            var registry = NormalRuntimeToolRegistry.Create(tools);
+            var verifiers = new List<IAgentRuntimeDomainVerifier>();
+            registry = session.Configure(tools, registry, verifiers);
+            Check(registry.TryGet("excel.get_active_workbook", out var getWorkbook)
+                && registry.TryGet("excel.write_range", out var writeRange),
+                "Workspace AskBeforeChanges did not expose launched-window Office tools.");
+
+            var launchedWindow = new DesktopWindowInfo(
+                "desktop-launched-excel",
+                0x12345,
+                7001,
+                638943000000000000L,
+                "EXCEL",
+                "Book1 - Excel",
+                new DesktopBounds(100, 100, 900, 700),
+                96,
+                true);
+            var launched = new DesktopApplicationLaunchResult(
+                "Excel",
+                "excel",
+                "EXCEL",
+                true,
+                false,
+                launchedWindow);
+            session.ObserveLaunchedApplicationWindow(launched);
+            fakeOffice.Bind(launchedWindow);
+
+            var getOutput = await getWorkbook.Executor.ExecuteAsync(
+                new ToolCall("get-launched-excel", "excel.get_active_workbook",
+                    JsonSerializer.SerializeToElement(new { })),
+                CancellationToken.None).ConfigureAwait(false);
+            using (var parsed = JsonDocument.Parse(getOutput))
+            {
+                Check(parsed.RootElement.GetProperty("SessionId").GetString() == TaskLaunchedExcelClient.SessionId,
+                    "Launched Excel window did not bind its exact Office session.");
+                Check(parsed.RootElement.GetProperty("StateToken").GetString() == "state-1",
+                    "Launched Excel snapshot did not provide the expected state token.");
+            }
+
+            var writeCall = new ToolCall(
+                "write-launched-excel",
+                "excel.write_range",
+                JsonSerializer.SerializeToElement(new
+                {
+                    session_id = TaskLaunchedExcelClient.SessionId,
+                    state_token = "state-1",
+                    sheet_name = "Sheet1",
+                    cells = new[] { new { address = "A1", value = "Xin chào" } }
+                }));
+            var writeOutput = await writeRange.Executor.ExecuteAsync(
+                writeCall,
+                CancellationToken.None).ConfigureAwait(false);
+            using (var parsed = JsonDocument.Parse(writeOutput))
+            {
+                Check(!parsed.RootElement.TryGetProperty("success", out var success)
+                        || success.ValueKind != JsonValueKind.False,
+                    "Launched Excel write returned a failure payload: " + writeOutput);
+            }
+            var after = await fakeOffice.SnapshotExcelAsync(
+                TaskLaunchedExcelClient.SessionId,
+                CancellationToken.None).ConfigureAwait(false);
+            Check(after.Sheets.Single().Cells.Single(cell => cell.Address == "A1").Value == "Xin chào"
+                && after.StateToken == "state-2",
+                "Launched Excel write did not survive Office readback.");
+
+            var wrongCall = writeCall with
+            {
+                Id = "wrong-launched-session",
+                Arguments = JsonSerializer.SerializeToElement(new
+                {
+                    session_id = "other-session",
+                    state_token = "state-2",
+                    sheet_name = "Sheet1",
+                    cells = new[] { new { address = "A1", value = "WRONG" } }
+                })
+            };
+            var decision = await session.AuthorizeAsync(
+                new AgentRuntimePermissionRequest(null!, writeRange, wrongCall, null),
+                CancellationToken.None).ConfigureAwait(false);
+            Check(!decision.Allowed,
+                "A different Office session inherited authority from the task-launched Excel window.");
+
+            var wrongNative = H2AgentResourceBinding.FromLiveObservation(
+                H2ApplicationKind.Excel,
+                "office-host",
+                "wrong-native-session",
+                "Book2",
+                DateTime.UtcNow,
+                providerInstanceId: "fake-office:wrong",
+                providerVersion: "fixture-v1",
+                processId: launchedWindow.ProcessId,
+                processStartUtcTicks: launchedWindow.ProcessStartedUtcTicks,
+                windowIdentity: $"win32:{launchedWindow.Handle + 1:x}:{launchedWindow.ProcessId}:{launchedWindow.ProcessStartedUtcTicks}",
+                viewIdentity: "wrong-view",
+                dirty: true);
+            Check(!session.IsTaskLaunchedOfficeCandidate(wrongNative),
+                "A different HWND was accepted as the task-launched Office target.");
+        }).ConfigureAwait(false);
+
         await Case("sensitive-app-blocks", async () =>
         {
             var policyDir = Path.Combine(root, "desktop-host-policy");
@@ -423,6 +579,197 @@ public static class MbDesktopComputerUseAcceptanceTests
 
         Console.WriteLine(string.Join(Environment.NewLine, lines));
         return gatePassed ? 0 : 1;
+    }
+
+    private sealed class TaskLaunchedExcelClient : IOfficeSessionClient
+    {
+        public const string SessionId = "task-launched-excel-session";
+        private OfficeNativeIdentity? _native;
+        private ExcelLiveSnapshot? _snapshot;
+        public string InstanceIdentity => "task-launched-office-fixture";
+
+        public void Bind(DesktopWindowInfo window)
+        {
+            _native = new OfficeNativeIdentity(
+                window.ProcessId,
+                window.ProcessStartedUtcTicks,
+                1,
+                window.Handle,
+                window.Handle,
+                0,
+                "task-launched-book1",
+                "fixture-v1");
+            _snapshot = Snapshot("state-1", "", "KEEP");
+        }
+
+        public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = Current();
+            var info = new ExcelWorkbookInfo(
+                snapshot.SessionId,
+                snapshot.Name,
+                snapshot.FullName,
+                snapshot.Saved,
+                snapshot.ActiveSheet,
+                snapshot.SelectionAddress,
+                snapshot.StateToken)
+            {
+                NativeIdentity = _native
+            };
+            return Task.FromResult(new ExcelDiscovery([info], SessionId)
+            {
+                Report = new OfficeDiscoveryReport(
+                    true,
+                    OfficeDiscoveryLimits.Coverage,
+                    1,
+                    1,
+                    1,
+                    [])
+            });
+        }
+
+        public Task<ExcelLiveSnapshot> SnapshotExcelAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequireSession(sessionId);
+            return Task.FromResult(Current());
+        }
+
+        public Task<ExcelPatchResult> PatchExcelAsync(
+            ExcelPatchRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequireSession(request.SessionId);
+            var before = Current();
+            if (request.StateToken != before.StateToken)
+                throw new OfficeHostClientException("stale_resource", "Fixture state token changed.", noEffect: true);
+            if (!request.PermissionGranted)
+                throw new OfficeHostClientException("permission_denied", "Fixture permission denied.", noEffect: true);
+            if (request.SheetName != "Sheet1")
+                throw new OfficeHostClientException("resource_not_found", "Fixture sheet missing.", noEffect: true);
+
+            var cells = before.Sheets.Single().Cells
+                .ToDictionary(cell => cell.Address, cell => cell, StringComparer.OrdinalIgnoreCase);
+            foreach (var patch in request.Cells)
+            {
+                if (!cells.TryGetValue(patch.Address, out var old))
+                    throw new OfficeHostClientException("resource_not_found", "Fixture cell missing.", noEffect: true);
+                cells[patch.Address] = old with
+                {
+                    Value = patch.ClearValue ? "" : patch.Value ?? old.Value,
+                    Formula = patch.Formula ?? old.Formula,
+                    Bold = patch.Bold ?? old.Bold,
+                    Italic = patch.Italic ?? old.Italic,
+                    FillColor = patch.FillColor ?? old.FillColor,
+                    NumberFormat = patch.NumberFormat ?? old.NumberFormat
+                };
+            }
+
+            var after = before with
+            {
+                Sheets =
+                [
+                    before.Sheets.Single() with
+                    {
+                        Cells = cells.Values.OrderBy(cell => cell.Address, StringComparer.Ordinal).ToArray()
+                    }
+                ],
+                StateToken = "state-2"
+            };
+            _snapshot = after;
+            return Task.FromResult(new ExcelPatchResult(
+                before,
+                after,
+                request.Cells.Select(cell => cell.Address).ToArray()));
+        }
+
+        public Task<ExcelLiveSnapshot> RecalculateExcelAsync(
+            ExcelRecalculateRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<ExcelLiveSnapshot>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        public Task<OfficeSaveCopyResult> SaveExcelCopyAsync(
+            OfficeSaveCopyRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<OfficeSaveCopyResult>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        public Task<WordDiscovery> DiscoverWordAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(new WordDiscovery([], null)
+            {
+                Report = new OfficeDiscoveryReport(true, OfficeDiscoveryLimits.Coverage, 1, 0, 0, [])
+            });
+
+        public Task<WordLiveSnapshot> SnapshotWordAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<WordLiveSnapshot>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        public Task<WordPatchResult> PatchWordAsync(
+            WordPatchRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<WordPatchResult>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        public Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(
+            WordLanguageEvidenceRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<WordLanguageEvidenceResult>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        public Task<OfficeSaveCopyResult> SaveWordCopyAsync(
+            OfficeSaveCopyRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<OfficeSaveCopyResult>(new NotSupportedException("Not used by AR-061 fixture."));
+
+        private ExcelLiveSnapshot Current()
+            => _snapshot ?? throw new InvalidOperationException("Task-launched Excel fixture is not bound.");
+
+        private void RequireSession(string sessionId)
+        {
+            if (sessionId != SessionId)
+                throw new OfficeHostClientException("session_not_found", "Fixture session mismatch.", noEffect: true);
+        }
+
+        private ExcelLiveSnapshot Snapshot(string token, string a1, string b1)
+            => new(
+                SessionId,
+                "Book1",
+                "Book1",
+                false,
+                "Sheet1",
+                "A1",
+                [
+                    new ExcelSheetState(
+                        "Sheet1",
+                        "visible",
+                        [
+                            Cell("A1", a1),
+                            Cell("B1", b1)
+                        ],
+                        [],
+                        [],
+                        [])
+                ],
+                token)
+            {
+                NativeIdentity = _native
+            };
+
+        private static ExcelCellState Cell(string address, string value)
+            => new(
+                address,
+                value,
+                "",
+                false,
+                false,
+                null,
+                "General",
+                "General",
+                "Bottom");
+
+        public void Dispose() { }
     }
 
     private static async Task ExpectCode<T>(string code, Func<Task<T>> action)

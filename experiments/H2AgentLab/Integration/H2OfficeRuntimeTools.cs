@@ -21,6 +21,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     private readonly Action<H2AgentTargetResolution>? _targetObserved;
     private readonly Func<IOfficeSessionClient>? _clientFactory;
     private readonly Func<H2ActiveWorkContext, bool> _captureValidator;
+    private readonly Func<H2AgentResourceBinding, bool>? _taskLaunchedCandidate;
+    private readonly Action<H2AgentResourceBinding>? _taskLaunchedObserved;
+    private readonly bool _taskLaunchedOnly;
     private IOfficeSessionClient? _client;
     private readonly ConcurrentDictionary<H2ApplicationKind, H2AgentTargetResolution> _selected = new();
     internal H2AgentResourceBinding? SelectedSource(H2ApplicationKind application)
@@ -43,17 +46,23 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
     // arbitrary global sessions; a selected workspace or explicit target is still required.
     public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
         IReadOnlyList<H2AgentTargetPath>? projectTargets = null)
-        : this(authorized, outputRoot, scope, projectTargets, null, H2AgentTargetIntent.OpenDocument, null, null, null) { }
+        : this(authorized, outputRoot, scope, projectTargets, null, H2AgentTargetIntent.OpenDocument, null, null, null, null, null, false) { }
 
     public H2OfficeRuntimeTools(Func<bool> authorized, string outputRoot, H2AgentPermissionScope? scope,
         IReadOnlyList<H2AgentTargetPath>? projectTargets, H2AgentTargetBindingPolicy? binding,
         H2AgentTargetIntent intent, Action<H2AgentTargetResolution>? targetObserved,
-        Func<IOfficeSessionClient>? clientFactory, Func<H2ActiveWorkContext, bool>? captureValidator)
+        Func<IOfficeSessionClient>? clientFactory, Func<H2ActiveWorkContext, bool>? captureValidator,
+        Func<H2AgentResourceBinding, bool>? taskLaunchedCandidate = null,
+        Action<H2AgentResourceBinding>? taskLaunchedObserved = null,
+        bool taskLaunchedOnly = false)
     {
         this.authorized = authorized; this.outputRoot = outputRoot; this.scope = scope;
         _binding = binding ?? new H2AgentTargetBindingPolicy(null, outputRoot, projectTargets);
         _intent = intent; _targetObserved = targetObserved; _clientFactory = clientFactory;
         _captureValidator = captureValidator ?? H2CapturedWindowIdentity.IsCurrent;
+        _taskLaunchedCandidate = taskLaunchedCandidate;
+        _taskLaunchedObserved = taskLaunchedObserved;
+        _taskLaunchedOnly = taskLaunchedOnly;
     }
     public string DomainId => "h2-office-live";
 
@@ -163,7 +172,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             if (listing)
             {
                 // Show only in-scope metadata. Merely discovering a session does not bind it.
-                var ids = observed.Resources.Where(item => _binding.IsCandidate(item, DateTime.UtcNow)
+                var now = DateTime.UtcNow;
+                var ids = observed.Resources.Where(item => CandidateAllowed(item, now)
                     && ScopeContains(item.DocumentSessionId!, item.CanonicalPath))
                     .Select(item => item.DocumentSessionId).ToHashSet(StringComparer.Ordinal);
                 var decision = Resolve(application, observed.Resources, null);
@@ -184,6 +194,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 if (!target.Resolved) throw new ToolPreflightException(target.Code == "outside_resource_scope" ? "target_not_grounded" : target.Code);
                 session = target.Binding!.DocumentSessionId!;
                 ValidateScope(session, target.Binding.CanonicalPath); // execution permission remains separate
+                if (target.Source == "task-launched-window")
+                    _taskLaunchedObserved?.Invoke(target.Binding);
                 _selected[application] = target;
                 _pins[application + ":" + session] = target;
                 _targetObserved?.Invoke(target);
@@ -432,7 +444,24 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             result = matches.Length == 1 && prior.Binding!.MatchesObservation(matches[0], requireContentVersion: false)
                 ? prior : new(null, matches.Length > 1 ? "ambiguous_target" : "stale_resource", false, "bound-session");
         }
-        else result = _binding.ResolveOpen(application, observed, intent, DateTime.UtcNow, session);
+        else
+        {
+            var launched = intent == H2AgentTargetIntent.OpenDocument
+                ? observed.Where(item => _taskLaunchedCandidate?.Invoke(item) == true).ToArray()
+                : [];
+            if (session is not null)
+                launched = launched.Where(item => item.DocumentSessionId == session).ToArray();
+
+            if (launched.Length == 1)
+                result = new(launched[0], "resolved", false, "task-launched-window");
+            else if (launched.Length > 1)
+                result = new(null, "ambiguous_target", false, "task-launched-window");
+            else if (_taskLaunchedOnly)
+                result = new(null, intent == H2AgentTargetIntent.OpenDocument ? "resource_not_found" : "stale_resource",
+                    false, "task-launched-window");
+            else
+                result = _binding.ResolveOpen(application, observed, intent, DateTime.UtcNow, session);
+        }
         if (result.Resolved && (result.Source == "captured-active" || intent is H2AgentTargetIntent.CapturedActive or H2AgentTargetIntent.CapturedSelection))
         {
             var capture = _binding.CapturedContext;
@@ -441,6 +470,10 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         }
         return result;
     }
+
+    private bool CandidateAllowed(H2AgentResourceBinding item, DateTime utcNow)
+        => _taskLaunchedCandidate?.Invoke(item) == true
+            || !_taskLaunchedOnly && _binding.IsCandidate(item, utcNow);
 
     private bool ScopeContains(string session, string? path)
     {
