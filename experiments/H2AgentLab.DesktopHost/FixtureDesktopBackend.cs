@@ -44,6 +44,27 @@ public sealed class FixtureDesktopBackend : IDesktopBackend
         DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
         var process = FixtureProcessName(request.Application);
         DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
+
+        // Simulate a single-instance app for acceptance coverage: a second Notepad launch
+        // reuses the exact already-observed safe window rather than inventing another target.
+        if (string.Equals(process, "notepad", StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = ListWindows()
+                .Where(x => string.Equals(x.ProcessName, process, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (existing.Length == 1)
+            {
+                _foregroundSessionId = existing[0].SessionId;
+                return new(
+                    request.Application,
+                    process.ToLowerInvariant(),
+                    process,
+                    false,
+                    true,
+                    existing[0] with { Foreground = true });
+            }
+        }
+
         _applicationSequence++;
         var window = new DesktopWindowInfo(
             "desktop-fixture-app-" + _applicationSequence,

@@ -194,6 +194,13 @@ public static class MbDesktopComputerUseAcceptanceTests
             Check(waited.SessionId == launched.Window.SessionId,
                 "Wait-for-window redirected to another application session.");
 
+            var reused = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest("notepad", true, 1000)).ConfigureAwait(false);
+            Check(!reused.NewWindowObserved
+                && reused.ReusedExistingWindow
+                && reused.Window.SessionId == launched.Window.SessionId,
+                "Second single-instance launch did not verify reuse of the exact existing safe window.");
+
             var activated = await client.ActivateWindowAsync(
                 new DesktopApplicationActivateRequest(launched.Window.SessionId, true)).ConfigureAwait(false);
             Check(activated.SessionId == launched.Window.SessionId && activated.Foreground,
