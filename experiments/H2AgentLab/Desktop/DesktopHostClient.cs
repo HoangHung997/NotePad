@@ -189,13 +189,19 @@ public sealed class DesktopHostClient : IDisposable
 
     private async Task EnsureCurrentProtocolAsync(CancellationToken cancellationToken)
     {
-        var currentPid = ProcessId;
-        if (currentPid is not null && _validatedProtocolProcessId == currentPid)
-            return;
-
+        int expectedProcessId;
         DesktopPingResult ping;
         try
         {
+            // Application lifecycle is the first path that requires the protocol handshake.
+            // Start the helper before capturing its expected PID; otherwise a fresh client would
+            // compare the successful ping against a null pre-start ProcessId and reject itself.
+            EnsureStarted();
+            expectedProcessId = ProcessId
+                ?? throw new IOException("DesktopHost did not expose a live process after start.");
+            if (_validatedProtocolProcessId == expectedProcessId)
+                return;
+
             ping = await PingAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -212,7 +218,7 @@ public sealed class DesktopHostClient : IDisposable
 
         try
         {
-            ValidatePreflightIdentity(currentPid, ping);
+            ValidatePreflightIdentity(expectedProcessId, ping);
         }
         catch (DesktopHostClientException)
         {
