@@ -224,15 +224,21 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         if (_scope.HasFullAccessAt(DateTime.UtcNow)) return true;
         if (descriptor.Namespace.Name is "files" or "python" && H2AgentTargetScope.Contains(_context?.TargetPaths,
             Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) return true;
-        // Application lifecycle has no pre-existing document/workspace target. The exact app/window
-        // is still host-resolved and every mutation always requires a separate approval below.
+        // Application lifecycle has no pre-existing file/document target. It is allowed only
+        // for explicit ask-before/project-policy tasks (which still require approval) or FullAccess
+        // (handled by the early HasFullAccessAt return). A scoped auto-change grant for a file or
+        // document never silently expands into machine process launch/activation.
         if (descriptor.Namespace.Name == "app")
+        {
+            if (_scope.Mode is not (H2AgentPermissionMode.AskBeforeChanges or H2AgentPermissionMode.UseProjectPolicy))
+                return false;
             return call.Name switch
             {
                 "launch_app" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
                 "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
                 _ => true
             };
+        }
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Workspace)
         {
             // This grant selects a filesystem root, never an Office session or desktop window.
@@ -266,8 +272,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     }
 
     private bool MayAutoApprove(ToolDescriptor descriptor, ToolCall call)
-        => descriptor.Namespace.Name != "app"
-            && _scope is { ApprovalRequired: false } && MatchesScope(descriptor, call)
+        => _scope is { ApprovalRequired: false } && MatchesScope(descriptor, call)
             && !(_scope.Mode != H2AgentPermissionMode.FullAccess && _context?.TargetPaths?.Any(t => t.Source == "user-path"
                 && H2AgentTargetScope.Contains([t], Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) == true)
             && (_scope.HasFullAccessAt(DateTime.UtcNow) || call.Name != "replace_project_note");
