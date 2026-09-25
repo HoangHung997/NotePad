@@ -98,6 +98,23 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Exact activation could not re-resolve a minimized window.");
         });
 
+        Test("Pre-launch identity keeps minimized windows private but stable", () =>
+        {
+            if (Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: false))
+                throw new InvalidOperationException("Global app inventory exposed a minimized/offscreen window.");
+            if (!Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: true))
+                throw new InvalidOperationException("Private pre-launch identity could not include a minimized/offscreen window.");
+
+            var before = new HashSet<string>(StringComparer.Ordinal) { "minimized-existing" };
+            var restoredOld = new DesktopWindowInfo(
+                "minimized-existing", 101, 11, 1011, "WINWORD", "Document1",
+                new H2AgentLab.DesktopProtocol.DesktopBounds(0, 0, 640, 480), 96, true);
+            var genuinelyNew = restoredOld with { SessionId = "new-word", Handle = 102 };
+            var selected = Win32DesktopBackend.SelectUniqueCreatedWindow([restoredOld, genuinelyNew], before);
+            if (selected?.SessionId != "new-word")
+                throw new InvalidOperationException("A restored pre-existing window was mistaken for the new launch target.");
+        });
+
         Test("AutoCAD launch completion requires the process main frame", () =>
         {
             const long main = 0x12345;

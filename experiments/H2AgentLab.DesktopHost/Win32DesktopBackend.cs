@@ -91,7 +91,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         ArgumentNullException.ThrowIfNull(request);
         DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
         var resolved = DesktopApplicationResolver.ResolveForLaunch(request.Application);
-        var before = ListWindows()
+
+        // Pre-launch identity must include safe minimized/offscreen windows. Otherwise a minimized
+        // existing Word/Excel window could be mistaken for a newly-created window after the OS
+        // restores it, or reuse_or_launch could create an unnecessary duplicate. Global inventory
+        // still hides offscreen windows; this broader snapshot is private to exact launch identity.
+        var before = EnumerateWindows(includeOffscreen: true)
             .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
                 && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
             .ToArray();
@@ -99,8 +104,8 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
 
         // If exactly one safe target is already running, "open/start app" is satisfied by
-        // activating that exact observed window. Do not start the executable again and risk
-        // creating an extra blank document/window.
+        // activating that exact observed window even when it is currently minimized/offscreen.
+        // Do not start the executable again and risk creating an extra blank document/window.
         if (!request.RequireNewWindow && before.Length == 1)
         {
             var reused = ActivateWindow(new DesktopApplicationActivateRequest(
