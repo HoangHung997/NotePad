@@ -56,7 +56,8 @@ public static class RecoveryPolicy
             "stale_state" => "Read the current file/window again, compare what changed and obtain a fresh hash/token. Do not blindly overwrite or repeat an external action.",
             "file_busy" => "Do a read-only check of the current file state. Retry only after new evidence; do not kill apps or overwrite locks.",
             "invalid_arguments" => "Check the advertised tool schema and observed exact values, correct the arguments and retry.",
-            _ when tool is "click_control" or "type_control" or "open_file" or "write_text" or "publish_artifact" => "Outcome may be partial/unknown. Inspect actual state first. Do not repeat side effects blindly; retain approval rules.",
+            _ when tool is "click_control" or "type_control" or "open_file" or "write_text" or "publish_artifact"
+                or "app.launch" or "app.activate" => "Outcome may be partial/unknown. Inspect actual state first. Do not repeat side effects blindly; retain approval rules.",
             _ => "Inspect the error and actual inputs/resources using a different diagnostic. Revise the approach, verify by readback and report remaining uncertainty. Do not repeat the identical failed call."
         };
         return new(code, ex.Message, canRepair, next);
@@ -99,7 +100,7 @@ public sealed class RecoverySupervisor
     public string? Block(ToolCall call)
     {
         var key = RecoveryPolicy.Fingerprint(call);
-        if (_failures.GetValueOrDefault(key) > 0 && call.Name is ("write_text" or "publish_artifact" or "click_control" or "type_control" or "open_file") && _failureVersions.GetValueOrDefault(key) == _observationVersions.GetValueOrDefault(Subject(call)))
+        if (_failures.GetValueOrDefault(key) > 0 && call.Name is ("write_text" or "publish_artifact" or "click_control" or "type_control" or "open_file" or "app.launch" or "app.activate") && _failureVersions.GetValueOrDefault(key) == _observationVersions.GetValueOrDefault(Subject(call)))
             return "The previous side-effecting call failed with an uncertain outcome. Observe the actual file/window state before retrying. This duplicate was NOT executed.";
         if (_failures.GetValueOrDefault(key) < 2) return null;
         return "Identical call already failed twice this turn. Inspect different evidence or change the approach; this repeated call was NOT executed.";
@@ -116,7 +117,7 @@ public sealed class RecoverySupervisor
             _pending.Add((call, fault)); return;
         }
         _observations.Add(call.Name);
-        if (call.Name is "read_file" or "word_paragraphs" or "inspect_window")
+        if (call.Name is "read_file" or "word_paragraphs" or "inspect_window" or "app.wait_for_window" or "app.list_running_apps")
         {
             var subject = Subject(call); _observationVersions[subject] = _observationVersions.GetValueOrDefault(subject) + 1;
         }
