@@ -20,7 +20,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: h2-ar061-crossbuild-${{ github.event.pull_request.head.sha }}
+  group: h2-ar061-crossbuild-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
   cross-build:
