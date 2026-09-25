@@ -50,6 +50,19 @@ public static class V2DesktopHostTests
             Check(client.ProcessId == ping.ProcessId,
                 "DesktopHost ping identity does not match the process started by the client.");
             DesktopHostClient.ValidatePreflightIdentity(client.ProcessId, ping);
+            DesktopHostClient.ValidateLiveProcessIdentity(ping.ProcessId, client.ProcessId);
+
+            foreach (var actual in new int?[] { null, ping.ProcessId + 1 })
+            {
+                try
+                {
+                    DesktopHostClient.ValidateLiveProcessIdentity(ping.ProcessId, actual);
+                    throw new InvalidOperationException("Changed DesktopHost process identity was accepted after preflight.");
+                }
+                catch (DesktopHostClientException ex) when (ex.Code == "preflight_unavailable")
+                {
+                }
+            }
 
             try
             {

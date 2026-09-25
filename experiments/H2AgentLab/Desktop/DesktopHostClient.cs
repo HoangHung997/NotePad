@@ -61,11 +61,13 @@ public sealed class DesktopHostClient : IDisposable
         CancellationToken cancellationToken = default)
     {
         await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        var validatedProcessId = RequireValidatedProcessId();
         return await CallAsync<DesktopApplicationLaunchResult>(
             "desktop.launch_app",
             request,
             ApplicationTimeout(request.WaitMilliseconds),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            requiredProcessId: validatedProcessId).ConfigureAwait(false);
     }
 
     public async Task<DesktopWindowInfo> WaitForApplicationWindowAsync(
@@ -73,11 +75,13 @@ public sealed class DesktopHostClient : IDisposable
         CancellationToken cancellationToken = default)
     {
         await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        var validatedProcessId = RequireValidatedProcessId();
         return await CallAsync<DesktopWindowInfo>(
             "desktop.wait_app",
             request,
             ApplicationTimeout(request.WaitMilliseconds),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            requiredProcessId: validatedProcessId).ConfigureAwait(false);
     }
 
     public async Task<DesktopWindowInfo> ActivateWindowAsync(
@@ -85,11 +89,13 @@ public sealed class DesktopHostClient : IDisposable
         CancellationToken cancellationToken = default)
     {
         await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        var validatedProcessId = RequireValidatedProcessId();
         return await CallAsync<DesktopWindowInfo>(
             "desktop.activate_window",
             request,
             null,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            requiredProcessId: validatedProcessId).ConfigureAwait(false);
     }
 
     public Task<DesktopObservation> ObserveAsync(string sessionId, CancellationToken cancellationToken = default)
@@ -106,13 +112,29 @@ public sealed class DesktopHostClient : IDisposable
         string method,
         object parameters,
         TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? requiredProcessId = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         ArgumentNullException.ThrowIfNull(parameters);
 
-        EnsureStarted();
+        if (requiredProcessId is { } expectedProcessId)
+        {
+            try
+            {
+                ValidateLiveProcessIdentity(expectedProcessId, ProcessId);
+            }
+            catch (DesktopHostClientException)
+            {
+                StopHost();
+                throw;
+            }
+        }
+        else
+        {
+            EnsureStarted();
+        }
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout ?? _defaultTimeout);
@@ -246,6 +268,27 @@ public sealed class DesktopHostClient : IDisposable
             throw new DesktopHostClientException(
                 "protocol_mismatch",
                 "DesktopHost protocol version does not match this H2 Notes build.");
+    }
+
+    private int RequireValidatedProcessId()
+    {
+        if (_validatedProtocolProcessId is not { } expectedProcessId)
+            throw new DesktopHostClientException(
+                "preflight_unavailable",
+                "DesktopHost application lifecycle call has no validated helper identity.");
+        ValidateLiveProcessIdentity(expectedProcessId, ProcessId);
+        return expectedProcessId;
+    }
+
+    internal static void ValidateLiveProcessIdentity(int expectedProcessId, int? actualProcessId)
+    {
+        if (expectedProcessId <= 0
+            || actualProcessId is null
+            || actualProcessId <= 0
+            || actualProcessId.Value != expectedProcessId)
+            throw new DesktopHostClientException(
+                "preflight_unavailable",
+                "DesktopHost process changed after preflight; application lifecycle call was not sent.");
     }
 
     private static TimeSpan ApplicationTimeout(int waitMilliseconds)
