@@ -93,6 +93,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     internal bool IsTaskLaunchedOfficeCandidate(H2AgentResourceBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
+        if (!AllowsTaskLaunchedOfficeHandoff()) return false;
         lock (_launchedOfficeGate)
             return _launchedOfficeWindows.TryGetValue(binding.ApplicationKind, out var authority)
                 && MatchesLaunchedAuthority(binding, authority);
@@ -100,13 +101,17 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
 
     internal bool HasTaskLaunchedOfficeAuthority(H2ApplicationKind application)
     {
-        if (application is not (H2ApplicationKind.Excel or H2ApplicationKind.Word)) return false;
+        if (application is not (H2ApplicationKind.Excel or H2ApplicationKind.Word)
+            || !AllowsTaskLaunchedOfficeHandoff())
+            return false;
         lock (_launchedOfficeGate) return _launchedOfficeWindows.ContainsKey(application);
     }
 
     internal void PinTaskLaunchedOfficeBinding(H2AgentResourceBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
+        if (!AllowsTaskLaunchedOfficeHandoff())
+            throw new InvalidOperationException("Current permission scope does not allow task-launched Office handoff.");
         if (string.IsNullOrWhiteSpace(binding.DocumentSessionId))
             throw new InvalidOperationException("Task-launched Office binding has no document session.");
         lock (_launchedOfficeGate)
@@ -118,9 +123,24 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         }
     }
 
+    private bool AllowsTaskLaunchedOfficeHandoff()
+    {
+        if (_scope?.HasFullAccessAt(DateTime.UtcNow) == true) return true;
+        return _scope is
+            {
+                Mode: H2AgentPermissionMode.AskBeforeChanges,
+                ScopeKind: H2AgentResourceScopeKind.Workspace
+            }
+            or
+            {
+                Mode: H2AgentPermissionMode.UseProjectPolicy,
+                ScopeKind: H2AgentResourceScopeKind.Project
+            };
+    }
+
     private bool IsTaskLaunchedOfficeSession(string toolNamespace, string? sessionId)
     {
-        if (string.IsNullOrWhiteSpace(sessionId)) return false;
+        if (!AllowsTaskLaunchedOfficeHandoff() || string.IsNullOrWhiteSpace(sessionId)) return false;
         var kind = toolNamespace switch
         {
             "excel" => H2ApplicationKind.Excel,
