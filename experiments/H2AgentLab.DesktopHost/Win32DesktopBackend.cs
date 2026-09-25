@@ -74,6 +74,103 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             .ToArray();
     }
 
+    public DesktopApplicationLaunchResult LaunchApplication(DesktopApplicationLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        var resolved = DesktopApplicationResolver.ResolveForLaunch(request.Application);
+        var before = ListWindows()
+            .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var beforeSessions = before.Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
+        var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
+
+        try
+        {
+            using var started = Process.Start(new ProcessStartInfo(resolved.ExecutablePath)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath) ?? AppContext.BaseDirectory
+            });
+            if (started is null)
+                throw new DesktopHostFaultException("provider_unavailable", "Windows did not start the requested application.");
+        }
+        catch (DesktopHostFaultException) { throw; }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            throw new DesktopHostFaultException("app_not_found", "Windows could not start the requested registered application.");
+        }
+
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 250, 10_000));
+        do
+        {
+            var current = ListWindows()
+                .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var created = current
+                .Where(x => !beforeSessions.Contains(x.SessionId))
+                .OrderByDescending(x => x.Foreground)
+                .ThenByDescending(x => x.ProcessStartedUtcTicks)
+                .FirstOrDefault();
+            if (created is not null)
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created);
+
+            var promoted = current.FirstOrDefault(x => x.Foreground && !beforeForeground.Contains(x.SessionId));
+            if (promoted is not null)
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        throw new DesktopHostFaultException(
+            "launch_unverified",
+            "The application launch was requested, but no new or newly activated safe window was observed.");
+    }
+
+    public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var processName = DesktopApplicationResolver.ProcessNameFor(request.Application);
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 0, 10_000));
+        do
+        {
+            var found = ListWindows()
+                .Where(x => string.Equals(x.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.Foreground)
+                .ThenByDescending(x => x.ProcessStartedUtcTicks)
+                .FirstOrDefault();
+            if (found is not null) return found;
+            if (DateTime.UtcNow >= deadline) break;
+            Thread.Sleep(100);
+        }
+        while (true);
+
+        throw new DesktopHostFaultException(
+            "app_not_found",
+            "No safe visible window for the requested application was observed.");
+    }
+
+    public DesktopWindowInfo ActivateWindow(DesktopApplicationActivateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        var window = ResolveWindow(request.SessionId);
+        var handle = new IntPtr(window.Handle);
+        if (IsIconic(handle)) _ = ShowWindowAsync(handle, 9);
+        _ = BringWindowToTop(handle);
+        _ = SetForegroundWindow(handle);
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            if (GetForegroundWindow() == handle)
+                return ResolveWindow(request.SessionId);
+            Thread.Sleep(50);
+        }
+        throw new DesktopHostFaultException(
+            "foreground_failed",
+            "Windows did not confirm the observed application window as foreground.");
+    }
+
     public DesktopObservation Observe(string sessionId)
     {
         var window = ResolveWindow(sessionId);
@@ -619,6 +716,15 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);

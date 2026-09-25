@@ -327,13 +327,14 @@ public static class ToolOutcomeBridge
         ToolReadinessState.NeedsConfiguration => "needs_configuration", ToolReadinessState.Busy => "provider_busy",
         ToolReadinessState.Unsupported => "unsupported_operation", _ => "provider_unavailable" };
     public static string NormalizeCode(string? code) => code switch {
-        "invalid_request" => "invalid_arguments", "stale_state" or "stale_hash" => "stale_resource",
-        "not_found" => "resource_not_found", "denied" or "access_denied" or "permission_required"
+        "invalid_request" or "invalid_application" => "invalid_arguments", "stale_state" or "stale_hash" => "stale_resource",
+        "not_found" or "app_not_found" => "resource_not_found", "denied" or "access_denied" or "permission_required"
             or "outside_resource_scope" or "expired_permission" or "boundary" => "permission_denied",
         "unavailable" or "office_unavailable" => "provider_unavailable", "file_busy" or "application_busy" => "provider_busy",
         "session_not_found" => "stale_resource",
         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
-        "timeout" => "deadline_exceeded", "validation_failed" => "verification_failed",
+        "timeout" => "deadline_exceeded", "validation_failed" or "foreground_failed" => "verification_failed",
+        "launch_unverified" => "outcome_unknown",
         "live_resource_required" or "target_not_grounded" or "invalid_arguments" or "unknown_tool" or "tool_not_loaded" or "repeated_failed_mutation"
             or "recovery_no_progress" or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"

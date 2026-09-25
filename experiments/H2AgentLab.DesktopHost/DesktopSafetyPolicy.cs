@@ -34,6 +34,23 @@ public static class DesktopSafetyPolicy
         return true;
     }
 
+    public static bool IsProcessAllowedForLaunch(string processName)
+    {
+        if (string.IsNullOrWhiteSpace(processName)) return false;
+        var normalized = Path.GetFileNameWithoutExtension(processName.Trim());
+        return !BlockedProcesses.Contains(normalized)
+            && !normalized.StartsWith("H2AgentLab", StringComparison.OrdinalIgnoreCase)
+            && !normalized.StartsWith("H2Notes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static void RequireLaunchProcessAllowed(string processName)
+    {
+        if (!IsProcessAllowedForLaunch(processName))
+            throw new DesktopHostFaultException(
+                "permission_denied",
+                "This application process is blocked by desktop safety policy.");
+    }
+
     public static void RequirePermission(bool granted)
     {
         if (!granted)

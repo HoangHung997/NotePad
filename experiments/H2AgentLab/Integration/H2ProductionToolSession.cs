@@ -233,6 +233,13 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             return string.Equals(_scope.ResourceKey, "workspace:" + root, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(_scope.DocumentPath, root, StringComparison.OrdinalIgnoreCase);
         }
+        if (descriptor.Namespace.Name == "app")
+            return call.Name switch
+            {
+                "app.launch" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
+                "app.activate" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
+                _ => true
+            };
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Project)
             return _projectId is { } project
                 && (descriptor.Namespace.Name == "h2" && Guid.TryParse(Arg(call, "project_id"), out var requested) && requested == project
@@ -257,7 +264,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     }
 
     private bool MayAutoApprove(ToolDescriptor descriptor, ToolCall call)
-        => _scope is { ApprovalRequired: false } && MatchesScope(descriptor, call)
+        => descriptor.Namespace.Name != "app"
+            && _scope is { ApprovalRequired: false } && MatchesScope(descriptor, call)
             && !(_scope.Mode != H2AgentPermissionMode.FullAccess && _context?.TargetPaths?.Any(t => t.Source == "user-path"
                 && H2AgentTargetScope.Contains([t], Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) == true)
             && (_scope.HasFullAccessAt(DateTime.UtcNow) || call.Name != "replace_project_note");
@@ -268,6 +276,10 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             return call.Name + ":" + _taskId.ToString("N") + ":" + (Arg(call, "job_id") ?? "unbound");
         if (descriptor.Namespace.Name == "h2") return "h2-project:" + Arg(call, "project_id");
         if (descriptor.Namespace.Name == "desktop") return _selectedWindowIdentity ?? "unbound-window";
+        if (descriptor.Namespace.Name == "app")
+            return call.Name == "app.activate"
+                ? "app-window:" + (Arg(call, "session_id") ?? "unbound")
+                : "app:" + (Arg(call, "application") ?? "inventory").Trim().ToLowerInvariant();
         if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)
             return descriptor.Namespace.Name + ":session:" + session;
         var path = Arg(call, "destination") ?? Arg(call, "path");

@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Validation;
+using H2AgentLab.Desktop;
+using H2AgentLab.DesktopProtocol;
 using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace H2AgentLab.Tools;
@@ -166,6 +168,47 @@ public static class NormalRuntimeToolRegistry
             Args(("path", "Relative .docx/.xlsx/.pdf/.txt"))),
 
         new(
+            "app.list_running_apps",
+            "app",
+            "List safe visible desktop applications and exact observed window/session identities. Does not launch or activate anything.",
+            AgentToolRisk.Low,
+            AgentToolAccess.ReadOnly,
+            true,
+            Args(),
+            Evidence: true,
+            Preference: Accessibility()),
+        new(
+            "app.launch",
+            "app",
+            "Launch an explicitly named registered Windows application. Arbitrary executable paths and shell commands are rejected; success requires a newly observed or newly activated safe window.",
+            AgentToolRisk.High,
+            AgentToolAccess.Mutating,
+            false,
+            Args(("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name")),
+            Evidence: true,
+            Preference: Accessibility()),
+        new(
+            "app.wait_for_window",
+            "app",
+            "Wait up to five seconds for a safe visible window of the explicitly named application and return its exact session identity.",
+            AgentToolRisk.Low,
+            AgentToolAccess.ReadOnly,
+            false,
+            Args(("application", "Friendly app name or registered executable name")),
+            Evidence: true,
+            Preference: Accessibility()),
+        new(
+            "app.activate",
+            "app",
+            "Activate one exact previously observed safe application window by session_id; never chooses another matching window.",
+            AgentToolRisk.Medium,
+            AgentToolAccess.Mutating,
+            false,
+            Args(("session_id", "Exact session_id returned by app.list_running_apps, app.launch or app.wait_for_window")),
+            Evidence: true,
+            Preference: Accessibility()),
+
+        new(
             "word_paragraphs",
             "office",
             "Read Word body paragraphs with indexes and original hash; the file is unchanged.",
@@ -229,6 +272,7 @@ public static class NormalRuntimeToolRegistry
             ["python"] = new PythonExecutor(host),
             ["files"] = new FileExecutor(host),
             ["office"] = new WordExecutor(host),
+            ["app"] = new ApplicationExecutor(host),
             ["desktop"] = new DesktopExecutor(host)
         };
 
@@ -370,6 +414,7 @@ public static class NormalRuntimeToolRegistry
             "core" => "Small stable planning/status tools.",
             "files" => "Workspace file discovery, reading, writing and open-file operations.",
             "office" => "Structured closed-document inspection and validation.",
+            "app" => "Observed desktop application discovery, launch and activation.",
             "desktop" => "User-selected window inspection and UI actions.",
             "python" => "Sandboxed Python execution and generated artifact inspection/publication.",
             "skills" => "Progressive skill discovery and guidance loading.",
@@ -384,6 +429,8 @@ public static class NormalRuntimeToolRegistry
             "view_artifact" => "model.vision",
             "publish_artifact" or "write_text" => "workspace.write",
             "open_file" => "desktop.open",
+            "app.launch" => "desktop.app-launch",
+            "app.activate" => "desktop.app-activate",
             "click_control" or "type_control" => "desktop.selected-window",
             _ => "mutation." + name.Replace('_', '.')
         };
@@ -1037,6 +1084,147 @@ public static class NormalRuntimeToolRegistry
             throw new InvalidOperationException(
                 "Unknown Word runtime tool.");
         }
+    }
+
+    private sealed class ApplicationExecutor : ExecutorBase
+    {
+        private static readonly IReadOnlySet<string> Supported =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "app.list_running_apps",
+                "app.launch",
+                "app.wait_for_window",
+                "app.activate"
+            };
+
+        public ApplicationExecutor(global::H2AgentLab.AgentTools host) : base(host) { }
+        public override string ExecutorId => "normal.app";
+        protected override IReadOnlySet<string> Names => Supported;
+
+        protected override async ValueTask<object?> ExecuteCoreAsync(
+            global::H2AgentLab.ToolCall call,
+            CancellationToken cancellationToken)
+        {
+            using var client = DesktopHostLocator.CreateClient();
+            try
+            {
+                if (call.Name == "app.list_running_apps")
+                {
+                    var windows = await client.ListWindowsAsync(cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        applications = windows
+                            .GroupBy(x => x.ProcessName, StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                            .Select(group => new
+                            {
+                                process = group.Key,
+                                windows = group.Select(WindowProjection).ToArray()
+                            })
+                            .ToArray(),
+                        windowCount = windows.Count,
+                        note = "Only safe visible DesktopHost windows are returned."
+                    };
+                }
+
+                if (call.Name == "app.wait_for_window")
+                {
+                    var observed = await client.WaitForApplicationWindowAsync(
+                        new DesktopApplicationWaitRequest(Arg(call, "application"), 5_000),
+                        cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        observed = WindowProjection(observed),
+                        verifiedByHostObservation = true
+                    };
+                }
+
+                if (Host.ReadOnly)
+                    throw new global::H2AgentLab.AgentFaultException(
+                        "permission_required",
+                        "Chế độ Chỉ đọc không cho phép mở hoặc kích hoạt ứng dụng.",
+                        false);
+
+                if (call.Name == "app.launch")
+                {
+                    var application = Arg(call, "application");
+                    await PermitOutsideProductionAsync(
+                        "Mở ứng dụng",
+                        "Ứng dụng: " + application + "\nDesktopHost chỉ cho phép tên ứng dụng/App Paths đã đăng ký; không chạy command line hoặc đường dẫn executable tùy ý.",
+                        cancellationToken).ConfigureAwait(false);
+                    var launched = await client.LaunchApplicationAsync(
+                        new DesktopApplicationLaunchRequest(application, true, 5_000),
+                        cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        application = launched.ApplicationId,
+                        process = launched.ProcessName,
+                        launched.NewWindowObserved,
+                        launched.ReusedExistingWindow,
+                        window = WindowProjection(launched.Window),
+                        verifiedByHostObservation = true
+                    };
+                }
+
+                if (call.Name == "app.activate")
+                {
+                    var sessionId = Arg(call, "session_id");
+                    await PermitOutsideProductionAsync(
+                        "Kích hoạt cửa sổ ứng dụng",
+                        "session_id: " + sessionId + "\nChỉ đúng cửa sổ đã được DesktopHost quan sát mới được kích hoạt.",
+                        cancellationToken).ConfigureAwait(false);
+                    var activated = await client.ActivateWindowAsync(
+                        new DesktopApplicationActivateRequest(sessionId, true),
+                        cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        window = WindowProjection(activated),
+                        activated = activated.Foreground,
+                        verifiedByHostObservation = activated.Foreground
+                    };
+                }
+
+                throw new InvalidOperationException("Unknown application runtime tool.");
+            }
+            catch (DesktopHostClientException ex)
+            {
+                throw Map(ex);
+            }
+        }
+
+        private async Task PermitOutsideProductionAsync(
+            string title,
+            string details,
+            CancellationToken cancellationToken)
+        {
+            if (Host.ProductionSession is null)
+                await Host.RuntimePermitAsync(title, details, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static object WindowProjection(DesktopWindowInfo window)
+            => new
+            {
+                session_id = window.SessionId,
+                hwnd = window.Handle,
+                pid = window.ProcessId,
+                process_started_utc_ticks = window.ProcessStartedUtcTicks,
+                process = window.ProcessName,
+                title = window.Title,
+                foreground = window.Foreground,
+                dpi = window.Dpi
+            };
+
+        private static Exception Map(DesktopHostClientException ex)
+            => ex.Code switch
+            {
+                "permission_denied" => new global::H2AgentLab.AgentFaultException("denied", ex.Message, false),
+                "session_not_found" => new global::H2AgentLab.AgentFaultException("stale_state", ex.Message),
+                "invalid_application" => new global::H2AgentLab.AgentFaultException("invalid_application", ex.Message, false),
+                "app_not_found" => new global::H2AgentLab.AgentFaultException("app_not_found", ex.Message),
+                "launch_unverified" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
+                "foreground_failed" => new global::H2AgentLab.AgentFaultException("foreground_failed", ex.Message),
+                _ => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message)
+            };
     }
 
     private sealed class DesktopExecutor : ExecutorBase

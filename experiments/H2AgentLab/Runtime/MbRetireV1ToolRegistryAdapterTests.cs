@@ -6,6 +6,10 @@ public static class MbRetireV1ToolRegistryAdapterTests
 {
     private static readonly string[] ExpectedTools =
     [
+        "app.activate",
+        "app.launch",
+        "app.list_running_apps",
+        "app.wait_for_window",
         "click_control",
         "check_word",
         "find_files",

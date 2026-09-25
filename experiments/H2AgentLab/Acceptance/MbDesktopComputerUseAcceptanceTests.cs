@@ -174,6 +174,48 @@ public static class MbDesktopComputerUseAcceptanceTests
                 "Vision-capable transport did not receive observed pixels.");
         }).ConfigureAwait(false);
 
+        await Case("application-launch-wait-activate", async () =>
+        {
+            using var client = Client();
+            var before = await client.ListWindowsAsync().ConfigureAwait(false);
+            Check(before.Count == 1, "Fixture application lifecycle did not start from one known window.");
+
+            var launched = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest("notepad", true, 1000)).ConfigureAwait(false);
+            Check(launched.NewWindowObserved
+                && !launched.ReusedExistingWindow
+                && launched.ProcessName == "notepad"
+                && !string.IsNullOrWhiteSpace(launched.Window.SessionId),
+                "Fixture launch did not return a newly observed application window.");
+
+            var waited = await client.WaitForApplicationWindowAsync(
+                new DesktopApplicationWaitRequest("notepad", 1000)).ConfigureAwait(false);
+            Check(waited.SessionId == launched.Window.SessionId,
+                "Wait-for-window redirected to another application session.");
+
+            var activated = await client.ActivateWindowAsync(
+                new DesktopApplicationActivateRequest(launched.Window.SessionId, true)).ConfigureAwait(false);
+            Check(activated.SessionId == launched.Window.SessionId && activated.Foreground,
+                "Activate did not verify the exact observed window as foreground.");
+        }).ConfigureAwait(false);
+
+        await Case("application-launch-guards", async () =>
+        {
+            using var client = Client();
+            await ExpectCode(
+                "permission_denied",
+                () => client.LaunchApplicationAsync(
+                    new DesktopApplicationLaunchRequest("notepad", false, 1000))).ConfigureAwait(false);
+            await ExpectCode(
+                "invalid_application",
+                () => client.LaunchApplicationAsync(
+                    new DesktopApplicationLaunchRequest(@"C:\Windows\notepad.exe", true, 1000))).ConfigureAwait(false);
+            await ExpectCode(
+                "session_not_found",
+                () => client.ActivateWindowAsync(
+                    new DesktopApplicationActivateRequest("not-observed", true))).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+
         await Case("sensitive-app-blocks", async () =>
         {
             var policyDir = Path.Combine(root, "desktop-host-policy");

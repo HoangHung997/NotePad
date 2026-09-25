@@ -1,0 +1,62 @@
+name: AR-061 desktop application lifecycle validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar061-validation.yml'
+      - 'experiments/H2AgentLab.DesktopHost/**'
+      - 'experiments/H2AgentLab.DesktopProtocol/**'
+      - 'experiments/H2AgentLab/Desktop/**'
+      - 'experiments/H2AgentLab/Tools/**'
+      - 'experiments/H2AgentLab/Integration/H2ProductionToolSession*'
+      - 'experiments/H2AgentLab/Acceptance/MbDesktopComputerUseAcceptanceTests.cs'
+      - 'experiments/H2AgentLab/Runtime/MbRetireV1ToolRegistryAdapterTests.cs'
+      - 'tests/H2Notes.Tests/**'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar061-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  desktop-app:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-061 E1-E2 and retained desktop gates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar061 | Out-Null
+          if (git status --porcelain) { throw 'Dirty checkout: AR-061 validation refused' }
+          $sha=git rev-parse HEAD
+          @{task='AR-061';code_sha=$sha;working_tree='CLEAN';E1='normal runtime app lifecycle schema and no arbitrary executable path';E2='fixture DesktopHost launch/wait/activate + full H2';E3='AWAITING_ENVIRONMENT: real Explorer/Word/Excel/AutoCAD launch not run';E4='AWAITING_ENVIRONMENT';E5='AR-083 DEFERRED_BY_USER'} | ConvertTo-Json -Depth 6 | Set-Content artifacts/ar061/identity.json
+          dotnet restore H2Notes.Avalonia.slnx 2>&1 | Tee-Object artifacts/ar061/restore.log
+          if ($LASTEXITCODE) { throw 'Restore failed' }
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar061/build.log
+          if ($LASTEXITCODE) { throw 'Build failed' }
+          dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-061 2>&1 | Tee-Object artifacts/ar061/ar061-tests.log
+          if ($LASTEXITCODE -ne 0 -or (Get-Content artifacts/ar061/ar061-tests.log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { throw 'AR-061 focused tests failed' }
+          $desktop=(Resolve-Path 'experiments/H2AgentLab.DesktopHost/bin/Release/net10.0-windows/H2AgentLab.DesktopHost.exe').Path
+          dotnet run --project experiments/H2AgentLab/H2AgentLab.csproj -c Release --no-build -- --v2-desktop-host-test artifacts/ar061/desktop-host $desktop 2>&1 | Tee-Object artifacts/ar061/desktop-host.log
+          if ($LASTEXITCODE) { throw 'DesktopHost regression failed' }
+          dotnet run --project experiments/H2AgentLab/H2AgentLab.csproj -c Release --no-build -- --mb-desktop-computer-use-acceptance-test artifacts/ar061/mb112 $desktop 2>&1 | Tee-Object artifacts/ar061/mb112.log
+          if ($LASTEXITCODE) { throw 'MB-112 desktop acceptance failed' }
+          dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build 2>&1 | Tee-Object artifacts/ar061/full.log
+          if ($LASTEXITCODE -ne 0 -or (Get-Content artifacts/ar061/full.log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { throw 'Full H2 regression failed' }
+          if (git status --porcelain) { throw 'Dirty validation checkout' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR061-E1-E2-Evidence
+          path: artifacts/ar061/
+          if-no-files-found: error
+          retention-days: 14

@@ -80,7 +80,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-011 | Tool outcome/error/readiness contract | 010 | E1/E2 | DONE |
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
-| AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT |
+| AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
@@ -95,7 +95,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
-| AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | NOT_STARTED |
+| AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | ACTIVE — application lifecycle repair |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER — final full-build external/native provider test; no E3 PASS claim |
@@ -117,8 +117,8 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 
 Không tạo tracker hoặc subsystem mới. Các lỗi người dùng vừa xác nhận được ánh xạ vào các AR hiện có; mỗi lượt vẫn chỉ triển khai **một AR active**:
 
-- **AR-021 (ACTIVE)** — Word/Excel live binding: giữ NativeOM là đường ưu tiên; bổ sung exact-window ROT/COM fallback khi NativeOM không khả dụng, nhưng chỉ chấp nhận đúng HWND + PID + process-start + desktop session đã quan sát. Không chọn tài liệu theo tên, ROT order hoặc ActiveDocument; không fallback sang disk khi user yêu cầu live.
-- **AR-061** — application launch/desktop: compose executor thật cho `app.launch/app.wait_for_window/app.activate` để mở File Explorer, Word, Excel, AutoCAD và app cho phép; mở file cụ thể không được là đường duy nhất để khởi động app.
+- **AR-021 (E3_DEFERRED_BY_USER)** — Word/Excel live binding: giữ NativeOM là đường ưu tiên; bổ sung exact-window ROT/COM fallback khi NativeOM không khả dụng, nhưng chỉ chấp nhận đúng HWND + PID + process-start + desktop session đã quan sát. Không chọn tài liệu theo tên, ROT order hoặc ActiveDocument; không fallback sang disk khi user yêu cầu live.
+- **AR-061 (ACTIVE)** — application launch/desktop: compose executor thật cho `app.launch/app.wait_for_window/app.activate` để mở File Explorer, Word, Excel, AutoCAD và app cho phép; mở file cụ thể không được là đường duy nhất để khởi động app.
 - **AR-063** — AutoCAD live: triển khai external Windows COM/ActiveX bridge từ H2 tới AutoCAD đang mở; **không yêu cầu cài plugin vào AutoCAD** cho các thao tác ActiveX hỗ trợ. Giữ typed document/entity/state-token contract và readback verifier; không dùng SendCommand/LISP tùy ý làm đường mặc định.
 - **AR-060** — Web thật: tách Search/HTTP Fetch/Browser readiness; cấu hình ít nhất một search backend thật và một browser backend có session/tab/page identity. Không gọi URL echo là browser action; 403/429/login/CAPTCHA/JS-required phải có typed reason.
 - **AR-052 + AR-067 + AR-070** — model/tool continuation và recovery: reconnect/rebase từ durable task state sau connection loss, không replay mutation không rõ kết quả; chặn same-input/no-new-evidence recovery loop.
@@ -370,7 +370,7 @@ Implemented production behavior: additive Office protocol/client/backend range-r
 
 **Acceptance:** không return URL rồi claim đã browser-act; không giả current web facts; schema readiness đúng. Dịch vụ đăng nhập/tài khoản ngoài chưa được cho phép ghi NotTested, không làm giả.
 
-### [ ] AR-061 — Desktop đúng target, capture và recovery
+### [~] AR-061 — Desktop đúng target, capture và recovery
 
 **Sửa:** DesktopHost/backend/protocol, selected-window model trong production, UI state projection.
 

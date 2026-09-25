@@ -55,6 +55,21 @@ public sealed class DesktopHostClient : IDisposable
     public Task<IReadOnlyList<DesktopWindowInfo>> ListWindowsAsync(CancellationToken cancellationToken = default)
         => CallAsync<IReadOnlyList<DesktopWindowInfo>>("desktop.list", new { }, null, cancellationToken);
 
+    public Task<DesktopApplicationLaunchResult> LaunchApplicationAsync(
+        DesktopApplicationLaunchRequest request,
+        CancellationToken cancellationToken = default)
+        => CallAsync<DesktopApplicationLaunchResult>("desktop.launch_app", request, null, cancellationToken);
+
+    public Task<DesktopWindowInfo> WaitForApplicationWindowAsync(
+        DesktopApplicationWaitRequest request,
+        CancellationToken cancellationToken = default)
+        => CallAsync<DesktopWindowInfo>("desktop.wait_app", request, null, cancellationToken);
+
+    public Task<DesktopWindowInfo> ActivateWindowAsync(
+        DesktopApplicationActivateRequest request,
+        CancellationToken cancellationToken = default)
+        => CallAsync<DesktopWindowInfo>("desktop.activate_window", request, null, cancellationToken);
+
     public Task<DesktopObservation> ObserveAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<DesktopObservation>(
             "desktop.observe",

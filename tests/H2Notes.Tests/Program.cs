@@ -701,6 +701,7 @@ H2AgentToolOutcomeTests.Run(Test);
 H2AgentResourceBindingTests.Run(Test);
 H2AgentLiveBindingTests.Run(Test);
 H2OfficeDiscoveryTests.Run(Test);
+H2AgentDesktopLaunchTests.Run(Test);
 H2ExcelRangeReadTests.Run(Test);
 H2AgentGoalRevisionTests.Run(Test);
 H2AgentArchiveJournalTests.Run(Test);
