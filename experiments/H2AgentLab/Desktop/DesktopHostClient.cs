@@ -58,12 +58,20 @@ public sealed class DesktopHostClient : IDisposable
     public Task<DesktopApplicationLaunchResult> LaunchApplicationAsync(
         DesktopApplicationLaunchRequest request,
         CancellationToken cancellationToken = default)
-        => CallAsync<DesktopApplicationLaunchResult>("desktop.launch_app", request, null, cancellationToken);
+        => CallAsync<DesktopApplicationLaunchResult>(
+            "desktop.launch_app",
+            request,
+            ApplicationTimeout(request.WaitMilliseconds),
+            cancellationToken);
 
     public Task<DesktopWindowInfo> WaitForApplicationWindowAsync(
         DesktopApplicationWaitRequest request,
         CancellationToken cancellationToken = default)
-        => CallAsync<DesktopWindowInfo>("desktop.wait_app", request, null, cancellationToken);
+        => CallAsync<DesktopWindowInfo>(
+            "desktop.wait_app",
+            request,
+            ApplicationTimeout(request.WaitMilliseconds),
+            cancellationToken);
 
     public Task<DesktopWindowInfo> ActivateWindowAsync(
         DesktopApplicationActivateRequest request,
@@ -164,6 +172,14 @@ public sealed class DesktopHostClient : IDisposable
             throw;
         }
     }
+
+    private static TimeSpan ApplicationTimeout(int waitMilliseconds)
+        => TimeSpan.FromMilliseconds(
+            Math.Clamp(
+                waitMilliseconds,
+                0,
+                DesktopProtocolConstants.MaxApplicationWaitMilliseconds)
+            + 5_000);
 
     private void EnsureStarted()
     {

@@ -26,11 +26,11 @@ public sealed record DesktopWindowInfo(
 public sealed record DesktopApplicationLaunchRequest(
     string Application,
     bool PermissionGranted,
-    int WaitMilliseconds = 5000);
+    int WaitMilliseconds = 20000);
 
 public sealed record DesktopApplicationWaitRequest(
     string Application,
-    int WaitMilliseconds = 5000);
+    int WaitMilliseconds = 10000);
 
 public sealed record DesktopApplicationActivateRequest(
     string SessionId,
@@ -124,4 +124,5 @@ public static class DesktopProtocolConstants
     public const int MaxScreenshotBytes = 4 * 1024 * 1024;
     public const int MaxElements = 200;
     public const int ElementTokenLifetimeSeconds = 60;
+    public const int MaxApplicationWaitMilliseconds = 30_000;
 }

@@ -101,7 +101,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             throw new DesktopHostFaultException("app_not_found", "Windows could not start the requested registered application.");
         }
 
-        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 250, 10_000));
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 250, DesktopProtocolConstants.MaxApplicationWaitMilliseconds));
         do
         {
             var current = ListWindows()
@@ -132,7 +132,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         var processName = DesktopApplicationResolver.ProcessNameFor(request.Application);
-        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 0, 10_000));
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 0, DesktopProtocolConstants.MaxApplicationWaitMilliseconds));
         do
         {
             var found = ListWindows()

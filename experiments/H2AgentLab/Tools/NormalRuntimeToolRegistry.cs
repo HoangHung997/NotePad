@@ -190,7 +190,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "wait_for_app_window",
             "app",
-            "Wait up to five seconds for a safe visible window of the explicitly named application and return its exact session identity.",
+            "Wait up to ten seconds for exactly one safe visible window of the explicitly named application; multiple matches fail closed.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
             false,
@@ -1131,7 +1131,7 @@ public static class NormalRuntimeToolRegistry
                 if (call.Name == "wait_for_app_window")
                 {
                     var observed = await client.WaitForApplicationWindowAsync(
-                        new DesktopApplicationWaitRequest(Arg(call, "application"), 5_000),
+                        new DesktopApplicationWaitRequest(Arg(call, "application"), 10_000),
                         cancellationToken).ConfigureAwait(false);
                     return new
                     {
@@ -1154,7 +1154,7 @@ public static class NormalRuntimeToolRegistry
                         "Ứng dụng: " + application + "\nDesktopHost chỉ cho phép tên ứng dụng/App Paths đã đăng ký; không chạy command line hoặc đường dẫn executable tùy ý.",
                         cancellationToken).ConfigureAwait(false);
                     var launched = await client.LaunchApplicationAsync(
-                        new DesktopApplicationLaunchRequest(application, true, 5_000),
+                        new DesktopApplicationLaunchRequest(application, true, 20_000),
                         cancellationToken).ConfigureAwait(false);
                     return new
                     {
