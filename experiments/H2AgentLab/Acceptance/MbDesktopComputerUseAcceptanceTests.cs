@@ -372,6 +372,113 @@ public static class MbDesktopComputerUseAcceptanceTests
                     new DesktopApplicationActivateRequest("not-observed", true))).ConfigureAwait(false);
         }).ConfigureAwait(false);
 
+        await Case("application-permission-scope-does-not-widen-machine-authority", async () =>
+        {
+            var workspace = Path.Combine(root, "app-permission-workspace");
+            var state = Path.Combine(root, "app-permission-state");
+            Directory.CreateDirectory(workspace);
+            Directory.CreateDirectory(state);
+
+            using var tools = new global::H2AgentLab.AgentTools(
+                new global::H2AgentLab.SafeWorkspace(workspace),
+                state,
+                (_, _) => Task.FromResult(true),
+                (_, _) => { })
+            {
+                ReadOnly = false
+            };
+            var registry = NormalRuntimeToolRegistry.Create(tools);
+            Check(registry.TryGet("launch_app", out var launch),
+                "launch_app is missing from the normal runtime registry.");
+            var call = new ToolCall(
+                "permission-launch",
+                "launch_app",
+                JsonSerializer.SerializeToElement(new
+                {
+                    application = "Word",
+                    mode = "reuse_or_launch"
+                }));
+
+            async Task<AgentRuntimePermissionDecision> Authorize(
+                H2AgentPermissionScope scope,
+                Guid? projectId)
+            {
+                var context = new H2AgentTaskContext(
+                    WorkspaceRoot: workspace,
+                    Summary: "AR-061 permission scope fixture",
+                    PermissionScope: scope);
+                using var session = new H2ProductionToolSession(
+                    Guid.NewGuid(),
+                    projectId,
+                    readOnly: false,
+                    context,
+                    projects: null,
+                    approve: (_, _, _) => Task.FromResult(true));
+                return await session.AuthorizeAsync(
+                    new AgentRuntimePermissionRequest(
+                        null!,
+                        launch,
+                        call,
+                        null),
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+
+            var now = DateTime.UtcNow;
+            var workspaceRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace));
+            var workspaceAsk = new H2AgentPermissionScope(
+                H2AgentPermissionMode.AskBeforeChanges,
+                H2AgentResourceScopeKind.Workspace,
+                "workspace:" + workspaceRoot,
+                mutationAllowed: true,
+                approvalRequired: true,
+                now,
+                now.AddMinutes(10),
+                documentPath: workspaceRoot);
+            Check((await Authorize(workspaceAsk, null).ConfigureAwait(false)).Allowed,
+                "Workspace AskBeforeChanges did not authorize explicit app launch.");
+
+            var documentAsk = new H2AgentPermissionScope(
+                H2AgentPermissionMode.AskBeforeChanges,
+                H2AgentResourceScopeKind.Document,
+                "document:fixture",
+                mutationAllowed: true,
+                approvalRequired: true,
+                now,
+                now.AddMinutes(10),
+                applicationKind: H2ApplicationKind.Word,
+                documentSessionId: "word-session",
+                documentPath: Path.Combine(workspace, "doc.docx"));
+            Check(!(await Authorize(documentAsk, null).ConfigureAwait(false)).Allowed,
+                "Document-scoped AskBeforeChanges silently widened into machine app launch authority.");
+
+            var project = Guid.NewGuid();
+            var projectPolicy = new H2AgentPermissionScope(
+                H2AgentPermissionMode.UseProjectPolicy,
+                H2AgentResourceScopeKind.Project,
+                "project:" + project.ToString("N"),
+                mutationAllowed: true,
+                approvalRequired: true,
+                now,
+                now.AddMinutes(10));
+            Check((await Authorize(projectPolicy, project).ConfigureAwait(false)).Allowed,
+                "Exact project policy did not authorize explicit app launch.");
+
+            var wrongProject = Guid.NewGuid();
+            Check(!(await Authorize(projectPolicy, wrongProject).ConfigureAwait(false)).Allowed,
+                "A different project inherited app launch authority from another project policy.");
+
+            var fullAccess = new H2AgentPermissionScope(
+                H2AgentPermissionMode.FullAccess,
+                H2AgentResourceScopeKind.Machine,
+                H2AgentPermissionScope.CurrentMachineResourceKey,
+                mutationAllowed: true,
+                approvalRequired: false,
+                now,
+                now.AddMinutes(10));
+            Check((await Authorize(fullAccess, null).ConfigureAwait(false)).Allowed,
+                "Current-machine FullAccess did not authorize app launch.");
+        }).ConfigureAwait(false);
+
         await Case("task-launched-excel-binds-and-writes-through-production-office-runtime", async () =>
         {
             var workspace = Path.Combine(root, "launched-office-workspace");
