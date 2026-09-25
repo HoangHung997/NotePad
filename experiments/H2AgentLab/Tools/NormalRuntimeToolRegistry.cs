@@ -180,7 +180,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "launch_app",
             "app",
-            "Launch an explicitly named registered Windows application. Arbitrary executable paths and shell commands are rejected; success requires a newly observed or newly activated safe window.",
+            "Open/start/launch File Explorer, Word, Excel, AutoCAD, or another exactly registered Windows application by name. Arbitrary executable paths and shell commands are rejected; success requires a newly observed or newly activated safe window.",
             AgentToolRisk.High,
             AgentToolAccess.Mutating,
             false,

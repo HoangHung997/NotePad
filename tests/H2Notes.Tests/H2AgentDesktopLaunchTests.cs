@@ -49,6 +49,20 @@ internal static class H2AgentDesktopLaunchTests
                 "Fresh observation of the same application did not unlock one reconciled retry.");
         });
 
+        test("AR-061 tool search discovers launcher for real user phrasing",()=>{
+            Temp((root,state)=>{
+                using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
+                var registry=NormalRuntimeToolRegistry.Create(host);
+                var index=new ToolSearchIndex(registry);
+                foreach(var query in new[]{"open word app","open file explorer","start excel application","launch autocad"})
+                {
+                    var results=index.Search(query,8);
+                    Check(results.Count>0 && results[0].Descriptor.Name=="launch_app",
+                        "Tool search did not rank launch_app first for: "+query);
+                }
+            });
+        });
+
         test("AR-061 launch_app schema requires an application name and offers no executable path argument",()=>{
             Temp((root,state)=>{
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
