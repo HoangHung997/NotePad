@@ -20,7 +20,7 @@ concurrency:
 jobs:
   desktop-app:
     if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
-    runs-on: windows-11-arm
+    runs-on: windows-2025
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
