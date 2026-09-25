@@ -1,0 +1,66 @@
+name: AR-061 Windows cross-build fallback
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar061-crossbuild.yml'
+      - 'experiments/H2AgentLab.DesktopHost/**'
+      - 'experiments/H2AgentLab.DesktopProtocol/**'
+      - 'experiments/H2AgentLab/Desktop/**'
+      - 'experiments/H2AgentLab/Tools/**'
+      - 'experiments/H2AgentLab/Integration/H2ProductionToolSession*'
+      - 'experiments/H2AgentLab/Integration/H2DesktopRuntimeVerifier.cs'
+      - 'experiments/H2AgentLab/RecoveryPolicy.cs'
+      - 'experiments/H2AgentLab/Acceptance/MbDesktopComputerUseAcceptanceTests.cs'
+      - 'experiments/H2AgentLab/Runtime/MbRetireV1ToolRegistryAdapterTests.cs'
+      - 'experiments/H2AgentLab/Runtime/MbRetireAgentToolsSwitchTests.cs'
+      - 'experiments/H2AgentLab/Runtime/MbInitialToolExposureTests.cs'
+      - 'experiments/H2AgentLab/V2ArchitectureTests.cs'
+      - 'tests/H2Notes.Tests/**'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar061-crossbuild-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  cross-build:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore Windows-targeted solution on Linux
+        run: dotnet restore H2Notes.Avalonia.slnx -p:EnableWindowsTargeting=true
+      - name: Cross-build exact source
+        run: dotnet build H2Notes.Avalonia.slnx -c Release --no-restore -p:EnableWindowsTargeting=true
+      - name: Cross-publish self-contained Windows x64
+        run: >
+          dotnet publish src/H2Notes.Avalonia/H2Notes.Avalonia.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:EnableWindowsTargeting=true
+          -o artifacts/H2Notes-Avalonia-Portable-crossbuild
+      - name: Record cross-build identity
+        shell: bash
+        run: |
+          test -s artifacts/H2Notes-Avalonia-Portable-crossbuild/H2Notes.Avalonia.exe
+          cat > artifacts/H2Notes-Avalonia-Portable-crossbuild/CROSSBUILD-NOT-NATIVE-VERIFIED.txt <<EOF
+          Source commit: ${{ github.event.pull_request.head.sha }}
+          Task: AR-061
+          Cross-built on ubuntu-latest for win-x64.
+          This artifact proves compile/publish only. It is NOT native Windows runtime acceptance and must not replace AR-061 E3/E4 or packaged-helper IPC on Windows.
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: H2Notes-Avalonia-Portable-win-x64-AR061-CROSSBUILD
+          path: artifacts/H2Notes-Avalonia-Portable-crossbuild/
+          if-no-files-found: error
+          retention-days: 7
