@@ -38,6 +38,13 @@ public static class ToolRecoveryPolicy
                 ["inspect_advertised_schema", "correct_arguments_preserve_target"],
                 preserveTargetIdentity: true),
 
+            "app_preflight_unavailable" => Plan(
+                ToolRetryClass.Configure,
+                ["repair_packaged_desktop_host", "check_desktop_host_protocol"],
+                requiresChangedEvidence: true,
+                preserveTargetIdentity: true,
+                allowsAlternateBackend: false),
+
             "needs_configuration" or "provider_unavailable" or "unsupported_operation" => Plan(
                 ToolRetryClass.Configure,
                 ["check_provider_health", "rediscover_provider_capabilities", "configure_existing_provider",

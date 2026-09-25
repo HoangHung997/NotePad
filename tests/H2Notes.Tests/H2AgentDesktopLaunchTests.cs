@@ -101,6 +101,18 @@ internal static class H2AgentDesktopLaunchTests
             });
         });
 
+        test("AR-061 DesktopHost preflight failure never suggests an alternate backend",()=>{
+            Check(ToolOutcomeBridge.NormalizeCode("app_preflight_unavailable")=="app_preflight_unavailable",
+                "DesktopHost preflight identity was collapsed into a generic provider error.");
+            var plan=ToolRecoveryPolicy.For("app_preflight_unavailable",ToolMutationEffect.None);
+            Check(plan.RetryClass==ToolRetryClass.Configure
+                && plan.RequiresChangedEvidence
+                && plan.PreserveTargetIdentity
+                && !plan.AllowsAlternateBackend
+                && plan.RecoveryCandidates.Contains("repair_packaged_desktop_host",StringComparer.Ordinal),
+                "DesktopHost preflight recovery can silently route to a different backend.");
+        });
+
         test("AR-061 launch_app schema requires an application name and offers no executable path argument",()=>{
             Temp((root,state)=>{
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});

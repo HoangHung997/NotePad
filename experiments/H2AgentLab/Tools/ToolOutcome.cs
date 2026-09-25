@@ -330,7 +330,8 @@ public static class ToolOutcomeBridge
         "invalid_request" or "invalid_application" => "invalid_arguments", "stale_state" or "stale_hash" => "stale_resource",
         "not_found" or "app_not_found" => "resource_not_found", "denied" or "access_denied" or "permission_required"
             or "outside_resource_scope" or "expired_permission" or "boundary" => "permission_denied",
-        "unavailable" or "office_unavailable" or "app_preflight_unavailable" => "provider_unavailable", "file_busy" or "application_busy" => "provider_busy",
+        "unavailable" or "office_unavailable" => "provider_unavailable", "app_preflight_unavailable" => code,
+        "file_busy" or "application_busy" => "provider_busy",
         "session_not_found" => "stale_resource",
         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
         "timeout" => "deadline_exceeded", "validation_failed" or "foreground_failed" => "verification_failed",
@@ -339,7 +340,8 @@ public static class ToolOutcomeBridge
             or "recovery_no_progress" or "unsupported_operation" or "needs_configuration" or "resource_not_found" or "ambiguous_target"
             or "stale_resource" or "provider_busy" or "modal_blocked" or "permission_denied" or "connection_lost"
             or "deadline_exceeded" or "rate_limited" or "partial_result" or "verification_failed"
-            or "partially_applied" or "outcome_unknown" or "invalid_result" or "provider_unavailable" or "cancelled" => code,
+            or "partially_applied" or "outcome_unknown" or "invalid_result" or "provider_unavailable"
+            or "app_preflight_unavailable" or "cancelled" => code,
         _ => "tool_failed" };
     public static string SafeMessage(string? code) => code switch {
         "ready" => "Configured executor is available; this is not verification of a completed operation.",
@@ -349,6 +351,7 @@ public static class ToolOutcomeBridge
             "unknown_tool" or "tool_not_loaded" => "Use an exact callable returned by tool discovery.",
             "needs_configuration" => "Configure an approved backend before using this capability.",
             "provider_unavailable" => "The configured backend or packaged helper is unavailable.",
+            "app_preflight_unavailable" => "The packaged DesktopHost helper is unavailable or incompatible before application launch. Repair that exact helper; no app mutation was sent.",
             "unsupported_operation" => "This backend does not support the requested operation.",
             "resource_not_found" => "The selected resource could not be found; observe exact resources again.",
             "ambiguous_target" => "More than one target matches; select an exact resource.",
