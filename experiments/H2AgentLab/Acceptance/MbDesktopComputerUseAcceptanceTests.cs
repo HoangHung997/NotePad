@@ -621,6 +621,82 @@ public static class MbDesktopComputerUseAcceptanceTests
                 "FullAccess silently fell back from the task-created Excel HWND to another workbook: " + output);
         }).ConfigureAwait(false);
 
+        await Case("document-scope-does-not-inherit-task-launched-office-window", async () =>
+        {
+            var workspace = Path.Combine(root, "document-scope-launched-office-workspace");
+            Directory.CreateDirectory(workspace);
+            var now = DateTime.UtcNow;
+            var scope = new H2AgentPermissionScope(
+                H2AgentPermissionMode.AskBeforeChanges,
+                H2AgentResourceScopeKind.Document,
+                "document:existing-excel-session",
+                mutationAllowed: true,
+                approvalRequired: true,
+                issuedUtc: now,
+                expiresUtc: now.AddMinutes(30),
+                applicationKind: H2ApplicationKind.Excel,
+                documentSessionId: "existing-excel-session",
+                documentPath: Path.Combine(workspace, "Existing.xlsx"));
+            var context = new H2AgentTaskContext(
+                workspace,
+                "",
+                PermissionScope: scope,
+                TargetIntent: H2AgentTargetIntent.OpenDocument);
+            using var session = new H2ProductionToolSession(
+                Guid.NewGuid(),
+                null,
+                readOnly: false,
+                context,
+                projects: null,
+                approve: (_, _, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(true);
+                });
+
+            var launchedWindow = new DesktopWindowInfo(
+                "desktop-document-scope-new-excel",
+                0x22345,
+                7101,
+                638943000000000100L,
+                "EXCEL",
+                "Book2 - Excel",
+                new DesktopBounds(120, 120, 900, 700),
+                96,
+                true);
+            session.ObserveLaunchedApplicationWindow(new DesktopApplicationLaunchResult(
+                "Excel",
+                "excel",
+                "EXCEL",
+                true,
+                false,
+                launchedWindow));
+
+            var launchedBinding = H2AgentResourceBinding.FromLiveObservation(
+                H2ApplicationKind.Excel,
+                "office-host",
+                "new-excel-session",
+                "Book2",
+                DateTime.UtcNow,
+                providerInstanceId: "office-document-scope-fixture",
+                providerVersion: "fixture-v1",
+                processId: launchedWindow.ProcessId,
+                processStartUtcTicks: launchedWindow.ProcessStartedUtcTicks,
+                windowIdentity: $"win32:{launchedWindow.Handle:x}:{launchedWindow.ProcessId}:{launchedWindow.ProcessStartedUtcTicks}",
+                viewIdentity: "new-excel-view");
+
+            Check(!session.HasTaskLaunchedOfficeAuthority(H2ApplicationKind.Excel)
+                && !session.IsTaskLaunchedOfficeCandidate(launchedBinding),
+                "A Document-scoped task inherited authority over a newly launched Excel window.");
+
+            var rejected = false;
+            try { session.PinTaskLaunchedOfficeBinding(launchedBinding); }
+            catch (InvalidOperationException) { rejected = true; }
+            Check(rejected,
+                "A Document-scoped task pinned a newly launched Excel session outside its granted document.");
+            await Task.CompletedTask;
+        }).ConfigureAwait(false);
+
         await Case("sensitive-app-blocks", async () =>
         {
             var policyDir = Path.Combine(root, "desktop-host-policy");
