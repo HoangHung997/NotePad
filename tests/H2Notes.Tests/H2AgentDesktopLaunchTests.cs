@@ -1,6 +1,7 @@
 using System.Text.Json;
 using H2AgentLab;
 using H2AgentLab.Tools;
+using H2AgentLab.Integration;
 
 internal static class H2AgentDesktopLaunchTests
 {
@@ -21,6 +22,33 @@ internal static class H2AgentDesktopLaunchTests
                     && launch.Preference?.InteractionFidelity==ToolInteractionFidelity.Accessibility,
                     "app.launch risk/preference metadata is wrong.");
             });
+        });
+
+        test("AR-061 app lifecycle verifier accepts only host-observed exact application window outcome",()=>{
+            var verifier=new H2DesktopRuntimeVerifier();
+            var launch=new ToolCall("launch","app.launch",JsonSerializer.SerializeToElement(new{application="notepad"}));
+            var good=JsonSerializer.Serialize(new{
+                application="notepad",
+                process="notepad",
+                newWindowObserved=true,
+                reusedExistingWindow=false,
+                window=new{session_id="win-1",hwnd=1001L,pid=22,process_started_utc_ticks=33L,process="notepad",title="Untitled",foreground=true,dpi=96},
+                verifiedByHostObservation=true
+            });
+            var report=verifier.VerifyAsync(null!,launch,good,CancellationToken.None).GetAwaiter().GetResult();
+            Check(report.Passed && report.EvidenceIds.Single()=="desktop-window:win-1",
+                "Host-observed app launch was not verified.");
+
+            var weak=JsonSerializer.Serialize(new{
+                application="notepad",
+                process="notepad",
+                newWindowObserved=false,
+                reusedExistingWindow=false,
+                window=new{session_id="win-1",pid=22},
+                verifiedByHostObservation=true
+            });
+            Check(!verifier.VerifyAsync(null!,launch,weak,CancellationToken.None).GetAwaiter().GetResult().Passed,
+                "Unobserved/semantically weak app launch was incorrectly verified.");
         });
 
         test("AR-061 app.launch schema requires an application name and offers no executable path argument",()=>{

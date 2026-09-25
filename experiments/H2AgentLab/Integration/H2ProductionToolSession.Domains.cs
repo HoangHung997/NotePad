@@ -18,7 +18,9 @@ internal sealed partial class H2ProductionToolSession
         if (_scope?.ScopeKind != H2Notes.Core.H2AgentResourceScopeKind.Workspace) office.Register(registry);
         verifiers.RemoveAll(item => item is StructuredOfficeRuntimeDomainVerifier);
         verifiers.Add(office);
-        if (tools.Desktop is not null) verifiers.Add(new H2DesktopRuntimeVerifier());
+        // App lifecycle is independent of a preselected window; click/type remain unavailable
+        // when no selected Desktop controller exists, but launch/activate can still be verified.
+        verifiers.Add(new H2DesktopRuntimeVerifier());
         if (_scope?.Mode == H2Notes.Core.H2AgentPermissionMode.FullAccess && H2AutoCadFileTools.FindExecutable() is { } cadExecutable)
         {
             var cad = new H2AutoCadFileTools(cadExecutable, tools.Workspace, tools.StateRoot); cad.Register(registry); verifiers.Add(cad);
