@@ -518,22 +518,22 @@ Do not claim these defects were already covered by historical Office/transport/U
   "required_evidence_level": "E3",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar021-continuation-binding-2026-09-24",
-  "last_code_commit": "f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f",
-  "last_validated_code_commit": "f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f",
-  "last_validation_result": "AR021_8_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1280_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; NATIVE_DIRECT_EDIT_RECALC_REBIND_HARDENED; CONTINUATION_BOUND_TO_RANGE_FIELDS_PAGE_SIZE; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
+  "owner_session": "chatgpt-ar021-sheet-rename-stale-2026-09-25",
+  "last_code_commit": "385e88644e7f026d095b22be4cbc6562ecd848e4",
+  "last_validated_code_commit": "385e88644e7f026d095b22be4cbc6562ecd848e4",
+  "last_validation_result": "AR021_9_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1281_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; NATIVE_DIRECT_EDIT_RECALC_REBIND_HARDENED; CONTINUATION_BOUND_TO_RANGE_FIELDS_PAGE_SIZE; SHEET_RENAME_CONTINUATION_RETURNS_STALE_CONTENT; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f. No reset/force-push/main merge occurred.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is 385e88644e7f026d095b22be4cbc6562ecd848e4. No reset/force-push/main merge occurred.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-24T14:02:28Z",
+  "checkpoint_saved_at_utc": "2026-09-25T00:04:39Z",
   "completed_this_session": [
-    "Reconciled the prior AR-021 checkpoint 80b771e377c641c516b67cc04f241d431f19f0c7 and kept AR-021 as the only active task.",
-    "Audited the native Excel event contract and retained Workbook.SheetChange plus Workbook.SheetCalculate tracking and COM identity rebind protection from the prior hardening.",
-    "Identified that the previous contentVersion was workbook/sheet scoped but not bound to the original range, normalized fields and page size, so a cursor could theoretically be replayed against a different read contract.",
-    "Bound production COM and fixture contentVersion to normalized requested range, canonical normalized fields and page size while preserving selection/focus independence.",
-    "Added an E2 regression that reuses the first-page cursor/version with a different range, different field set and different page size; every drift must fail stale_content with no effect.",
+    "Reconciled the prior AR-021 checkpoint 8827b8e6e8a1980fd5f791d078db575f56e33870 and kept AR-021 as the only active task.",
+    "Audited continuation behavior for worksheet identity changes and found that a rename/delete between pages could surface sheet_not_found instead of the required stale/restart semantics.",
+    "Changed production COM and fixture range readers so a continuation targeting a missing/renamed sheet returns stale_content/no-effect rather than treating it as a fresh lookup.",
+    "Re-read the actual worksheet name after each native page and include it in the post-page version check so a rename racing the current page invalidates the result.",
+    "Added an E2 regression that renames the worksheet between pages and verifies both the old sheet name and the new sheet name cannot reuse the old cursor/contentVersion.",
     "Validated exact code SHA through dedicated AR-021 and full Avalonia CI; all 11 pull-request workflows succeeded.",
-    "Downloaded and inspected exact-SHA AR-021 evidence: focused 8/8 and full H2 1280/1280; preserved E3 as AWAITING_ENVIRONMENT."
+    "Downloaded and inspected exact-SHA AR-021 evidence: focused 9/9, full H2 1281/1281, ZIP integrity PASS; preserved E3 as AWAITING_ENVIRONMENT."
   ],
   "remaining_in_active_task": [
     "Run AR-021 E3 RC-06/07 on an authorized Windows PC with real Microsoft Excel using only synthetic test workbooks.",
@@ -541,6 +541,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "Change selection/focus between pages and confirm contentVersion remains valid and the bound workbook/range does not redirect.",
     "With Saved already false, edit a cell directly in Excel between pages and confirm stale_content through Workbook.SheetChange.",
     "Trigger a real worksheet recalculation between pages and confirm stale_content through Workbook.SheetCalculate.",
+    "Rename or remove the target worksheet between pages and confirm the old continuation returns stale_content/no-effect; where practical race a rename during a page read and confirm the post-page version check rejects it.",
     "Disable Excel events and confirm multi-page reads fail closed with content_tracking_unavailable.",
     "Exercise fresh OfficeHost/replacement workbook binding where practical and confirm an old continuation cannot cross the rebind.",
     "Attempt to replay a cursor/contentVersion with a different range, field set or page size and confirm stale_content/no-effect on the packaged production path.",
@@ -549,74 +550,74 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_test_commands": [
     {
       "command": "tools/agent-reliability/validate_ar021.ps1",
-      "sha": "f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f",
-      "run_id": 36008612093,
-      "job_id": 107663176044,
+      "sha": "385e88644e7f026d095b22be4cbc6562ecd848e4",
+      "run_id": 36075156926,
+      "job_id": 107884596266,
       "attempt": 1,
-      "result": "SUCCESS; AR021 8/8; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1280/1280; artifact 10811574511 sha256 2518853c3d0f74a283c7a8bf02b6c23ef3a522adcaa406a2e576c62b0a1a61b7"
+      "result": "SUCCESS; AR021 9/9; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1281/1281; artifact 10840361378 sha256 786fcf8a8c8c49f7795034b3dd4491e15a875fed06bcbb86c04ccc13d62ad228"
     },
     {
       "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "f0de37c8fa4ee49c54cd0044e70dd84d8cc6662f",
-      "run_id": 36008612174,
-      "job_id": 107663175598,
+      "sha": "385e88644e7f026d095b22be4cbc6562ecd848e4",
+      "run_id": 36075156864,
+      "job_id": 107884595730,
       "attempt": 1,
-      "result": "SUCCESS; full H2 1280/1280; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10811603810 sha256 928153a6375d617ce29a3547693cda434f9882b67f30af542c004b2dfcd3bf5e; NAS probe 10811054797 sha256 c31ffe5d21a1d4ee622f51d499acd3697148656465bfb85377d2a3e39b27786a"
+      "result": "SUCCESS; full H2 1281/1281; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10839708989 sha256 9ad74efbff5e38b5d15621d3a8d071714010854b5cea2f40ecf439d5855a1f1a; NAS probe 10839234965 sha256 bd95bedc5bbba28f41e54ce3275e5a547bb65ff8b60e9ccb8e38f169c427a529"
     }
   ],
   "ci_runs": [
     {
-      "id": 36008612087,
+      "id": 36075156872,
       "name": "AR-000 baseline capture",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612279,
+      "id": 36075156900,
       "name": "AR-001 isolated implementation workspace",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612224,
+      "id": 36075156886,
       "name": "AR-010 shared runtime validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612216,
+      "id": 36075156874,
       "name": "AR-011 outcome contract validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612173,
+      "id": 36075156883,
       "name": "AR-012 scoped binding validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612133,
+      "id": 36075156888,
       "name": "AR-020 native discovery implementation validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612093,
+      "id": 36075156926,
       "name": "AR-021 bounded Excel range validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008614837,
+      "id": 36075156852,
       "name": "AR-030 outcome and revision validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612109,
+      "id": 36075156851,
       "name": "AR-031 journal and cancellation regression",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612074,
+      "id": 36075156850,
       "name": "AR-032 scoped history validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36008612174,
+      "id": 36075156864,
       "name": "Avalonia CI",
       "result": "SUCCESS"
     }
@@ -625,8 +626,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-021/evidence.json",
     "docs/agent-reliability/AR-021/implementation.md",
     "docs/agent-reliability/AR-021/native-acceptance.md",
-    "GitHub artifact 10811574511 AR021-E1-E2-Evidence",
-    "GitHub artifact 10811603810 H2Notes-Avalonia-Portable-win-x64"
+    "GitHub artifact 10840361378 AR021-E1-E2-Evidence",
+    "GitHub artifact 10839708989 H2Notes-Avalonia-Portable-win-x64"
   ],
   "known_failures": [
     {
@@ -646,7 +647,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-021-E3",
       "status": "AWAITING_ENVIRONMENT",
-      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus, including direct edits while already unsaved, real recalculation SheetCalculate delivery, event-disabled fail-closed behavior, replacement/fresh-process binding behavior and production continuation-contract replay checks; fixture/scripted E2 is not native acceptance."
+      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus, including direct edits while already unsaved, real recalculation SheetCalculate delivery, worksheet rename/delete continuation invalidation, event-disabled fail-closed behavior, replacement/fresh-process binding behavior and production continuation-contract replay checks; fixture/scripted E2 is not native acceptance."
     }
   ],
   "parked_acceptance": [
@@ -683,13 +684,13 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "pending_user_decisions": [],
   "downloadable_build": {
-    "artifact_id": 10811603810,
+    "artifact_id": 10839708989,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110307477,
-    "sha256": "928153a6375d617ce29a3547693cda434f9882b67f30af542c004b2dfcd3bf5e",
-    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code with direct-edit/recalculation/rebind tracking and continuation contract binding; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate."
+    "bytes": 110307640,
+    "sha256": "9ad74efbff5e38b5d15621d3a8d071714010854b5cea2f40ecf439d5855a1f1a",
+    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code with direct-edit/recalculation/rebind tracking, continuation contract binding and sheet-rename stale-continuation hardening; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate."
   },
-  "next_exact_action": "Use the final portable build on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Validate direct edit while already unsaved, worksheet recalculation, event-disabled fail-closed behavior, fresh/replacement binding, and rejection of cursor/version replay with a different range/fields/page size. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
+  "next_exact_action": "Use the final portable build on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Validate direct edit while already unsaved, worksheet recalculation, worksheet rename/delete between pages, event-disabled fail-closed behavior, fresh/replacement binding, and rejection of cursor/version replay with a different range/fields/page size. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
   "next_task_if_active_done": "AR-022"
 }
 ```
