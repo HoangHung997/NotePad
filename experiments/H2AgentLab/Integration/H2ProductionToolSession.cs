@@ -63,7 +63,9 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     {
         ArgumentNullException.ThrowIfNull(launched);
         var kind = LaunchedOfficeKind(launched.ApplicationId, launched.ProcessName, launched.Window.ProcessName);
-        if (kind == H2ApplicationKind.Unknown) return;
+        // Only a distinct newly-created Office HWND becomes a new task-local live source.
+        // Re-activating a pre-existing app is useful UI behavior but is not a new source grant.
+        if (kind == H2ApplicationKind.Unknown || !launched.NewWindowObserved || launched.ReusedExistingWindow) return;
         if (launched.Window.Handle <= 0
             || launched.Window.ProcessId <= 0
             || launched.Window.ProcessStartedUtcTicks <= 0

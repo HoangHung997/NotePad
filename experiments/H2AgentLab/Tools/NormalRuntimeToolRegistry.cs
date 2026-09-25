@@ -1168,6 +1168,16 @@ public static class NormalRuntimeToolRegistry
                     var launched = await client.LaunchApplicationAsync(
                         new DesktopApplicationLaunchRequest(application, true, 20_000, requireNewWindow),
                         cancellationToken).ConfigureAwait(false);
+                    var launchSemanticsVerified =
+                        string.Equals(launched.RequestedApplication?.Trim(), application.Trim(), StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(launched.ProcessName, launched.Window.ProcessName, StringComparison.OrdinalIgnoreCase)
+                        && (requireNewWindow
+                            ? launched.NewWindowObserved && !launched.ReusedExistingWindow
+                            : launched.NewWindowObserved || launched.ReusedExistingWindow);
+                    if (!launchSemanticsVerified)
+                        throw new global::H2AgentLab.AgentFaultException(
+                            "launch_unverified",
+                            "DesktopHost result did not prove the exact requested application launch mode.");
                     Host.ProductionSession?.ObserveLaunchedApplicationWindow(launched);
                     return new
                     {
