@@ -50,6 +50,11 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 && window.TryGetProperty("session_id", out var session)
                 ? session.GetString()
                 : null;
+            var windowProcessName = hasWindowObject
+                && window.TryGetProperty("process", out var windowProcess)
+                && windowProcess.ValueKind == JsonValueKind.String
+                ? windowProcess.GetString()
+                : null;
             var hasWindow = hasWindowObject
                 && !string.IsNullOrWhiteSpace(sessionId)
                 && window.TryGetProperty("hwnd", out var hwnd)
@@ -61,14 +66,13 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 && window.TryGetProperty("process_started_utc_ticks", out var started)
                 && started.TryGetInt64(out var processStarted)
                 && processStarted > 0
-                && window.TryGetProperty("process", out var windowProcess)
-                && !string.IsNullOrWhiteSpace(windowProcess.GetString());
+                && !string.IsNullOrWhiteSpace(windowProcessName);
             var semantic = call.Name == "launch_app"
                 ? ((root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
                     || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True))
                     && root.TryGetProperty("process", out var launchedProcess)
                     && launchedProcess.ValueKind == JsonValueKind.String
-                    && string.Equals(launchedProcess.GetString(), windowProcess.GetString(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(launchedProcess.GetString(), windowProcessName, StringComparison.OrdinalIgnoreCase)
                 : hasWindowObject
                     && call.Arguments.TryGetProperty("session_id", out var requestedSession)
                     && requestedSession.ValueKind == JsonValueKind.String
