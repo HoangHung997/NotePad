@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using H2AgentLab.Desktop;
 using H2AgentLab.DesktopProtocol;
+using H2AgentLab.Integration;
 using H2AgentLab.Transport;
 
 namespace H2AgentLab.Acceptance;
@@ -197,6 +198,58 @@ public static class MbDesktopComputerUseAcceptanceTests
                 new DesktopApplicationActivateRequest(launched.Window.SessionId, true)).ConfigureAwait(false);
             Check(activated.SessionId == launched.Window.SessionId && activated.Foreground,
                 "Activate did not verify the exact observed window as foreground.");
+        }).ConfigureAwait(false);
+
+        await Case("application-lifecycle-verifier", async () =>
+        {
+            var verifier = new H2DesktopRuntimeVerifier();
+            var launch = new ToolCall(
+                "launch",
+                "app.launch",
+                JsonSerializer.SerializeToElement(new { application = "notepad" }));
+            var good = JsonSerializer.Serialize(new
+            {
+                application = "notepad",
+                process = "notepad",
+                newWindowObserved = true,
+                reusedExistingWindow = false,
+                window = new
+                {
+                    session_id = "win-1",
+                    hwnd = 1001L,
+                    pid = 22,
+                    process_started_utc_ticks = 33L,
+                    process = "notepad",
+                    title = "Untitled",
+                    foreground = true,
+                    dpi = 96
+                },
+                verifiedByHostObservation = true
+            });
+            var report = await verifier.VerifyAsync(
+                null!,
+                launch,
+                good,
+                CancellationToken.None).ConfigureAwait(false);
+            Check(report.Passed
+                && report.EvidenceIds.Single() == "desktop-window:win-1",
+                "Host-observed app launch was not verified.");
+
+            var weak = JsonSerializer.Serialize(new
+            {
+                application = "notepad",
+                process = "notepad",
+                newWindowObserved = false,
+                reusedExistingWindow = false,
+                window = new { session_id = "win-1", pid = 22 },
+                verifiedByHostObservation = true
+            });
+            Check(!((await verifier.VerifyAsync(
+                        null!,
+                        launch,
+                        weak,
+                        CancellationToken.None).ConfigureAwait(false)).Passed),
+                "Unobserved/semantically weak app launch was incorrectly verified.");
         }).ConfigureAwait(false);
 
         await Case("application-launch-guards", async () =>
