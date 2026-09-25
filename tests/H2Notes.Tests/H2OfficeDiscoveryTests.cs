@@ -9,7 +9,7 @@ using H2Notes.Core;
 
 /// <summary>E1 catalog/probe seam and E2 concrete production capture/UI projection. No native
 /// Office is substituted as passed. Controlled native-object leases never touch user documents.</summary>
-internal static class H2OfficeDiscoveryTests
+public static class H2OfficeDiscoveryTests
 {
     public static void Run(Action<string,Action> test)
     {
@@ -310,7 +310,7 @@ internal static class H2OfficeDiscoveryTests
         private readonly object[] _objects=objects;
         public IReadOnlyList<object> Snapshot()=>_objects;
     }
-    private sealed class RotWordApplication
+    public sealed class RotWordApplication
     {
         public RotWordApplication(params RotWordWindow[] windows)
         {
@@ -321,14 +321,14 @@ internal static class H2OfficeDiscoveryTests
         public string Version{get;}
         public RotWordWindows Windows{get;}
     }
-    private sealed class RotWordWindows
+    public sealed class RotWordWindows
     {
         private readonly RotWordWindow[] _windows;
         public RotWordWindows(RotWordWindow[] windows)=>_windows=windows;
         public int Count=>_windows.Length;
         public RotWordWindow Item(int index)=>_windows[index-1];
     }
-    private sealed class RotWordWindow
+    public sealed class RotWordWindow
     {
         public RotWordWindow(long hwnd,RotWordDocument document,int start,int end)
         {Hwnd=hwnd;Document=document;Selection=new RotWordSelection(start,end);}
@@ -337,7 +337,7 @@ internal static class H2OfficeDiscoveryTests
         public RotWordDocument Document{get;}
         public RotWordSelection Selection{get;}
     }
-    private sealed class RotWordDocument
+    public sealed class RotWordDocument
     {
         public RotWordDocument(string name,string path,string fullName,bool saved)
         {Name=name;Path=path;FullName=System.IO.Path.Combine(path,fullName);Saved=saved;}
@@ -346,14 +346,14 @@ internal static class H2OfficeDiscoveryTests
         public string FullName{get;}
         public bool Saved{get;}
     }
-    private sealed class RotWordSelection
+    public sealed class RotWordSelection
     {
         public RotWordSelection(int start,int end){Start=start;End=end;}
         public int Start{get;}
         public int End{get;}
     }
 
-    private sealed class RotExcelApplication
+    public sealed class RotExcelApplication
     {
         public RotExcelApplication(params RotExcelWindow[] windows)
         {
@@ -364,27 +364,27 @@ internal static class H2OfficeDiscoveryTests
         public string Version{get;}
         public RotExcelWindows Windows{get;}
     }
-    private sealed class RotExcelWindows
+    public sealed class RotExcelWindows
     {
         private readonly RotExcelWindow[] _windows;
         public RotExcelWindows(RotExcelWindow[] windows)=>_windows=windows;
         public int Count=>_windows.Length;
         public RotExcelWindow Item(int index)=>_windows[index-1];
     }
-    private sealed class RotExcelWindow
+    public sealed class RotExcelWindow
     {
         public RotExcelWindow(long hwnd,RotExcelSheet sheet){Hwnd=hwnd;ActiveSheet=sheet;}
         public long Hwnd{get;}
         public RotExcelApplication Application{get;set;}=null!;
         public RotExcelSheet ActiveSheet{get;}
     }
-    private sealed class RotExcelSheet
+    public sealed class RotExcelSheet
     {
         public RotExcelSheet(string name,RotExcelWorkbook parent){Name=name;Parent=parent;}
         public string Name{get;}
         public RotExcelWorkbook Parent{get;}
     }
-    private sealed class RotExcelWorkbook
+    public sealed class RotExcelWorkbook
     {
         public RotExcelWorkbook(string name,string path,string fullName,bool saved)
         {Name=name;Path=path;FullName=System.IO.Path.Combine(path,fullName);Saved=saved;}
