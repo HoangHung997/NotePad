@@ -53,6 +53,24 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Ordinary safe application was blocked from launch.");
         });
 
+        Test("App Paths executable identity cannot redirect to another process", () =>
+        {
+            if (!DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "winword.exe",
+                    @"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"))
+                throw new InvalidOperationException("Matching App Paths executable identity was rejected.");
+
+            if (DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "winword.exe",
+                    @"C:\Windows\System32\cmd.exe"))
+                throw new InvalidOperationException("App Paths executable identity redirected Word to cmd.exe.");
+
+            if (DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "notepad.exe",
+                    @"C:\Tools\powershell.exe"))
+                throw new InvalidOperationException("App Paths executable identity accepted another executable stem.");
+        });
+
         Test("Sensitive title terms are blocked", () =>
         {
             foreach (var title in new[]

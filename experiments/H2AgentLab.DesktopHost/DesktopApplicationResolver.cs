@@ -100,15 +100,30 @@ public static class DesktopApplicationResolver
 
     private static ResolvedDesktopApplication? ResolveExecutable(string executable)
     {
-        var process = Path.GetFileNameWithoutExtension(executable);
-        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
         var path = FindRegisteredExecutable(executable);
-        return path is null
-            ? null
-            : new(
-                Path.GetFileNameWithoutExtension(executable).ToLowerInvariant(),
-                path,
-                process);
+        if (path is null) return null;
+        if (!RegisteredExecutableIdentityMatches(executable, path))
+            throw new DesktopHostFaultException(
+                "invalid_application",
+                "Registered application identity does not match its executable target.");
+
+        var process = Path.GetFileNameWithoutExtension(path);
+        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
+        return new(
+            Path.GetFileNameWithoutExtension(executable).ToLowerInvariant(),
+            path,
+            process);
+    }
+
+    internal static bool RegisteredExecutableIdentityMatches(string executable, string resolvedPath)
+    {
+        if (string.IsNullOrWhiteSpace(executable) || string.IsNullOrWhiteSpace(resolvedPath))
+            return false;
+        var expected = Path.GetFileNameWithoutExtension(executable.Trim());
+        var actual = Path.GetFileNameWithoutExtension(resolvedPath.Trim());
+        return expected.Length > 0
+            && actual.Length > 0
+            && string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<RegisteredApplicationCandidate> RegisteredApplications()
@@ -143,6 +158,7 @@ public static class DesktopApplicationResolver
                         registered = Environment.ExpandEnvironmentVariables(registered.Trim().Trim('"'));
                         if (!File.Exists(registered)) continue;
                         registered = Path.GetFullPath(registered);
+                        if (!RegisteredExecutableIdentityMatches(subKeyName, registered)) continue;
                         if (!seen.Add(registered)) continue;
 
                         var process = Path.GetFileNameWithoutExtension(registered);
@@ -188,7 +204,8 @@ public static class DesktopApplicationResolver
         => ex is UnauthorizedAccessException
             or IOException
             or System.Security.SecurityException
-            or ArgumentException;
+            or ArgumentException
+            or NotSupportedException;
 
     private static string NormalizeFriendlyName(string value)
         => new(value.Normalize()
@@ -217,7 +234,7 @@ public static class DesktopApplicationResolver
                     if (File.Exists(registered)) return Path.GetFullPath(registered);
                 }
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+            catch (Exception ex) when (RegistryReadFailure(ex))
             {
             }
         }
