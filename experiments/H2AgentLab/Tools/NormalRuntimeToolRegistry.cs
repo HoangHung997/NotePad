@@ -600,7 +600,7 @@ public static class NormalRuntimeToolRegistry
             // IOException text is not evidence that a file operation was atomic.
             if (exception is global::H2AgentLab.AgentFaultException known
                 && known.Code is "stale_state" or "invalid_arguments" or "invalid_application" or "app_not_found"
-                    or "denied" or "boundary" or "permission_required")
+                    or "app_preflight_unavailable" or "denied" or "boundary" or "permission_required")
                 result["mutationApplied"] = false;
 
             if (fault.Code == "not_found"
@@ -1108,7 +1108,7 @@ public static class NormalRuntimeToolRegistry
             global::H2AgentLab.ToolCall call,
             CancellationToken cancellationToken)
         {
-            using var client = DesktopHostLocator.CreateClient();
+            using var client = DesktopHostLocator.CreateClientForApplicationLifecycle();
             try
             {
                 if (call.Name == "list_running_apps")
@@ -1249,7 +1249,10 @@ public static class NormalRuntimeToolRegistry
                 "ambiguous_target" => new global::H2AgentLab.AgentFaultException("ambiguous_target", ex.Message, false),
                 "launch_unverified" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
                 "foreground_failed" => new global::H2AgentLab.AgentFaultException("foreground_failed", ex.Message),
-                "protocol_mismatch" => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message, false),
+                "preflight_unavailable" or "protocol_mismatch" => new global::H2AgentLab.AgentFaultException(
+                    "app_preflight_unavailable",
+                    ex.Message,
+                    false),
                 _ => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message)
             };
     }

@@ -193,7 +193,23 @@ public sealed class DesktopHostClient : IDisposable
         if (currentPid is not null && _validatedProtocolProcessId == currentPid)
             return;
 
-        var ping = await PingAsync(cancellationToken).ConfigureAwait(false);
+        DesktopPingResult ping;
+        try
+        {
+            ping = await PingAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException)
+        {
+            StopHost();
+            throw new DesktopHostClientException(
+                "preflight_unavailable",
+                "DesktopHost preflight failed before any application lifecycle mutation.");
+        }
+
         if (!string.Equals(
                 ping.ProtocolVersion,
                 DesktopProtocolConstants.Version,

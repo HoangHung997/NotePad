@@ -62,8 +62,25 @@ public static class DesktopHostLocator
     public static DesktopHostClient CreateClient()
         => new(ResolveExecutable());
 
+    public static DesktopHostClient CreateClientForApplicationLifecycle()
+    {
+        try
+        {
+            return CreateClient();
+        }
+        catch (global::H2AgentLab.AgentFaultException ex) when (ex.Code == "unavailable")
+        {
+            throw new global::H2AgentLab.AgentFaultException(
+                "app_preflight_unavailable",
+                "DesktopHost packaged helper is incomplete or unavailable before application launch.",
+                false);
+        }
+    }
+
     private static bool CompleteHelper(string path)
-        => File.Exists(path) && File.Exists(Path.ChangeExtension(path, ".dll"))
+        => File.Exists(path)
+            && File.Exists(Path.ChangeExtension(path, ".dll"))
+            && File.Exists(Path.ChangeExtension(path, ".deps.json"))
             && File.Exists(Path.ChangeExtension(path, ".runtimeconfig.json"));
 }
 

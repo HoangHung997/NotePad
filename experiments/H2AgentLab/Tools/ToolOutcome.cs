@@ -330,7 +330,7 @@ public static class ToolOutcomeBridge
         "invalid_request" or "invalid_application" => "invalid_arguments", "stale_state" or "stale_hash" => "stale_resource",
         "not_found" or "app_not_found" => "resource_not_found", "denied" or "access_denied" or "permission_required"
             or "outside_resource_scope" or "expired_permission" or "boundary" => "permission_denied",
-        "unavailable" or "office_unavailable" => "provider_unavailable", "file_busy" or "application_busy" => "provider_busy",
+        "unavailable" or "office_unavailable" or "app_preflight_unavailable" => "provider_unavailable", "file_busy" or "application_busy" => "provider_busy",
         "session_not_found" => "stale_resource",
         "native_object_unavailable" or "discovery_limit" or "session_capacity" or "unsupported_selection" or "selection_too_large" => code,
         "timeout" => "deadline_exceeded", "validation_failed" or "foreground_failed" => "verification_failed",

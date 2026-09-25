@@ -63,6 +63,44 @@ internal static class H2AgentDesktopLaunchTests
             });
         });
 
+        test("AR-061 missing DesktopHost is a no-effect launch preflight failure",()=>{
+            Temp((root,state)=>{
+                var previous=Environment.GetEnvironmentVariable(H2AgentLab.Desktop.DesktopHostLocator.EnvironmentVariable);
+                try
+                {
+                    Environment.SetEnvironmentVariable(
+                        H2AgentLab.Desktop.DesktopHostLocator.EnvironmentVariable,
+                        Path.Combine(root,"missing-desktop-host.exe"));
+                    using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
+                    host.ReadOnly=false;
+                    var registry=NormalRuntimeToolRegistry.Create(host);
+                    Check(registry.TryGet("launch_app",out var launch),"launch_app missing.");
+                    var raw=launch.Executor.ExecuteAsync(
+                        new ToolCall("preflight","launch_app",JsonSerializer.SerializeToElement(new{
+                            application="notepad",
+                            mode="reuse_or_launch"
+                        })),
+                        CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                    using var json=JsonDocument.Parse(raw);
+                    var rootNode=json.RootElement;
+                    Check(rootNode.TryGetProperty("success",out var success)
+                        && success.ValueKind==JsonValueKind.False,
+                        "Missing helper launch preflight did not fail.");
+                    Check(rootNode.TryGetProperty("mutationApplied",out var applied)
+                        && applied.ValueKind==JsonValueKind.False,
+                        "Missing helper preflight was not classified as no-effect.");
+                    Check(rootNode.GetProperty("recovery").GetProperty("code").GetString()=="app_preflight_unavailable",
+                        "Missing helper preflight lost its typed recovery code.");
+                }
+                finally
+                {
+                    Environment.SetEnvironmentVariable(
+                        H2AgentLab.Desktop.DesktopHostLocator.EnvironmentVariable,
+                        previous);
+                }
+            });
+        });
+
         test("AR-061 launch_app schema requires an application name and offers no executable path argument",()=>{
             Temp((root,state)=>{
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});

@@ -53,6 +53,7 @@ public static class RecoveryPolicy
             "denied" or "boundary" or "access_denied" or "permission_required" => "Stop this scope. Do not retry or route around this restriction. Explain what needs user action without changing permissions.",
             "unknown_tool" => "Choose from the actual advertised tools or use list_skills. Do not invent a tool name; use a supported approach.",
             "unavailable" => "This capability is not installed/available. Consider another supported approach within the request, otherwise report the missing prerequisite. Do not claim it ran.",
+            "app_preflight_unavailable" => "The packaged DesktopHost helper failed before any app mutation. Repair helper packaging/protocol first; do not reconcile or repeat the app launch as if it may have run.",
             "stale_state" => "Read the current file/window again, compare what changed and obtain a fresh hash/token. Do not blindly overwrite or repeat an external action.",
             "file_busy" => "Do a read-only check of the current file state. Retry only after new evidence; do not kill apps or overwrite locks.",
             "invalid_arguments" => "Check the advertised tool schema and observed exact values, correct the arguments and retry.",
