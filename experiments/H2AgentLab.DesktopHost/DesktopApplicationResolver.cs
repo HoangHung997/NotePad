@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Win32;
 
 namespace H2AgentLab.DesktopHost;
@@ -13,7 +14,9 @@ public static class DesktopApplicationResolver
         new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
         {
             ["explorer"] = "explorer.exe",
+            ["explore"] = "explorer.exe",
             ["file explorer"] = "explorer.exe",
+            ["file explore"] = "explorer.exe",
             ["windows explorer"] = "explorer.exe",
             ["notepad"] = "notepad.exe",
             ["word"] = "winword.exe",
@@ -35,31 +38,47 @@ public static class DesktopApplicationResolver
         };
 
     public static string ProcessNameFor(string application)
-    {
-        var executable = ExecutableName(application);
-        var process = Path.GetFileNameWithoutExtension(executable);
-        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
-        return process;
-    }
+        => ResolveForLaunch(application).ProcessName;
 
     public static ResolvedDesktopApplication ResolveForLaunch(string application)
     {
         if (!OperatingSystem.IsWindows())
             throw new DesktopHostFaultException("unsupported_operation", "Desktop application launch requires Windows.");
-        var executable = ExecutableName(application);
-        var process = Path.GetFileNameWithoutExtension(executable);
-        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
-        var path = FindRegisteredExecutable(executable)
-            ?? throw new DesktopHostFaultException(
+
+        application = ValidateApplicationText(application);
+        if (Aliases.TryGetValue(application, out var alias))
+            return ResolveExecutable(alias)
+                ?? throw new DesktopHostFaultException(
+                    "app_not_found",
+                    "The requested application is not registered in an approved Windows application location.");
+
+        if (TryExecutableName(application, out var executable)
+            && ResolveExecutable(executable) is { } exact)
+            return exact;
+
+        var normalized = NormalizeFriendlyName(application);
+        var matches = RegisteredApplications()
+            .Where(candidate => candidate.Names.Any(name =>
+                string.Equals(NormalizeFriendlyName(name), normalized, StringComparison.Ordinal)))
+            .Select(candidate => candidate.Application)
+            .GroupBy(x => x.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(2)
+            .ToArray();
+
+        return matches.Length switch
+        {
+            1 => matches[0],
+            > 1 => throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one registered Windows application exactly matches this friendly name."),
+            _ => throw new DesktopHostFaultException(
                 "app_not_found",
-                "The requested application is not registered in an approved Windows application location.");
-        return new(
-            Path.GetFileNameWithoutExtension(executable).ToLowerInvariant(),
-            path,
-            process);
+                "No exact registered Windows application matches this name.")
+        };
     }
 
-    private static string ExecutableName(string application)
+    private static string ValidateApplicationText(string application)
     {
         application = (application ?? "").Trim();
         if (application.Length is < 1 or > 128 || application.Any(char.IsControl)
@@ -68,19 +87,98 @@ public static class DesktopApplicationResolver
             throw new DesktopHostFaultException(
                 "invalid_application",
                 "Use an application name, not an executable path or shell command.");
+        return application;
+    }
 
-        if (Aliases.TryGetValue(application, out var alias))
-            return alias;
-
-        var candidate = application.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+    private static bool TryExecutableName(string application, out string executable)
+    {
+        executable = application.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? application
             : application + ".exe";
-        if (candidate.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-')))
-            throw new DesktopHostFaultException(
-                "app_not_found",
-                "Use a known application alias or an installed App Paths executable name.");
-        return candidate;
+        return executable.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-');
     }
+
+    private static ResolvedDesktopApplication? ResolveExecutable(string executable)
+    {
+        var process = Path.GetFileNameWithoutExtension(executable);
+        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
+        var path = FindRegisteredExecutable(executable);
+        return path is null
+            ? null
+            : new(
+                Path.GetFileNameWithoutExtension(executable).ToLowerInvariant(),
+                path,
+                process);
+    }
+
+    private static IEnumerable<RegisteredApplicationCandidate> RegisteredApplications()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
+        {
+            RegistryKey? root = null;
+            RegistryKey? appPaths = null;
+            try
+            {
+                root = RegistryKey.OpenBaseKey(hive, view);
+                appPaths = root.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths",
+                    writable: false);
+                if (appPaths is null) continue;
+
+                foreach (var subKeyName in appPaths.GetSubKeyNames())
+                {
+                    using var key = appPaths.OpenSubKey(subKeyName, writable: false);
+                    if (key?.GetValue(null) is not string registered) continue;
+                    registered = Environment.ExpandEnvironmentVariables(registered.Trim().Trim('"'));
+                    if (!File.Exists(registered)) continue;
+                    registered = Path.GetFullPath(registered);
+                    if (!seen.Add(registered)) continue;
+
+                    var process = Path.GetFileNameWithoutExtension(registered);
+                    if (!DesktopSafetyPolicy.IsProcessAllowedForLaunch(process)) continue;
+
+                    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        Path.GetFileNameWithoutExtension(subKeyName),
+                        process
+                    };
+                    try
+                    {
+                        var version = FileVersionInfo.GetVersionInfo(registered);
+                        if (!string.IsNullOrWhiteSpace(version.ProductName)) names.Add(version.ProductName);
+                        if (!string.IsNullOrWhiteSpace(version.FileDescription)) names.Add(version.FileDescription);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                    {
+                    }
+
+                    yield return new(
+                        new(
+                            Path.GetFileNameWithoutExtension(subKeyName).ToLowerInvariant(),
+                            registered,
+                            process),
+                        names.ToArray());
+                }
+            }
+            finally
+            {
+                appPaths?.Dispose();
+                root?.Dispose();
+            }
+        }
+    }
+
+    private static string NormalizeFriendlyName(string value)
+        => new(value.Normalize()
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+
+    private sealed record RegisteredApplicationCandidate(
+        ResolvedDesktopApplication Application,
+        IReadOnlyList<string> Names);
 
     private static string? FindRegisteredExecutable(string executable)
     {
