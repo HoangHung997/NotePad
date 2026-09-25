@@ -6,6 +6,9 @@ public static class DesktopSafetyPolicy
     {
         "cmd", "powershell", "pwsh", "powershell_ise", "WindowsTerminal", "OpenConsole", "conhost",
         "wsl", "bash", "ssh", "mstsc", "Taskmgr", "regedit", "mmc", "consent", "CredentialUIBroker",
+        "rundll32", "regsvr32", "mshta", "wscript", "cscript", "msiexec", "runas",
+        "wmic", "diskpart", "bcdedit", "schtasks", "sc", "net", "net1", "taskkill",
+        "certutil", "bitsadmin", "wevtutil", "takeown", "icacls", "fodhelper", "ComputerDefaults",
         "LogonUI", "winlogon", "lsass", "SecHealthUI", "SecurityHealthSystray", "SystemSettings",
         "1Password", "Bitwarden", "KeePass", "KeePassXC", "NordPass", "LastPass",
         "Codex", "ChatGPT", "Code", "devenv"

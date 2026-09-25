@@ -41,6 +41,9 @@ public static class DesktopHostSelfTests
             foreach (var process in new[]
             {
                 "cmd", "powershell", "pwsh", "regedit",
+                "rundll32", "regsvr32", "mshta", "wscript", "cscript", "msiexec",
+                "runas", "wmic", "diskpart", "bcdedit", "schtasks", "taskkill",
+                "certutil", "bitsadmin", "wevtutil", "takeown", "icacls", "fodhelper",
                 "CredentialUIBroker", "1Password", "Bitwarden",
                 "ChatGPT", "Codex", "Code", "devenv"
             })
