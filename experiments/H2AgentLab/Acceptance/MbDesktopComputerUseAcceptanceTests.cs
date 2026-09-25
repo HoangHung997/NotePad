@@ -252,6 +252,19 @@ public static class MbDesktopComputerUseAcceptanceTests
                 "Unobserved/semantically weak app launch was incorrectly verified.");
         }).ConfigureAwait(false);
 
+        await Case("application-wait-fails-closed-on-ambiguity", async () =>
+        {
+            using var client = Client();
+            _ = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest("word", true, 1000)).ConfigureAwait(false);
+            _ = await client.LaunchApplicationAsync(
+                new DesktopApplicationLaunchRequest("word", true, 1000)).ConfigureAwait(false);
+            await ExpectCode(
+                "ambiguous_target",
+                () => client.WaitForApplicationWindowAsync(
+                    new DesktopApplicationWaitRequest("word", 1000))).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+
         await Case("application-launch-guards", async () =>
         {
             using var client = Client();

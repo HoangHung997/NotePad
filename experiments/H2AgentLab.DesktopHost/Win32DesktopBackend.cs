@@ -137,10 +137,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         {
             var found = ListWindows()
                 .Where(x => string.Equals(x.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.Foreground)
-                .ThenByDescending(x => x.ProcessStartedUtcTicks)
-                .FirstOrDefault();
-            if (found is not null) return found;
+                .ToArray();
+            if (found.Length == 1) return found[0];
+            if (found.Length > 1)
+                throw new DesktopHostFaultException(
+                    "ambiguous_target",
+                    "More than one safe visible window exists for this application; enumerate and use an exact session_id.");
             if (DateTime.UtcNow >= deadline) break;
             Thread.Sleep(100);
         }

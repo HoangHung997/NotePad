@@ -72,9 +72,13 @@ public sealed class FixtureDesktopBackend : IDesktopBackend
         var process = FixtureProcessName(request.Application);
         var found = ListWindows()
             .Where(x => string.Equals(x.ProcessName, process, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(x => x.Foreground)
-            .FirstOrDefault();
-        return found ?? throw new DesktopHostFaultException(
+            .ToArray();
+        if (found.Length == 1) return found[0];
+        if (found.Length > 1)
+            throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one fixture application window is running.");
+        throw new DesktopHostFaultException(
             "app_not_found",
             "Fixture application window is not running.");
     }
