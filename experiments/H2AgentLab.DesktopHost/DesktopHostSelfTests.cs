@@ -92,6 +92,10 @@ public static class DesktopHostSelfTests
                     throw new InvalidOperationException("Explorer shell surface was accepted as an app window: " + shellClass);
             if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("notepad", "Notepad"))
                 throw new InvalidOperationException("Ordinary application launch window was rejected.");
+            if (Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: false))
+                throw new InvalidOperationException("Global app inventory exposed an offscreen/minimized window.");
+            if (!Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: true))
+                throw new InvalidOperationException("Exact activation could not re-resolve a minimized window.");
         });
 
         Test("AutoCAD launch completion requires the process main frame", () =>

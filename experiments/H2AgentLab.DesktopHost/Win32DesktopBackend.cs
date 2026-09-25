@@ -17,6 +17,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     private long _mutationSequence;
 
     public IReadOnlyList<DesktopWindowInfo> ListWindows()
+        => EnumerateWindows(includeOffscreen: false);
+
+    private IReadOnlyList<DesktopWindowInfo> EnumerateWindows(bool includeOffscreen)
     {
         var result = new List<DesktopWindowInfo>();
         foreach (AutomationElement element in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
@@ -26,7 +29,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 var current = element.Current;
                 if (current.NativeWindowHandle == 0
                     || current.ProcessId <= 0
-                    || current.IsOffscreen
+                    || !ShouldIncludeWindow(current.IsOffscreen, includeOffscreen)
                     || string.IsNullOrWhiteSpace(current.Name))
                     continue;
 
@@ -221,6 +224,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         return IsApplicationLaunchWindowClass(processName, className);
     }
 
+    internal static bool ShouldIncludeWindow(bool isOffscreen, bool includeOffscreen)
+        => includeOffscreen || !isOffscreen;
+
     internal static bool IsApplicationLaunchWindowCandidate(
         string processName,
         long handle,
@@ -261,7 +267,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     {
         ArgumentNullException.ThrowIfNull(request);
         DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
-        var window = ResolveWindow(request.SessionId);
+        // The exact session may have become minimized/offscreen after it was observed.
+        // Resolve the same HWND/PID/start identity without broadening inventory visibility,
+        // restore/focus it, then require a normal visible re-resolution below.
+        var window = ResolveWindow(request.SessionId, includeOffscreen: true);
         var handle = new IntPtr(window.Handle);
         TryActivateExactWindow(handle);
 
@@ -557,9 +566,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         };
     }
 
-    private DesktopWindowInfo ResolveWindow(string sessionId)
+    private DesktopWindowInfo ResolveWindow(string sessionId, bool includeOffscreen = false)
     {
-        var window = ListWindows().SingleOrDefault(x => x.SessionId == sessionId);
+        var window = EnumerateWindows(includeOffscreen).SingleOrDefault(x => x.SessionId == sessionId);
         return window
             ?? throw new DesktopHostFaultException("session_not_found", "Desktop window session is unavailable or blocked by policy.");
     }
