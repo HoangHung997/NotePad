@@ -1258,6 +1258,7 @@ public static class NormalRuntimeToolRegistry
                 "invalid_application" => new global::H2AgentLab.AgentFaultException("invalid_application", ex.Message, false),
                 "app_not_found" => new global::H2AgentLab.AgentFaultException("app_not_found", ex.Message),
                 "ambiguous_target" => new global::H2AgentLab.AgentFaultException("ambiguous_target", ex.Message, false),
+                "launch_ambiguous" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
                 "launch_unverified" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
                 "foreground_failed" => new global::H2AgentLab.AgentFaultException("foreground_failed", ex.Message),
                 "preflight_unavailable" or "protocol_mismatch" => new global::H2AgentLab.AgentFaultException(

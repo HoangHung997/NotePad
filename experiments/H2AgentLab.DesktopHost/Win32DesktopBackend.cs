@@ -142,11 +142,13 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 .ToArray();
             var created = current
                 .Where(x => !beforeSessions.Contains(x.SessionId))
-                .OrderByDescending(x => x.Foreground)
-                .ThenByDescending(x => x.ProcessStartedUtcTicks)
-                .FirstOrDefault();
-            if (created is not null)
-                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created);
+                .ToArray();
+            if (created.Length > 1)
+                throw new DesktopHostFaultException(
+                    "launch_ambiguous",
+                    "The application launch produced multiple new safe windows. The app may be open, but no exact target can be selected without new observation.");
+            if (created.Length == 1)
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created[0]);
 
             if (!request.RequireNewWindow)
             {
