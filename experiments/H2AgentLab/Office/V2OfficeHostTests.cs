@@ -124,11 +124,12 @@ public static class V2OfficeHostTests
         {
             using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);
             var session = (await client.DiscoverExcelAsync()).ActiveSessionId!;
+            var fields = new[] { ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula };
             var first = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
                 session,
                 "Data",
                 "A1:B2",
-                [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula, ExcelRangeReadFields.Format],
+                fields,
                 2));
 
             Check(first.PageRange == "A1:B1"
@@ -144,12 +145,24 @@ public static class V2OfficeHostTests
                 session,
                 "Data",
                 "A1:B2",
-                [ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula, ExcelRangeReadFields.Format],
+                fields,
                 2,
                 first.NextCursor,
                 first.ContentVersion));
             Check(second.PageRange == "A2:B2" && second.Complete && second.NextCursor is null,
                 "Range continuation skipped, duplicated or failed to terminate.");
+
+            var structural = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B1",
+                [ExcelRangeReadFields.Format, ExcelRangeReadFields.Merge, ExcelRangeReadFields.Hidden],
+                2));
+            Check(structural.Complete
+                && structural.NextCursor is null
+                && structural.Cells.Single(x => x.Address == "B1").Italic == true
+                && structural.MergedRanges.Contains("A1:B1", StringComparer.Ordinal),
+                "Single-page structural range evidence did not cross OfficeHost IPC.");
 
             var snapshot = await client.SnapshotExcelAsync(session);
             _ = await client.PatchExcelAsync(new ExcelPatchRequest(
@@ -164,8 +177,8 @@ public static class V2OfficeHostTests
                     session,
                     "Data",
                     "A1:B2",
-                    [ExcelRangeReadFields.Value],
-                    1,
+                    fields,
+                    2,
                     first.NextCursor,
                     first.ContentVersion)));
         });
