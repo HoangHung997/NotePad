@@ -30,6 +30,7 @@ public sealed class DesktopHostClient : IDisposable
     private string? _pipeName;
     private bool _disposed;
     private int _starts;
+    private int? _validatedProtocolProcessId;
 
     public DesktopHostClient(
         string hostExecutable,
@@ -55,28 +56,41 @@ public sealed class DesktopHostClient : IDisposable
     public Task<IReadOnlyList<DesktopWindowInfo>> ListWindowsAsync(CancellationToken cancellationToken = default)
         => CallAsync<IReadOnlyList<DesktopWindowInfo>>("desktop.list", new { }, null, cancellationToken);
 
-    public Task<DesktopApplicationLaunchResult> LaunchApplicationAsync(
+    public async Task<DesktopApplicationLaunchResult> LaunchApplicationAsync(
         DesktopApplicationLaunchRequest request,
         CancellationToken cancellationToken = default)
-        => CallAsync<DesktopApplicationLaunchResult>(
+    {
+        await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        return await CallAsync<DesktopApplicationLaunchResult>(
             "desktop.launch_app",
             request,
             ApplicationTimeout(request.WaitMilliseconds),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+    }
 
-    public Task<DesktopWindowInfo> WaitForApplicationWindowAsync(
+    public async Task<DesktopWindowInfo> WaitForApplicationWindowAsync(
         DesktopApplicationWaitRequest request,
         CancellationToken cancellationToken = default)
-        => CallAsync<DesktopWindowInfo>(
+    {
+        await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        return await CallAsync<DesktopWindowInfo>(
             "desktop.wait_app",
             request,
             ApplicationTimeout(request.WaitMilliseconds),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+    }
 
-    public Task<DesktopWindowInfo> ActivateWindowAsync(
+    public async Task<DesktopWindowInfo> ActivateWindowAsync(
         DesktopApplicationActivateRequest request,
         CancellationToken cancellationToken = default)
-        => CallAsync<DesktopWindowInfo>("desktop.activate_window", request, null, cancellationToken);
+    {
+        await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        return await CallAsync<DesktopWindowInfo>(
+            "desktop.activate_window",
+            request,
+            null,
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public Task<DesktopObservation> ObserveAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<DesktopObservation>(
@@ -173,6 +187,27 @@ public sealed class DesktopHostClient : IDisposable
         }
     }
 
+    private async Task EnsureCurrentProtocolAsync(CancellationToken cancellationToken)
+    {
+        var currentPid = ProcessId;
+        if (currentPid is not null && _validatedProtocolProcessId == currentPid)
+            return;
+
+        var ping = await PingAsync(cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(
+                ping.ProtocolVersion,
+                DesktopProtocolConstants.Version,
+                StringComparison.Ordinal))
+        {
+            StopHost();
+            throw new DesktopHostClientException(
+                "protocol_mismatch",
+                "DesktopHost protocol version does not match this H2 Notes build.");
+        }
+
+        _validatedProtocolProcessId = ping.ProcessId;
+    }
+
     private static TimeSpan ApplicationTimeout(int waitMilliseconds)
         => TimeSpan.FromMilliseconds(
             Math.Clamp(
@@ -226,6 +261,7 @@ public sealed class DesktopHostClient : IDisposable
             }
         }
         _pipeName = null;
+        _validatedProtocolProcessId = null;
     }
 
     public void Dispose()

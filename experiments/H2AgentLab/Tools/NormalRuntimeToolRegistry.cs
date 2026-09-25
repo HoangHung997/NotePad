@@ -1249,6 +1249,7 @@ public static class NormalRuntimeToolRegistry
                 "ambiguous_target" => new global::H2AgentLab.AgentFaultException("ambiguous_target", ex.Message, false),
                 "launch_unverified" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
                 "foreground_failed" => new global::H2AgentLab.AgentFaultException("foreground_failed", ex.Message),
+                "protocol_mismatch" => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message, false),
                 _ => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message)
             };
     }

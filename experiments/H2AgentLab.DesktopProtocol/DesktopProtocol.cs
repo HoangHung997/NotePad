@@ -120,7 +120,7 @@ public sealed record DesktopPingResult(
 
 public static class DesktopProtocolConstants
 {
-    public const string Version = "1.1";
+    public const string Version = "1.2";
     public const int MaxMessageBytes = 8 * 1024 * 1024;
     public const int MaxScreenshotBytes = 4 * 1024 * 1024;
     public const int MaxElements = 200;
