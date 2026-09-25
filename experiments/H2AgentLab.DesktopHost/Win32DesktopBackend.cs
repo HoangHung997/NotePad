@@ -188,18 +188,59 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
         var window = ResolveWindow(request.SessionId);
         var handle = new IntPtr(window.Handle);
-        if (IsIconic(handle)) _ = ShowWindowAsync(handle, 9);
-        _ = BringWindowToTop(handle);
-        _ = SetForegroundWindow(handle);
+        TryActivateExactWindow(handle);
+
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (GetForegroundWindow() == handle)
+                return ResolveWindow(request.SessionId);
+            Thread.Sleep(50);
+        }
+
+        // One bounded retry after the OS had time to process restore/focus messages.
+        TryActivateExactWindow(handle);
         for (var attempt = 0; attempt < 10; attempt++)
         {
             if (GetForegroundWindow() == handle)
                 return ResolveWindow(request.SessionId);
             Thread.Sleep(50);
         }
+
         throw new DesktopHostFaultException(
             "foreground_failed",
-            "Windows did not confirm the observed application window as foreground.");
+            "Windows did not confirm the exact observed application window as foreground.");
+    }
+
+    private static void TryActivateExactWindow(IntPtr handle)
+    {
+        if (IsIconic(handle)) _ = ShowWindowAsync(handle, 9); // SW_RESTORE
+
+        var currentThread = GetCurrentThreadId();
+        var targetThread = GetWindowThreadProcessId(handle, out _);
+        var foreground = GetForegroundWindow();
+        var foregroundThread = foreground == IntPtr.Zero
+            ? 0u
+            : GetWindowThreadProcessId(foreground, out _);
+
+        var attachedForeground = false;
+        var attachedTarget = false;
+        try
+        {
+            if (foregroundThread != 0 && foregroundThread != currentThread)
+                attachedForeground = AttachThreadInput(currentThread, foregroundThread, true);
+            if (targetThread != 0 && targetThread != currentThread)
+                attachedTarget = AttachThreadInput(currentThread, targetThread, true);
+
+            _ = BringWindowToTop(handle);
+            _ = SetForegroundWindow(handle);
+        }
+        finally
+        {
+            if (attachedTarget)
+                _ = AttachThreadInput(currentThread, targetThread, false);
+            if (attachedForeground)
+                _ = AttachThreadInput(currentThread, foregroundThread, false);
+        }
     }
 
     public DesktopObservation Observe(string sessionId)
@@ -756,6 +797,15 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);
