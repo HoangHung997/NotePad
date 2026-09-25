@@ -4,12 +4,15 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Preconditions
 
-- Run the portable build produced from code `1483743c504f742043e8605ff002f66de8d9abbf` or a later docs-only checkpoint whose runtime tree contains that code.
+- Run the portable build produced from code `1c4e244669a3b3355836906b7a3af056966ceec2` or a later docs-only checkpoint whose runtime tree contains that code.
 - Microsoft Excel is installed and can be discovered by H2 OfficeHost.
 - Create a synthetic workbook with: more than 5,000 populated cells; at least two sheets; formulas (including at least one formula whose displayed value can change on recalculation); one merged range; hidden row and column; and a deliberately sparse UsedRange extending far beyond the small range used for the first read.
 - Keep API/model credentials out of the workbook and evidence. A model is not required for the E3 helper/provider boundary.
 
 ## Required checks
+
+**Previously observed native failure retest:** before the broader corpus, repeat the user workflow that previously returned `native_object_unavailable` / `live_resource_required` while Excel or Word was already open. The repaired provider may retry transient native acquisition internally, but the Agent must not blindly replay the user operation. If the error persists, save the exact new UI error/log and keep AR-021 open.
+
 
 1. Bind the intended live workbook and read a small range such as `Data!A1:D20`. Confirm returned cells and metrics are bounded to that range, not the whole UsedRange.
 2. Read a range larger than one page and follow `nextCursor` with the same `contentVersion` until complete. Confirm no duplicates/gaps and each page has at most 512 cells.
@@ -26,6 +29,6 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Pass condition
 
-RC-06/07 pass only when the real Excel provider reads the exact requested bounded ranges, value/formula cursor/version behavior is consistent and bound to the original range/fields/page size, bounded one-page structural evidence works on demand, structural multi-page requests fail closed, selection-only changes do not invalidate value/formula content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, worksheet renames/deletes require restart, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
+RC-06/07 pass only when the previously observed live-binding failure no longer reproduces on the repaired build and the real Excel provider reads the exact requested bounded ranges, value/formula cursor/version behavior is consistent and bound to the original range/fields/page size, bounded one-page structural evidence works on demand, structural multi-page requests fail closed, selection-only changes do not invalidate value/formula content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, worksheet renames/deletes require restart, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
 
 If a case fails, keep AR-021 active, save the failure evidence, repair on the same branch, and rerun focused + full CI before moving to AR-022.

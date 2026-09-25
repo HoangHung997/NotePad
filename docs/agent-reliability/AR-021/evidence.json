@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "AR-021",
-  "code_sha": "1483743c504f742043e8605ff002f66de8d9abbf",
+  "code_sha": "1c4e244669a3b3355836906b7a3af056966ceec2",
   "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
@@ -32,28 +32,29 @@
     "already_unsaved_recalculate_regression": "The E2 recalculation stale-content case starts page 1 with Saved=false and recalculates before continuation; the old token must be rejected.",
     "continuation_contract_binding": "contentVersion is bound to normalized requested range, canonical normalized fields and page size; cursor/version replay with a drifted contract is rejected stale_content/no-effect.",
     "sheet_identity_continuation": "A continuation against a renamed/deleted worksheet returns stale_content/no-effect; native post-page validation re-reads the actual worksheet name so a rename racing the page invalidates the response.",
-    "structural_paging_policy": "format/merge/hidden reads are supported only when the requested structural range completes in one bounded page; any structural request requiring continuation returns content_tracking_unavailable/no-effect because native Excel does not provide a reliable structural-edit revision signal."
+    "structural_paging_policy": "format/merge/hidden reads are supported only when the requested structural range completes in one bounded page; any structural request requiring continuation returns content_tracking_unavailable/no-effect because native Excel does not provide a reliable structural-edit revision signal.",
+    "transient_native_object_retry": "OfficeWindowCatalog retries only no-effect native object acquisition classified provider_busy or native_object_unavailable with a finite initial/40 ms/100 ms schedule; stale_resource and other non-transient classes fail immediately; no mutation/effect is replayed."
   },
   "validation": {
     "dedicated": {
-      "run_id": 36078139948,
-      "job_id": 107894641974,
+      "run_id": 36090762155,
+      "job_id": 107932509786,
       "result": "SUCCESS",
-      "focused": "10/10",
+      "focused": "11/11",
       "office_host": "17/17",
       "retained_ar020": "36/36",
       "retained_ar012": "44/44",
       "retained_ar001": "13/13",
-      "full_h2": "1282/1282",
-      "artifact_id": 10841121673,
-      "artifact_bytes": 36273,
-      "artifact_sha256": "070e4be37ccecd830063697dfa38838c9256fd5d2e87b37ac33f36da2632ecef"
+      "full_h2": "1283/1283",
+      "artifact_id": 10845273854,
+      "artifact_bytes": 36333,
+      "artifact_sha256": "ece71f1ae2bddf66c05f7f8f57084eea12d87341bdd3f1d5693d9005152091bc"
     },
     "avalonia": {
-      "run_id": 36078139952,
-      "job_id": 107893870274,
+      "run_id": 36090762198,
+      "job_id": 107932509507,
       "result": "SUCCESS",
-      "full_h2": "1282/1282",
+      "full_h2": "1283/1283",
       "all_agent_mb_office_transport_steps": "PASS",
       "windows_x64_publish": "PASS",
       "packaged_helper_ipc": "PASS"
@@ -65,16 +66,16 @@
     }
   },
   "build": {
-    "artifact_id": 10841461195,
+    "artifact_id": 10845199972,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110307986,
-    "sha256": "6f80ff52a2e108459bba517ff70b6070fd41b38243953dd04872f2ca20628a54",
+    "bytes": 110308263,
+    "sha256": "d96d6e1bca0abfbbd14d471e0a6392628c022b4783bac8497c29febdc65d10c1",
     "independently_downloaded": false,
     "zip_crc": "PENDING_FINAL_CHECKPOINT_COPY",
     "zip_entries": null
   },
   "not_claimed": {
-    "native_excel_e3": "AWAITING_ENVIRONMENT / NOT_RUN; E2 now covers structural multi-page fail-closed policy in addition to direct edit/recalculation/rebind/continuation-contract/sheet-rename semantics, but real Excel behavior still requires RC-06/07.",
+    "native_excel_e3": "NOT PASSED. A real user-machine attempt failed with native_object_unavailable/live_resource_required on the prior build. Repair 1c4e244669a3b3355836906b7a3af056966ceec2 is E2/CI validated and requires native retest before E3 can pass.",
     "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
     "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
     "full_workbook_support": "NOT_CLAIMED from bounded range implementation"
@@ -92,5 +93,16 @@
       "result": "FAILURE",
       "repair": "e7dba71f76e36fc73aee7509e8f39416b8f7296a"
     }
-  ]
+  ],
+  "native_failure_history": {
+    "status": "NATIVE_FAILURE_OBSERVED_REPAIRED_AWAITING_RETEST",
+    "observed_from": "user-supplied H2 Notes screenshots in current conversation; screenshots not copied into repository",
+    "symptom_codes": [
+      "native_object_unavailable",
+      "live_resource_required"
+    ],
+    "interpretation": "Real Office was open but live binding failed before useful work; exact Office build/log correlation was not available from screenshots alone.",
+    "repair_sha": "1c4e244669a3b3355836906b7a3af056966ceec2",
+    "retest_required": true
+  }
 }
