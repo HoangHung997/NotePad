@@ -294,7 +294,14 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         for (var attempt = 0; attempt < 20; attempt++)
         {
             if (GetForegroundWindow() == handle)
-                return ResolveWindow(request.SessionId);
+            {
+                try { return ResolveWindow(request.SessionId); }
+                catch (DesktopHostFaultException ex) when (ex.Code == "session_not_found")
+                {
+                    // Win32 focus can precede UI Automation's visible/offscreen refresh.
+                    // Keep the same exact session identity and retry briefly; never pick another HWND.
+                }
+            }
             Thread.Sleep(50);
         }
 
@@ -303,7 +310,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         for (var attempt = 0; attempt < 10; attempt++)
         {
             if (GetForegroundWindow() == handle)
-                return ResolveWindow(request.SessionId);
+            {
+                try { return ResolveWindow(request.SessionId); }
+                catch (DesktopHostFaultException ex) when (ex.Code == "session_not_found")
+                {
+                }
+            }
             Thread.Sleep(50);
         }
 
