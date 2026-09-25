@@ -505,7 +505,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task checkpoint is AR-021: bounded Excel range/paging/content-token implementation is E1/E2 green on exact code `ad843b075bccd0f5967464ec380717d9fe7dfeea`; native paged reads now track direct cell edits via Workbook.SheetChange and fail closed when event tracking is unavailable; native Excel E3 is AWAITING_ENVIRONMENT and is NOT PASS.** The user's requested downloadable Windows build is available from the same validated code. Do not start AR-022 in this one-task turn; first use the build for AR-021 real Excel RC-06/07 and repair any observed regression inside AR-021. Prior AR-020/033/051/064/065/066/067/068/069/070 real-environment debts remain recorded at their existing evidence levels; AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
+**Current task checkpoint is AR-061: desktop application lifecycle repair is the only ACTIVE implementation task. AR-021 native E3 was explicitly deferred by the user after its E2-green portable build, so it no longer blocks the sequence. Current AR-061 source HEAD is `590e8b72c60bdf1a2e2fbd27369b0e3f134d0647`: normal runtime now exposes transport-safe `launch_app`, `list_running_apps`, `wait_for_app_window` and `activate_app`; DesktopHost resolves exact approved Windows applications, verifies HWND/PID/process-start/session identity, fails closed on ambiguous windows, supports bounded slow startup and single-instance reuse, preserves task permission presets, redacts global window titles, guards uncertain retries, and blocks shell/credential/developer plus high-risk Windows loader/admin executables. AR-061 has NOT passed E1/E2 yet because GitHub-hosted runners have not started any step for the current Windows, Avalonia or cross-build gates; do not infer PASS from source review. Last fully validated application build remains the older AR-021 code `9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd`, which does NOT contain the AR-061 launcher repair. AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
@@ -524,174 +524,99 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-021_EXACT_WINDOW_ROT_FALLBACK_E2_PASS_E3_NATIVE_RETEST_REQUIRED_BUILD_READY",
-  "active_task": "AR-021",
-  "implementation_status": "IMPLEMENTED",
-  "acceptance_status": "AWAITING_ENVIRONMENT",
-  "completed_evidence_level": "E2",
-  "required_evidence_level": "E3",
+  "phase": "AR-061_APPLICATION_LIFECYCLE_IMPLEMENTED_BUILD_BLOCKED_BY_GITHUB_RUNNER_QUEUE",
+  "active_task": "AR-061",
+  "implementation_status": "IMPLEMENTED_PENDING_BUILD",
+  "acceptance_status": "CI_RUNNER_QUEUED",
+  "completed_evidence_level": "NO_AR061_E1_E2_PASS_YET",
+  "required_evidence_level": "E3/E4",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar021-exact-window-rot-fallback-2026-09-25",
-  "last_code_commit": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
+  "owner_session": "chatgpt-ar061-application-lifecycle-2026-09-25",
+  "last_code_commit": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
   "last_validated_code_commit": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-  "last_validation_result": "AR021_14_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1286_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; ALL_22_EXACT_SHA_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; EXACT_WINDOW_ROT_COM_FALLBACK_VALIDATED_E2_FOR_WORD_AND_EXCEL; NATIVEOM_REMAINS_PRIMARY; NO_FILENAME_ROT_ORDER_ACTIVEDOCUMENT_GUESS; USER_NATIVE_E3_RETEST_REQUIRED; NO_E3_PASS_CLAIM",
+  "last_validation_result": "AR-061 CURRENT HEAD HAS NO COMPLETED BUILD/TEST RUN. GitHub check-runs are valid but queued before step 1. Do not claim E1/E2. Prior AR-021 SHA 9d8624c... remains fully validated but predates AR-061.",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is 9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd. User screenshots establish a real native Office live-binding failure symptom on an earlier portable build; screenshots and the reference Word package remain conversation evidence and were not copied into the repository. No reset/force-push/main merge occurred.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. Repository work performed through GitHub connector on PR #3. No reset/force-push/main merge. Current AR-061 source is committed; no known uncommitted connector-side diff.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-25T08:21:14Z",
+  "checkpoint_saved_at_utc": "2026-09-25T12:58:20Z",
   "completed_this_session": [
-    "Continued AR-021 only after the user supplied real Word/Excel native_object_unavailable/live_resource_required screenshots.",
-    "Reviewed the user-supplied Word integration reference and retained its useful ROT/COM discovery idea without copying its weaker target-selection semantics.",
-    "Kept AccessibleObjectFromWindow/OBJID_NATIVEOM as the primary Office path.",
-    "Added OfficeRotWindowFallback that enumerates the Windows ROT and accepts a candidate only when COM Window.Hwnd matches the already-observed top-level HWND and PID/process-start/desktop-session identity also matches.",
-    "When EXCEL7/_WwG child discovery yields no candidate, the exact-root ROT fallback may supply one; NativeOM Open may also fall back only for provider_busy/native_object_unavailable, never stale_resource/permission errors.",
-    "The ROT path never chooses by filename, ROT order, ActiveDocument or fuzzy title and therefore preserves AR-020 no-guess semantics.",
-    "Added E2 Word and Excel regressions for exact-window ROT binding plus wrong-HWND and wrong-process-start negative controls.",
-    "Recorded and repaired two intermediate test-only failures: 466fddb93d7fe9b52c30d9662b7f52479199ffa7 had Path.Combine shadowing in fixtures; 6a6287a6cf06cacd6d7bc19d987069e147d17610 had private dynamic fixtures invisible across the OfficeHost assembly boundary.",
-    "Validated exact code SHA 9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd: AR-021 14/14, OfficeHost 17/17, retained AR-020 36/36, AR-012 44/44, AR-001 13/13, full H2 1286/1286.",
-    "All 11 pull-request workflows and all 22 exact-SHA push/pull-request workflows completed SUCCESS.",
-    "Avalonia CI published a self-contained win-x64 portable and verified packaged Agent helper startup/IPC."
+    "User explicitly allowed AR-021 native E3 to be deferred so repair sequence could advance.",
+    "Mapped the next user-observed defect to AR-061: production could open a specific file but had no callable application lifecycle executor for opening File Explorer or a blank/running desktop application.",
+    "Added normal runtime app namespace callables: launch_app, list_running_apps, wait_for_app_window and activate_app. Names use underscore form so Chat Completions/Ollama and Responses transports can all advertise them safely.",
+    "Added DesktopHost RPC request/result contract and client/server routing for application launch/wait/activate independent of preselected desktop-window control.",
+    "Added Windows App Paths/system application resolver with exact aliases for Explorer, Word, Excel, AutoCAD, browsers and common apps; arbitrary executable paths/shell syntax are rejected.",
+    "Extended exact friendly-name resolution from registered App Paths metadata without fuzzy guessing; multiple exact matches fail ambiguous_target.",
+    "Bound App Paths key identity to resolved executable stem so a key cannot redirect to another executable identity.",
+    "Launch verifies a newly observed exact safe window, a newly promoted exact window, or one exact reusable existing safe window; multiple existing ambiguous windows fail closed.",
+    "Activation verifies the exact prior session HWND/PID/process-start identity and foreground state; input-thread attachment is bounded and detached after focus attempt.",
+    "Global app inventory redacts window titles; targeted launch/wait evidence retains only what is needed for requested-resource verification.",
+    "Production verifier checks requested application string, resolved process, HWND, PID, process-start, session and foreground/new-or-reused semantics before allowing launch/activate completion claims.",
+    "Permission semantics preserved: ObserveOnly blocks mutation; AskBeforeChanges/ProjectPolicy require approval; FullAccess follows its existing no-per-call-approval contract; scoped file/document auto-change permission does not silently become machine app-launch authority.",
+    "Recovery guard treats launch/activate as side effects: uncertain results require changed evidence for the same application/session before retry; unrelated app observation cannot unlock a retry.",
+    "Added bounded 20-second application startup / 30-second host cap with client timeout margin for slower applications such as AutoCAD.",
+    "Hardened launcher blocklist against shells, credential managers, developer control surfaces and Windows loader/admin executables such as rundll32, regsvr32, mshta, script hosts, diskpart, bcdedit and schtasks.",
+    "Added/updated AR-061 focused tests, MB-112 lifecycle/ambiguity/reuse/verifier/safety cases, canonical tool-surface expectations and tool-search discovery for English/Vietnamese user phrasing.",
+    "PR #3 title updated to AR-061 so future handoff does not present the stale AR-021 title."
   ],
   "remaining_in_active_task": [
-    "User must retest the exact portable build on the authorized Windows machine with real Word and Excel already open.",
-    "First reproduce the prior native_object_unavailable/live_resource_required workflow. NativeOM should remain primary; if that exact window lacks usable NativeOM, ROT/COM may bind only the same observed HWND/PID/start/session.",
-    "Confirm multiple Word/Excel instances do not redirect the task to a different document.",
-    "If live binding succeeds, complete RC-06/07 native Excel corpus: >5000 cells, bounded paging, direct edit/recalc invalidation, structural single-page evidence, structural multi-page fail-closed, sheet rename/delete, event-disabled fail-closed and rebind safety.",
-    "If the live error persists, preserve the exact new UI error/log/build SHA and keep AR-021 active for the next repair.",
-    "Do not start AR-022 or any other implementation task until AR-021 E3 passes or the user explicitly defers AR-021 after this build retest."
-  ],
-  "last_test_commands": [
-    {
-      "command": "tools/agent-reliability/validate_ar021.ps1",
-      "sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-      "run_id": 36111369647,
-      "job_id": 107996232046,
-      "attempt": 1,
-      "result": "SUCCESS; AR021 14/14; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1286/1286; artifact 10853612713 sha256 0cc1a307f3a76ccdba28d9cac0efdbf7f918e74aeba1123079c7516d23bd5384"
-    },
-    {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-      "run_id": 36111369556,
-      "job_id": 107995347410,
-      "attempt": 1,
-      "result": "SUCCESS; full H2 1286/1286; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10853806963 sha256 d9d0612c75200d7a0dcc7b273721c955bc6c219f77b8a75ebd6af872e8b932c8; NAS probe 10853662301 sha256 3353b764acd4fcf87f51a573e9beb55a43106ebfb5c9b30372a38fa322f253c2"
-    }
+    "Obtain a runner for the exact current HEAD and run AR-061 focused validation; inspect compile/test logs and repair any failure inside AR-061 only.",
+    "Run full Avalonia CI on the same source, including full H2/Agent/MB regression, self-contained win-x64 publish and packaged-helper startup/IPC.",
+    "Download and hash the exact AR-061 portable artifact. Do not give the user the older AR-021 artifact as if it contained this repair.",
+    "After CI is green, run E3 user-machine acceptance: File Explorer, Word, Excel and AutoCAD launch/activate behavior, single and multiple windows, blocked sensitive executables and app-not-found/ambiguity paths.",
+    "Keep AR-061 active until exact build exists and at least its required build/test gate is green; do not start AR-060/AR-063 implementation in this one-task sequence."
   ],
   "ci_runs": [
     {
-      "id": 36111369746,
-      "name": "AR-000 baseline capture",
-      "result": "SUCCESS"
+      "id": 36138050188,
+      "name": "AR-061 desktop application lifecycle validation",
+      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
+      "status": "QUEUED_NO_STEPS_STARTED"
     },
     {
-      "id": 36111369603,
-      "name": "AR-001 isolated implementation workspace",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369542,
-      "name": "AR-010 shared runtime validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369696,
-      "name": "AR-011 outcome contract validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369744,
-      "name": "AR-012 scoped binding validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369725,
-      "name": "AR-020 native discovery implementation validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369647,
-      "name": "AR-021 bounded Excel range validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369505,
-      "name": "AR-030 outcome and revision validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369577,
-      "name": "AR-031 journal and cancellation regression",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369714,
-      "name": "AR-032 scoped history validation",
-      "result": "SUCCESS"
-    },
-    {
-      "id": 36111369556,
+      "id": 36138050265,
       "name": "Avalonia CI",
-      "result": "SUCCESS"
+      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
+      "status": "QUEUED_NO_STEPS_STARTED"
+    },
+    {
+      "id": 36138050136,
+      "name": "AR-061 Windows cross-build fallback",
+      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
+      "status": "QUEUED_NO_STEPS_STARTED"
     }
+  ],
+  "ci_queue_investigation": [
+    "Multiple prior AR-061 pull-request runs were cancelled by newer synchronize events before any steps ran.",
+    "Tried supported Windows runner pools and cross-build pools; jobs remained queued without runner assignment.",
+    "Added latest-per-PR concurrency cancellation to prevent new backlog; already-created historical queued runs cannot be cancelled through the available GitHub connector because no cancel-run action is exposed.",
+    "GitHub public status reported Actions operational, so no global incident was used as a PASS/FAIL explanation.",
+    "Sandbox has no dotnet/csc/msbuild toolchain and cannot download binary SDK/source archives directly; local substitute build is unavailable in this chat environment."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-021/evidence.json",
-    "docs/agent-reliability/AR-021/implementation.md",
-    "docs/agent-reliability/AR-021/native-acceptance.md",
-    "User-provided H2 Notes screenshot bundle and Word integration reference ZIP in the ChatGPT conversation (not copied into repo)",
-    "GitHub artifact 10853612713 AR021-E1-E2-Evidence",
-    "GitHub artifact 10853806963 H2Notes-Avalonia-Portable-win-x64"
-  ],
-  "known_failures": [
-    {
-      "sha": "a5e9b76c8e5518de170eed6615165f639f8ab1dc",
-      "run_id": 35985389076,
-      "status": "FAILURE",
-      "reason": "Three ComOfficeBackend compile errors: wrong ValidateCurrent named argument and target-typed ExcelRangeReadMetrics construction.",
-      "repair": "1fca3a506a8b40d1955c910fa2135a49797332b3"
-    },
-    {
-      "sha": "1fca3a506a8b40d1955c910fa2135a49797332b3",
-      "run_id": 35986730031,
-      "status": "FAILURE",
-      "reason": "AR-021 test file referenced ToolCall without global H2AgentLab qualification.",
-      "repair": "e7dba71f76e36fc73aee7509e8f39416b8f7296a"
-    },
-    {
-      "sha": "d0dacf5f9d4001c9c7b568b38de82fc7e777b4bc",
-      "status": "FAILURE",
-      "reason": "First-capture targeted scan retry violated AR-020 enumeration/no-guess invariants.",
-      "repair": "c00a38790158cbf7cab49a182a0c8597835d8fac"
-    },
-    {
-      "id": "AR-021-E3-USER-NATIVE",
-      "status": "NATIVE_FAILURE_OBSERVED",
-      "reason": "User screenshots showed live Office work failing with native_object_unavailable/live_resource_required while Excel/Word were open on an earlier portable build.",
-      "repair": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd adds exact-window ROT/COM fallback while retaining NativeOM primary; awaiting real native retest."
-    },
-    {
-      "sha": "466fddb93d7fe9b52c30d9662b7f52479199ffa7",
-      "status": "FAILURE",
-      "reason": "New ROT regression fixture shadowed System.IO.Path with a string property, causing CS1061 in test code.",
-      "repair": "6a6287a6cf06cacd6d7bc19d987069e147d17610"
-    },
-    {
-      "sha": "6a6287a6cf06cacd6d7bc19d987069e147d17610",
-      "status": "FAILURE",
-      "reason": "Full H2 reported 1284/1286 because private fake dynamic Word/Excel fixture types were not accessible from the OfficeHost assembly path.",
-      "repair": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd"
-    }
+    "docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
+    ".github/workflows/h2-ar061-validation.yml",
+    ".github/workflows/h2-ar061-crossbuild.yml",
+    "experiments/H2AgentLab.DesktopHost/DesktopApplicationResolver.cs",
+    "experiments/H2AgentLab.DesktopHost/Win32DesktopBackend.cs",
+    "experiments/H2AgentLab/Tools/NormalRuntimeToolRegistry.cs",
+    "experiments/H2AgentLab/Integration/H2DesktopRuntimeVerifier.cs",
+    "experiments/H2AgentLab/Acceptance/MbDesktopComputerUseAcceptanceTests.cs",
+    "tests/H2Notes.Tests/H2AgentDesktopLaunchTests.cs"
   ],
   "external_blockers": [
     {
-      "id": "AR-021-E3",
-      "status": "AWAITING_ENVIRONMENT",
-      "missing_evidence": "Real Word/Excel retest on the user's authorized Windows PC using portable artifact 10853806963. E2 proves exact-window ROT/COM fallback and retained no-guess guards, but only real Office can establish that the original native_object_unavailable/live_resource_required failure is resolved and complete RC-06/07."
+      "id": "AR-061-CI-RUNNER",
+      "status": "BLOCKING_BUILD",
+      "missing_evidence": "GitHub-hosted runner assignment. Current exact-SHA check-runs exist but remain queued with no completed steps, so no AR-061 binary or E1/E2 result exists yet."
     }
   ],
   "parked_acceptance": [
+    {
+      "id": "AR-021",
+      "status": "E3_DEFERRED_BY_USER",
+      "required": "real Word/Excel retest of prior portable"
+    },
     {
       "id": "AR-020",
       "status": "AWAITING_ENVIRONMENT",
@@ -723,18 +648,15 @@ Do not claim these defects were already covered by historical Office/transport/U
       "required": "E5 physical two-PC/NAS"
     }
   ],
-  "pending_user_decisions": [],
-  "downloadable_build": {
+  "previous_downloadable_build_not_ar061": {
     "artifact_id": 10853806963,
-    "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110312844,
-    "sha256": "d9d0612c75200d7a0dcc7b273721c955bc6c219f77b8a75ebd6af872e8b932c8",
-    "expires_at_utc": "2026-12-24T08:09:10Z",
     "source_sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 repair code. Includes NativeOM primary binding plus exact-window ROT/COM fallback for Word/Excel; first capture/broad discovery still never guesses a document."
+    "sha256": "d9d0612c75200d7a0dcc7b273721c955bc6c219f77b8a75ebd6af872e8b932c8",
+    "warning": "This is the prior AR-021 portable and does not contain AR-061 application lifecycle changes."
   },
-  "next_exact_action": "Download portable artifact 10853806963 and retest the exact Word/Excel live workflows that previously returned native_object_unavailable/live_resource_required. If binding succeeds, complete RC-06/07; if it fails, capture exact new UI error/log and keep AR-021 active. Do not start AR-022 until E3 passes or is explicitly deferred.",
-  "next_task_if_active_done": "AR-022"
+  "pending_user_decisions": [],
+  "next_exact_action": "Inspect AR-061 run 36138050188, Avalonia run 36138050265 and cross-build run 36138050136 on the latest source. When a runner is assigned, read the first failing step/log, repair AR-061 only, re-run until focused + full CI + publish/package gates pass, then download/hash the new portable artifact before user testing.",
+  "next_task_if_active_done": "Remain on AR-061 acceptance until the exact build is green; only then follow tracker dependency order."
 }
 ```
 
