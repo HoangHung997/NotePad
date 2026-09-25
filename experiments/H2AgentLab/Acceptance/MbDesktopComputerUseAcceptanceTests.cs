@@ -251,9 +251,7 @@ public static class MbDesktopComputerUseAcceptanceTests
                     pid = 22,
                     process_started_utc_ticks = 33L,
                     process = "notepad",
-                    title = "Untitled",
-                    foreground = true,
-                    dpi = 96
+                    foreground = true
                 },
                 verifiedByHostObservation = true
             });

@@ -1237,6 +1237,8 @@ public static class NormalRuntimeToolRegistry
                 foreground = window.Foreground
             };
 
+        // App lifecycle evidence needs exact process/window identity, not human window titles.
+        // Titles can contain document names or other private UI text and are deliberately omitted.
         private static object WindowProjection(DesktopWindowInfo window)
             => new
             {
@@ -1245,9 +1247,7 @@ public static class NormalRuntimeToolRegistry
                 pid = window.ProcessId,
                 process_started_utc_ticks = window.ProcessStartedUtcTicks,
                 process = window.ProcessName,
-                title = window.Title,
-                foreground = window.Foreground,
-                dpi = window.Dpi
+                foreground = window.Foreground
             };
 
         private static Exception Map(DesktopHostClientException ex)
