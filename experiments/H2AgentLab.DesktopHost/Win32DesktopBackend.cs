@@ -140,15 +140,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
                     && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
                 .ToArray();
-            var created = current
-                .Where(x => !beforeSessions.Contains(x.SessionId))
-                .ToArray();
-            if (created.Length > 1)
-                throw new DesktopHostFaultException(
-                    "launch_ambiguous",
-                    "The application launch produced multiple new safe windows. The app may be open, but no exact target can be selected without new observation.");
-            if (created.Length == 1)
-                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created[0]);
+            var created = SelectUniqueCreatedWindow(current, beforeSessions);
+            if (created is not null)
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created);
 
             if (!request.RequireNewWindow)
             {
@@ -166,6 +160,25 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             request.RequireNewWindow
                 ? "A distinct new application window was requested, but no new safe HWND/session was observed."
                 : "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
+    }
+
+    internal static DesktopWindowInfo? SelectUniqueCreatedWindow(
+        IReadOnlyList<DesktopWindowInfo> current,
+        IReadOnlySet<string> beforeSessions)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(beforeSessions);
+        var created = current
+            .Where(x => !beforeSessions.Contains(x.SessionId))
+            .ToArray();
+        return created.Length switch
+        {
+            0 => null,
+            1 => created[0],
+            _ => throw new DesktopHostFaultException(
+                "launch_ambiguous",
+                "The application launch produced multiple new safe windows. The app may be open, but no exact target can be selected without new observation.")
+        };
     }
 
     public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)

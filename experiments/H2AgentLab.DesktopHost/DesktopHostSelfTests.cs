@@ -111,6 +111,27 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Friendly-name normalization discarded meaningful punctuation.");
         });
 
+        Test("Launch never guesses among multiple newly observed windows", () =>
+        {
+            var before = new HashSet<string>(StringComparer.Ordinal) { "before-1" };
+            var one = new DesktopWindowInfo(
+                "new-1", 101, 11, 1011, "fixture", "One",
+                new H2AgentLab.DesktopProtocol.DesktopBounds(0, 0, 640, 480), 96, true);
+            var selected = Win32DesktopBackend.SelectUniqueCreatedWindow([one], before);
+            if (selected?.SessionId != "new-1")
+                throw new InvalidOperationException("Unique new application window was not selected.");
+
+            var two = one with { SessionId = "new-2", Handle = 102 };
+            try
+            {
+                _ = Win32DesktopBackend.SelectUniqueCreatedWindow([one, two], before);
+                throw new InvalidOperationException("Multiple new windows were silently reduced to one target.");
+            }
+            catch (DesktopHostFaultException ex) when (ex.Code == "launch_ambiguous")
+            {
+            }
+        });
+
         Test("Sensitive title terms are blocked", () =>
         {
             foreach (var title in new[]
