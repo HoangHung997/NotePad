@@ -14,7 +14,7 @@ concurrency:
 jobs:
   validate-build:
     if: github.repository == 'HoangHung997/NotePad'
-    runs-on: windows-11-vs2026-arm
+    runs-on: windows-latest
     timeout-minutes: 40
     steps:
       - name: Checkout exact source
@@ -36,7 +36,7 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/ar061-fastlane | Out-Null
           if (git status --porcelain) { throw 'Dirty checkout before AR-061 fastlane validation.' }
           $sha = git rev-parse HEAD
-          @{task='AR-061';code_sha=$sha;runner='windows-11-vs2026-arm';working_tree='CLEAN';E1='focused schema/tool/recovery';E2='DesktopHost fixture + MB-112 + full H2 + Agent suites';E3='AWAITING_ENVIRONMENT';E4='AWAITING_ENVIRONMENT';E5='AR-083 DEFERRED_BY_USER'} |
+          @{task='AR-061';code_sha=$sha;runner='windows-latest';working_tree='CLEAN';E1='focused schema/tool/recovery';E2='DesktopHost fixture + MB-112 + full H2 + Agent suites';E3='AWAITING_ENVIRONMENT';E4='AWAITING_ENVIRONMENT';E5='AR-083 DEFERRED_BY_USER'} |
             ConvertTo-Json -Depth 6 | Set-Content artifacts/ar061-fastlane/identity.json
 
           dotnet restore .\H2Notes.Avalonia.slnx 2>&1 | Tee-Object artifacts/ar061-fastlane/restore.log
@@ -87,7 +87,7 @@ jobs:
           Actions run: ${{ github.run_id }}
           Built UTC: $([DateTime]::UtcNow.ToString('O'))
           Task: AR-061
-          Runner: windows-11-vs2026-arm
+          Runner: windows-latest
           "@ | Set-Content -LiteralPath .\artifacts\H2Notes-Avalonia-Portable\SOURCE.txt -Encoding UTF8
 
       - name: Verify packaged Agent helpers start and answer IPC
