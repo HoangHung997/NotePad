@@ -46,11 +46,42 @@ public sealed class OfficeViewLease : IDisposable
 /// windows and document identity; names/order/active object are never fallback locators.</summary>
 public sealed class OfficeWindowCatalog : IDisposable
 {
+    private static readonly int[] TransientOpenRetryDelaysMilliseconds = [0, 40, 100];
+
     private readonly IOfficeWindowProbe _probe;
     private readonly Dictionary<string, OfficeViewLease> _views = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);
     private bool _disposed;
     public OfficeWindowCatalog(IOfficeWindowProbe probe) => _probe=probe ?? throw new ArgumentNullException(nameof(probe));
+
+    private OfficeViewLease OpenWithTransientRetry(OfficeWindowCandidate candidate, Stopwatch? discoveryClock = null)
+    {
+        Exception? last = null;
+        foreach (var delay in TransientOpenRetryDelaysMilliseconds)
+        {
+            if (delay > 0)
+            {
+                if (discoveryClock is not null
+                    && discoveryClock.ElapsedMilliseconds + delay >= OfficeDiscoveryLimits.EnumerationBudgetMilliseconds)
+                    break;
+                Thread.Sleep(delay);
+            }
+
+            try { return _probe.Open(candidate); }
+            catch (Exception ex) when (OfficeNativeWindowProbe.IsProbeFailure(ex))
+            {
+                last = ex;
+                var code = OfficeNativeWindowProbe.FaultCode(ex);
+                if (code is not ("provider_busy" or "native_object_unavailable"))
+                    throw;
+            }
+        }
+
+        throw last ?? new OfficeHostFaultException(
+            "native_object_unavailable",
+            "Native Office object remained unavailable after bounded no-effect probing.",
+            true);
+    }
     public OfficeDiscoveryReport LastReport { get; private set; } = new(false, OfficeDiscoveryLimits.Coverage,0,0,0,[]);
     public IReadOnlyList<OfficeViewLease> Refresh(string application, long? rootHandle = null)
     {
@@ -71,7 +102,7 @@ public sealed class OfficeWindowCatalog : IDisposable
                 try
                 {
                     probed++;
-                    view=_probe.Open(candidate);
+                    view=OpenWithTransientRetry(candidate, clock);
                     if (view.Candidate != candidate || view.ViewHandle<=0 || candidate.ProcessId<=0 || candidate.ProcessStartUtcTicks<=0
                         || string.IsNullOrWhiteSpace(view.Name) || view.Name.Length>512 || view.FullName.Length>4096 || view.Version.Length>128)
                         throw new OfficeHostFaultException("stale_resource","Native view metadata did not match its window.",true);
@@ -155,7 +186,7 @@ public sealed class OfficeWindowCatalog : IDisposable
         {
             if (!_views.Values.Any(v=>ReferenceEquals(v,selected)))
                 throw new OfficeHostFaultException("stale_resource","The native binding is no longer owned by this helper.",noEffect);
-            using var observed=_probe.Open(selected.Candidate);
+            using var observed=OpenWithTransientRetry(selected.Candidate);
             if (observed.Candidate!=selected.Candidate || observed.ViewHandle!=selected.ViewHandle
                 || observed.FullName!=selected.FullName || observed.Name!=selected.Name
                 || !SameObject(selected.Document,observed.Document))

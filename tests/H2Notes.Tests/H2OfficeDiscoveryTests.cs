@@ -120,6 +120,26 @@ internal static class H2OfficeDiscoveryTests
             }
             Check(p.Releases==p.Opens.Count && p.SelectionReads==0,"Catalog quota control leaked leases or read content.");
         });
+        test("AR-021 transient Office object acquisition retries only bounded no-effect probe failures",()=>{
+            var p=new Probe();var item=p.Add(11,101,1001,"A.xlsx");
+            item.Faults.Enqueue("native_object_unavailable");
+            item.Faults.Enqueue("provider_busy");
+            using var catalog=new OfficeWindowCatalog(p);
+            var bound=catalog.Refresh("excel").Single();
+            Check(catalog.LastReport is {Complete:true} && p.Opens.Count==3,
+                "Transient native object acquisition did not recover within the bounded retry window.");
+
+            item.Faults.Enqueue("provider_busy");
+            catalog.ValidateCurrent(bound,true);
+            Check(p.Opens.Count==5,
+                "Native identity revalidation did not retry a transient provider_busy observation.");
+
+            item.Fault="stale_resource";
+            var before=p.Opens.Count;
+            Fault(()=>catalog.ValidateCurrent(bound,true),"stale_resource");
+            Check(p.Opens.Count==before+1,
+                "Non-transient stale_resource was retried instead of failing immediately.");
+        });
         test("AR-020 native COM failure classes distinguish busy and stale",()=>{
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x8001010A)))=="provider_busy","Busy flattened.");
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x80010108)))=="stale_resource","Disconnected object accepted.");
@@ -196,7 +216,7 @@ internal static class H2OfficeDiscoveryTests
     {public WorkAssistantWindowSnapshot? CaptureForeground()=>new(1001,11,101,"EXCEL","Synthetic Office");public WorkAssistantWindowSnapshot? InspectWindow(long handle)=>CaptureForeground();}
     private sealed class Probe:IOfficeWindowProbe
     {
-        public sealed class Item {public required OfficeWindowCandidate Candidate;public required string Name;public object Document=new();public string? Fault;public Action? OnSelection;}
+        public sealed class Item {public required OfficeWindowCandidate Candidate;public required string Name;public object Document=new();public string? Fault;public Queue<string> Faults=new();public Action? OnSelection;}
         public List<Item> Views=[];public List<long> Opens=[];public int Releases,SelectionReads;
         public long ForegroundRoot{get;set;}
         public Item Add(int pid,long start,long hwnd,string name,object? document=null,string application="excel")
@@ -205,6 +225,7 @@ internal static class H2OfficeDiscoveryTests
         public OfficeViewLease Open(OfficeWindowCandidate candidate)
         {
             Opens.Add(candidate.RootHandle);var i=Views.First(x=>x.Candidate==candidate);
+            if(i.Faults.Count>0)throw new OfficeHostFaultException(i.Faults.Dequeue(),"Controlled transient failure",true);
             if(i.Fault is{} code)throw new OfficeHostFaultException(code,"Controlled failure",true);
             return new(candidate,candidate.RootHandle,new object(),i.Document,new object(),i.Name,i.Name,false,"FIXTURE-NOT-OFFICE",
                 ()=>{SelectionReads++;i.OnSelection?.Invoke();return candidate.Application=="word"?"word-range:3:9":"Sheet1!A1";},()=>Releases++);
