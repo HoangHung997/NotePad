@@ -74,6 +74,17 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("App Paths executable identity accepted another executable stem.");
         });
 
+        Test("Office new-window mode uses only host-owned safe switches", () =>
+        {
+            if (DesktopApplicationResolver.NewWindowArgumentsForProcess("WINWORD") != "/w")
+                throw new InvalidOperationException("Word new-window launch lost the documented /w switch.");
+            if (DesktopApplicationResolver.NewWindowArgumentsForProcess("EXCEL") != "/x")
+                throw new InvalidOperationException("Excel new-window launch lost the documented /x switch.");
+            foreach (var process in new[] { "explorer", "acad", "notepad", "chrome" })
+                if (DesktopApplicationResolver.NewWindowArgumentsForProcess(process).Length != 0)
+                    throw new InvalidOperationException("Unexpected command-line switch for ordinary application: " + process);
+        });
+
         Test("Friendly app identity preserves meaningful punctuation", () =>
         {
             if (!DesktopApplicationResolver.FriendlyNameMatches("Microsoft Word", " microsoft   word "))

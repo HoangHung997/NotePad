@@ -104,11 +104,15 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
         try
         {
-            using var started = Process.Start(new ProcessStartInfo(resolved.ExecutablePath)
+            var startInfo = new ProcessStartInfo(resolved.ExecutablePath)
             {
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath) ?? AppContext.BaseDirectory
-            });
+            };
+            if (request.RequireNewWindow)
+                startInfo.Arguments = DesktopApplicationResolver.NewWindowArgumentsForProcess(resolved.ProcessName);
+
+            using var started = Process.Start(startInfo);
             if (started is null)
                 throw new DesktopHostFaultException("provider_unavailable", "Windows did not start the requested application.");
         }

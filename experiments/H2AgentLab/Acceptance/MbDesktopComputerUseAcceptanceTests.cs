@@ -385,7 +385,7 @@ public static class MbDesktopComputerUseAcceptanceTests
             Check(process.ExitCode == 0, "DesktopHost safety self-test failed.");
 
             var report = File.ReadAllText(Path.Combine(policyDir, "desktop-host-self-tests.txt"));
-            Check(report.Contains("RESULT: 7 passed, 0 failed.", StringComparison.Ordinal),
+            Check(report.Contains("RESULT: 8 passed, 0 failed.", StringComparison.Ordinal),
                 "DesktopHost sensitive-app safety suite is not fully green.");
         }).ConfigureAwait(false);
 

@@ -115,6 +115,14 @@ public static class DesktopApplicationResolver
             process);
     }
 
+    internal static string NewWindowArgumentsForProcess(string processName)
+        => processName switch
+        {
+            var name when name.Equals("WINWORD", StringComparison.OrdinalIgnoreCase) => "/w",
+            var name when name.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) => "/x",
+            _ => ""
+        };
+
     internal static bool RegisteredExecutableIdentityMatches(string executable, string resolvedPath)
     {
         if (string.IsNullOrWhiteSpace(executable) || string.IsNullOrWhiteSpace(resolvedPath))
