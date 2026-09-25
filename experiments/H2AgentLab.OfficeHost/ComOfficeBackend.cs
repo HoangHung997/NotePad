@@ -87,6 +87,14 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             throw new OfficeHostFaultException("invalid_request", ex.Message, true);
         }
 
+        var structuralPaging = !plan.Complete
+            && fields.Any(field => field is ExcelRangeReadFields.Format or ExcelRangeReadFields.Merge or ExcelRangeReadFields.Hidden);
+        if (structuralPaging)
+            throw new OfficeHostFaultException(
+                "content_tracking_unavailable",
+                "Paged Excel format/merge/hidden reads are not safe because native Excel change events do not provide a reliable structural-edit revision. Request a bounded structural range that completes in one page.",
+                true);
+
         dynamic? sheet = null;
         try
         {

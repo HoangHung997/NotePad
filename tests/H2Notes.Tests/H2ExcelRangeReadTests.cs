@@ -264,6 +264,37 @@ internal static class H2ExcelRangeReadTests
                 "Recalculation was allowed to mix a new value generation into an old cursor.");
         });
 
+        test("AR-021 E2 structural fields fail closed when the requested range needs paging", () =>
+        {
+            var backend = new FixtureOfficeBackend(extraExcelRows: 900);
+            var reader = (IExcelRangeReadBackend)backend;
+            var session = backend.DiscoverExcel().ActiveSessionId!;
+
+            OfficeHostFaultException? blocked = null;
+            try
+            {
+                _ = reader.ReadExcelRange(new(
+                    session,
+                    "Data",
+                    "A1:A902",
+                    [ExcelRangeReadFields.Format, ExcelRangeReadFields.Merge, ExcelRangeReadFields.Hidden],
+                    128));
+            }
+            catch (OfficeHostFaultException ex) { blocked = ex; }
+
+            Check(blocked?.Code == "content_tracking_unavailable" && blocked.NoEffect,
+                "Multi-page structural read did not fail closed when native structural edits cannot be versioned reliably.");
+
+            var bounded = reader.ReadExcelRange(new(
+                session,
+                "Data",
+                "A1:C3",
+                [ExcelRangeReadFields.Format, ExcelRangeReadFields.Merge, ExcelRangeReadFields.Hidden],
+                32));
+            Check(bounded.Complete && bounded.NextCursor is null,
+                "Bounded single-page structural read should remain supported.");
+        });
+
         test("AR-021 E2 range fields keep formatting and structure on demand", () =>
         {
             var backend = new FixtureOfficeBackend();

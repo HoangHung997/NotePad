@@ -105,6 +105,19 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             throw new OfficeHostFaultException("invalid_request", ex.Message, true);
         }
 
+        ExcelRangePagePlan plan;
+        try { plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor); }
+        catch (Exception ex) when (ex is ArgumentException)
+        { throw new OfficeHostFaultException("invalid_cursor", ex.Message, true); }
+
+        var structuralPaging = !plan.Complete
+            && fields.Any(field => field is ExcelRangeReadFields.Format or ExcelRangeReadFields.Merge or ExcelRangeReadFields.Hidden);
+        if (structuralPaging)
+            throw new OfficeHostFaultException(
+                "content_tracking_unavailable",
+                "Paged Excel format/merge/hidden reads are not safe because native Excel change events do not provide a reliable structural-edit revision. Request a bounded structural range that completes in one page.",
+                true);
+
         var extent = ExcelExtent();
         var contentVersion = OfficeHostSafety.StableToken(new
         {
@@ -124,11 +137,6 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         if (!string.IsNullOrWhiteSpace(request.ContentVersion)
             && !string.Equals(request.ContentVersion, contentVersion, StringComparison.Ordinal))
             throw new OfficeHostFaultException("stale_content", "Excel content changed after the previous page; restart the range read.", true);
-
-        ExcelRangePagePlan plan;
-        try { plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor); }
-        catch (Exception ex) when (ex is ArgumentException)
-        { throw new OfficeHostFaultException("invalid_cursor", ex.Message, true); }
 
         var started = Environment.TickCount64;
         var cells = new List<ExcelRangeCellState>(plan.CellCount);
