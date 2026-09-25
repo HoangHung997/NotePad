@@ -210,18 +210,36 @@ public sealed class DesktopHostClient : IDisposable
                 "DesktopHost preflight failed before any application lifecycle mutation.");
         }
 
+        try
+        {
+            ValidatePreflightIdentity(currentPid, ping);
+        }
+        catch (DesktopHostClientException)
+        {
+            StopHost();
+            throw;
+        }
+
+        _validatedProtocolProcessId = ping.ProcessId;
+    }
+
+    internal static void ValidatePreflightIdentity(int? expectedProcessId, DesktopPingResult ping)
+    {
+        if (expectedProcessId is null
+            || expectedProcessId <= 0
+            || ping.ProcessId <= 0
+            || ping.ProcessId != expectedProcessId.Value)
+            throw new DesktopHostClientException(
+                "preflight_unavailable",
+                "DesktopHost preflight process identity does not match the helper started by H2 Notes.");
+
         if (!string.Equals(
                 ping.ProtocolVersion,
                 DesktopProtocolConstants.Version,
                 StringComparison.Ordinal))
-        {
-            StopHost();
             throw new DesktopHostClientException(
                 "protocol_mismatch",
                 "DesktopHost protocol version does not match this H2 Notes build.");
-        }
-
-        _validatedProtocolProcessId = ping.ProcessId;
     }
 
     private static TimeSpan ApplicationTimeout(int waitMilliseconds)

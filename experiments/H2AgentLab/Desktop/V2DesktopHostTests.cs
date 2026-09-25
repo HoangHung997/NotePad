@@ -47,6 +47,31 @@ public static class V2DesktopHostTests
             Check(ping.FixtureMode, "DesktopHost fixture mode was not reported.");
             Check(ping.ProcessId != Environment.ProcessId, "DesktopHost is not a separate process.");
             Check(ping.ProtocolVersion == DesktopProtocolConstants.Version, "Desktop protocol version mismatch.");
+            Check(client.ProcessId == ping.ProcessId,
+                "DesktopHost ping identity does not match the process started by the client.");
+            DesktopHostClient.ValidatePreflightIdentity(client.ProcessId, ping);
+
+            try
+            {
+                DesktopHostClient.ValidatePreflightIdentity(
+                    ping.ProcessId + 1,
+                    ping);
+                throw new InvalidOperationException("Mismatched DesktopHost PID was accepted.");
+            }
+            catch (DesktopHostClientException ex) when (ex.Code == "preflight_unavailable")
+            {
+            }
+
+            try
+            {
+                DesktopHostClient.ValidatePreflightIdentity(
+                    ping.ProcessId,
+                    ping with { ProtocolVersion = DesktopProtocolConstants.Version + "-stale" });
+                throw new InvalidOperationException("Mismatched DesktopHost protocol was accepted.");
+            }
+            catch (DesktopHostClientException ex) when (ex.Code == "protocol_mismatch")
+            {
+            }
 
             var repo = FindRepoRoot();
             var project = File.ReadAllText(
