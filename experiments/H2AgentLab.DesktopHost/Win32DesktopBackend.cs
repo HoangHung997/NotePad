@@ -36,8 +36,13 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     continue;
 
                 var handle = new IntPtr(current.NativeWindowHandle);
-                if (processName.Equals("explorer", StringComparison.OrdinalIgnoreCase)
-                    && !IsApplicationLaunchWindow(processName, current.NativeWindowHandle))
+                var className = WindowClass(handle);
+                var mainWindowHandle = process.MainWindowHandle.ToInt64();
+                if (!IsApplicationLaunchWindowCandidate(
+                        processName,
+                        current.NativeWindowHandle,
+                        mainWindowHandle,
+                        className))
                     continue;
                 var bounds = ReadBounds(handle);
                 if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -213,6 +218,21 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     private static bool IsApplicationLaunchWindow(string processName, long handle)
     {
         var className = WindowClass(new IntPtr(handle));
+        return IsApplicationLaunchWindowClass(processName, className);
+    }
+
+    internal static bool IsApplicationLaunchWindowCandidate(
+        string processName,
+        long handle,
+        long processMainWindowHandle,
+        string className)
+    {
+        if (processName.Equals("acad", StringComparison.OrdinalIgnoreCase)
+            || processName.Equals("acadlt", StringComparison.OrdinalIgnoreCase))
+            return handle > 0
+                && processMainWindowHandle > 0
+                && handle == processMainWindowHandle;
+
         return IsApplicationLaunchWindowClass(processName, className);
     }
 

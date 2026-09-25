@@ -94,6 +94,38 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Ordinary application launch window was rejected.");
         });
 
+        Test("AutoCAD launch completion requires the process main frame", () =>
+        {
+            const long main = 0x12345;
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acad",
+                    main,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD main frame was rejected.");
+
+            if (Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acad",
+                    0x22345,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD non-main/splash window was accepted.");
+
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acadlt",
+                    main,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD LT main frame was rejected.");
+
+            if (Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acadlt",
+                    main,
+                    0,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD LT window was accepted without a process main-frame identity.");
+        });
+
         Test("Office new-window mode uses only host-owned safe switches", () =>
         {
             if (DesktopApplicationResolver.NewWindowArgumentsForProcess("WINWORD") != "/w")
