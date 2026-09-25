@@ -131,6 +131,15 @@ public sealed class RecoverySupervisor
     private static string Subject(ToolCall call)
     {
         if (call.Name is "inspect_window" or "click_control" or "type_control") return "window";
+        if (call.Name is "app.launch" or "app.wait_for_window")
+            return "app:" + (call.Arguments.TryGetProperty("application", out var app)
+                ? app.ToString().Trim().ToUpperInvariant()
+                : "");
+        if (call.Name == "app.activate")
+            return "app-window:" + (call.Arguments.TryGetProperty("session_id", out var session)
+                ? session.ToString()
+                : "");
+        if (call.Name == "app.list_running_apps") return "app-inventory";
         var field = call.Name == "publish_artifact" ? "destination" : "path";
         return "file:" + (call.Arguments.TryGetProperty(field, out var value) ? value.ToString().Replace('\\', '/').ToUpperInvariant() : "");
     }

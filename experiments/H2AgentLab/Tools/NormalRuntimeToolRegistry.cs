@@ -597,7 +597,8 @@ public static class NormalRuntimeToolRegistry
             // Only typed, documented preflight rejection establishes that no mutation ran.
             // IOException text is not evidence that a file operation was atomic.
             if (exception is global::H2AgentLab.AgentFaultException known
-                && known.Code is "stale_state" or "invalid_arguments" or "denied" or "boundary" or "permission_required")
+                && known.Code is "stale_state" or "invalid_arguments" or "invalid_application" or "app_not_found"
+                    or "denied" or "boundary" or "permission_required")
                 result["mutationApplied"] = false;
 
             if (fault.Code == "not_found"
