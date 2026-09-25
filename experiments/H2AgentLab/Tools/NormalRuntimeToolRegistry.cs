@@ -170,7 +170,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "list_running_apps",
             "app",
-            "List safe visible desktop applications and exact observed window/session identities. Does not launch or activate anything.",
+            "List safe visible desktop applications and exact observed session identities without exposing window titles. Does not launch or activate anything.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
             true,
@@ -1120,7 +1120,7 @@ public static class NormalRuntimeToolRegistry
                             .Select(group => new
                             {
                                 process = group.Key,
-                                windows = group.Select(WindowProjection).ToArray()
+                                windows = group.Select(WindowIdentityProjection).ToArray()
                             })
                             .ToArray(),
                         windowCount = windows.Count,
@@ -1201,6 +1201,16 @@ public static class NormalRuntimeToolRegistry
             if (Host.ProductionSession is null)
                 await Host.RuntimePermitAsync(title, details, cancellationToken).ConfigureAwait(false);
         }
+
+        private static object WindowIdentityProjection(DesktopWindowInfo window)
+            => new
+            {
+                session_id = window.SessionId,
+                pid = window.ProcessId,
+                process_started_utc_ticks = window.ProcessStartedUtcTicks,
+                process = window.ProcessName,
+                foreground = window.Foreground
+            };
 
         private static object WindowProjection(DesktopWindowInfo window)
             => new
