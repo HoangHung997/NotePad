@@ -168,7 +168,7 @@ public static class NormalRuntimeToolRegistry
             Args(("path", "Relative .docx/.xlsx/.pdf/.txt"))),
 
         new(
-            "app.list_running_apps",
+            "list_running_apps",
             "app",
             "List safe visible desktop applications and exact observed window/session identities. Does not launch or activate anything.",
             AgentToolRisk.Low,
@@ -178,7 +178,7 @@ public static class NormalRuntimeToolRegistry
             Evidence: true,
             Preference: Accessibility()),
         new(
-            "app.launch",
+            "launch_app",
             "app",
             "Launch an explicitly named registered Windows application. Arbitrary executable paths and shell commands are rejected; success requires a newly observed or newly activated safe window.",
             AgentToolRisk.High,
@@ -188,7 +188,7 @@ public static class NormalRuntimeToolRegistry
             Evidence: true,
             Preference: Accessibility()),
         new(
-            "app.wait_for_window",
+            "wait_for_app_window",
             "app",
             "Wait up to five seconds for a safe visible window of the explicitly named application and return its exact session identity.",
             AgentToolRisk.Low,
@@ -198,13 +198,13 @@ public static class NormalRuntimeToolRegistry
             Evidence: true,
             Preference: Accessibility()),
         new(
-            "app.activate",
+            "activate_app",
             "app",
             "Activate one exact previously observed safe application window by session_id; never chooses another matching window.",
             AgentToolRisk.Medium,
             AgentToolAccess.Mutating,
             false,
-            Args(("session_id", "Exact session_id returned by app.list_running_apps, app.launch or app.wait_for_window")),
+            Args(("session_id", "Exact session_id returned by list_running_apps, launch_app or wait_for_app_window")),
             Evidence: true,
             Preference: Accessibility()),
 
@@ -429,8 +429,8 @@ public static class NormalRuntimeToolRegistry
             "view_artifact" => "model.vision",
             "publish_artifact" or "write_text" => "workspace.write",
             "open_file" => "desktop.open",
-            "app.launch" => "desktop.app-launch",
-            "app.activate" => "desktop.app-activate",
+            "launch_app" => "desktop.app-launch",
+            "activate_app" => "desktop.app-activate",
             "click_control" or "type_control" => "desktop.selected-window",
             _ => "mutation." + name.Replace('_', '.')
         };
@@ -1092,10 +1092,10 @@ public static class NormalRuntimeToolRegistry
         private static readonly IReadOnlySet<string> Supported =
             new HashSet<string>(StringComparer.Ordinal)
             {
-                "app.list_running_apps",
-                "app.launch",
-                "app.wait_for_window",
-                "app.activate"
+                "list_running_apps",
+                "launch_app",
+                "wait_for_app_window",
+                "activate_app"
             };
 
         public ApplicationExecutor(global::H2AgentLab.AgentTools host) : base(host) { }
@@ -1109,7 +1109,7 @@ public static class NormalRuntimeToolRegistry
             using var client = DesktopHostLocator.CreateClient();
             try
             {
-                if (call.Name == "app.list_running_apps")
+                if (call.Name == "list_running_apps")
                 {
                     var windows = await client.ListWindowsAsync(cancellationToken).ConfigureAwait(false);
                     return new
@@ -1128,7 +1128,7 @@ public static class NormalRuntimeToolRegistry
                     };
                 }
 
-                if (call.Name == "app.wait_for_window")
+                if (call.Name == "wait_for_app_window")
                 {
                     var observed = await client.WaitForApplicationWindowAsync(
                         new DesktopApplicationWaitRequest(Arg(call, "application"), 5_000),
@@ -1146,7 +1146,7 @@ public static class NormalRuntimeToolRegistry
                         "Chế độ Chỉ đọc không cho phép mở hoặc kích hoạt ứng dụng.",
                         false);
 
-                if (call.Name == "app.launch")
+                if (call.Name == "launch_app")
                 {
                     var application = Arg(call, "application");
                     await PermitOutsideProductionAsync(
@@ -1167,7 +1167,7 @@ public static class NormalRuntimeToolRegistry
                     };
                 }
 
-                if (call.Name == "app.activate")
+                if (call.Name == "activate_app")
                 {
                     var sessionId = Arg(call, "session_id");
                     await PermitOutsideProductionAsync(

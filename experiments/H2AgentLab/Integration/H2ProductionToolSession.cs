@@ -236,8 +236,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         if (descriptor.Namespace.Name == "app")
             return call.Name switch
             {
-                "app.launch" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
-                "app.activate" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
+                "launch_app" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
+                "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
                 _ => true
             };
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Project)
@@ -277,7 +277,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         if (descriptor.Namespace.Name == "h2") return "h2-project:" + Arg(call, "project_id");
         if (descriptor.Namespace.Name == "desktop") return _selectedWindowIdentity ?? "unbound-window";
         if (descriptor.Namespace.Name == "app")
-            return call.Name == "app.activate"
+            return call.Name == "activate_app"
                 ? "app-window:" + (Arg(call, "session_id") ?? "unbound")
                 : "app:" + (Arg(call, "application") ?? "inventory").Trim().ToLowerInvariant();
         if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)

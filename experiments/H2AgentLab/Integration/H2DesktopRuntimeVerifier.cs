@@ -13,7 +13,7 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
     public string DomainId => "h2-desktop";
 
     public bool CanVerify(ToolCall call, string output)
-        => call.Name is "click_control" or "type_control" or "app.launch" or "app.activate";
+        => call.Name is "click_control" or "type_control" or "launch_app" or "activate_app";
 
     public Task<AgentRuntimeDomainVerification> VerifyAsync(
         AgentRuntimeVerificationContext context,
@@ -40,7 +40,7 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 passed ? null : "Desktop text action has no verified resulting state. Inspect it before claiming success."));
         }
 
-        if (call.Name is "app.launch" or "app.activate")
+        if (call.Name is "launch_app" or "activate_app")
         {
             var observed = root.TryGetProperty("verifiedByHostObservation", out var hostObserved)
                 && hostObserved.ValueKind == JsonValueKind.True;
@@ -51,7 +51,7 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 && window.TryGetProperty("pid", out var pid)
                 && pid.TryGetInt32(out var processId)
                 && processId > 0;
-            var semantic = call.Name == "app.launch"
+            var semantic = call.Name == "launch_app"
                 ? (root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
                     || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True)
                 : root.TryGetProperty("activated", out var activated)

@@ -57,7 +57,7 @@ public static class RecoveryPolicy
             "file_busy" => "Do a read-only check of the current file state. Retry only after new evidence; do not kill apps or overwrite locks.",
             "invalid_arguments" => "Check the advertised tool schema and observed exact values, correct the arguments and retry.",
             _ when tool is "click_control" or "type_control" or "open_file" or "write_text" or "publish_artifact"
-                or "app.launch" or "app.activate" => "Outcome may be partial/unknown. Inspect actual state first. Do not repeat side effects blindly; retain approval rules.",
+                or "launch_app" or "activate_app" => "Outcome may be partial/unknown. Inspect actual state first. Do not repeat side effects blindly; retain approval rules.",
             _ => "Inspect the error and actual inputs/resources using a different diagnostic. Revise the approach, verify by readback and report remaining uncertainty. Do not repeat the identical failed call."
         };
         return new(code, ex.Message, canRepair, next);
@@ -100,7 +100,7 @@ public sealed class RecoverySupervisor
     public string? Block(ToolCall call)
     {
         var key = RecoveryPolicy.Fingerprint(call);
-        if (_failures.GetValueOrDefault(key) > 0 && call.Name is ("write_text" or "publish_artifact" or "click_control" or "type_control" or "open_file" or "app.launch" or "app.activate") && _failureVersions.GetValueOrDefault(key) == _observationVersions.GetValueOrDefault(Subject(call)))
+        if (_failures.GetValueOrDefault(key) > 0 && call.Name is ("write_text" or "publish_artifact" or "click_control" or "type_control" or "open_file" or "launch_app" or "activate_app") && _failureVersions.GetValueOrDefault(key) == _observationVersions.GetValueOrDefault(Subject(call)))
             return "The previous side-effecting call failed with an uncertain outcome. Observe the actual file/window state before retrying. This duplicate was NOT executed.";
         if (_failures.GetValueOrDefault(key) < 2) return null;
         return "Identical call already failed twice this turn. Inspect different evidence or change the approach; this repeated call was NOT executed.";
@@ -117,7 +117,7 @@ public sealed class RecoverySupervisor
             _pending.Add((call, fault)); return;
         }
         _observations.Add(call.Name);
-        if (call.Name is "read_file" or "word_paragraphs" or "inspect_window" or "app.wait_for_window" or "app.list_running_apps")
+        if (call.Name is "read_file" or "word_paragraphs" or "inspect_window" or "wait_for_app_window" or "list_running_apps")
         {
             var subject = Subject(call); _observationVersions[subject] = _observationVersions.GetValueOrDefault(subject) + 1;
         }
@@ -131,15 +131,15 @@ public sealed class RecoverySupervisor
     private static string Subject(ToolCall call)
     {
         if (call.Name is "inspect_window" or "click_control" or "type_control") return "window";
-        if (call.Name is "app.launch" or "app.wait_for_window")
+        if (call.Name is "launch_app" or "wait_for_app_window")
             return "app:" + (call.Arguments.TryGetProperty("application", out var app)
                 ? app.ToString().Trim().ToUpperInvariant()
                 : "");
-        if (call.Name == "app.activate")
+        if (call.Name == "activate_app")
             return "app-window:" + (call.Arguments.TryGetProperty("session_id", out var session)
                 ? session.ToString()
                 : "");
-        if (call.Name == "app.list_running_apps") return "app-inventory";
+        if (call.Name == "list_running_apps") return "app-inventory";
         var field = call.Name == "publish_artifact" ? "destination" : "path";
         return "file:" + (call.Arguments.TryGetProperty(field, out var value) ? value.ToString().Replace('\\', '/').ToUpperInvariant() : "");
     }

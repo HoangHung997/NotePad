@@ -7,10 +7,10 @@ public static class MbRetireAgentToolsSwitchTests
 {
     private static readonly string[] ExpectedTools =
     [
-        "app.activate",
-        "app.launch",
-        "app.list_running_apps",
-        "app.wait_for_window",
+        "activate_app",
+        "launch_app",
+        "list_running_apps",
+        "wait_for_app_window",
         "list_skills",
         "read_skill",
         "read_tool_output",

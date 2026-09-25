@@ -755,10 +755,10 @@ public static class V2ArchitectureTests
 
             var expectedNames = new[]
             {
-                "app.activate",
-                "app.launch",
-                "app.list_running_apps",
-                "app.wait_for_window",
+                "activate_app",
+                "launch_app",
+                "list_running_apps",
+                "wait_for_app_window",
                 "check_word",
                 "click_control",
                 "find_files",
@@ -803,7 +803,7 @@ public static class V2ArchitectureTests
                 || click.Risk != AgentToolRisk.High
                 || !click.IsMutating)
                 throw new InvalidOperationException("desktop mutation metadata is incorrect.");
-            if (!registry.TryGet("app.launch", out var launch)
+            if (!registry.TryGet("launch_app", out var launch)
                 || launch.Namespace.Name != "app"
                 || launch.Risk != AgentToolRisk.High
                 || !launch.IsMutating

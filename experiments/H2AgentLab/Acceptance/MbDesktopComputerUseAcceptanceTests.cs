@@ -205,7 +205,7 @@ public static class MbDesktopComputerUseAcceptanceTests
             var verifier = new H2DesktopRuntimeVerifier();
             var launch = new ToolCall(
                 "launch",
-                "app.launch",
+                "launch_app",
                 JsonSerializer.SerializeToElement(new { application = "notepad" }));
             var good = JsonSerializer.Serialize(new
             {

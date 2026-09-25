@@ -11,21 +11,21 @@ internal static class H2AgentDesktopLaunchTests
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
                 host.ReadOnly=false;
                 var registry=NormalRuntimeToolRegistry.Create(host);
-                foreach(var name in new[]{"app.list_running_apps","app.launch","app.wait_for_window","app.activate"})
+                foreach(var name in new[]{"list_running_apps","launch_app","wait_for_app_window","activate_app"})
                     Check(registry.TryGet(name,out _),"Missing callable "+name);
                 Check(host.Desktop is null,"Test unexpectedly has a selected desktop target.");
                 Check(registry.GetNamespace("app").Count==4,"Application lifecycle namespace is incomplete.");
-                Check(registry.TryGet("app.launch",out var launch)
+                Check(registry.TryGet("launch_app",out var launch)
                     && launch.IsMutating
                     && launch.Risk==AgentToolRisk.High
                     && launch.Preference?.InteractionFidelity==ToolInteractionFidelity.Accessibility,
-                    "app.launch risk/preference metadata is wrong.");
+                    "launch_app risk/preference metadata is wrong.");
             });
         });
 
         test("AR-061 application retry guard requires changed evidence for the same application",()=>{
             var supervisor=new RecoverySupervisor();
-            var launch=new ToolCall("launch-1","app.launch",JsonSerializer.SerializeToElement(new{application="Word"}));
+            var launch=new ToolCall("launch-1","launch_app",JsonSerializer.SerializeToElement(new{application="Word"}));
             supervisor.Observe(launch,JsonSerializer.Serialize(new{
                 success=false,
                 recovery=new{
@@ -36,35 +36,35 @@ internal static class H2AgentDesktopLaunchTests
                 }
             }));
             Check(supervisor.Block(launch) is not null,
-                "Uncertain app.launch could repeat without a fresh observation.");
+                "Uncertain launch_app could repeat without a fresh observation.");
 
-            var other=new ToolCall("wait-other","app.wait_for_window",JsonSerializer.SerializeToElement(new{application="Excel"}));
+            var other=new ToolCall("wait-other","wait_for_app_window",JsonSerializer.SerializeToElement(new{application="Excel"}));
             supervisor.Observe(other,JsonSerializer.Serialize(new{success=true,observed=new{session_id="excel-1"}}));
             Check(supervisor.Block(launch) is not null,
                 "Observing a different application incorrectly unlocked Word launch retry.");
 
-            var same=new ToolCall("wait-word","app.wait_for_window",JsonSerializer.SerializeToElement(new{application="Word"}));
+            var same=new ToolCall("wait-word","wait_for_app_window",JsonSerializer.SerializeToElement(new{application="Word"}));
             supervisor.Observe(same,JsonSerializer.Serialize(new{success=true,observed=new{session_id="word-1"}}));
             Check(supervisor.Block(launch) is null,
                 "Fresh observation of the same application did not unlock one reconciled retry.");
         });
 
-        test("AR-061 app.launch schema requires an application name and offers no executable path argument",()=>{
+        test("AR-061 launch_app schema requires an application name and offers no executable path argument",()=>{
             Temp((root,state)=>{
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
                 var registry=NormalRuntimeToolRegistry.Create(host);
-                Check(registry.TryGet("app.launch",out var launch),"app.launch missing.");
+                Check(registry.TryGet("launch_app",out var launch),"launch_app missing.");
                 var function=launch.CallableSchema.GetProperty("function");
                 var parameters=function.GetProperty("parameters");
                 var properties=parameters.GetProperty("properties");
-                Check(properties.TryGetProperty("application",out _),"app.launch lacks application argument.");
+                Check(properties.TryGetProperty("application",out _),"launch_app lacks application argument.");
                 Check(!properties.TryGetProperty("path",out _)
                     && !properties.TryGetProperty("command",out _)
                     && !properties.TryGetProperty("arguments",out _),
-                    "app.launch exposed arbitrary executable/shell arguments.");
+                    "launch_app exposed arbitrary executable/shell arguments.");
                 Check(parameters.GetProperty("required").EnumerateArray()
                     .Select(x=>x.GetString()).SequenceEqual(new[]{"application"}),
-                    "app.launch application argument is not required.");
+                    "launch_app application argument is not required.");
             });
         });
     }

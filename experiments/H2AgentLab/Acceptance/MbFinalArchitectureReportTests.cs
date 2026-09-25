@@ -117,7 +117,7 @@ public static class MbFinalArchitectureReportTests
             var registry = NormalRuntimeToolRegistry.Create(host);
             Check(registry.Tools.Count == 24 && registry.TryGet("read_tool_output", out var reader)
                   && reader.Namespace.Name == "evidence" && !reader.IsMutating && reader.SupportsParallel
-                  && registry.TryGet("app.launch", out var launch)
+                  && registry.TryGet("launch_app", out var launch)
                   && launch.Namespace.Name == "app" && launch.IsMutating,
                 "Expected the historical callable surface plus four AR-061 application lifecycle tools and the read-only evidence reader.");
 
