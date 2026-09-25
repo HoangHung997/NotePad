@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Microsoft.Win32;
 
 namespace H2AgentLab.DesktopHost;
@@ -56,10 +57,9 @@ public static class DesktopApplicationResolver
             && ResolveExecutable(executable) is { } exact)
             return exact;
 
-        var normalized = NormalizeFriendlyName(application);
         var matches = RegisteredApplications()
             .Where(candidate => candidate.Names.Any(name =>
-                string.Equals(NormalizeFriendlyName(name), normalized, StringComparison.Ordinal)))
+                FriendlyNameMatches(name, application)))
             .Select(candidate => candidate.Application)
             .GroupBy(x => x.ExecutablePath, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
@@ -207,9 +207,20 @@ public static class DesktopApplicationResolver
             or ArgumentException
             or NotSupportedException;
 
+    internal static bool FriendlyNameMatches(string candidate, string requested)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(requested))
+            return false;
+        return string.Equals(
+            NormalizeFriendlyName(candidate),
+            NormalizeFriendlyName(requested),
+            StringComparison.Ordinal);
+    }
+
     private static string NormalizeFriendlyName(string value)
-        => new(value.Normalize()
-            .Where(char.IsLetterOrDigit)
+        => new(value.Normalize(NormalizationForm.FormKC)
+            .Trim()
+            .Where(c => !char.IsWhiteSpace(c))
             .Select(char.ToLowerInvariant)
             .ToArray());
 

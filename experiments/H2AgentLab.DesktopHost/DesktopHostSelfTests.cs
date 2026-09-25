@@ -74,6 +74,18 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("App Paths executable identity accepted another executable stem.");
         });
 
+        Test("Friendly app identity preserves meaningful punctuation", () =>
+        {
+            if (!DesktopApplicationResolver.FriendlyNameMatches("Microsoft Word", " microsoft   word "))
+                throw new InvalidOperationException("Whitespace/case normalization rejected an exact friendly name.");
+            if (!DesktopApplicationResolver.FriendlyNameMatches("AutoCAD 2026", "autocad 2026"))
+                throw new InvalidOperationException("Exact AutoCAD friendly name was rejected.");
+            if (DesktopApplicationResolver.FriendlyNameMatches("Notepad++", "Notepad"))
+                throw new InvalidOperationException("Friendly-name normalization collapsed Notepad++ into Notepad.");
+            if (DesktopApplicationResolver.FriendlyNameMatches("App-X", "App X"))
+                throw new InvalidOperationException("Friendly-name normalization discarded meaningful punctuation.");
+        });
+
         Test("Sensitive title terms are blocked", () =>
         {
             foreach (var title in new[]
