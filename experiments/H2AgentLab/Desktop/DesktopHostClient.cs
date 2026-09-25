@@ -53,8 +53,17 @@ public sealed class DesktopHostClient : IDisposable
     public Task<DesktopPingResult> PingAsync(CancellationToken cancellationToken = default)
         => CallAsync<DesktopPingResult>("ping", new { }, null, cancellationToken);
 
-    public Task<IReadOnlyList<DesktopWindowInfo>> ListWindowsAsync(CancellationToken cancellationToken = default)
-        => CallAsync<IReadOnlyList<DesktopWindowInfo>>("desktop.list", new { }, null, cancellationToken);
+    public async Task<IReadOnlyList<DesktopWindowInfo>> ListWindowsAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureCurrentProtocolAsync(cancellationToken).ConfigureAwait(false);
+        var validatedProcessId = RequireValidatedProcessId();
+        return await CallAsync<IReadOnlyList<DesktopWindowInfo>>(
+            "desktop.list",
+            new { },
+            null,
+            cancellationToken,
+            requiredProcessId: validatedProcessId).ConfigureAwait(false);
+    }
 
     public async Task<DesktopApplicationLaunchResult> LaunchApplicationAsync(
         DesktopApplicationLaunchRequest request,
