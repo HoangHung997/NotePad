@@ -518,106 +518,107 @@ Do not claim these defects were already covered by historical Office/transport/U
   "required_evidence_level": "E3",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar021-sheet-rename-stale-2026-09-25",
-  "last_code_commit": "385e88644e7f026d095b22be4cbc6562ecd848e4",
-  "last_validated_code_commit": "385e88644e7f026d095b22be4cbc6562ecd848e4",
-  "last_validation_result": "AR021_9_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1281_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; NATIVE_DIRECT_EDIT_RECALC_REBIND_HARDENED; CONTINUATION_BOUND_TO_RANGE_FIELDS_PAGE_SIZE; SHEET_RENAME_CONTINUATION_RETURNS_STALE_CONTENT; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
+  "owner_session": "chatgpt-ar021-structural-paging-failclosed-2026-09-25",
+  "last_code_commit": "1483743c504f742043e8605ff002f66de8d9abbf",
+  "last_validated_code_commit": "1483743c504f742043e8605ff002f66de8d9abbf",
+  "last_validation_result": "AR021_10_PASS; OFFICE_HOST_17_PASS; RETAINED_AR020_36_PASS; AR012_44_PASS; AR001_13_PASS; FULL_H2_1282_PASS; 11_OF_11_PR_WORKFLOWS_SUCCESS; WINDOWS_X64_PUBLISH_PASS; PACKAGED_HELPER_IPC_PASS; VALUE_FORMULA_PAGING_SUPPORTED; STRUCTURAL_FORMAT_MERGE_HIDDEN_MULTI_PAGE_FAILS_CLOSED; SINGLE_PAGE_STRUCTURAL_READ_SUPPORTED; E3_NATIVE_EXCEL_NOT_RUN_AWAITING_ENVIRONMENT; NO_E3_PASS_CLAIM",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is 385e88644e7f026d095b22be4cbc6562ecd848e4. No reset/force-push/main merge occurred.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA validators and Avalonia CI used clean isolated checkouts. Final validated application/test source is 1483743c504f742043e8605ff002f66de8d9abbf. No reset/force-push/main merge occurred.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-25T00:04:39Z",
+  "checkpoint_saved_at_utc": "2026-09-25T00:46:22Z",
   "completed_this_session": [
-    "Reconciled the prior AR-021 checkpoint 8827b8e6e8a1980fd5f791d078db575f56e33870 and kept AR-021 as the only active task.",
-    "Audited continuation behavior for worksheet identity changes and found that a rename/delete between pages could surface sheet_not_found instead of the required stale/restart semantics.",
-    "Changed production COM and fixture range readers so a continuation targeting a missing/renamed sheet returns stale_content/no-effect rather than treating it as a fresh lookup.",
-    "Re-read the actual worksheet name after each native page and include it in the post-page version check so a rename racing the current page invalidates the result.",
-    "Added an E2 regression that renames the worksheet between pages and verifies both the old sheet name and the new sheet name cannot reuse the old cursor/contentVersion.",
-    "Validated exact code SHA through dedicated AR-021 and full Avalonia CI; all 11 pull-request workflows succeeded.",
-    "Downloaded and inspected exact-SHA AR-021 evidence: focused 9/9, full H2 1281/1281, ZIP integrity PASS; preserved E3 as AWAITING_ENVIRONMENT."
+    "Reconciled prior AR-021 checkpoint and kept AR-021 as the only active task.",
+    "Audited native Excel consistency for formatting, merge and hidden-state changes. Workbook.SheetChange covers cell changes and SheetCalculate covers recalculation, but native Excel does not provide a reliable structural-edit revision for these fields.",
+    "Hardened production COM and fixture range readers so format/merge/hidden requests that would require more than one page fail closed with content_tracking_unavailable/no-effect instead of presenting an unprovable cross-page structural snapshot.",
+    "Kept bounded single-page structural reads supported; value/formula paging remains supported with existing content revision tracking.",
+    "Added an E2 regression proving multi-page structural reads fail closed while a bounded single-page structural read still succeeds.",
+    "Aligned OfficeHost IPC test 0804B with the structural paging policy by reading format/merge/hidden evidence in one bounded page.",
+    "Validated exact SHA through dedicated AR-021 and full Avalonia CI; all 11 pull-request workflows succeeded.",
+    "Downloaded and inspected exact-SHA evidence: AR-021 10/10, OfficeHost 17/17, full H2 1282/1282; preserved native Excel E3 as AWAITING_ENVIRONMENT."
   ],
   "remaining_in_active_task": [
     "Run AR-021 E3 RC-06/07 on an authorized Windows PC with real Microsoft Excel using only synthetic test workbooks.",
-    "Verify >5000 populated cells, sparse UsedRange, multiple sheets, formulas, merges/hidden state and <=512-cell pagination.",
-    "Change selection/focus between pages and confirm contentVersion remains valid and the bound workbook/range does not redirect.",
+    "Verify >5000 populated cells, sparse UsedRange, multiple sheets and <=512-cell value/formula pagination.",
+    "Verify formatting/merge/hidden evidence on bounded single-page ranges and confirm a structural request requiring multiple pages fails closed with content_tracking_unavailable/no-effect.",
+    "Change selection/focus between value/formula pages and confirm contentVersion remains valid and the bound workbook/range does not redirect.",
     "With Saved already false, edit a cell directly in Excel between pages and confirm stale_content through Workbook.SheetChange.",
     "Trigger a real worksheet recalculation between pages and confirm stale_content through Workbook.SheetCalculate.",
-    "Rename or remove the target worksheet between pages and confirm the old continuation returns stale_content/no-effect; where practical race a rename during a page read and confirm the post-page version check rejects it.",
-    "Disable Excel events and confirm multi-page reads fail closed with content_tracking_unavailable.",
-    "Exercise fresh OfficeHost/replacement workbook binding where practical and confirm an old continuation cannot cross the rebind.",
-    "Attempt to replay a cursor/contentVersion with a different range, field set or page size and confirm stale_content/no-effect on the packaged production path.",
+    "Rename or remove the target worksheet between pages and confirm stale_content/no-effect.",
+    "Disable Excel events and confirm multi-page value/formula reads fail closed with content_tracking_unavailable.",
+    "Exercise fresh OfficeHost/replacement workbook binding and continuation-contract replay with changed range/fields/page size.",
     "If any native regression appears, repair and re-run exact-SHA AR-021/full CI before moving to AR-022."
   ],
   "last_test_commands": [
     {
       "command": "tools/agent-reliability/validate_ar021.ps1",
-      "sha": "385e88644e7f026d095b22be4cbc6562ecd848e4",
-      "run_id": 36075156926,
-      "job_id": 107884596266,
+      "sha": "1483743c504f742043e8605ff002f66de8d9abbf",
+      "run_id": 36078139948,
+      "job_id": 107894641974,
       "attempt": 1,
-      "result": "SUCCESS; AR021 9/9; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1281/1281; artifact 10840361378 sha256 786fcf8a8c8c49f7795034b3dd4491e15a875fed06bcbb86c04ccc13d62ad228"
+      "result": "SUCCESS; AR021 10/10; OfficeHost 17/17; retained AR020 36/36, AR012 44/44, AR001 13/13; full H2 1282/1282; artifact 10841121673 sha256 070e4be37ccecd830063697dfa38838c9256fd5d2e87b37ac33f36da2632ecef"
     },
     {
       "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "385e88644e7f026d095b22be4cbc6562ecd848e4",
-      "run_id": 36075156864,
-      "job_id": 107884595730,
+      "sha": "1483743c504f742043e8605ff002f66de8d9abbf",
+      "run_id": 36078139952,
+      "job_id": 107893870274,
       "attempt": 1,
-      "result": "SUCCESS; full H2 1281/1281; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10839708989 sha256 9ad74efbff5e38b5d15621d3a8d071714010854b5cea2f40ecf439d5855a1f1a; NAS probe 10839234965 sha256 bd95bedc5bbba28f41e54ce3275e5a547bb65ff8b60e9ccb8e38f169c427a529"
+      "result": "SUCCESS; full H2 1282/1282; all Agent/MB/Office/transport steps PASS; self-contained win-x64 publish PASS; packaged helpers IPC PASS; portable artifact 10841461195 sha256 6f80ff52a2e108459bba517ff70b6070fd41b38243953dd04872f2ca20628a54; NAS probe 10841351247 sha256 ab8ca9a79c46fdfae7d13b0de7149f19cb17ff2046c686ff46e42e33da1539de"
     }
   ],
   "ci_runs": [
     {
-      "id": 36075156872,
+      "id": 36078139947,
       "name": "AR-000 baseline capture",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156900,
+      "id": 36078140020,
       "name": "AR-001 isolated implementation workspace",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156886,
+      "id": 36078139955,
       "name": "AR-010 shared runtime validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156874,
+      "id": 36078139950,
       "name": "AR-011 outcome contract validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156883,
+      "id": 36078139986,
       "name": "AR-012 scoped binding validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156888,
+      "id": 36078139987,
       "name": "AR-020 native discovery implementation validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156926,
+      "id": 36078139948,
       "name": "AR-021 bounded Excel range validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156852,
+      "id": 36078139970,
       "name": "AR-030 outcome and revision validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156851,
+      "id": 36078139942,
       "name": "AR-031 journal and cancellation regression",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156850,
+      "id": 36078139966,
       "name": "AR-032 scoped history validation",
       "result": "SUCCESS"
     },
     {
-      "id": 36075156864,
+      "id": 36078139952,
       "name": "Avalonia CI",
       "result": "SUCCESS"
     }
@@ -626,8 +627,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "docs/agent-reliability/AR-021/evidence.json",
     "docs/agent-reliability/AR-021/implementation.md",
     "docs/agent-reliability/AR-021/native-acceptance.md",
-    "GitHub artifact 10840361378 AR021-E1-E2-Evidence",
-    "GitHub artifact 10839708989 H2Notes-Avalonia-Portable-win-x64"
+    "GitHub artifact 10841121673 AR021-E1-E2-Evidence",
+    "GitHub artifact 10841461195 H2Notes-Avalonia-Portable-win-x64"
   ],
   "known_failures": [
     {
@@ -647,7 +648,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-021-E3",
       "status": "AWAITING_ENVIRONMENT",
-      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus, including direct edits while already unsaved, real recalculation SheetCalculate delivery, worksheet rename/delete continuation invalidation, event-disabled fail-closed behavior, replacement/fresh-process binding behavior and production continuation-contract replay checks; fixture/scripted E2 is not native acceptance."
+      "missing_evidence": "Real Microsoft Excel on an authorized Windows PC with synthetic RC-06/07 workbook corpus, including value/formula paging, bounded single-page structural evidence, fail-closed structural multi-page behavior, direct edits while already unsaved, recalculation, worksheet rename/delete, event-disabled fail-closed behavior, replacement/fresh-process binding and continuation-contract replay checks; fixture/scripted E2 is not native acceptance."
     }
   ],
   "parked_acceptance": [
@@ -684,13 +685,13 @@ Do not claim these defects were already covered by historical Office/transport/U
   ],
   "pending_user_decisions": [],
   "downloadable_build": {
-    "artifact_id": 10839708989,
+    "artifact_id": 10841461195,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110307640,
-    "sha256": "9ad74efbff5e38b5d15621d3a8d071714010854b5cea2f40ecf439d5855a1f1a",
-    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code with direct-edit/recalculation/rebind tracking, continuation contract binding and sheet-rename stale-continuation hardening; optional external Office/AutoCAD/Ollama/OCR dependencies remain separate."
+    "bytes": 110307986,
+    "sha256": "6f80ff52a2e108459bba517ff70b6070fd41b38243953dd04872f2ca20628a54",
+    "note": "Self-contained Windows x64 H2 Notes portable from exact validated AR-021 code. Value/formula paging is bounded/versioned; format/merge/hidden are supported only when the requested structural read completes in one page, otherwise fail closed. Optional external Office/AutoCAD/Ollama/OCR dependencies remain separate."
   },
-  "next_exact_action": "Use the final portable build on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Validate direct edit while already unsaved, worksheet recalculation, worksheet rename/delete between pages, event-disabled fail-closed behavior, fresh/replacement binding, and rejection of cursor/version replay with a different range/fields/page size. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
+  "next_exact_action": "Use the final portable build on an authorized Windows+Excel environment and execute docs/agent-reliability/AR-021/native-acceptance.md RC-06/07. Validate value/formula pagination, bounded single-page format/merge/hidden reads, structural multi-page fail-closed behavior, direct edit/recalculation/worksheet rename invalidation, event-disabled fail-closed behavior, rebind safety and continuation-contract replay. Keep AR-021 active and repair any native regression; do not start AR-022 until AR-021 E3 is passed or explicitly deferred by the user after this build test.",
   "next_task_if_active_done": "AR-022"
 }
 ```

@@ -4,7 +4,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Preconditions
 
-- Run the portable build produced from code `385e88644e7f026d095b22be4cbc6562ecd848e4` or a later docs-only checkpoint whose runtime tree contains that code.
+- Run the portable build produced from code `1483743c504f742043e8605ff002f66de8d9abbf` or a later docs-only checkpoint whose runtime tree contains that code.
 - Microsoft Excel is installed and can be discovered by H2 OfficeHost.
 - Create a synthetic workbook with: more than 5,000 populated cells; at least two sheets; formulas (including at least one formula whose displayed value can change on recalculation); one merged range; hidden row and column; and a deliberately sparse UsedRange extending far beyond the small range used for the first read.
 - Keep API/model credentials out of the workbook and evidence. A model is not required for the E3 helper/provider boundary.
@@ -13,7 +13,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 1. Bind the intended live workbook and read a small range such as `Data!A1:D20`. Confirm returned cells and metrics are bounded to that range, not the whole UsedRange.
 2. Read a range larger than one page and follow `nextCursor` with the same `contentVersion` until complete. Confirm no duplicates/gaps and each page has at most 512 cells.
-3. Request formulas only, then formatting/merge/hidden evidence on demand. Confirm unrequested heavy fields are not materialized.
+3. Request formulas only across a range that needs multiple pages and confirm normal value/formula continuation works. Then request formatting/merge/hidden evidence on a bounded range that completes in one page and confirm unrequested heavy fields are not materialized. Finally request format/merge/hidden over a range that would require multiple pages and confirm the operation fails before reading with `content_tracking_unavailable`/no-effect rather than returning a cursor.
 4. Change only selection/focus between pages. The continuation must remain valid and must not redirect to the new selection.
 5. Put the workbook into an already-unsaved state, read page 1, then directly edit another workbook cell in Excel before requesting page 2. The old continuation must be rejected as `stale_content` through native `Workbook.SheetChange`; H2 must not concatenate old/new pages.
 6. With a multi-page read active, trigger a real worksheet recalculation that changes or can change a displayed formula value. The old continuation must be rejected as `stale_content` through native `Workbook.SheetCalculate`.
@@ -26,6 +26,6 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Pass condition
 
-RC-06/07 pass only when the real Excel provider reads the exact requested bounded ranges, cursor/version behavior is consistent and bound to the original range/fields/page size, selection-only changes do not invalidate content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, worksheet renames/deletes require restart, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
+RC-06/07 pass only when the real Excel provider reads the exact requested bounded ranges, value/formula cursor/version behavior is consistent and bound to the original range/fields/page size, bounded one-page structural evidence works on demand, structural multi-page requests fail closed, selection-only changes do not invalidate value/formula content, direct edits and recalculation invalidate/restart safely, disabled event tracking fails closed, worksheet renames/deletes require restart, replacement bindings cannot reuse old continuations, and no unrelated workbook is read or mutated.
 
 If a case fails, keep AR-021 active, save the failure evidence, repair on the same branch, and rerun focused + full CI before moving to AR-022.

@@ -1,7 +1,7 @@
 # AR-021 — Excel bounded range/paging implementation
 
 Status: **IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT (E3), NOT DONE**  
-Validated code: `385e88644e7f026d095b22be4cbc6562ecd848e4`  
+Validated code: `1483743c504f742043e8605ff002f66de8d9abbf`  
 Branch: `feature/h2-agent-reliability-ar-000` · PR #3
 
 ## Implemented
@@ -14,18 +14,19 @@ Native paged reads now attach both `Workbook.SheetChange` and `Workbook.SheetCal
 
 Worksheet rename/delete continuation semantics are fail-safe: if the bound sheet disappears before a continuation, the backend returns `stale_content`/no-effect rather than a fresh `sheet_not_found`; the native post-page token also re-reads the actual sheet name to reject a rename racing the page.
 
+Structural consistency policy is intentionally narrower than value/formula paging. Native Excel exposes reliable events for cell changes and recalculation, but not a reliable revision signal for formatting, merged-range or row/column hidden-state edits. Therefore `format`/`merge`/`hidden` requests remain supported only when the requested structural range completes in a single bounded page. A structural request that would require continuation fails before reading with `content_tracking_unavailable`/no-effect instead of claiming an unprovable cross-page snapshot.
+
 The production OfficeHost implements `IExcelRangeReadClient`/backend support. Older injected test clients remain compatible and can use the historical snapshot path; the packaged production OfficeHost uses the bounded range path.
 
 ## Exact evidence
 
-- Dedicated AR-021 workflow `36003582856`, job `107645945118`: **SUCCESS**.
-- AR-021 focused **7/7**; OfficeHost **17/17** including named-pipe paging; retained AR-020 **36/36**, AR-012 **44/44**, AR-001 **13/13**; full H2 **1279/1279**.
-- Direct-edit stale-content E2 starts with the fixture workbook already unsaved, then edits another cell between pages; invalidation therefore depends on the content revision rather than merely on a `Saved` true→false transition.
-- Recalculation stale-content E2 also starts already unsaved, then recalculates between pages and requires the old continuation to fail as `stale_content`.
-- Evidence artifact `10810237920`, 36,122 bytes, SHA256 `45595fb9d8785591520fe7656f74fa02e09f5cc1642488d894c36b92217dae1f`.
-- All **11/11** pull-request workflows on exact code SHA `228403a47e53632ce00ae6bd6f7614b869fd8450` succeeded.
-- Avalonia CI `36003582843`, job `107645944504`: full H2/Agent/MB/Office/transport gates, self-contained Windows x64 publish and packaged-helper IPC all succeeded.
-- Portable artifact `10809482318`, 110,306,705 bytes, SHA256 `c8a2a584ca864dce774fda94472e4bdef564721fbab2a5aba3f28e2b8c61705f`.
+- Dedicated AR-021 workflow `36078139948`, job `107894641974`: **SUCCESS**.
+- AR-021 focused **10/10**; OfficeHost **17/17** including named-pipe paging and bounded single-page structural evidence; retained AR-020 **36/36**, AR-012 **44/44**, AR-001 **13/13**; full H2 **1282/1282**.
+- Structural paging regression proves format/merge/hidden requests requiring continuation fail closed with `content_tracking_unavailable`, while bounded one-page structural reads remain supported.
+- Evidence artifact `10841121673`, 36,273 bytes, SHA256 `070e4be37ccecd830063697dfa38838c9256fd5d2e87b37ac33f36da2632ecef`.
+- All **11/11** pull-request workflows on exact code SHA `1483743c504f742043e8605ff002f66de8d9abbf` succeeded.
+- Avalonia CI `36078139952`, job `107893870274`: full H2/Agent/MB/Office/transport gates, self-contained Windows x64 publish and packaged-helper IPC all succeeded.
+- Portable artifact `10841461195`, 110,307,986 bytes, SHA256 `6f80ff52a2e108459bba517ff70b6070fd41b38243953dd04872f2ca20628a54`.
 
 ## Remaining acceptance
 
