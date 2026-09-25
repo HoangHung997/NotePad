@@ -380,11 +380,18 @@ public static class NormalRuntimeToolRegistry
     {
         var properties = card.Arguments.ToDictionary(
             x => x.Name,
-            x => (object)new
-            {
-                type = "string",
-                description = x.Description
-            },
+            x => card.Name == "launch_app" && x.Name == "mode"
+                ? (object)new
+                {
+                    type = "string",
+                    description = x.Description,
+                    @enum = new[] { "reuse_or_launch", "new_window" }
+                }
+                : new
+                {
+                    type = "string",
+                    description = x.Description
+                },
             StringComparer.Ordinal);
         return JsonSerializer.SerializeToElement(new
         {

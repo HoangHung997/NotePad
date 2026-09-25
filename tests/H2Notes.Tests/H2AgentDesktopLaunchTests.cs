@@ -125,7 +125,10 @@ internal static class H2AgentDesktopLaunchTests
                 var parameters=function.GetProperty("parameters");
                 var properties=parameters.GetProperty("properties");
                 Check(properties.TryGetProperty("application",out _),"launch_app lacks application argument.");
-                Check(properties.TryGetProperty("mode",out _),"launch_app lacks explicit launch mode.");
+                Check(properties.TryGetProperty("mode",out var mode),"launch_app lacks explicit launch mode.");
+                Check(mode.TryGetProperty("enum",out var values)
+                    && values.EnumerateArray().Select(x=>x.GetString()).SequenceEqual(new[]{"reuse_or_launch","new_window"}),
+                    "launch_app mode schema is not restricted to the two supported semantics.");
                 Check(!properties.TryGetProperty("path",out _)
                     && !properties.TryGetProperty("command",out _)
                     && !properties.TryGetProperty("arguments",out _),
