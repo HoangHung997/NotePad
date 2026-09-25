@@ -101,7 +101,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             throw new DesktopHostFaultException("app_not_found", "Windows could not start the requested registered application.");
         }
 
-        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 250, DesktopProtocolConstants.MaxApplicationWaitMilliseconds));
+        var wait = Math.Clamp(
+            request.WaitMilliseconds,
+            250,
+            DesktopProtocolConstants.MaxApplicationWaitMilliseconds);
+        var startedUtc = DateTime.UtcNow;
+        var deadline = startedUtc.AddMilliseconds(wait);
         do
         {
             var current = ListWindows()
@@ -119,13 +124,29 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             if (promoted is not null)
                 return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
 
+            // Give the application a short grace period to create/activate a new window first.
+            // If it was already open as exactly one safe target and remains observable, the user's
+            // "open/start app" goal is already satisfied; do not turn that into an unknown outcome.
+            if (before.Length == 1
+                && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
+                && current.Length == 1
+                && string.Equals(current[0].SessionId, before[0].SessionId, StringComparison.Ordinal))
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, current[0]);
+
+            if (before.Length > 1
+                && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
+                && current.All(x => beforeSessions.Contains(x.SessionId)))
+                throw new DesktopHostFaultException(
+                    "ambiguous_target",
+                    "The application was already open in multiple safe windows and no exact new/activated target was observed.");
+
             Thread.Sleep(100);
         }
         while (DateTime.UtcNow < deadline);
 
         throw new DesktopHostFaultException(
             "launch_unverified",
-            "The application launch was requested, but no new or newly activated safe window was observed.");
+            "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
     }
 
     public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)
