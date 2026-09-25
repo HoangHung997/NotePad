@@ -44,17 +44,22 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
         {
             var observed = root.TryGetProperty("verifiedByHostObservation", out var hostObserved)
                 && hostObserved.ValueKind == JsonValueKind.True;
-            var hasWindow = root.TryGetProperty("window", out var window)
-                && window.ValueKind == JsonValueKind.Object
+            var hasWindowObject = root.TryGetProperty("window", out var window)
+                && window.ValueKind == JsonValueKind.Object;
+            var sessionId = hasWindowObject
                 && window.TryGetProperty("session_id", out var session)
-                && !string.IsNullOrWhiteSpace(session.GetString())
+                ? session.GetString()
+                : null;
+            var hasWindow = hasWindowObject
+                && !string.IsNullOrWhiteSpace(sessionId)
                 && window.TryGetProperty("pid", out var pid)
                 && pid.TryGetInt32(out var processId)
                 && processId > 0;
             var semantic = call.Name == "launch_app"
                 ? (root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
                     || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True)
-                : root.TryGetProperty("activated", out var activated)
+                : hasWindowObject
+                    && root.TryGetProperty("activated", out var activated)
                     && activated.ValueKind == JsonValueKind.True
                     && window.TryGetProperty("foreground", out var foreground)
                     && foreground.ValueKind == JsonValueKind.True;
@@ -62,7 +67,7 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
             return Task.FromResult(new AgentRuntimeDomainVerification(
                 DomainId,
                 passed,
-                passed ? ["desktop-window:" + session.GetString()] : [],
+                passed ? ["desktop-window:" + sessionId] : [],
                 passed ? null : "DesktopHost did not verify the requested application window outcome."));
         }
 
