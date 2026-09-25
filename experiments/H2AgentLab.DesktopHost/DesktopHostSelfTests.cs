@@ -56,6 +56,43 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Ordinary safe application was blocked from launch.");
         });
 
+        Test("Launcher strips credential environment without losing ordinary app settings", () =>
+        {
+            const string secretName = "H2_AR061_TEST_API_KEY";
+            const string safeName = "H2_AR061_SAFE_SETTING";
+            var oldSecret = Environment.GetEnvironmentVariable(secretName);
+            var oldSafe = Environment.GetEnvironmentVariable(safeName);
+            try
+            {
+                Environment.SetEnvironmentVariable(secretName, "DO_NOT_INHERIT");
+                Environment.SetEnvironmentVariable(safeName, "keep-me");
+                var info = Win32DesktopBackend.CreateLaunchStartInfo(
+                    new ResolvedDesktopApplication(
+                        "notepad",
+                        Path.Combine(Environment.SystemDirectory, "notepad.exe"),
+                        "notepad"),
+                    requireNewWindow: false);
+
+                if (info.UseShellExecute)
+                    throw new InvalidOperationException("Application launcher unexpectedly routes through ShellExecute.");
+                if (info.Environment.ContainsKey(secretName))
+                    throw new InvalidOperationException("Credential-like environment variable leaked into launched app.");
+                if (!info.Environment.TryGetValue(safeName, out var safe) || safe != "keep-me")
+                    throw new InvalidOperationException("Ordinary application environment was stripped unnecessarily.");
+                if (!Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("GITHUB_TOKEN")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("AZURE_CLIENT_SECRET")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("SSH_AUTH_SOCK")
+                    || Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("TEMP"))
+                    throw new InvalidOperationException("Launcher credential-environment classification is incorrect.");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(secretName, oldSecret);
+                Environment.SetEnvironmentVariable(safeName, oldSafe);
+            }
+        });
+
         Test("App Paths executable identity cannot redirect to another process", () =>
         {
             if (!DesktopApplicationResolver.RegisteredExecutableIdentityMatches(

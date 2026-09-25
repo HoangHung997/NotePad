@@ -136,14 +136,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
         try
         {
-            var startInfo = new ProcessStartInfo(resolved.ExecutablePath)
-            {
-                UseShellExecute = true,
-                WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath) ?? AppContext.BaseDirectory
-            };
-            if (request.RequireNewWindow)
-                startInfo.Arguments = DesktopApplicationResolver.NewWindowArgumentsForProcess(resolved.ProcessName);
-
+            var startInfo = CreateLaunchStartInfo(resolved, request.RequireNewWindow);
             using var started = Process.Start(startInfo);
             if (started is null)
                 throw new DesktopHostFaultException("provider_unavailable", "Windows did not start the requested application.");
@@ -187,6 +180,44 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             request.RequireNewWindow
                 ? "A distinct new application window was requested, but no new safe HWND/session was observed."
                 : "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
+    }
+
+    internal static ProcessStartInfo CreateLaunchStartInfo(
+        ResolvedDesktopApplication resolved,
+        bool requireNewWindow)
+    {
+        ArgumentNullException.ThrowIfNull(resolved);
+        var startInfo = new ProcessStartInfo(resolved.ExecutablePath)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = false,
+            WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath) ?? AppContext.BaseDirectory
+        };
+
+        if (requireNewWindow
+            && DesktopApplicationResolver.NewWindowArgumentsForProcess(resolved.ProcessName) is { Length: > 0 } fixedArgument)
+            startInfo.ArgumentList.Add(fixedArgument);
+
+        foreach (var name in startInfo.Environment.Keys
+            .Where(IsSensitiveLaunchEnvironmentVariable)
+            .ToArray())
+            startInfo.Environment.Remove(name);
+
+        return startInfo;
+    }
+
+    internal static bool IsSensitiveLaunchEnvironmentVariable(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var normalized = name.Trim().ToUpperInvariant();
+        return normalized.Contains("TOKEN", StringComparison.Ordinal)
+            || normalized.Contains("PASSWORD", StringComparison.Ordinal)
+            || normalized.Contains("SECRET", StringComparison.Ordinal)
+            || normalized.Contains("CREDENTIAL", StringComparison.Ordinal)
+            || normalized.Contains("PRIVATE_KEY", StringComparison.Ordinal)
+            || normalized.EndsWith("_API_KEY", StringComparison.Ordinal)
+            || normalized.EndsWith("APIKEY", StringComparison.Ordinal)
+            || normalized is "SSH_AUTH_SOCK" or "GPG_AGENT_INFO";
     }
 
     internal static DesktopWindowInfo? SelectUniqueCreatedWindow(
