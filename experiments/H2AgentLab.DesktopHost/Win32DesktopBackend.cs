@@ -19,7 +19,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     public IReadOnlyList<DesktopWindowInfo> ListWindows()
         => EnumerateWindows(includeOffscreen: false);
 
-    private IReadOnlyList<DesktopWindowInfo> EnumerateWindows(bool includeOffscreen)
+    private IReadOnlyList<DesktopWindowInfo> EnumerateWindows(
+        bool includeOffscreen,
+        string? requiredProcessName = null)
     {
         var result = new List<DesktopWindowInfo>();
         foreach (AutomationElement element in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
@@ -35,6 +37,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
                 using var process = Process.GetProcessById(current.ProcessId);
                 var processName = process.ProcessName;
+                if (requiredProcessName is { Length: > 0 }
+                    && !string.Equals(processName, requiredProcessName, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 if (!DesktopSafetyPolicy.IsWindowAllowed(processName, current.Name))
                     continue;
 
@@ -96,9 +101,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         // existing Word/Excel window could be mistaken for a newly-created window after the OS
         // restores it, or reuse_or_launch could create an unnecessary duplicate. Global inventory
         // still hides offscreen windows; this broader snapshot is private to exact launch identity.
-        var before = EnumerateWindows(includeOffscreen: true)
-            .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
-                && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
+        var before = EnumerateWindows(
+                includeOffscreen: true,
+                requiredProcessName: resolved.ProcessName)
+            .Where(x => IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
             .ToArray();
         var beforeSessions = before.Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
         var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
@@ -152,9 +158,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         var deadline = startedUtc.AddMilliseconds(wait);
         do
         {
-            var current = ListWindows()
-                .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
-                    && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
+            var current = EnumerateWindows(
+                    includeOffscreen: false,
+                    requiredProcessName: resolved.ProcessName)
+                .Where(x => IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
                 .ToArray();
             var created = SelectUniqueCreatedWindow(current, beforeSessions);
             if (created is not null)
@@ -204,9 +211,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 0, DesktopProtocolConstants.MaxApplicationWaitMilliseconds));
         do
         {
-            var found = ListWindows()
-                .Where(x => string.Equals(x.ProcessName, processName, StringComparison.OrdinalIgnoreCase)
-                    && IsApplicationLaunchWindow(processName, x.Handle))
+            var found = EnumerateWindows(
+                    includeOffscreen: false,
+                    requiredProcessName: processName)
+                .Where(x => IsApplicationLaunchWindow(processName, x.Handle))
                 .ToArray();
             if (found.Length == 1) return found[0];
             if (found.Length > 1)
