@@ -234,7 +234,6 @@ public static class MbDesktopComputerUseAcceptanceTests
             var good = JsonSerializer.Serialize(new
             {
                 requestedApplication = "notepad",
-                requestedApplication = "notepad",
                 requestedMode = "new_window",
                 application = "notepad",
                 process = "notepad",
