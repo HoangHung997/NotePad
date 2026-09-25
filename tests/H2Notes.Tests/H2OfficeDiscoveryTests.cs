@@ -157,6 +157,36 @@ internal static class H2OfficeDiscoveryTests
             Check(p.Enumerations==before+1,
                 "Non-transient targeted scan failure was retried.");
         });
+        test("AR-021 ROT fallback binds only the exact observed Word HWND and process identity",()=>{
+            var documentA=new RotWordDocument("A.docx",@"C:\\A","A.docx",saved:false);
+            var documentB=new RotWordDocument("B.docx",@"C:\\B","B.docx",saved:false);
+            var windowA=new RotWordWindow(1001,documentA,3,9);
+            var windowB=new RotWordWindow(2001,documentB,10,12);
+            var app=new RotWordApplication(windowA,windowB);
+            var source=new RotSource(app);
+            var fallback=new OfficeRotWindowFallback(source,(kind,hwnd)=>hwnd switch
+            {
+                1001=>new OfficeRotWindowIdentity(11,101,1,1001),
+                2001=>new OfficeRotWindowIdentity(12,102,1,2001),
+                _=>throw new OfficeHostFaultException("stale_resource","Controlled unknown window.",true)
+            });
+
+            var candidate=fallback.TryCreateCandidate("word",1001,11,101,1);
+            Check(candidate is {PaneHandle:0,RootHandle:1001,ProcessId:11,ProcessStartUtcTicks:101},
+                "ROT fallback did not produce an exact-root candidate.");
+            using(var lease=fallback.OpenExact(candidate!))
+            {
+                Check(lease.FullName==@"C:\\A\\A.docx"
+                    && lease.ViewHandle==1001
+                    && lease.ReadSelection()=="word-range:3:9",
+                    "ROT fallback bound the wrong Word document/window.");
+            }
+
+            Check(fallback.TryCreateCandidate("word",9999,11,101,1) is null,
+                "ROT fallback guessed a running Word document for an unrelated HWND.");
+            var wrong=candidate! with {ProcessStartUtcTicks=999};
+            Fault(()=>{using var ignored=fallback.OpenExact(wrong);},"stale_resource");
+        });
         test("AR-020 native COM failure classes distinguish busy and stale",()=>{
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x8001010A)))=="provider_busy","Busy flattened.");
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x80010108)))=="stale_resource","Disconnected object accepted.");
@@ -255,6 +285,54 @@ internal static class H2OfficeDiscoveryTests
                 ()=>{SelectionReads++;i.OnSelection?.Invoke();return candidate.Application=="word"?"word-range:3:9":"Sheet1!A1";},()=>Releases++);
         }
     }
+    private sealed class RotSource(params object[] objects):IOfficeRunningObjectSource
+    {
+        private readonly object[] _objects=objects;
+        public IReadOnlyList<object> Snapshot()=>_objects;
+    }
+    private sealed class RotWordApplication
+    {
+        public RotWordApplication(params RotWordWindow[] windows)
+        {
+            Name="Microsoft Word";Version="16.0";Windows=new RotWordWindows(windows);
+            foreach(var window in windows) window.Application=this;
+        }
+        public string Name{get;}
+        public string Version{get;}
+        public RotWordWindows Windows{get;}
+    }
+    private sealed class RotWordWindows
+    {
+        private readonly RotWordWindow[] _windows;
+        public RotWordWindows(RotWordWindow[] windows)=>_windows=windows;
+        public int Count=>_windows.Length;
+        public RotWordWindow Item(int index)=>_windows[index-1];
+    }
+    private sealed class RotWordWindow
+    {
+        public RotWordWindow(long hwnd,RotWordDocument document,int start,int end)
+        {Hwnd=hwnd;Document=document;Selection=new RotWordSelection(start,end);}
+        public long Hwnd{get;}
+        public RotWordApplication Application{get;set;}=null!;
+        public RotWordDocument Document{get;}
+        public RotWordSelection Selection{get;}
+    }
+    private sealed class RotWordDocument
+    {
+        public RotWordDocument(string name,string path,string fullName,bool saved)
+        {Name=name;Path=path;FullName=Path.Combine(path,fullName);Saved=saved;}
+        public string Name{get;}
+        public string Path{get;}
+        public string FullName{get;}
+        public bool Saved{get;}
+    }
+    private sealed class RotWordSelection
+    {
+        public RotWordSelection(int start,int end){Start=start;End=end;}
+        public int Start{get;}
+        public int End{get;}
+    }
+
     // Test-only seam for the manual native marker report. These tests are never E3 evidence.
     private sealed class MarkerBackend:IOfficeBackend
     {
