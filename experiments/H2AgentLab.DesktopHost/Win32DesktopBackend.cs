@@ -21,7 +21,8 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     private IReadOnlyList<DesktopWindowInfo> EnumerateWindows(
         bool includeOffscreen,
-        string? requiredProcessName = null)
+        string? requiredProcessName = null,
+        string? requiredSessionId = null)
     {
         var result = new List<DesktopWindowInfo>();
         foreach (AutomationElement element in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
@@ -61,6 +62,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     current.ProcessId.ToString(CultureInfo.InvariantCulture),
                     started.ToString(CultureInfo.InvariantCulture),
                     current.NativeWindowHandle.ToString(CultureInfo.InvariantCulture));
+                if (requiredSessionId is { Length: > 0 }
+                    && !string.Equals(sessionId, requiredSessionId, StringComparison.Ordinal))
+                    continue;
 
                 result.Add(new DesktopWindowInfo(
                     sessionId,
@@ -73,7 +77,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     GetDpiForWindow(handle),
                     GetForegroundWindow() == handle));
 
-                if (result.Count >= 80) break;
+                if (requiredSessionId is { Length: > 0 } || result.Count >= 80) break;
             }
             catch (Exception ex) when (
                 ex is ElementNotAvailableException
@@ -581,7 +585,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     private DesktopWindowInfo ResolveWindow(string sessionId, bool includeOffscreen = false)
     {
-        var window = EnumerateWindows(includeOffscreen).SingleOrDefault(x => x.SessionId == sessionId);
+        var window = EnumerateWindows(
+                includeOffscreen,
+                requiredSessionId: sessionId)
+            .SingleOrDefault();
         return window
             ?? throw new DesktopHostFaultException("session_not_found", "Desktop window session is unavailable or blocked by policy.");
     }
