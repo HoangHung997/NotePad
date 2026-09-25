@@ -224,6 +224,15 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         if (_scope.HasFullAccessAt(DateTime.UtcNow)) return true;
         if (descriptor.Namespace.Name is "files" or "python" && H2AgentTargetScope.Contains(_context?.TargetPaths,
             Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) return true;
+        // Application lifecycle has no pre-existing document/workspace target. The exact app/window
+        // is still host-resolved and every mutation always requires a separate approval below.
+        if (descriptor.Namespace.Name == "app")
+            return call.Name switch
+            {
+                "launch_app" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
+                "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
+                _ => true
+            };
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Workspace)
         {
             // This grant selects a filesystem root, never an Office session or desktop window.
@@ -233,13 +242,6 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             return string.Equals(_scope.ResourceKey, "workspace:" + root, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(_scope.DocumentPath, root, StringComparison.OrdinalIgnoreCase);
         }
-        if (descriptor.Namespace.Name == "app")
-            return call.Name switch
-            {
-                "launch_app" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
-                "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
-                _ => true
-            };
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Project)
             return _projectId is { } project
                 && (descriptor.Namespace.Name == "h2" && Guid.TryParse(Arg(call, "project_id"), out var requested) && requested == project
