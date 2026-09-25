@@ -103,6 +103,10 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 ReusedExistingWindow: true,
                 reused);
         }
+        if (!request.RequireNewWindow && before.Length > 1)
+            throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one safe application window is already running; enumerate and activate an exact session_id. No new process was started.");
 
         try
         {
@@ -150,13 +154,6 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 if (promoted is not null)
                     return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
             }
-
-            if (!request.RequireNewWindow && before.Length > 1
-                && DateTime.UtcNow - startedUtc >= TimeSpan.FromMilliseconds(Math.Min(1_000, wait))
-                && current.All(x => beforeSessions.Contains(x.SessionId)))
-                throw new DesktopHostFaultException(
-                    "ambiguous_target",
-                    "The application was already open in multiple safe windows and no exact new/activated target was observed.");
 
             Thread.Sleep(100);
         }

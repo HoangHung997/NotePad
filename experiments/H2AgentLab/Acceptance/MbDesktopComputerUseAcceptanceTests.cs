@@ -283,6 +283,7 @@ public static class MbDesktopComputerUseAcceptanceTests
             var wrongRequested = JsonSerializer.Serialize(new
             {
                 requestedApplication = "excel",
+                requestedMode = "new_window",
                 application = "notepad",
                 process = "notepad",
                 newWindowObserved = true,
@@ -341,7 +342,11 @@ public static class MbDesktopComputerUseAcceptanceTests
             _ = await client.LaunchApplicationAsync(
                 new DesktopApplicationLaunchRequest("word", true, 1000)).ConfigureAwait(false);
             _ = await client.LaunchApplicationAsync(
-                new DesktopApplicationLaunchRequest("word", true, 1000)).ConfigureAwait(false);
+                new DesktopApplicationLaunchRequest(
+                    "word",
+                    true,
+                    1000,
+                    RequireNewWindow: true)).ConfigureAwait(false);
             await ExpectCode(
                 "ambiguous_target",
                 () => client.WaitForApplicationWindowAsync(

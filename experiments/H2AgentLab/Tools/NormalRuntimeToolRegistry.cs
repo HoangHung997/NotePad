@@ -600,7 +600,7 @@ public static class NormalRuntimeToolRegistry
             // IOException text is not evidence that a file operation was atomic.
             if (exception is global::H2AgentLab.AgentFaultException known
                 && known.Code is "stale_state" or "invalid_arguments" or "invalid_application" or "app_not_found"
-                    or "app_preflight_unavailable" or "denied" or "boundary" or "permission_required")
+                    or "ambiguous_target" or "app_preflight_unavailable" or "denied" or "boundary" or "permission_required")
                 result["mutationApplied"] = false;
 
             if (fault.Code == "not_found"
