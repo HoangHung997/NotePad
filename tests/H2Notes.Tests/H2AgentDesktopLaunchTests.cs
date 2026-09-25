@@ -54,7 +54,7 @@ internal static class H2AgentDesktopLaunchTests
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
                 var registry=NormalRuntimeToolRegistry.Create(host);
                 var index=new ToolSearchIndex(registry);
-                foreach(var query in new[]{"open word app","open file explorer","start excel application","launch autocad"})
+                foreach(var query in new[]{"open word app","open file explorer","mở file explore","mở app word","start excel application","launch autocad"})
                 {
                     var results=index.Search(query,8);
                     Check(results.Count>0 && results[0].Descriptor.Name=="launch_app",
