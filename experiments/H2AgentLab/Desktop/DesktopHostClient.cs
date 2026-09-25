@@ -331,7 +331,7 @@ public sealed class DesktopHostClient : IDisposable
             try
             {
                 if (!_process.HasExited)
-                    _process.Kill(entireProcessTree: true);
+                    _process.Kill(entireProcessTree: false);
                 _process.WaitForExit(2_000);
             }
             catch
