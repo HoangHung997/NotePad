@@ -448,8 +448,22 @@ public static class MbDesktopComputerUseAcceptanceTests
                 applicationKind: H2ApplicationKind.Word,
                 documentSessionId: "word-session",
                 documentPath: Path.Combine(workspace, "doc.docx"));
-            Check(!(await Authorize(documentAsk, null).ConfigureAwait(false)).Allowed,
-                "Document-scoped AskBeforeChanges silently widened into machine app launch authority.");
+            Check((await Authorize(documentAsk, null).ConfigureAwait(false)).Allowed,
+                "AskBeforeChanges did not admit exact per-call app approval from a document context.");
+
+            var documentAuto = new H2AgentPermissionScope(
+                H2AgentPermissionMode.AllowScopedChanges,
+                H2AgentResourceScopeKind.Document,
+                "document:auto-fixture",
+                mutationAllowed: true,
+                approvalRequired: false,
+                now,
+                now.AddMinutes(10),
+                applicationKind: H2ApplicationKind.Word,
+                documentSessionId: "word-auto-session",
+                documentPath: Path.Combine(workspace, "auto.docx"));
+            Check(!(await Authorize(documentAuto, null).ConfigureAwait(false)).Allowed,
+                "AllowScopedChanges silently widened document authority into machine app launch.");
 
             var project = Guid.NewGuid();
             var projectPolicy = new H2AgentPermissionScope(

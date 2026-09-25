@@ -359,15 +359,16 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         if (_scope.HasFullAccessAt(DateTime.UtcNow)) return true;
         if (descriptor.Namespace.Name is "files" or "python" && H2AgentTargetScope.Contains(_context?.TargetPaths,
             Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) return true;
-        // App launch/activation is machine-visible and must never inherit authority from a
-        // narrower document/session/window grant. Only Workspace+AskBeforeChanges, the exact
-        // current Project+UseProjectPolicy, or FullAccess (handled above) can admit it.
+        // App launch/activation is machine-visible. AskBeforeChanges may admit the exact
+        // app/session because the wrapper still requires a separate resource-specific approval
+        // for every mutating call. AllowScopedChanges never expands a document/session grant into
+        // process launch. ProjectPolicy must still match the exact current project. FullAccess was
+        // handled by the early HasFullAccessAt return above.
         if (descriptor.Namespace.Name == "app")
         {
             var scopeAllowsApp = _scope switch
             {
-                { Mode: H2AgentPermissionMode.AskBeforeChanges,
-                  ScopeKind: H2AgentResourceScopeKind.Workspace } => true,
+                { Mode: H2AgentPermissionMode.AskBeforeChanges } => true,
                 { Mode: H2AgentPermissionMode.UseProjectPolicy,
                   ScopeKind: H2AgentResourceScopeKind.Project } when _projectId is { } project
                     && (_scope.ResourceKey == "h2-project:" + project.ToString("N")
