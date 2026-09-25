@@ -111,64 +111,84 @@ public static class DesktopApplicationResolver
                 process);
     }
 
-    private static IEnumerable<RegisteredApplicationCandidate> RegisteredApplications()
+    private static IReadOnlyList<RegisteredApplicationCandidate> RegisteredApplications()
     {
+        const int maxEntries = 512;
+        var result = new List<RegisteredApplicationCandidate>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
         foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
         {
-            RegistryKey? root = null;
-            RegistryKey? appPaths = null;
+            if (result.Count >= maxEntries) break;
             try
             {
-                root = RegistryKey.OpenBaseKey(hive, view);
-                appPaths = root.OpenSubKey(
+                using var root = RegistryKey.OpenBaseKey(hive, view);
+                using var appPaths = root.OpenSubKey(
                     @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths",
                     writable: false);
                 if (appPaths is null) continue;
 
-                foreach (var subKeyName in appPaths.GetSubKeyNames())
+                string[] subKeys;
+                try { subKeys = appPaths.GetSubKeyNames(); }
+                catch (Exception ex) when (RegistryReadFailure(ex)) { continue; }
+
+                foreach (var subKeyName in subKeys)
                 {
-                    using var key = appPaths.OpenSubKey(subKeyName, writable: false);
-                    if (key?.GetValue(null) is not string registered) continue;
-                    registered = Environment.ExpandEnvironmentVariables(registered.Trim().Trim('"'));
-                    if (!File.Exists(registered)) continue;
-                    registered = Path.GetFullPath(registered);
-                    if (!seen.Add(registered)) continue;
-
-                    var process = Path.GetFileNameWithoutExtension(registered);
-                    if (!DesktopSafetyPolicy.IsProcessAllowedForLaunch(process)) continue;
-
-                    var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        Path.GetFileNameWithoutExtension(subKeyName),
-                        process
-                    };
+                    if (result.Count >= maxEntries) break;
                     try
                     {
-                        var version = FileVersionInfo.GetVersionInfo(registered);
-                        if (!string.IsNullOrWhiteSpace(version.ProductName)) names.Add(version.ProductName);
-                        if (!string.IsNullOrWhiteSpace(version.FileDescription)) names.Add(version.FileDescription);
+                        using var key = appPaths.OpenSubKey(subKeyName, writable: false);
+                        if (key?.GetValue(null) is not string registered) continue;
+                        registered = Environment.ExpandEnvironmentVariables(registered.Trim().Trim('"'));
+                        if (!File.Exists(registered)) continue;
+                        registered = Path.GetFullPath(registered);
+                        if (!seen.Add(registered)) continue;
+
+                        var process = Path.GetFileNameWithoutExtension(registered);
+                        if (!DesktopSafetyPolicy.IsProcessAllowedForLaunch(process)) continue;
+
+                        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            Path.GetFileNameWithoutExtension(subKeyName),
+                            process
+                        };
+                        try
+                        {
+                            var version = FileVersionInfo.GetVersionInfo(registered);
+                            if (!string.IsNullOrWhiteSpace(version.ProductName)) names.Add(version.ProductName);
+                            if (!string.IsNullOrWhiteSpace(version.FileDescription)) names.Add(version.FileDescription);
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                            or System.ComponentModel.Win32Exception or ArgumentException)
+                        {
+                        }
+
+                        result.Add(new(
+                            new(
+                                Path.GetFileNameWithoutExtension(subKeyName).ToLowerInvariant(),
+                                registered,
+                                process),
+                            names.ToArray()));
                     }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                    catch (Exception ex) when (RegistryReadFailure(ex))
                     {
                     }
-
-                    yield return new(
-                        new(
-                            Path.GetFileNameWithoutExtension(subKeyName).ToLowerInvariant(),
-                            registered,
-                            process),
-                        names.ToArray());
                 }
             }
-            finally
+            catch (Exception ex) when (RegistryReadFailure(ex))
             {
-                appPaths?.Dispose();
-                root?.Dispose();
             }
         }
+
+        return result;
     }
+
+    private static bool RegistryReadFailure(Exception ex)
+        => ex is UnauthorizedAccessException
+            or IOException
+            or System.Security.SecurityException
+            or ArgumentException;
 
     private static string NormalizeFriendlyName(string value)
         => new(value.Normalize()
