@@ -187,6 +187,26 @@ internal static class H2OfficeDiscoveryTests
             var wrong=candidate! with {ProcessStartUtcTicks=999};
             Fault(()=>{using var ignored=fallback.OpenExact(wrong);},"stale_resource");
         });
+        test("AR-021 ROT fallback binds the exact observed Excel window and workbook",()=>{
+            var workbook=new RotExcelWorkbook("Book1.xlsx",@"C:\Excel","Book1.xlsx",saved:false);
+            var sheet=new RotExcelSheet("Data",workbook);
+            var window=new RotExcelWindow(3001,sheet);
+            var app=new RotExcelApplication(window);
+            var fallback=new OfficeRotWindowFallback(
+                new RotSource(app),
+                (kind,hwnd)=>hwnd==3001
+                    ? new OfficeRotWindowIdentity(31,301,1,3001)
+                    : throw new OfficeHostFaultException("stale_resource","Controlled unknown window.",true));
+
+            var candidate=fallback.TryCreateCandidate("excel",3001,31,301,1);
+            Check(candidate is {PaneHandle:0,RootHandle:3001,ProcessId:31},
+                "Excel ROT fallback did not retain exact observed identity.");
+            using var lease=fallback.OpenExact(candidate!);
+            Check(lease.Name=="Book1.xlsx"
+                && lease.FullName==@"C:\Excel\Book1.xlsx"
+                && lease.ViewHandle==3001,
+                "Excel ROT fallback bound the wrong workbook/window.");
+        });
         test("AR-020 native COM failure classes distinguish busy and stale",()=>{
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x8001010A)))=="provider_busy","Busy flattened.");
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x80010108)))=="stale_resource","Disconnected object accepted.");
@@ -331,6 +351,47 @@ internal static class H2OfficeDiscoveryTests
         public RotWordSelection(int start,int end){Start=start;End=end;}
         public int Start{get;}
         public int End{get;}
+    }
+
+    private sealed class RotExcelApplication
+    {
+        public RotExcelApplication(params RotExcelWindow[] windows)
+        {
+            Name="Microsoft Excel";Version="16.0";Windows=new RotExcelWindows(windows);
+            foreach(var window in windows) window.Application=this;
+        }
+        public string Name{get;}
+        public string Version{get;}
+        public RotExcelWindows Windows{get;}
+    }
+    private sealed class RotExcelWindows
+    {
+        private readonly RotExcelWindow[] _windows;
+        public RotExcelWindows(RotExcelWindow[] windows)=>_windows=windows;
+        public int Count=>_windows.Length;
+        public RotExcelWindow Item(int index)=>_windows[index-1];
+    }
+    private sealed class RotExcelWindow
+    {
+        public RotExcelWindow(long hwnd,RotExcelSheet sheet){Hwnd=hwnd;ActiveSheet=sheet;}
+        public long Hwnd{get;}
+        public RotExcelApplication Application{get;set;}=null!;
+        public RotExcelSheet ActiveSheet{get;}
+    }
+    private sealed class RotExcelSheet
+    {
+        public RotExcelSheet(string name,RotExcelWorkbook parent){Name=name;Parent=parent;}
+        public string Name{get;}
+        public RotExcelWorkbook Parent{get;}
+    }
+    private sealed class RotExcelWorkbook
+    {
+        public RotExcelWorkbook(string name,string path,string fullName,bool saved)
+        {Name=name;Path=path;FullName=Path.Combine(path,fullName);Saved=saved;}
+        public string Name{get;}
+        public string Path{get;}
+        public string FullName{get;}
+        public bool Saved{get;}
     }
 
     // Test-only seam for the manual native marker report. These tests are never E3 evidence.
