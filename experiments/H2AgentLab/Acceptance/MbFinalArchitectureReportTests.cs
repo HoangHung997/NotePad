@@ -115,9 +115,11 @@ public static class MbFinalArchitectureReportTests
                 (_, _) => { });
 
             var registry = NormalRuntimeToolRegistry.Create(host);
-            Check(registry.Tools.Count == 20 && registry.TryGet("read_tool_output", out var reader)
-                  && reader.Namespace.Name == "evidence" && !reader.IsMutating && reader.SupportsParallel,
-                "Expected 19 historical tools plus the read-only evidence reader, with unchanged access policy.");
+            Check(registry.Tools.Count == 24 && registry.TryGet("read_tool_output", out var reader)
+                  && reader.Namespace.Name == "evidence" && !reader.IsMutating && reader.SupportsParallel
+                  && registry.TryGet("app.launch", out var launch)
+                  && launch.Namespace.Name == "app" && launch.IsMutating,
+                "Expected the historical callable surface plus four AR-061 application lifecycle tools and the read-only evidence reader.");
 
             var exposure = new DeferredToolDiscovery(registry).BuildInitialExposure();
             var names = exposure.CallableSchemas

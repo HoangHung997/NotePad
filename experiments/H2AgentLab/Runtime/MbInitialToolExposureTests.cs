@@ -98,6 +98,10 @@ public static class MbInitialToolExposureTests
 
             foreach (var heavy in new[]
             {
+                "app.list_running_apps",
+                "app.launch",
+                "app.wait_for_window",
+                "app.activate",
                 "run_python",
                 "word_paragraphs",
                 "check_word",

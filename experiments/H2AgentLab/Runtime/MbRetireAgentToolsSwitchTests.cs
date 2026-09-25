@@ -7,6 +7,10 @@ public static class MbRetireAgentToolsSwitchTests
 {
     private static readonly string[] ExpectedTools =
     [
+        "app.activate",
+        "app.launch",
+        "app.list_running_apps",
+        "app.wait_for_window",
         "list_skills",
         "read_skill",
         "read_tool_output",
@@ -100,8 +104,8 @@ public static class MbRetireAgentToolsSwitchTests
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
-            Check(executors.Length == 7,
-                "Expected seven domain executors including evidence, got: " + string.Join(", ", executors));
+            Check(executors.Length == 8,
+                "Expected eight domain executors including application lifecycle and evidence, got: " + string.Join(", ", executors));
             Check(executors.All(x => x.StartsWith("normal.", StringComparison.Ordinal)),
                 "Normal registry still includes a legacy giant-switch executor.");
 

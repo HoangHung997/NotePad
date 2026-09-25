@@ -755,6 +755,10 @@ public static class V2ArchitectureTests
 
             var expectedNames = new[]
             {
+                "app.activate",
+                "app.launch",
+                "app.list_running_apps",
+                "app.wait_for_window",
                 "check_word",
                 "click_control",
                 "find_files",
@@ -799,6 +803,12 @@ public static class V2ArchitectureTests
                 || click.Risk != AgentToolRisk.High
                 || !click.IsMutating)
                 throw new InvalidOperationException("desktop mutation metadata is incorrect.");
+            if (!registry.TryGet("app.launch", out var launch)
+                || launch.Namespace.Name != "app"
+                || launch.Risk != AgentToolRisk.High
+                || !launch.IsMutating
+                || launch.Preference?.InteractionFidelity != ToolInteractionFidelity.Accessibility)
+                throw new InvalidOperationException("application launch metadata is incorrect.");
         });
 
         Test("ToolSearchIndex ranks lexically and caches by registry version", () =>
