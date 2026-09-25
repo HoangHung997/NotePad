@@ -36,6 +36,23 @@ public static class DesktopHostSelfTests
             }
         });
 
+        Test("Launcher blocks shell credential and developer processes", () =>
+        {
+            foreach (var process in new[]
+            {
+                "cmd", "powershell", "pwsh", "regedit",
+                "CredentialUIBroker", "1Password", "Bitwarden",
+                "ChatGPT", "Codex", "Code", "devenv"
+            })
+            {
+                if (DesktopSafetyPolicy.IsProcessAllowedForLaunch(process))
+                    throw new InvalidOperationException("Blocked process was launchable: " + process);
+            }
+
+            if (!DesktopSafetyPolicy.IsProcessAllowedForLaunch("notepad"))
+                throw new InvalidOperationException("Ordinary safe application was blocked from launch.");
+        });
+
         Test("Sensitive title terms are blocked", () =>
         {
             foreach (var title in new[]
