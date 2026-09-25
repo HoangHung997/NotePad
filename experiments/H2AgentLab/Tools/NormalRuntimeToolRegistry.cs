@@ -1158,6 +1158,7 @@ public static class NormalRuntimeToolRegistry
                         cancellationToken).ConfigureAwait(false);
                     return new
                     {
+                        requestedApplication = launched.RequestedApplication,
                         application = launched.ApplicationId,
                         process = launched.ProcessName,
                         newWindowObserved = launched.NewWindowObserved,

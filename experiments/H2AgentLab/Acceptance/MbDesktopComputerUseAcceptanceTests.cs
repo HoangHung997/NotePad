@@ -216,6 +216,7 @@ public static class MbDesktopComputerUseAcceptanceTests
                 JsonSerializer.SerializeToElement(new { application = "notepad" }));
             var good = JsonSerializer.Serialize(new
             {
+                requestedApplication = "notepad",
                 application = "notepad",
                 process = "notepad",
                 newWindowObserved = true,
@@ -257,6 +258,33 @@ public static class MbDesktopComputerUseAcceptanceTests
                         weak,
                         CancellationToken.None).ConfigureAwait(false)).Passed),
                 "Unobserved/semantically weak app launch was incorrectly verified.");
+
+            var wrongRequested = JsonSerializer.Serialize(new
+            {
+                requestedApplication = "excel",
+                application = "notepad",
+                process = "notepad",
+                newWindowObserved = true,
+                reusedExistingWindow = false,
+                window = new
+                {
+                    session_id = "win-1",
+                    hwnd = 1001L,
+                    pid = 22,
+                    process_started_utc_ticks = 33L,
+                    process = "notepad",
+                    title = "Untitled",
+                    foreground = true,
+                    dpi = 96
+                },
+                verifiedByHostObservation = true
+            });
+            Check(!((await verifier.VerifyAsync(
+                        null!,
+                        launch,
+                        wrongRequested,
+                        CancellationToken.None).ConfigureAwait(false)).Passed),
+                "launch_app verified a result for a different requested application.");
 
             var activate = new ToolCall(
                 "activate",

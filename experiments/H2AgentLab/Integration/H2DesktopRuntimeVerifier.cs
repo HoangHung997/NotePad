@@ -68,8 +68,19 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 && processStarted > 0
                 && !string.IsNullOrWhiteSpace(windowProcessName);
             var semantic = call.Name == "launch_app"
-                ? ((root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
-                    || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True))
+                ? call.Arguments.TryGetProperty("application", out var requestedArgument)
+                    && requestedArgument.ValueKind == JsonValueKind.String
+                    && root.TryGetProperty("requestedApplication", out var requestedApplication)
+                    && requestedApplication.ValueKind == JsonValueKind.String
+                    && string.Equals(
+                        requestedArgument.GetString()?.Trim(),
+                        requestedApplication.GetString()?.Trim(),
+                        StringComparison.OrdinalIgnoreCase)
+                    && ((root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
+                        || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True))
+                    && root.TryGetProperty("application", out var applicationId)
+                    && applicationId.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(applicationId.GetString())
                     && root.TryGetProperty("process", out var launchedProcess)
                     && launchedProcess.ValueKind == JsonValueKind.String
                     && string.Equals(launchedProcess.GetString(), windowProcessName, StringComparison.OrdinalIgnoreCase)
