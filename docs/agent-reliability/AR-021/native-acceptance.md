@@ -4,7 +4,7 @@ This is the remaining **E3** gate. Use an isolated Windows test profile and synt
 
 ## Preconditions
 
-- Run the portable build produced from code `385e88644e7f026d095b22be4cbc6562ecd848e4` or a later docs-only checkpoint whose runtime tree contains that code.nly checkpoint whose runtime tree contains that code.
+- Run the portable build produced from code `385e88644e7f026d095b22be4cbc6562ecd848e4` or a later docs-only checkpoint whose runtime tree contains that code.
 - Microsoft Excel is installed and can be discovered by H2 OfficeHost.
 - Create a synthetic workbook with: more than 5,000 populated cells; at least two sheets; formulas (including at least one formula whose displayed value can change on recalculation); one merged range; hidden row and column; and a deliberately sparse UsedRange extending far beyond the small range used for the first read.
 - Keep API/model credentials out of the workbook and evidence. A model is not required for the E3 helper/provider boundary.
