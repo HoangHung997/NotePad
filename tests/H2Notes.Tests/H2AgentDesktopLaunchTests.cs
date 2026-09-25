@@ -53,13 +53,16 @@ internal static class H2AgentDesktopLaunchTests
             Temp((root,state)=>{
                 using var host=new AgentTools(new SafeWorkspace(root),state,(_,_)=>Task.FromResult(true),(_,_)=>{});
                 var registry=NormalRuntimeToolRegistry.Create(host);
-                var index=new ToolSearchIndex(registry);
+                var discovery=new DeferredToolDiscovery(registry);
                 foreach(var query in new[]{"open word app","open file explorer","mở file explore","mở app word","start excel application","launch autocad","open blank excel window","mở word trắng mới"})
                 {
-                    var results=index.Search(query,8);
+                    var results=discovery.Search(query,8);
                     Check(results.Count>0 && results[0].Descriptor.Name=="launch_app",
-                        "Tool search did not rank launch_app first for: "+query);
+                        "Production deferred discovery did not rank launch_app first for: "+query);
                 }
+                Check(registry.TryGet("launch_app",out var launcher)
+                    && launcher.Preference?.CapabilityFamily=="application-lifecycle",
+                    "launch_app still shares the active-content preference family and can be displaced by document tools.");
             });
         });
 

@@ -176,7 +176,7 @@ public static class NormalRuntimeToolRegistry
             true,
             Args(),
             Evidence: true,
-            Preference: Accessibility()),
+            Preference: ApplicationLifecycle()),
         new(
             "launch_app",
             "app",
@@ -188,7 +188,7 @@ public static class NormalRuntimeToolRegistry
                 ("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name"),
                 ("mode", "Exactly reuse_or_launch or new_window. Use new_window for explicit new/blank/trắng/mới window requests.")),
             Evidence: true,
-            Preference: Accessibility()),
+            Preference: ApplicationLifecycle()),
         new(
             "wait_for_app_window",
             "app",
@@ -198,7 +198,7 @@ public static class NormalRuntimeToolRegistry
             false,
             Args(("application", "Friendly app name or registered executable name")),
             Evidence: true,
-            Preference: Accessibility()),
+            Preference: ApplicationLifecycle()),
         new(
             "activate_app",
             "app",
@@ -208,7 +208,7 @@ public static class NormalRuntimeToolRegistry
             false,
             Args(("session_id", "Exact session_id returned by list_running_apps, launch_app or wait_for_app_window")),
             Evidence: true,
-            Preference: Accessibility()),
+            Preference: ApplicationLifecycle()),
 
         new(
             "word_paragraphs",
@@ -457,6 +457,9 @@ public static class NormalRuntimeToolRegistry
 
     private static ToolPreferenceMetadata Accessibility()
         => new("active-content", ToolInteractionFidelity.Accessibility);
+
+    private static ToolPreferenceMetadata ApplicationLifecycle()
+        => new("application-lifecycle", ToolInteractionFidelity.Accessibility);
 
     private abstract class ExecutorBase : IAgentToolExecutor
     {
