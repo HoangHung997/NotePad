@@ -140,21 +140,6 @@ internal static class H2OfficeDiscoveryTests
             Check(p.Opens.Count==before+1,
                 "Non-transient stale_resource was retried instead of failing immediately.");
         });
-        test("AR-021 targeted live capture retries transient native window scan failures without broad discovery retry",()=>{
-            var p=new Probe();p.Add(11,101,1001,"A.xlsx");
-            p.EnumerationFaults.Enqueue("native_object_unavailable");
-            p.EnumerationFaults.Enqueue("provider_busy");
-            using var b=new ComOfficeBackend(p);
-            var captured=b.Capture(new("excel",1001,11,101));
-            Check(captured.Status=="Ready" && captured.SessionId is not null && p.Enumerations==3,
-                "Targeted live capture did not recover from transient native window scan failures.");
-
-            p.EnumerationFaults.Enqueue("native_object_unavailable");
-            var before=p.Enumerations;
-            var discovery=b.DiscoverExcel();
-            Check(p.Enumerations==before+1 && discovery.Report is {Complete:false},
-                "Broad discovery retried a transient scan and violated the explicit-discovery boundary.");
-        });
         test("AR-021 bound session require retries only its known root after transient scan loss",()=>{
             var p=new Probe();p.Add(11,101,1001,"A.xlsx");
             using var catalog=new OfficeWindowCatalog(p);

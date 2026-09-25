@@ -256,7 +256,7 @@ public sealed class OfficeWindowCatalog : IDisposable
             return new("Rejected","invalid_arguments",null,null,null,null,clock.ElapsedMilliseconds);
         try
         {
-            var matches=RefreshTargetedWithTransientRetry(request.Application,request.WindowHandle).Where(v=>v.Candidate.ProcessId==request.ProcessId
+            var matches=Refresh(request.Application,request.WindowHandle).Where(v=>v.Candidate.ProcessId==request.ProcessId
                 && v.Candidate.ProcessStartUtcTicks==request.ProcessStartUtcTicks && v.Candidate.RootHandle==request.WindowHandle).ToArray();
             if(matches.Length!=1 || !LastReport.Complete)
                 return new("Unavailable",LastReport.Issues.FirstOrDefault()?.Code ?? (matches.Length>1?"ambiguous_target":"stale_resource"),null,null,null,null,clock.ElapsedMilliseconds);
