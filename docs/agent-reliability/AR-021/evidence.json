@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "AR-021",
-  "code_sha": "1c4e244669a3b3355836906b7a3af056966ceec2",
+  "code_sha": "c00a38790158cbf7cab49a182a0c8597835d8fac",
   "implementation_status": "IMPLEMENTED",
   "acceptance_status": "AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
@@ -33,28 +33,29 @@
     "continuation_contract_binding": "contentVersion is bound to normalized requested range, canonical normalized fields and page size; cursor/version replay with a drifted contract is rejected stale_content/no-effect.",
     "sheet_identity_continuation": "A continuation against a renamed/deleted worksheet returns stale_content/no-effect; native post-page validation re-reads the actual worksheet name so a rename racing the page invalidates the response.",
     "structural_paging_policy": "format/merge/hidden reads are supported only when the requested structural range completes in one bounded page; any structural request requiring continuation returns content_tracking_unavailable/no-effect because native Excel does not provide a reliable structural-edit revision signal.",
-    "transient_native_object_retry": "OfficeWindowCatalog retries only no-effect native object acquisition classified provider_busy or native_object_unavailable with a finite initial/40 ms/100 ms schedule; stale_resource and other non-transient classes fail immediately; no mutation/effect is replayed."
+    "transient_native_object_retry": "OfficeWindowCatalog retries only no-effect native object acquisition classified provider_busy or native_object_unavailable with a finite initial/40 ms/100 ms schedule; stale_resource and other non-transient classes fail immediately; no mutation/effect is replayed.",
+    "bound_session_targeted_scan_retry": "Require(sessionId) uses the already-validated session's known root and may repeat only targeted scans that fail with provider_busy/native_object_unavailable. First capture and broad discovery remain single-scan/no-retry so failed enumeration cannot invent or guess a live resource."
   },
   "validation": {
     "dedicated": {
-      "run_id": 36090762155,
-      "job_id": 107932509786,
+      "run_id": 36094885451,
+      "job_id": 107945931939,
       "result": "SUCCESS",
-      "focused": "11/11",
+      "focused": "12/12",
       "office_host": "17/17",
       "retained_ar020": "36/36",
       "retained_ar012": "44/44",
       "retained_ar001": "13/13",
-      "full_h2": "1283/1283",
-      "artifact_id": 10845273854,
-      "artifact_bytes": 36333,
-      "artifact_sha256": "ece71f1ae2bddf66c05f7f8f57084eea12d87341bdd3f1d5693d9005152091bc"
+      "full_h2": "1284/1284",
+      "artifact_id": 10847666504,
+      "artifact_bytes": 36409,
+      "artifact_sha256": "5e4bc2987ec4e32eabe957d6942c911060f5703b06e1681980b162c9d7a5723b"
     },
     "avalonia": {
-      "run_id": 36090762198,
-      "job_id": 107932509507,
+      "run_id": 36094885377,
+      "job_id": 107944939262,
       "result": "SUCCESS",
-      "full_h2": "1283/1283",
+      "full_h2": "1284/1284",
       "all_agent_mb_office_transport_steps": "PASS",
       "windows_x64_publish": "PASS",
       "packaged_helper_ipc": "PASS"
@@ -66,16 +67,16 @@
     }
   },
   "build": {
-    "artifact_id": 10845199972,
+    "artifact_id": 10847831076,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110308263,
-    "sha256": "d96d6e1bca0abfbbd14d471e0a6392628c022b4783bac8497c29febdc65d10c1",
+    "bytes": 110308752,
+    "sha256": "9c77abbc0c2c8d278deae90362db96d4e1ae2fb5c6435855e1aa9edd41ba3fe4",
     "independently_downloaded": false,
     "zip_crc": "PENDING_FINAL_CHECKPOINT_COPY",
     "zip_entries": null
   },
   "not_claimed": {
-    "native_excel_e3": "NOT PASSED. A real user-machine attempt failed with native_object_unavailable/live_resource_required on the prior build. Repair 1c4e244669a3b3355836906b7a3af056966ceec2 is E2/CI validated and requires native retest before E3 can pass.",
+    "native_excel_e3": "NOT PASSED. A real user-machine attempt failed with native_object_unavailable/live_resource_required on a prior build. Final repair c00a38790158cbf7cab49a182a0c8597835d8fac is E2/CI validated and requires native retest before E3 can pass.",
     "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
     "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
     "full_workbook_support": "NOT_CLAIMED from bounded range implementation"
@@ -92,6 +93,12 @@
       "run_id": 35986730031,
       "result": "FAILURE",
       "repair": "e7dba71f76e36fc73aee7509e8f39416b8f7296a"
+    },
+    {
+      "sha": "d0dacf5f9d4001c9c7b568b38de82fc7e777b4bc",
+      "result": "FAILURE",
+      "repair": "c00a38790158cbf7cab49a182a0c8597835d8fac",
+      "reason": "First-capture targeted scan retry violated AR-020 enumeration/no-guess invariants; final repair limits targeted scan retry to already-bound sessions."
     }
   ],
   "native_failure_history": {
@@ -102,7 +109,11 @@
       "live_resource_required"
     ],
     "interpretation": "Real Office was open but live binding failed before useful work; exact Office build/log correlation was not available from screenshots alone.",
-    "repair_sha": "1c4e244669a3b3355836906b7a3af056966ceec2",
-    "retest_required": true
+    "repair_sha": "c00a38790158cbf7cab49a182a0c8597835d8fac",
+    "retest_required": true,
+    "repair_chain": [
+      "1c4e244669a3b3355836906b7a3af056966ceec2: bounded transient COM Open/revalidation retry",
+      "c00a38790158cbf7cab49a182a0c8597835d8fac: targeted transient scan retry only for already-bound session; first capture/discovery remain one-shot"
+    ]
   }
 }
