@@ -133,7 +133,8 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         do
         {
             var current = ListWindows()
-                .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase))
+                .Where(x => string.Equals(x.ProcessName, resolved.ProcessName, StringComparison.OrdinalIgnoreCase)
+                    && IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
                 .ToArray();
             var created = current
                 .Where(x => !beforeSessions.Contains(x.SessionId))
