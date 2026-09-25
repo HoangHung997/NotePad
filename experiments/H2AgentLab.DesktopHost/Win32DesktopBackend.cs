@@ -228,7 +228,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         {
             if (foregroundThread != 0 && foregroundThread != currentThread)
                 attachedForeground = AttachThreadInput(currentThread, foregroundThread, true);
-            if (targetThread != 0 && targetThread != currentThread)
+            if (targetThread != 0
+                && targetThread != currentThread
+                && targetThread != foregroundThread)
                 attachedTarget = AttachThreadInput(currentThread, targetThread, true);
 
             _ = BringWindowToTop(handle);
