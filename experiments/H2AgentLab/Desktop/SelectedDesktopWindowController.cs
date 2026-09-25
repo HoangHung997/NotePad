@@ -70,11 +70,22 @@ public static class DesktopHostLocator
         }
         catch (global::H2AgentLab.AgentFaultException ex) when (ex.Code == "unavailable")
         {
-            throw new global::H2AgentLab.AgentFaultException(
+            throw AppPreflightUnavailable();
+        }
+        catch (Exception ex) when (
+            ex is FileNotFoundException
+                or ArgumentException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+        {
+            throw AppPreflightUnavailable();
+        }
+
+        static global::H2AgentLab.AgentFaultException AppPreflightUnavailable()
+            => new(
                 "app_preflight_unavailable",
                 "DesktopHost packaged helper is incomplete or unavailable before application launch.",
                 false);
-        }
     }
 
     private static bool CompleteHelper(string path)
