@@ -9,6 +9,7 @@ on:
       - 'experiments/H2AgentLab/Desktop/**'
       - 'experiments/H2AgentLab/Tools/**'
       - 'experiments/H2AgentLab/Integration/H2ProductionToolSession*'
+      - 'experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs'
       - 'experiments/H2AgentLab/Acceptance/MbDesktopComputerUseAcceptanceTests.cs'
       - 'experiments/H2AgentLab/Runtime/MbRetireV1ToolRegistryAdapterTests.cs'
       - 'tests/H2Notes.Tests/**'
