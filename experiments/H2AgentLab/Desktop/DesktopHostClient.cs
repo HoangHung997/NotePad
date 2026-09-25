@@ -239,7 +239,7 @@ public sealed class DesktopHostClient : IDisposable
         {
             throw;
         }
-        catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException)
+        catch (Exception ex) when (IsPreflightFailure(ex))
         {
             StopHost();
             throw new DesktopHostClientException(
@@ -259,6 +259,14 @@ public sealed class DesktopHostClient : IDisposable
 
         _validatedProtocolProcessId = ping.ProcessId;
     }
+
+    internal static bool IsPreflightFailure(Exception ex)
+        => ex is IOException
+            or TimeoutException
+            or InvalidOperationException
+            or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception
+            or System.Security.SecurityException;
 
     internal static void ValidatePreflightIdentity(int? expectedProcessId, DesktopPingResult ping)
     {

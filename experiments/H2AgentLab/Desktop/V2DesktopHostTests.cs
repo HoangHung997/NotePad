@@ -86,6 +86,20 @@ public static class V2DesktopHostTests
             {
             }
 
+            foreach (Exception preflight in new Exception[]
+            {
+                new IOException("fixture"),
+                new TimeoutException("fixture"),
+                new InvalidOperationException("fixture"),
+                new UnauthorizedAccessException("fixture"),
+                new System.ComponentModel.Win32Exception(5),
+                new System.Security.SecurityException("fixture")
+            })
+                Check(DesktopHostClient.IsPreflightFailure(preflight),
+                    "Known helper-start preflight failure was not classified no-effect: " + preflight.GetType().Name);
+            Check(!DesktopHostClient.IsPreflightFailure(new ArgumentException("fixture")),
+                "Ordinary tool argument failure was incorrectly classified as helper-start preflight.");
+
             var repo = FindRepoRoot();
             var project = File.ReadAllText(
                 Path.Combine(repo, "experiments", "H2AgentLab.DesktopHost", "H2AgentLab.DesktopHost.csproj"));
