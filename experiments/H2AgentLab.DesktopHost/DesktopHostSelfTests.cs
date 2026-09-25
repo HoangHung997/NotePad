@@ -84,6 +84,12 @@ public static class DesktopHostSelfTests
                 throw new InvalidOperationException("Excel main window class was rejected.");
             if (Win32DesktopBackend.IsApplicationLaunchWindowClass("EXCEL", "bosa_sdm_XL9"))
                 throw new InvalidOperationException("Excel dialog class was accepted as launch completion.");
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", "CabinetWClass")
+                || !Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", "ExploreWClass"))
+                throw new InvalidOperationException("File Explorer main window class was rejected.");
+            foreach (var shellClass in new[] { "Shell_TrayWnd", "Progman", "WorkerW" })
+                if (Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", shellClass))
+                    throw new InvalidOperationException("Explorer shell surface was accepted as an app window: " + shellClass);
             if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("notepad", "Notepad"))
                 throw new InvalidOperationException("Ordinary application launch window was rejected.");
         });

@@ -36,6 +36,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     continue;
 
                 var handle = new IntPtr(current.NativeWindowHandle);
+                if (processName.Equals("explorer", StringComparison.OrdinalIgnoreCase)
+                    && !IsApplicationLaunchWindow(processName, current.NativeWindowHandle))
+                    continue;
                 var bounds = ReadBounds(handle);
                 if (bounds.Width <= 0 || bounds.Height <= 0)
                     continue;
@@ -220,6 +223,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 => className.Equals("OpusApp", StringComparison.Ordinal),
             var name when name.Equals("EXCEL", StringComparison.OrdinalIgnoreCase)
                 => className.Equals("XLMAIN", StringComparison.Ordinal),
+            var name when name.Equals("explorer", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("CabinetWClass", StringComparison.Ordinal)
+                    || className.Equals("ExploreWClass", StringComparison.Ordinal),
             _ => true
         };
 
