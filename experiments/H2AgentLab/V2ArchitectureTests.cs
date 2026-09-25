@@ -756,15 +756,14 @@ public static class V2ArchitectureTests
             var expectedNames = new[]
             {
                 "activate_app",
-                "launch_app",
-                "list_running_apps",
-                "wait_for_app_window",
                 "check_word",
                 "click_control",
                 "find_files",
                 "inspect_artifact",
                 "inspect_window",
+                "launch_app",
                 "list_files",
+                "list_running_apps",
                 "list_skills",
                 "open_file",
                 "publish_artifact",
@@ -777,6 +776,7 @@ public static class V2ArchitectureTests
                 "type_control",
                 "update_plan",
                 "view_artifact",
+                "wait_for_app_window",
                 "word_paragraphs",
                 "write_text"
             };
