@@ -95,6 +95,12 @@ public static class V2DesktopHostTests
                 && !project.Contains("../H2AgentLab/H2AgentLab.csproj", StringComparison.Ordinal)
                 && !project.Contains("H2AgentLab.OfficeHost", StringComparison.Ordinal),
                 "DesktopHost helper gained UI/model/Python/OfficeHost project coupling.");
+
+            var clientSource = File.ReadAllText(
+                Path.Combine(repo, "experiments", "H2AgentLab", "Desktop", "DesktopHostClient.cs"));
+            Check(clientSource.Contains("Kill(entireProcessTree: false)", StringComparison.Ordinal)
+                && !clientSource.Contains("Kill(entireProcessTree: true)", StringComparison.Ordinal),
+                "DesktopHost client may kill applications launched by the helper when stopping the helper process.");
         });
 
         await Test("0902 window enumeration exposes only policy-allowed fixture window", async () =>
