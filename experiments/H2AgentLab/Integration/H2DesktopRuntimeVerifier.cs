@@ -52,13 +52,27 @@ internal sealed class H2DesktopRuntimeVerifier : IAgentRuntimeDomainVerifier
                 : null;
             var hasWindow = hasWindowObject
                 && !string.IsNullOrWhiteSpace(sessionId)
+                && window.TryGetProperty("hwnd", out var hwnd)
+                && hwnd.TryGetInt64(out var windowHandle)
+                && windowHandle > 0
                 && window.TryGetProperty("pid", out var pid)
                 && pid.TryGetInt32(out var processId)
-                && processId > 0;
+                && processId > 0
+                && window.TryGetProperty("process_started_utc_ticks", out var started)
+                && started.TryGetInt64(out var processStarted)
+                && processStarted > 0
+                && window.TryGetProperty("process", out var windowProcess)
+                && !string.IsNullOrWhiteSpace(windowProcess.GetString());
             var semantic = call.Name == "launch_app"
-                ? (root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
-                    || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True)
+                ? ((root.TryGetProperty("newWindowObserved", out var created) && created.ValueKind == JsonValueKind.True)
+                    || (root.TryGetProperty("reusedExistingWindow", out var reused) && reused.ValueKind == JsonValueKind.True))
+                    && root.TryGetProperty("process", out var launchedProcess)
+                    && launchedProcess.ValueKind == JsonValueKind.String
+                    && string.Equals(launchedProcess.GetString(), windowProcess.GetString(), StringComparison.OrdinalIgnoreCase)
                 : hasWindowObject
+                    && call.Arguments.TryGetProperty("session_id", out var requestedSession)
+                    && requestedSession.ValueKind == JsonValueKind.String
+                    && string.Equals(requestedSession.GetString(), sessionId, StringComparison.Ordinal)
                     && root.TryGetProperty("activated", out var activated)
                     && activated.ValueKind == JsonValueKind.True
                     && window.TryGetProperty("foreground", out var foreground)

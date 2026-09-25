@@ -257,6 +257,33 @@ public static class MbDesktopComputerUseAcceptanceTests
                         weak,
                         CancellationToken.None).ConfigureAwait(false)).Passed),
                 "Unobserved/semantically weak app launch was incorrectly verified.");
+
+            var activate = new ToolCall(
+                "activate",
+                "activate_app",
+                JsonSerializer.SerializeToElement(new { session_id = "expected-window" }));
+            var wrongWindow = JsonSerializer.Serialize(new
+            {
+                window = new
+                {
+                    session_id = "different-window",
+                    hwnd = 1002L,
+                    pid = 23,
+                    process_started_utc_ticks = 34L,
+                    process = "notepad",
+                    title = "Untitled",
+                    foreground = true,
+                    dpi = 96
+                },
+                activated = true,
+                verifiedByHostObservation = true
+            });
+            Check(!((await verifier.VerifyAsync(
+                        null!,
+                        activate,
+                        wrongWindow,
+                        CancellationToken.None).ConfigureAwait(false)).Passed),
+                "activate_app verified a different session than the exact requested window.");
         }).ConfigureAwait(false);
 
         await Case("application-wait-fails-closed-on-ambiguity", async () =>
