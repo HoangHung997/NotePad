@@ -25,7 +25,7 @@ concurrency:
 jobs:
   cross-build:
     if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
-    runs-on: ubuntu-latest
+    runs-on: macos-15-intel
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
           cat > artifacts/H2Notes-Avalonia-Portable-crossbuild/CROSSBUILD-NOT-NATIVE-VERIFIED.txt <<EOF
           Source commit: ${{ github.event.pull_request.head.sha }}
           Task: AR-061
-          Cross-built on ubuntu-latest for win-x64.
+          Cross-built on macos-15-intel for win-x64.
           This artifact proves compile/publish only. It is NOT native Windows runtime acceptance and must not replace AR-061 E3/E4 or packaged-helper IPC on Windows.
           EOF
       - uses: actions/upload-artifact@v4
