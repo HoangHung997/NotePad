@@ -82,6 +82,43 @@ public sealed class OfficeWindowCatalog : IDisposable
             "Native Office object remained unavailable after bounded no-effect probing.",
             true);
     }
+
+    private IReadOnlyList<OfficeViewLease> RefreshTargetedWithTransientRetry(
+        string application,
+        long rootHandle,
+        string? requiredSessionId = null)
+    {
+        IReadOnlyList<OfficeViewLease> last = [];
+        foreach (var delay in TransientOpenRetryDelaysMilliseconds)
+        {
+            if (delay > 0) Thread.Sleep(delay);
+            last = Refresh(application, rootHandle);
+
+            if (requiredSessionId is null)
+            {
+                if (last.Count > 0 || !IsRetryableTargetedScan(rootHandle))
+                    return last;
+            }
+            else
+            {
+                if (last.Any(v => string.Equals(v.SessionId, requiredSessionId, StringComparison.Ordinal))
+                    || last.Count > 0
+                    || !IsRetryableTargetedScan(rootHandle))
+                    return last;
+            }
+        }
+        return last;
+    }
+
+    private bool IsRetryableTargetedScan(long rootHandle)
+    {
+        if (LastReport.Complete) return false;
+        var relevant = LastReport.Issues
+            .Where(i => i.WindowHandle is null || i.WindowHandle == rootHandle)
+            .ToArray();
+        return relevant.Length > 0
+            && relevant.All(i => i.Code is "provider_busy" or "native_object_unavailable");
+    }
     public OfficeDiscoveryReport LastReport { get; private set; } = new(false, OfficeDiscoveryLimits.Coverage,0,0,0,[]);
     public IReadOnlyList<OfficeViewLease> Refresh(string application, long? rootHandle = null)
     {
@@ -199,7 +236,15 @@ public sealed class OfficeWindowCatalog : IDisposable
     public OfficeViewLease Require(string application,string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId)) throw new OfficeHostFaultException("invalid_arguments","An exact observed session is required.",true);
-        var candidates=Refresh(application).Where(v=>v.SessionId==sessionId).ToArray();
+
+        var prior = _views.Values
+            .Where(v => v.Candidate.Application == application
+                && string.Equals(v.SessionId, sessionId, StringComparison.Ordinal))
+            .ToArray();
+        var observed = prior.Length == 1
+            ? RefreshTargetedWithTransientRetry(application, prior[0].Candidate.RootHandle, sessionId)
+            : Refresh(application);
+        var candidates=observed.Where(v=>v.SessionId==sessionId).ToArray();
         if(candidates.Length==1) return candidates[0];
         throw new OfficeHostFaultException(LastReport.Issues.FirstOrDefault()?.Code ?? "stale_resource",
             "The observed Office session is no longer available. Discover and bind again; no operation was dispatched.",true);
@@ -211,7 +256,7 @@ public sealed class OfficeWindowCatalog : IDisposable
             return new("Rejected","invalid_arguments",null,null,null,null,clock.ElapsedMilliseconds);
         try
         {
-            var matches=Refresh(request.Application,request.WindowHandle).Where(v=>v.Candidate.ProcessId==request.ProcessId
+            var matches=RefreshTargetedWithTransientRetry(request.Application,request.WindowHandle).Where(v=>v.Candidate.ProcessId==request.ProcessId
                 && v.Candidate.ProcessStartUtcTicks==request.ProcessStartUtcTicks && v.Candidate.RootHandle==request.WindowHandle).ToArray();
             if(matches.Length!=1 || !LastReport.Complete)
                 return new("Unavailable",LastReport.Issues.FirstOrDefault()?.Code ?? (matches.Length>1?"ambiguous_target":"stale_resource"),null,null,null,null,clock.ElapsedMilliseconds);

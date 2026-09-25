@@ -140,6 +140,38 @@ internal static class H2OfficeDiscoveryTests
             Check(p.Opens.Count==before+1,
                 "Non-transient stale_resource was retried instead of failing immediately.");
         });
+        test("AR-021 targeted live capture retries transient native window scan failures without broad discovery retry",()=>{
+            var p=new Probe();p.Add(11,101,1001,"A.xlsx");
+            p.EnumerationFaults.Enqueue("native_object_unavailable");
+            p.EnumerationFaults.Enqueue("provider_busy");
+            using var b=new ComOfficeBackend(p);
+            var captured=b.Capture(new("excel",1001,11,101));
+            Check(captured.Status=="Ready" && captured.SessionId is not null && p.Enumerations==3,
+                "Targeted live capture did not recover from transient native window scan failures.");
+
+            p.EnumerationFaults.Enqueue("native_object_unavailable");
+            var before=p.Enumerations;
+            var discovery=b.DiscoverExcel();
+            Check(p.Enumerations==before+1 && discovery.Report is {Complete:false},
+                "Broad discovery retried a transient scan and violated the explicit-discovery boundary.");
+        });
+        test("AR-021 bound session require retries only its known root after transient scan loss",()=>{
+            var p=new Probe();p.Add(11,101,1001,"A.xlsx");
+            using var catalog=new OfficeWindowCatalog(p);
+            var first=catalog.Refresh("excel").Single();
+            var session=first.SessionId;
+            p.EnumerationFaults.Enqueue("native_object_unavailable");
+            p.EnumerationFaults.Enqueue("provider_busy");
+            var rebound=catalog.Require("excel",session);
+            Check(rebound.SessionId==session && p.Enumerations==4,
+                "Bound live session did not recover through targeted retry on its known root.");
+
+            p.EnumerationFaults.Enqueue("stale_resource");
+            var before=p.Enumerations;
+            Fault(()=>catalog.Require("excel",session),"stale_resource");
+            Check(p.Enumerations==before+1,
+                "Non-transient targeted scan failure was retried.");
+        });
         test("AR-020 native COM failure classes distinguish busy and stale",()=>{
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x8001010A)))=="provider_busy","Busy flattened.");
             Check(OfficeNativeWindowProbe.FaultCode(new COMException("sensitive",unchecked((int)0x80010108)))=="stale_resource","Disconnected object accepted.");
@@ -217,11 +249,18 @@ internal static class H2OfficeDiscoveryTests
     private sealed class Probe:IOfficeWindowProbe
     {
         public sealed class Item {public required OfficeWindowCandidate Candidate;public required string Name;public object Document=new();public string? Fault;public Queue<string> Faults=new();public Action? OnSelection;}
-        public List<Item> Views=[];public List<long> Opens=[];public int Releases,SelectionReads;
+        public List<Item> Views=[];public List<long> Opens=[];public int Releases,SelectionReads,Enumerations;
+        public Queue<string> EnumerationFaults=new();
         public long ForegroundRoot{get;set;}
         public Item Add(int pid,long start,long hwnd,string name,object? document=null,string application="excel")
         {var item=new Item{Candidate=new(application,pid,start,1,hwnd,hwnd+10000),Name=name,Document=document??new object()};Views.Add(item);return item;}
-        public OfficeWindowScan Enumerate(string application,long? rootHandle=null)=>new(Views.Where(x=>x.Candidate.Application==application && (rootHandle is null||x.Candidate.RootHandle==rootHandle)).Select(x=>x.Candidate).ToArray(),[],true,Views.Count);
+        public OfficeWindowScan Enumerate(string application,long? rootHandle=null)
+        {
+            Enumerations++;
+            if(EnumerationFaults.Count>0)
+                return new([], [new(EnumerationFaults.Dequeue(),rootHandle)], false, Views.Count);
+            return new(Views.Where(x=>x.Candidate.Application==application && (rootHandle is null||x.Candidate.RootHandle==rootHandle)).Select(x=>x.Candidate).ToArray(),[],true,Views.Count);
+        }
         public OfficeViewLease Open(OfficeWindowCandidate candidate)
         {
             Opens.Add(candidate.RootHandle);var i=Views.First(x=>x.Candidate==candidate);
