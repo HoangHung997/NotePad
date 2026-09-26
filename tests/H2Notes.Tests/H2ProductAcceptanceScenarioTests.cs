@@ -399,9 +399,21 @@ internal static class H2ProductAcceptanceScenarioTests
                     var taskId = app.CurrentWorkAssistantTaskId!.Value;
                     var summary = WaitTerminal(adapter, taskId, 20_000);
 
-                    Check(summary.Status == H2AgentTaskStatus.Completed,
-                        "Global production Office slice did not complete: status=" + summary.Status
-                        + "; error=" + summary.Error + "; final=" + summary.FinalText);
+                    if (summary.Status != H2AgentTaskStatus.Completed)
+                    {
+                        var completion = summary.Completion is null ? "<null>" : JsonSerializer.Serialize(summary.Completion);
+                        var goals = summary.GoalState is null ? "<null>" : JsonSerializer.Serialize(summary.GoalState);
+                        var evidenceDump = JsonSerializer.Serialize(summary.Evidence.Select(x => new
+                        {
+                            x.EvidenceId, x.Kind, x.Summary, x.Provenance, x.VerificationPassed
+                        }));
+                        var outcomesPath = Path.Combine(stateRoot, "tasks", taskId.ToString("N"), "tool-outcomes.jsonl");
+                        var outcomeDump = File.Exists(outcomesPath) ? File.ReadAllText(outcomesPath) : "<missing>";
+                        throw new Exception("Global production Office slice did not complete: status=" + summary.Status
+                            + "; error=" + summary.Error + "; final=" + summary.FinalText
+                            + "; completion=" + completion + "; goals=" + goals
+                            + "; evidence=" + evidenceDump + "; outcomes=" + outcomeDump);
+                    }
                     Check(summary.ProjectId is null, "Global Work Assistant unexpectedly became project-scoped.");
                     Check(summary.Evidence.Any(x => x.Kind.Contains("verification", StringComparison.OrdinalIgnoreCase)),
                         "Global Excel mutation has no production verification evidence.");
