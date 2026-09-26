@@ -42,15 +42,21 @@ $env:PATH="$env:SystemRoot\System32;$env:SystemRoot"
 $pwshExe=Join-Path $PSHOME 'pwsh.exe'
 if(-not (Test-Path -LiteralPath $pwshExe -PathType Leaf)){throw 'PowerShell child executable is unavailable for portable verifier isolation'}
 function Invoke-PortableVerify([string]$root,[string]$output) {
-  & $pwshExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'VERIFY-PORTABLE.ps1') -OutputDirectory $output
-  return $LASTEXITCODE
+  # External-process stdout is pipeline output in PowerShell. If it escapes this
+  # function together with $LASTEXITCODE, the caller receives an object[] and
+  # `if($exit)` becomes true even when the real process exit code is 0.
+  # Buffer and replay diagnostics through Write-Host, then return one typed int.
+  $lines = @(& $pwshExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'VERIFY-PORTABLE.ps1') -OutputDirectory $output 2>&1)
+  [int]$exitCode = $LASTEXITCODE
+  foreach($line in $lines){ Write-Host $line }
+  return $exitCode
 }
 $cleanOut=Join-Path $env:RUNNER_TEMP 'ar082-clean-output'
 Remove-Item -LiteralPath $cleanOut -Recurse -Force -ErrorAction SilentlyContinue
 $cleanExit=Invoke-PortableVerify $portable $cleanOut
 $cleanReport=Join-Path $cleanOut 'portable-check.json'
 if(Test-Path -LiteralPath $cleanReport){Copy-Item -LiteralPath $cleanReport -Destination artifacts/ar082/clean-profile-portable-check.json -Force}
-if($cleanExit){throw 'Clean-profile portable verification failed'}
+if([int]$cleanExit -ne 0){throw 'Clean-profile portable verification failed'}
 $clean=Get-Content -LiteralPath $cleanReport -Raw|ConvertFrom-Json
 if(!$clean.passed -or $clean.manifest.sourceSha -ne $sha){throw 'Clean portable report did not bind exact source SHA'}
 foreach($id in @('ollama.endpoint','ai.online_credentials','web.search','browser.live_tab')){
@@ -77,7 +83,7 @@ Remove-Item -LiteralPath $configuredOut -Recurse -Force -ErrorAction SilentlyCon
 $configuredExit=Invoke-PortableVerify $portable $configuredOut
 $configuredReport=Join-Path $configuredOut 'portable-check.json'
 if(Test-Path -LiteralPath $configuredReport){Copy-Item -LiteralPath $configuredReport -Destination artifacts/ar082/configured-profile-portable-check.json -Force}
-if($configuredExit){throw 'Configured-profile portable verification failed'}
+if([int]$configuredExit -ne 0){throw 'Configured-profile portable verification failed'}
 $configuredText=Get-Content -LiteralPath $configuredReport -Raw
 if($configuredText.Contains($sentinel)){throw 'Portable preflight leaked synthetic credential'}
 $configuredJson=$configuredText|ConvertFrom-Json
@@ -91,14 +97,14 @@ $badHelper=Join-Path $env:RUNNER_TEMP 'ar082-bad-helper';Remove-Item $badHelper 
 Remove-Item -LiteralPath (Join-Path $badHelper 'H2AgentLab.OfficeHost.exe') -Force
 $badHelperOut=Join-Path $env:RUNNER_TEMP 'ar082-bad-helper-out';Remove-Item $badHelperOut -Recurse -Force -ErrorAction SilentlyContinue
 $badHelperExit=Invoke-PortableVerify $badHelper $badHelperOut
-if($badHelperExit -eq 0){throw 'Portable with missing OfficeHost unexpectedly passed'}
+if([int]$badHelperExit -eq 0){throw 'Portable with missing OfficeHost unexpectedly passed'}
 
 # Negative bootstrap: hostfxr missing must fail before app start with typed bootstrap code.
 $badRuntime=Join-Path $env:RUNNER_TEMP 'ar082-bad-runtime';Remove-Item $badRuntime -Recurse -Force -ErrorAction SilentlyContinue;Copy-Item $portable $badRuntime -Recurse
 Remove-Item -LiteralPath (Join-Path $badRuntime 'hostfxr.dll') -Force
 $badRuntimeOut=Join-Path $env:RUNNER_TEMP 'ar082-bad-runtime-out';Remove-Item $badRuntimeOut -Recurse -Force -ErrorAction SilentlyContinue
 $badRuntimeExit=Invoke-PortableVerify $badRuntime $badRuntimeOut
-if($badRuntimeExit -eq 0){throw 'Portable with missing hostfxr unexpectedly passed'}
+if([int]$badRuntimeExit -eq 0){throw 'Portable with missing hostfxr unexpectedly passed'}
 $boot=Get-Content -LiteralPath (Join-Path $badRuntimeOut 'portable-bootstrap-check.json') -Raw|ConvertFrom-Json
 if($boot.code -ne 'runtime_component_missing'){throw 'Missing runtime did not produce typed bootstrap diagnostic'}
 
