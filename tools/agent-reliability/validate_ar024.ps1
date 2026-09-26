@@ -19,6 +19,11 @@ dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-bu
 $fx=$LASTEXITCODE;$ft=Get-Content artifacts/ar024/ar024-tests.log -Raw
 $fm=[regex]::Matches($ft,'RESULT: (\d+) passed, (\d+) failed');$fp=[regex]::Matches($ft,'(?m)^PASS ').Count
 $fv=$fx -eq 0 -and $fm.Count -eq 1 -and $fm[0].Groups[2].Value -eq '0' -and [int]$fm[0].Groups[1].Value -eq $fp -and $fp -eq 2
+if(!$fv){
+ @{task='AR-024';code_sha=$sha;focused_result=($fm.Value -join ';');focused_pass_lines=$fp;E1='FAIL';E2='NOT_RUN_AFTER_FOCUSED_FAILURE';E4='DEFERRED_BY_USER_AWAITING_ENVIRONMENT';clean_end=(!(git status --porcelain))} |
+  ConvertTo-Json -Depth 6 | Set-Content artifacts/ar024/validation.json
+ throw 'AR-024 focused production slice failed'
+}
 
 $office=(Resolve-Path 'experiments/H2AgentLab.OfficeHost/bin/Release/net10.0-windows/H2AgentLab.OfficeHost.exe').Path
 dotnet run --project experiments/H2AgentLab/H2AgentLab.csproj -c Release --no-build -- --v2-office-host-test artifacts/ar024/office-host $office 2>&1|Tee-Object artifacts/ar024/office-host.log
