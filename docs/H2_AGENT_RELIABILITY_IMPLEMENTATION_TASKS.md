@@ -95,7 +95,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
-| AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | ACTIVE — application lifecycle repair |
+| AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — portable ready; real desktop E3/E4 not yet run |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER — final full-build external/native provider test; no E3 PASS claim |
@@ -118,7 +118,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 Không tạo tracker hoặc subsystem mới. Các lỗi người dùng vừa xác nhận được ánh xạ vào các AR hiện có; mỗi lượt vẫn chỉ triển khai **một AR active**:
 
 - **AR-021 (E3_DEFERRED_BY_USER)** — Word/Excel live binding: giữ NativeOM là đường ưu tiên; bổ sung exact-window ROT/COM fallback khi NativeOM không khả dụng, nhưng chỉ chấp nhận đúng HWND + PID + process-start + desktop session đã quan sát. Không chọn tài liệu theo tên, ROT order hoặc ActiveDocument; không fallback sang disk khi user yêu cầu live.
-- **AR-061 (ACTIVE)** — application launch/desktop: compose executor thật cho `launch_app/wait_for_app_window/activate_app` để mở File Explorer, Word, Excel, AutoCAD và app cho phép; mở file cụ thể không được là đường duy nhất để khởi động app.
+- **AR-061 (IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT)** — application launch/desktop: compose executor thật cho `launch_app/wait_for_app_window/activate_app` để mở File Explorer, Word, Excel, AutoCAD và app cho phép; mở file cụ thể không được là đường duy nhất để khởi động app.
 - **AR-063** — AutoCAD live: triển khai external Windows COM/ActiveX bridge từ H2 tới AutoCAD đang mở; **không yêu cầu cài plugin vào AutoCAD** cho các thao tác ActiveX hỗ trợ. Giữ typed document/entity/state-token contract và readback verifier; không dùng SendCommand/LISP tùy ý làm đường mặc định.
 - **AR-060** — Web thật: tách Search/HTTP Fetch/Browser readiness; cấu hình ít nhất một search backend thật và một browser backend có session/tab/page identity. Không gọi URL echo là browser action; 403/429/login/CAPTCHA/JS-required phải có typed reason.
 - **AR-052 + AR-067 + AR-070** — model/tool continuation và recovery: reconnect/rebase từ durable task state sau connection loss, không replay mutation không rõ kết quả; chặn same-input/no-new-evidence recovery loop.
@@ -380,6 +380,12 @@ Implemented production behavior: additive Office protocol/client/backend range-r
 
 **Acceptance:** không click cửa sổ khác để “thử cho được”; không reset guard bằng cách tắt safety. Cua hoặc driver khác chưa tự thành mặc định.
 
+**AR-061 E2 checkpoint — 2026-09-26:** exact validated code `779a92bc0027be8c6194edf1fd00c1c132ae8d2e`. Production now exposes transport-safe `launch_app`, `list_running_apps`, `wait_for_app_window`, and `activate_app` through the normal ToolRegistry/DesktopHost path without requiring a preselected desktop window. App resolution is bounded to safe aliases/system locations and exact Windows App Paths metadata; arbitrary executable paths/shell syntax are rejected, blocked/sensitive processes stay blocked, multiple matching windows fail closed, a single already-open safe target may be verified/reused, and launch/activation completion requires DesktopHost-observed window/process identity. Permission behavior stays host-owned: ObserveOnly blocks mutation, AskBeforeChanges/ProjectPolicy require approval, FullAccess keeps its existing no-per-call approval contract, and scoped file/document auto-change authority does not silently expand into machine app launch. Recovery treats launch/activate as side effects and requires same-app/session observation before uncertain retry.
+
+Dedicated AR-061 run `36208050660` / job `108308672263` **SUCCESS**: focused AR-061 **6/6**, DesktopHost **10/10**, MB-112 **16/16**, full H2 **1292/1292**, all mandatory Agent suites PASS, self-contained Windows x64 publish PASS, packaged helper startup/IPC PASS. Evidence artifact `10894352815` SHA256 `d62cb6077191da06a1ca106c1bfc4e68a1c32e4fff8465695af5de74bae42e72`; dedicated portable `10894232933` SHA256 `ee03f32dcd5007954dcbc54a7fd33b4482c8d3f3c8a0983c1292076057c7532a`. Full Avalonia CI `36208050707` / job `108308917465` **SUCCESS**, including all H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, Windows x64 publish and packaged-helper IPC; final portable artifact `10894338034`, 110,358,547 bytes, SHA256 `12d0997324ebbf1fadc206a5874bae861ec4172a5869f4cfdafa7547d1426109`; NAS probe artifact `10894083425` SHA256 `cfd2661f3af6b4a59368597907085ae0a3c7750575bfa992da526b3551965029`. Cross-build run `36208050639` **SUCCESS**. All **26/26** workflows on exact code SHA completed SUCCESS, 0 failed. The final portable ZIP was independently downloaded in the ChatGPT execution environment; SHA256 matched GitHub, ZIP integrity passed across 482 entries, and the package contains `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe`.
+
+**Not claimed:** real user-machine File Explorer/Word/Excel/AutoCAD launch/activate acceptance is **NOT RUN / AWAITING_ENVIRONMENT**. AR-061 remains `[~]` until E3/E4 native H2 testing is completed or the user explicitly defers that acceptance.
+
 ### [ ] AR-062 — Tạo/xuất tài liệu và publish có verifier
 
 **Sửa/reuse:** file/Python/OpenXML/native tools, artifact publishing và inspector. Không bắt tạo 20 tool mới nếu adapter có operation contracts đủ dùng.
@@ -524,98 +530,123 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-061_APPLICATION_LIFECYCLE_IMPLEMENTED_BUILD_BLOCKED_BY_GITHUB_RUNNER_QUEUE",
+  "phase": "AR-061_APPLICATION_LIFECYCLE_IMPLEMENTED_E2_PASS_PORTABLE_READY_E3_E4_USER_TEST_REQUIRED",
   "active_task": "AR-061",
-  "implementation_status": "IMPLEMENTED_PENDING_BUILD",
-  "acceptance_status": "CI_RUNNER_QUEUED",
-  "completed_evidence_level": "NO_AR061_E1_E2_PASS_YET",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "completed_evidence_level": "E2",
   "required_evidence_level": "E3/E4",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar061-application-lifecycle-2026-09-25",
-  "last_code_commit": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
-  "last_validated_code_commit": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-  "last_validation_result": "AR-061 CURRENT HEAD HAS NO COMPLETED BUILD/TEST RUN. GitHub check-runs are valid but queued before step 1. Do not claim E1/E2. Prior AR-021 SHA 9d8624c... remains fully validated but predates AR-061.",
+  "owner_session": "chatgpt-ar061-application-lifecycle-2026-09-26",
+  "last_code_commit": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+  "last_validated_code_commit": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+  "last_validation_result": "AR061 6/6; DesktopHost 10/10; MB112 16/16; full H2 1292/1292; all mandatory Agent suites PASS; AR061 Windows run 36208050660 SUCCESS; Avalonia CI 36208050707 SUCCESS; cross-build 36208050639 SUCCESS; self-contained win-x64 publish PASS; packaged Desktop/Office helpers startup+IPC PASS; 26/26 exact-SHA workflows SUCCESS; final portable 10894338034 SHA256 12d0997324ebbf1fadc206a5874bae861ec4172a5869f4cfdafa7547d1426109; no E3/E4 native PASS claim.",
   "checkpoint_commit_lookup": "git log -1 --format=%H -- docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. Repository work performed through GitHub connector on PR #3. No reset/force-push/main merge. Current AR-061 source is committed; no known uncommitted connector-side diff.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub exact-SHA workflows used isolated checkouts. No reset/force-push/main merge. Final validated runtime/test code is 779a92bc0027be8c6194edf1fd00c1c132ae8d2e.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-25T12:58:20Z",
+  "checkpoint_saved_at_utc": "2026-09-26T01:34:01Z",
   "completed_this_session": [
-    "User explicitly allowed AR-021 native E3 to be deferred so repair sequence could advance.",
-    "Mapped the next user-observed defect to AR-061: production could open a specific file but had no callable application lifecycle executor for opening File Explorer or a blank/running desktop application.",
-    "Added normal runtime app namespace callables: launch_app, list_running_apps, wait_for_app_window and activate_app. Names use underscore form so Chat Completions/Ollama and Responses transports can all advertise them safely.",
-    "Added DesktopHost RPC request/result contract and client/server routing for application launch/wait/activate independent of preselected desktop-window control.",
-    "Added Windows App Paths/system application resolver with exact aliases for Explorer, Word, Excel, AutoCAD, browsers and common apps; arbitrary executable paths/shell syntax are rejected.",
-    "Extended exact friendly-name resolution from registered App Paths metadata without fuzzy guessing; multiple exact matches fail ambiguous_target.",
-    "Bound App Paths key identity to resolved executable stem so a key cannot redirect to another executable identity.",
-    "Launch verifies a newly observed exact safe window, a newly promoted exact window, or one exact reusable existing safe window; multiple existing ambiguous windows fail closed.",
-    "Activation verifies the exact prior session HWND/PID/process-start identity and foreground state; input-thread attachment is bounded and detached after focus attempt.",
-    "Global app inventory redacts window titles; targeted launch/wait evidence retains only what is needed for requested-resource verification.",
-    "Production verifier checks requested application string, resolved process, HWND, PID, process-start, session and foreground/new-or-reused semantics before allowing launch/activate completion claims.",
-    "Permission semantics preserved: ObserveOnly blocks mutation; AskBeforeChanges/ProjectPolicy require approval; FullAccess follows its existing no-per-call-approval contract; scoped file/document auto-change permission does not silently become machine app-launch authority.",
-    "Recovery guard treats launch/activate as side effects: uncertain results require changed evidence for the same application/session before retry; unrelated app observation cannot unlock a retry.",
-    "Added bounded 20-second application startup / 30-second host cap with client timeout margin for slower applications such as AutoCAD.",
-    "Hardened launcher blocklist against shells, credential managers, developer control surfaces and Windows loader/admin executables such as rundll32, regsvr32, mshta, script hosts, diskpart, bcdedit and schtasks.",
-    "Added/updated AR-061 focused tests, MB-112 lifecycle/ambiguity/reuse/verifier/safety cases, canonical tool-surface expectations and tool-search discovery for English/Vietnamese user phrasing.",
-    "PR #3 title updated to AR-061 so future handoff does not present the stale AR-021 title."
+    "User allowed AR-021 E3 to be deferred so repair work could advance one task at a time to AR-061.",
+    "Added production app lifecycle callables launch_app, list_running_apps, wait_for_app_window and activate_app to the normal V2 ToolRegistry; they are independent of a preselected selected-window controller.",
+    "Extended DesktopProtocol/DesktopHost/client/server with typed launch, wait and activate RPC while keeping DesktopHost isolated behind current-user-only IPC.",
+    "Implemented Windows application resolution using safe aliases/system locations plus exact registered App Paths executable/product/file-description metadata. Arbitrary paths, shell syntax and fuzzy selection are rejected.",
+    "Kept sensitive process blocklist for shells, terminal/admin/credential/developer control surfaces; launcher accepts no arbitrary command arguments.",
+    "Launch verifies a new exact safe window, a newly foregrounded exact window, or a single reusable already-open safe window; ambiguous multi-window cases fail closed.",
+    "wait_for_app_window returns only one exact safe target and fails ambiguous_target when multiple matching windows exist.",
+    "activate_app requires the exact previously observed session identity and verifies foreground state.",
+    "Added bounded startup timing for slow apps: 20-second requested launch wait, 30-second host cap, client timeout margin.",
+    "Aligned application permissions with existing H2 presets: ObserveOnly blocks, AskBeforeChanges/ProjectPolicy require approval, FullAccess retains host no-per-call approval, and file/document scoped auto-change grants do not expand into machine app lifecycle authority.",
+    "Added H2DesktopRuntimeVerifier coverage for host-observed launch/activation identity and updated recovery policy so uncertain app effects require same-app/session observation before retry.",
+    "Used transport-safe underscore callable names for Chat Completions/Ollama/Responses compatibility while retaining namespace app.",
+    "Updated canonical tool-surface, deferred-discovery, tool-search ranking and MB acceptance regressions so user phrases such as open Word app, open File Explorer, start Excel and launch AutoCAD discover launch_app.",
+    "Added single-instance reuse, multi-window ambiguity, permission denial, arbitrary-path rejection and verifier tests.",
+    "Repaired CI concurrency/runner backlog and added bounded Linux Windows-targeted cross-build fallback without treating it as native acceptance.",
+    "Validated exact code SHA 779a92bc0027be8c6194edf1fd00c1c132ae8d2e on Windows and full CI. All 26 exact-SHA workflows completed SUCCESS.",
+    "Downloaded final Avalonia portable artifact 10894338034 into the ChatGPT execution environment, matched SHA256 12d0997324ebbf1fadc206a5874bae861ec4172a5869f4cfdafa7547d1426109, ZIP integrity PASS (482 entries), and confirmed main/DesktopHost/OfficeHost executables are present."
   ],
   "remaining_in_active_task": [
-    "Obtain a runner for the exact current HEAD and run AR-061 focused validation; inspect compile/test logs and repair any failure inside AR-061 only.",
-    "Run full Avalonia CI on the same source, including full H2/Agent/MB regression, self-contained win-x64 publish and packaged-helper startup/IPC.",
-    "Download and hash the exact AR-061 portable artifact. Do not give the user the older AR-021 artifact as if it contained this repair.",
-    "After CI is green, run E3 user-machine acceptance: File Explorer, Word, Excel and AutoCAD launch/activate behavior, single and multiple windows, blocked sensitive executables and app-not-found/ambiguity paths.",
-    "Keep AR-061 active until exact build exists and at least its required build/test gate is green; do not start AR-060/AR-063 implementation in this one-task sequence."
+    "Run E3/E4 on the user's authorized Windows PC with the final portable build. Use the real H2 Work Assistant/Agent rather than fixture helpers.",
+    "With a mutation-capable permission preset, test: open File Explorer; open a blank Word application; open a blank Excel application; launch/activate AutoCAD if installed.",
+    "Verify one already-open safe app window is reused without false failure, while multiple matching windows never silently redirect to another target.",
+    "Confirm ObserveOnly blocks launch, AskBeforeChanges asks before mutation, and FullAccess follows its existing task-local permission contract.",
+    "If any real app launch/activate fails, capture the exact H2 UI error/progress, requested app, permission preset and build/source SHA; keep AR-061 active for repair.",
+    "Do not start another implementation task in the same one-task turn. After the user either passes or explicitly defers AR-061 E3/E4, follow the approved repair backlog."
+  ],
+  "last_test_commands": [
+    {
+      "command": "AR-061 desktop application lifecycle validation workflow",
+      "sha": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+      "run_id": 36208050660,
+      "job_id": 108308672263,
+      "result": "SUCCESS; AR061 6/6; DesktopHost 10/10; MB112 16/16; full H2 1292/1292; all required Agent suites PASS; win-x64 publish PASS; packaged helper IPC PASS"
+    },
+    {
+      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
+      "sha": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+      "run_id": 36208050707,
+      "job_id": 108308917465,
+      "result": "SUCCESS; full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transports PASS; Windows x64 publish PASS; packaged helper IPC PASS"
+    },
+    {
+      "command": "AR-061 Windows cross-build fallback",
+      "sha": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+      "run_id": 36208050639,
+      "job_id": 108308672390,
+      "result": "SUCCESS; restore/build/cross-publish win-x64 PASS; compile/publish evidence only, not native E3/E4"
+    }
   ],
   "ci_runs": [
     {
-      "id": 36138050188,
+      "id": 36208050660,
       "name": "AR-061 desktop application lifecycle validation",
-      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
-      "status": "QUEUED_NO_STEPS_STARTED"
+      "result": "SUCCESS"
     },
     {
-      "id": 36138050265,
+      "id": 36208050707,
       "name": "Avalonia CI",
-      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
-      "status": "QUEUED_NO_STEPS_STARTED"
+      "result": "SUCCESS"
     },
     {
-      "id": 36138050136,
+      "id": 36208050639,
       "name": "AR-061 Windows cross-build fallback",
-      "sha": "590e8b72c60bdf1a2e2fbd27369b0e3f134d0647",
-      "status": "QUEUED_NO_STEPS_STARTED"
+      "result": "SUCCESS"
+    },
+    {
+      "summary": "All workflows on exact code SHA",
+      "count": 26,
+      "success": 26,
+      "failed": 0
     }
   ],
-  "ci_queue_investigation": [
-    "Multiple prior AR-061 pull-request runs were cancelled by newer synchronize events before any steps ran.",
-    "Tried supported Windows runner pools and cross-build pools; jobs remained queued without runner assignment.",
-    "Added latest-per-PR concurrency cancellation to prevent new backlog; already-created historical queued runs cannot be cancelled through the available GitHub connector because no cancel-run action is exposed.",
-    "GitHub public status reported Actions operational, so no global incident was used as a PASS/FAIL explanation.",
-    "Sandbox has no dotnet/csc/msbuild toolchain and cannot download binary SDK/source archives directly; local substitute build is unavailable in this chat environment."
-  ],
   "evidence_locations": [
-    "docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
-    ".github/workflows/h2-ar061-validation.yml",
-    ".github/workflows/h2-ar061-crossbuild.yml",
-    "experiments/H2AgentLab.DesktopHost/DesktopApplicationResolver.cs",
-    "experiments/H2AgentLab.DesktopHost/Win32DesktopBackend.cs",
-    "experiments/H2AgentLab/Tools/NormalRuntimeToolRegistry.cs",
-    "experiments/H2AgentLab/Integration/H2DesktopRuntimeVerifier.cs",
-    "experiments/H2AgentLab/Acceptance/MbDesktopComputerUseAcceptanceTests.cs",
-    "tests/H2Notes.Tests/H2AgentDesktopLaunchTests.cs"
+    "docs/agent-reliability/AR-061/evidence.json",
+    "docs/agent-reliability/AR-061/implementation.md",
+    "docs/agent-reliability/AR-061/native-acceptance.md",
+    "GitHub artifact 10894352815 AR061-E1-E2-Evidence",
+    "GitHub artifact 10894232933 H2Notes-Avalonia-Portable-win-x64-AR061",
+    "GitHub artifact 10894338034 H2Notes-Avalonia-Portable-win-x64 (full Avalonia CI)"
+  ],
+  "known_failures": [
+    {
+      "id": "AR-061-CI-QUEUE",
+      "status": "RESOLVED",
+      "reason": "A large set of GitHub-hosted runner jobs remained queued before step 1 across Windows and Linux pools while many iterative commits accumulated.",
+      "repair": "Latest-per-PR concurrency controls plus runner availability eventually allowed exact source validation. No runtime safety/test threshold was relaxed."
+    }
   ],
   "external_blockers": [
     {
-      "id": "AR-061-CI-RUNNER",
-      "status": "BLOCKING_BUILD",
-      "missing_evidence": "GitHub-hosted runner assignment. Current exact-SHA check-runs exist but remain queued with no completed steps, so no AR-061 binary or E1/E2 result exists yet."
+      "id": "AR-061-E3-E4",
+      "status": "AWAITING_ENVIRONMENT",
+      "missing_evidence": "Real H2 user-machine launch/activate acceptance for File Explorer, Word, Excel and AutoCAD (if installed), including permission behavior and single/multiple-window semantics. E2/CI does not certify these native user workflows."
     }
   ],
   "parked_acceptance": [
     {
       "id": "AR-021",
       "status": "E3_DEFERRED_BY_USER",
-      "required": "real Word/Excel retest of prior portable"
+      "required": "real Word/Excel retest"
     },
     {
       "id": "AR-020",
@@ -648,15 +679,18 @@ Do not claim these defects were already covered by historical Office/transport/U
       "required": "E5 physical two-PC/NAS"
     }
   ],
-  "previous_downloadable_build_not_ar061": {
-    "artifact_id": 10853806963,
-    "source_sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
-    "sha256": "d9d0612c75200d7a0dcc7b273721c955bc6c219f77b8a75ebd6af872e8b932c8",
-    "warning": "This is the prior AR-021 portable and does not contain AR-061 application lifecycle changes."
+  "downloadable_build": {
+    "artifact_id": 10894338034,
+    "name": "H2Notes-Avalonia-Portable-win-x64",
+    "bytes": 110358547,
+    "sha256": "12d0997324ebbf1fadc206a5874bae861ec4172a5869f4cfdafa7547d1426109",
+    "expires_at_utc": "2026-12-25T01:19:49Z",
+    "source_sha": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
+    "local_verification": "Downloaded through GitHub connector; local SHA256 matched artifact digest; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Inspect AR-061 run 36138050188, Avalonia run 36138050265 and cross-build run 36138050136 on the latest source. When a runner is assigned, read the first failing step/log, repair AR-061 only, re-run until focused + full CI + publish/package gates pass, then download/hash the new portable artifact before user testing.",
-  "next_task_if_active_done": "Remain on AR-061 acceptance until the exact build is green; only then follow tracker dependency order."
+  "next_exact_action": "User downloads final portable artifact 10894338034 and runs AR-061 native H2 acceptance on the authorized Windows PC. If a real launcher/activation path fails, preserve the exact UI error/progress and build SHA and continue AR-061; otherwise record E3/E4 result or explicit defer before starting another implementation task.",
+  "next_task_if_active_done": "Follow the approved repair backlog only after AR-061 E3/E4 passes or the user explicitly defers it."
 }
 ```
 
