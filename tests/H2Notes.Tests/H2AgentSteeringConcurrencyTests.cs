@@ -104,7 +104,7 @@ internal static class H2AgentSteeringConcurrencyTests
                 {
                     BeforeDispatchAsync=(call,ct)=>{
                         Interlocked.Increment(ref rechecks);
-                        return ValueTask.FromResult<ToolExecutionOutput?>(allowed?null:
+                        return ValueTask.FromResult<ToolExecutionOutput?>(Volatile.Read(ref allowed)?null:
                             ToolOutcomeBridge.Failure(call,descriptor,"expired_permission",
                                 ToolErrorPhase.Preflight,ToolMutationEffect.None));
                     },
@@ -112,7 +112,7 @@ internal static class H2AgentSteeringConcurrencyTests
                 }],CancellationToken.None);
             Thread.Sleep(80);
             Check(rechecks==0,"Permission revalidation ran before the queued task acquired the resource.");
-            allowed=false;releaseHolder.TrySetResult();
+            Volatile.Write(ref allowed,false);releaseHolder.TrySetResult();
             Task.WhenAll(holder,queued).GetAwaiter().GetResult();
             var result=queued.Result.Single();
             Check(rechecks==1&&queuedEffects==0&&queuedDispatches==0
