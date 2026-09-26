@@ -89,7 +89,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | DONE |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | DONE |
-| AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | ACTIVE — durable restart reconcile receipts / exact resource rebind / no blind replay |
+| AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E3 PASS / no exactly-once claim |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
@@ -334,7 +334,7 @@ Exact-SHA workflow note: **16/16 workflow identities completed SUCCESS**. The fi
 
 **AR-040 accepted 2026-09-23:** IMPLEMENTED / E2_PASS / DONE on `462ab1dec0d0c723920283b0b3b9142b46d6796a`; focused 35816609055 **57/57 x3**, all retained AR regressions and **74/74** Agent suites; full 35816612945 **915/915**, publish/helper IPC PASS. Existing production Global/Project tools use real owned Windows processes, journal and ArtifactStore with scripted model transport. [Evidence](agent-reliability/AR-040/acceptance.json). Native AR-020/033 and E4 remain pending; AR-083 DEFERRED_BY_USER. AR-050 is the next independent core task; AR-041 native prerequisites remain open.
 
-### [ ] AR-041 — Reconcile uncertain mutation và restart
+### [~] AR-041 — Reconcile uncertain mutation và restart
 
 **Sửa:** dispatch/result journal, Office/file/process adapters, archive load, integration resume API.
 
@@ -343,6 +343,16 @@ Exact-SHA workflow note: **16/16 workflow identities completed SUCCESS**. The fi
 **Test E3 + deterministic crash:** RC-22/24/34 tại trước dispatch, sau tác động trước result, sau result trước checkpoint. Append paragraph/cell edit phải không bị nhân đôi. Resource đóng/mở lại và Save As không dùng stale handle.
 
 **Acceptance:** unknown outcome không thành success/failure giả; resume bảo toàn outcome đã verified; khi không xác định được thì NeedsUser rõ. Không hứa exactly-once chung; không replay mouse input sau restart.
+
+**AR-041 implementation checkpoint — 2026-09-26:** exact validated code SHA `ca215bf616bca98f94fafa11f8ec0690bc99e961`. AR-041 reuses the existing AR-031 local immutable Agent journal and adds host-owned restart reconciliation; it does **not** add a second recovery database or auto-resume engine. The public H2 adapter exposes `ReconcileInterruptedTask` with typed host observations. Durable operation receipts keep Prepared/Dispatched/Result identity plus reconciliation state/evidence/version metadata; raw executable arguments and raw document observations are not persisted.
+
+Restart behavior is fail-closed: Prepared-only proves the executor was never dispatched and is finalized as `NoEffect`; Dispatched/Unknown stays blocked until the host reobserves the exact resource; an Applied result from an interrupted task remains `AppliedUnverified` until independent verification; wrong resource hash becomes `NeedsUserResourceMismatch`; `CancelOnHostExit` jobs persisted as Running become `NeedsUserWorkerDead` and are never adopted by PID. `RepairRequired` and `NeedsUser` remain blockers, not retry instructions. Terminal Verified/NoEffect receipts are idempotent only for the same resource/version. Reconciliation never executes a tool/model, never replays a mutation, and returns `RequiresFreshPermission=true`; the archived task remains Blocked/Interrupted for AR-052 to resume later under a new permission/resource binding.
+
+Dedicated AR-041 run `36225962252` / job `108359938339` **SUCCESS**: focused AR-041 **6/6**, retained AR-031 **39/39**, AR-040 **57/57**, AR-024 **2/2**, AR-033 **42/42**, AR-022 **8/8**, full H2 **1317/1317**, and all **75** required Agent suites PASS. Evidence artifact `10901281618`, 430,125 bytes, SHA256 `21123b9eae6339366ae67a40f428de9956844f2ced4115458996844b0add4f79`, was independently downloaded; ZIP integrity passed across **647** entries and `validation.json` reports E1=PASS, E2=PASS, E3=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, replay_claim=false, exactly_once_claim=false and fresh_permission_required=true.
+
+Full Avalonia CI `36225962431` / job `108359938825` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **17/17** pull-request workflows on exact SHA completed SUCCESS, 0 failed. Final portable artifact `10900553554` is 110,405,384 bytes, SHA256 `26b5bbab87e1fbcb92f1cb845f79b7429172d11bb8a36899e353908c550435ac`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** real E3 crash/restart acceptance against native Office/GUI/live-resource providers is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user tests the final full build. This does not convert E3 to PASS and does not make AR-041 fully DONE.
 
 ### [ ] AR-042 — Steering, hủy và cạnh tranh giữa tác vụ
 
@@ -558,59 +568,66 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-041_RESTART_RECONCILE_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-041",
-  "parked_task": "AR-024",
-  "implementation_status": "AR-041_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-041_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-041",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E4 real H2 UI + configured model + native Office acceptance deferred until user tests final build",
+  "required_evidence_level": "E3 real crash/restart reconciliation with native Office/GUI/live-resource providers deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "4e6b4a07f4103edd654b680ca9af7f485f8b04d8",
+  "validated_code_sha": "ca215bf616bca98f94fafa11f8ec0690bc99e961",
   "implementation_commits": [
-    "58ba74efbf03aa3477984740851420e5960e033c test(AR-024): exercise production Office slice",
-    "6c9284424a79515b911a633d165af107f5f1e940 fix(AR-024): import Office protocol snapshots",
-    "2b3061ab8e20a7f154f47cd29729bf76a9269b33 test(AR-024): avoid fake captured identity in Global fixture",
-    "6e53365fc1b21af1f8a7b31de403c2cbb3029c77 test(AR-024): require production Excel verify readback",
-    "472ba1f2679e945a2b901d1495d9833ac1904653 test(AR-024): expose blocked completion diagnostics",
-    "f800b4b93dd8072431cfb3298eea2f9ec8cd61cb test(AR-024): cancel superseded validation runs",
-    "535927717fa3d9c97e9b0f60a82b8707ffdfb881 test(AR-024): fail fast on focused slice",
-    "4e6b4a07f4103edd654b680ca9af7f485f8b04d8 test(AR-024): ground Global Excel by exact path"
+    "ca215bf616bca98f94fafa11f8ec0690bc99e961 feat(AR-041): reconcile uncertain mutations after restart"
   ],
-  "last_validation_result": "AR024 2/2; OfficeHost 19/19; retained AR023 9/9, AR022 8/8, AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13; full H2 1311/1311; 75/75 required Agent suites PASS. AR024 run 36221310522 SUCCESS; Avalonia CI 36221310599 SUCCESS; Windows x64 publish and packaged helper IPC PASS. 16/16 workflow identities SUCCESS after same-SHA AR023 rerun confirmed the one-off retained AR021 flake was not reproducible.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 4e6b4a07; AR024 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T05:51:53Z",
-  "user_decision": "User requires the complete build before personal testing. AR-024 native/model E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
-  "evidence_locations": [
-    "docs/agent-reliability/AR-024/implementation.md",
-    "docs/agent-reliability/AR-024/evidence.json",
-    "docs/agent-reliability/AR-024/native-acceptance.md",
-    "GitHub artifact 10899865137 AR024-E1-E2-Evidence",
-    "GitHub artifact 10899446974 H2Notes-Avalonia-Portable-win-x64"
-  ],
-  "downloadable_build": {
-    "artifact_id": 10899446974,
-    "bytes": 110398090,
-    "sha256": "d6fbcdf729092a967b1d2a010736c69420ec4619aa0e48bdf60f5bc0f2417866",
-    "expires_at_utc": "2026-12-25T05:36:41Z",
-    "source_sha": "4e6b4a07f4103edd654b680ca9af7f485f8b04d8",
-    "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
-  },
-  "failed_attempts_repaired": [
-    "Initial AR-024 test compile missed H2AgentLab.OfficeProtocol; fixed without runtime change.",
-    "Global fixture initially used a fake captured-window context that OfficeHost fixture cannot prove; removed rather than weakening native binding.",
-    "Global FullAccess without capture still blocked because a model session ID is not target authority; final fixture grounds the exact workbook path in the user prompt.",
-    "One retained AR021 probe flaked once inside the first AR023 workflow attempt; the same test passed elsewhere on the exact SHA and the same-SHA AR023 rerun completed SUCCESS, confirming a one-off flake without runtime change."
+  "last_validation_result": "AR041 6/6; retained AR031 39/39, AR040 57/57, AR024 2/2, AR033 42/42, AR022 8/8; full H2 1317/1317; 75/75 required Agent suites PASS. Dedicated run 36225962252 SUCCESS; Avalonia CI 36225962431 SUCCESS; all 17/17 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at ca215bf6; AR041 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T07:29:13Z",
+  "user_decision": "User requires a complete build before personal testing. AR-041 native E3 crash/restart acceptance is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "completed_this_session": [
+    "Reused the existing AR-031 journal; no second recovery database or auto-resume engine was created.",
+    "Added typed H2 restart reconciliation observations/results and production adapter API without leaking provider/runtime types.",
+    "Persisted typed reconciliation receipts on the original durable operation identity; raw observation notes are not persisted.",
+    "Prepared-only becomes durable NoEffect; Dispatched/Unknown requires exact-resource observation; Applied remains AppliedUnverified until independently Verified.",
+    "Wrong resource identity becomes NeedsUserResourceMismatch; CancelOnHostExit Running job becomes NeedsUserWorkerDead and is never adopted by PID.",
+    "Verified/NoEffect duplicate observations are idempotent only for the same resource/version; terminal receipts cannot be rebound/rewritten.",
+    "Reconciliation never executes/replays tools and always requires fresh permission before later continuation; archived task remains interrupted/blocked for AR-052.",
+    "Validated exact SHA ca215bf6 with 17/17 workflows SUCCESS and independent portable/evidence ZIP verification."
   ],
   "remaining_in_parked_task": [
-    "Run E4 later with H2 UI, a configured allowed model and real Word/Excel on an authorized Windows PC.",
-    "Cover Global exact active/explicit path, Project linked document, unsaved live document, ambiguity/wrong target, permission modes, readback and final artifact/evidence.",
-    "Do not call fixture OfficeHost or scripted transport E4."
+    "Run E3 later with real H2/native Office or GUI providers using disposable resources and controlled process interruption.",
+    "Crash after dispatch-before-result and after effect-before-result; restart H2; rebind exact resource and reobserve postcondition before any repair.",
+    "Test resource closed/reopened/Save As and stale native handle rejection.",
+    "Test permission expires/revokes across restart: no old grant restored; continuation requires a fresh scope.",
+    "Never claim exactly-once generic COM/GUI semantics and never replay mouse input after restart."
   ],
+  "evidence_locations": [
+    "docs/agent-reliability/AR-041/implementation.md",
+    "docs/agent-reliability/AR-041/evidence.json",
+    "docs/agent-reliability/AR-041/native-acceptance.md",
+    "GitHub artifact 10901281618 AR041-E1-E2-Evidence",
+    "GitHub artifact 10900553554 H2Notes-Avalonia-Portable-win-x64"
+  ],
+  "downloadable_build": {
+    "artifact_id": 10900553554,
+    "bytes": 110405384,
+    "sha256": "26b5bbab87e1fbcb92f1cb845f79b7429172d11bb8a36899e353908c550435ac",
+    "expires_at_utc": "2026-12-25T07:10:18Z",
+    "source_sha": "ca215bf616bca98f94fafa11f8ec0690bc99e961",
+    "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
+  },
+  "safety_claims": {
+    "replay_claim": false,
+    "exactly_once_claim": false,
+    "fresh_permission_required": true,
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none"
+  },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile branch/CI, including the AR-023 same-SHA rerun, then select exactly one READY core task from tracker dependency order. Reopen AR-024 only if real E4 test reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-024 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-041 unless native E3 final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-041 turn."
 }
 ```
 
