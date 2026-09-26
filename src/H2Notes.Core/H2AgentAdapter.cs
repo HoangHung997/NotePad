@@ -232,7 +232,7 @@ public sealed record H2AgentOutcomeSnapshot(string Id, string Requirement, strin
 public sealed record H2AgentGoalRevisionSnapshot(string Id, string? ParentId, int Sequence,
     string SourceId, string SourceText, IReadOnlyList<string> Added, IReadOnlyList<string> Retired);
 public sealed record H2AgentGoalSnapshot(string RevisionId, IReadOnlyList<H2AgentGoalRevisionSnapshot> Revisions,
-    IReadOnlyList<H2AgentOutcomeSnapshot> Outcomes, IReadOnlyList<string> MutationRevisions);
+    IReadOnlyList<H2AgentOutcomeSnapshot> Outcomes, IReadOnlyList<string> MutationRevisions, string? Scope = null);
 
 public sealed record H2AgentTaskObservation(
     H2AgentTaskSummary Summary,
@@ -272,6 +272,13 @@ public interface IH2AgentAdapter
         H2AgentTaskContext? context = null,
         bool readOnly = true,
         CancellationToken cancellationToken = default);
+
+    Task<Guid> ResumeTaskAsync(
+        Guid taskId,
+        H2AgentTaskContext context,
+        bool readOnly = true,
+        CancellationToken cancellationToken = default)
+        => Task.FromException<Guid>(new NotSupportedException("Task resume/rebase is not supported by this Agent adapter."));
 
     H2AgentTaskObservation ObserveTask(
         Guid taskId,

@@ -107,6 +107,33 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             Append(summary.TaskId, kind, summary with { PendingApproval = null, Recovery = null });
         }
     }
+    internal void ActivateResume(H2AgentTaskSummary summary)
+    {
+        lock (_gate)
+        {
+            EnsureWritable();
+            ValidateSummary(summary);
+            if (!_tasks.ContainsKey(summary.TaskId))
+                throw new KeyNotFoundException("Agent task is not available.");
+            Append(summary.TaskId, "task-state", summary with { PendingApproval = null, Recovery = null });
+            _interrupted.Remove(summary.TaskId);
+        }
+    }
+
+    internal bool TryMatchSteeringInput(Guid taskId, Guid inputId, string text, out bool matches)
+    {
+        if (taskId == Guid.Empty || inputId == Guid.Empty)
+            throw new ArgumentException("Task/input identity is required.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        lock (_gate)
+        {
+            if (!_steeringReceipts.TryGetValue((taskId, inputId), out var receipt))
+            { matches = false; return false; }
+            matches = receipt.TextSha256 == Hash(System.Text.Encoding.UTF8.GetBytes(text));
+            return true;
+        }
+    }
+
     public bool AttachProject(Guid taskId, Guid projectId)
     {
         lock (_gate)

@@ -93,7 +93,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E3/E5/distributed-lock claim |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
-| AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
+| AR-052 | Rebase model và resume context | 041/051 | E2/E4 | ACTIVE — same-TaskId fresh-turn rebase from canonical journal/checkpoint; no opaque provider continuation |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
@@ -582,11 +582,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-042_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-052_MODEL_CONTEXT_RESUME_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-052",
   "parked_task": "AR-042",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-052_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3 real native Office/GUI multi-task steering/cancel/concurrency acceptance deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",

@@ -228,6 +228,150 @@ public sealed partial class H2ProductionAgentAdapter :
         return reservation?.Completion.Task ?? Task.FromResult(taskId);
     }
 
+    public Task<Guid> ResumeTaskAsync(
+        Guid taskId,
+        H2AgentTaskContext context,
+        bool readOnly = true,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (taskId == Guid.Empty) throw new ArgumentException("TaskId cannot be empty.", nameof(taskId));
+        ArgumentNullException.ThrowIfNull(context);
+        _archive.EnsureWritable();
+
+        LiveTask? priorLive = null;
+        lock (_gate)
+        {
+            if (_live.TryGetValue(taskId, out var current))
+            {
+                var snapshot = current.Snapshot();
+                if (snapshot.Status is H2AgentTaskStatus.Completed or H2AgentTaskStatus.Cancelled)
+                    throw new InvalidOperationException("Completed or cancelled Agent task cannot be resumed.");
+                if (!current.Finished.Task.IsCompleted)
+                {
+                    if (context.TurnId is { } same && same != Guid.Empty && same == current.TurnId)
+                        return Task.FromResult(taskId);
+                    throw new InvalidOperationException("Agent task is still live; wait for its current turn to quiesce before rebasing.");
+                }
+                _live.Remove(taskId);
+                priorLive = current;
+            }
+        }
+        priorLive?.Cancellation.Dispose();
+
+        var archived = _archive.Get(taskId)
+            ?? throw new KeyNotFoundException("Agent task is not available.");
+        if (archived.Status is H2AgentTaskStatus.Completed or H2AgentTaskStatus.Cancelled)
+            throw new InvalidOperationException("Completed or cancelled Agent task cannot be resumed.");
+        if (archived.Recovery?.ReconcileRequired == true)
+            throw new InvalidOperationException("Task has unresolved effects. Reconcile the exact resource before model/context resume.");
+        if (archived.GoalState is null)
+            throw new InvalidDataException("Task has no durable goal state to resume.");
+        if (context.AfterTaskId is not null)
+            throw new ArgumentException("Resume keeps the existing TaskId and cannot queue behind another task.", nameof(context));
+        if (context.ThreadId is { } requestedThread && requestedThread != archived.ThreadId)
+            throw new InvalidOperationException("Resume thread identity differs from the archived task.");
+        if (!readOnly)
+        {
+            var scope = context.PermissionScope
+                ?? throw new InvalidOperationException("Mutation resume requires a fresh H2 permission scope.");
+            if (!scope.MutationAllowed || !scope.IsActiveAt(DateTime.UtcNow))
+                throw new InvalidOperationException("Mutation resume permission is absent, expired or revoked.");
+        }
+
+        var projectId = archived.ProjectId;
+        var workspace = ResolveWorkspace(context.WorkspaceRoot);
+        var version = Math.Max(0, context.Version);
+        if (projectId is { } project && _projectTools is not null)
+        {
+            var current = _projectTools.ReadProject(project);
+            if (version == 0) version = current.Version;
+        }
+
+        var newTurn = context.TurnId is { } requestedTurn && requestedTurn != Guid.Empty
+            ? requestedTurn : Guid.NewGuid();
+        if (newTurn == archived.TurnId || _archive.FindByTurnId(newTurn) is not null)
+            throw new InvalidOperationException("Resume requires a fresh TurnId; provider continuation identity is never reused.");
+
+        var freshContext = context with
+        {
+            WorkspaceRoot = workspace,
+            ThreadId = archived.ThreadId ?? taskId,
+            TurnId = newTurn,
+            AfterTaskId = null,
+            RecentTurns = Array.Empty<H2AgentChatTurn>(),
+            TargetPaths = H2AgentTargetScope.FromUserRequest(archived.Goal)
+                .Concat(context.TargetPaths ?? [])
+                .DistinctBy(t => t.Path, H2AgentTargetScope.PathComparer).ToArray(),
+            TargetIntent = H2AgentTargetBindingPolicy.IntentFromUserRequest(archived.Goal, context.TargetIntent)
+        };
+        var model = SnapshotModel(freshContext); // Fail before changing durable task state.
+        var fallbackScope = "workspace:" + workspace;
+        var restoredGoals = AgentGoalState.Restore(taskId, fallbackScope, archived.GoalState, archived.Evidence);
+        var resumeSummary = BuildResumeSummary(archived, freshContext.Summary, newTurn);
+
+        TurnStartReservation reservation;
+        lock (_gate)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(H2ProductionAgentAdapter));
+            if (_turnStarts.TryGetValue(newTurn, out var existing))
+            {
+                if (existing.TaskId != taskId) throw new InvalidOperationException("Resume TurnId belongs to another task.");
+                return existing.Completion.Task;
+            }
+            reservation = new(taskId, projectId, archived.ThreadId, archived.Goal,
+                new(TaskCreationOptions.RunContinuationsAsynchronously));
+            _turnStarts.Add(newTurn, reservation);
+        }
+
+        var live = new LiveTask(taskId, projectId, archived.Goal, workspace, resumeSummary,
+            version, readOnly, freshContext.PermissionScope, archived.CreatedUtc)
+        {
+            RequestContext = SnapshotContext(freshContext),
+            ThreadId = archived.ThreadId ?? taskId,
+            TurnId = newTurn,
+            Model = model,
+            GoalState = archived.GoalState with { Scope = restoredGoals.Scope },
+            RuntimeGoals = restoredGoals,
+            Completion = archived.Completion,
+            IsResumed = true,
+            PreviousTurnId = archived.TurnId
+        };
+        live.Evidence.AddRange(archived.Evidence);
+        live.Progress.AddRange(_archive.ReadProgress(taskId, -1));
+
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                _turnStarts.Remove(newTurn);
+                reservation.Completion.TrySetException(new ObjectDisposedException(nameof(H2ProductionAgentAdapter)));
+                live.Cancellation.Dispose();
+                throw new ObjectDisposedException(nameof(H2ProductionAgentAdapter));
+            }
+            _live.Add(taskId, live);
+        }
+
+        try
+        {
+            AddProgress(live, "lifecycle", "resume-rebased",
+                "Resuming canonical task state on a fresh model turn; prior provider continuation is not reused.");
+            _archive.ActivateResume(live.Snapshot());
+            reservation.Completion.TrySetResult(taskId);
+        }
+        catch (Exception ex)
+        {
+            lock (_gate) { _live.Remove(taskId); _turnStarts.Remove(newTurn); }
+            reservation.Completion.TrySetException(ex);
+            live.Cancellation.Dispose(); live.Finished.TrySetResult();
+            throw;
+        }
+
+        _ = ExecuteWhenReadyAsync(live);
+        return reservation.Completion.Task;
+    }
+
     public H2AgentTaskObservation ObserveTask(
         Guid taskId,
         long afterSequence = -1)
@@ -489,7 +633,9 @@ public sealed partial class H2ProductionAgentAdapter :
 
             var contextInput = new AgentContextInput(
                 TaskContract: live.Goal,
-                CurrentState: history.MinimumContext(contract.Goals?.RevisionId) + "Host-selected workspace: " + live.WorkspaceRoot
+                CurrentState: history.MinimumContext(contract.Goals?.RevisionId)
+                    + (live.IsResumed ? history.ResumeContext(contract.Goals?.RevisionId) : "")
+                    + "Host-selected workspace: " + live.WorkspaceRoot
                     + (fullAccess ? "\nFull access grants execution permission, NOT automatic target selection. File tools still require this workspace or an exact host-listed external target. exec_command runs PowerShell without a workspace/network sandbox; it is not a way around a denied target. Never claim success without checking results.\n"
                         : "\nFile tools accept relative workspace paths, plus exact host-listed external targets.\n")
                     + toolSession.LiveResourceInstruction
@@ -542,7 +688,8 @@ public sealed partial class H2ProductionAgentAdapter :
                                 r.SourceText,r.Added,r.Retired)).ToArray()),
                             Array.AsReadOnly(goals.Obligations.Select(o => new H2AgentOutcomeSnapshot(o.Id,o.Requirement,o.SourceId,o.RevisionId,
                                 o.TargetScope,o.Status.ToString(),o.ReplacedBy,Array.AsReadOnly(o.Evidence.Select(e=>e.ReferenceId).ToArray()))).ToArray()),
-                            goals.MutationRevisions);
+                            goals.MutationRevisions, goals.Scope);
+                        live.RuntimeGoals = goals;
                         if (goals.HasOutcomes && previousRevision != goals.RevisionId)
                             AddProgressLocked(live,"goal","goal-revision",goals.Describe());
                     }
@@ -726,10 +873,11 @@ public sealed partial class H2ProductionAgentAdapter :
 
     private static AgentTaskContract Contract(LiveTask live)
     {
+        var scope = live.RuntimeGoals?.Scope ?? "workspace:" + live.WorkspaceRoot;
         return new AgentTaskContract(
             live.TaskId,
             live.Goal,
-            "workspace:" + live.WorkspaceRoot,
+            scope,
             live.ExecutionProjectId is null ? null : ["h2-project:" + live.ExecutionProjectId.Value.ToString("N")],
             null,
             ["preserve unrelated user state"],
@@ -737,7 +885,43 @@ public sealed partial class H2ProductionAgentAdapter :
             [],
             AgentTaskRiskClass.ReadOnly,
             new AgentVerificationPolicy(requireVerification: false),
-            mutationAllowed: !live.ReadOnly);
+            mutationAllowed: !live.ReadOnly,
+            goals: live.RuntimeGoals);
+    }
+
+    private static string BuildResumeSummary(H2AgentTaskSummary archived, string? currentSummary, Guid newTurn)
+    {
+        var recovery = archived.Recovery;
+        var payload = JsonSerializer.Serialize(new
+        {
+            marker = "HOST_RESUME_STATE_CANONICAL_NOT_PROVIDER_CONTINUATION",
+            taskId = archived.TaskId,
+            previousTurnId = archived.TurnId,
+            newTurnId = newTurn,
+            goalRevisionId = archived.GoalState?.RevisionId,
+            outcomes = archived.GoalState?.Outcomes.Select(o => new
+            {
+                o.Id, o.Status, o.TargetScope, evidenceIds = o.EvidenceIds
+            }).ToArray() ?? [],
+            mutationRevisions = archived.GoalState?.MutationRevisions ?? [],
+            completion = archived.Completion,
+            recovery = recovery is null ? null : new
+            {
+                recovery.Interrupted, recovery.ReconcileRequired,
+                operationCount = recovery.Operations.Count,
+                latest = recovery.Operations.TakeLast(16).Select(o => new
+                {
+                    o.InvocationId, o.LogicalOperationId, o.ToolName, o.State, o.Status, o.Effect,
+                    o.ReconciliationState, o.ReconciliationEvidenceId, o.ReconciledObservedVersion
+                }).ToArray()
+            },
+            evidenceIds = archived.Evidence.Select(e => e.EvidenceId).Distinct(StringComparer.Ordinal).Take(32).ToArray(),
+            currentHostSummary = Bound(currentSummary, 4_000),
+            rule = "Use current contract and host verification as authority. Read older exact facts through scoped history locators. Never replay a historical mutation or reuse an old provider response/continuation ID."
+        });
+        if (payload.Length > 12_000)
+            throw new InvalidDataException("Canonical resume state exceeds its active-context bound; exact history remains durable.");
+        return "\n[HOST RESUME STATE]\n" + payload + "\n";
     }
 
     private static AgentPromptStablePrefix StablePrefix()
@@ -1027,7 +1211,10 @@ public sealed partial class H2ProductionAgentAdapter :
         public Queue<AgentGoalInput> SupplementalInput { get; } = new();
         public Dictionary<Guid, string> SupplementalIds { get; } = [];
         public H2AgentGoalSnapshot? GoalState { get; set; }
+        public AgentGoalState? RuntimeGoals { get; set; }
         public H2AgentCompletionAssessment? Completion { get; set; }
+        public bool IsResumed { get; init; }
+        public Guid? PreviousTurnId { get; init; }
         public bool AcceptingInput { get; set; } = true;
         public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 

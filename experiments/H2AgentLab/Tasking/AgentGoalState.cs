@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using H2AgentLab.Verification;
+using H2Notes.Core;
 
 namespace H2AgentLab.Tasking;
 
@@ -60,6 +61,76 @@ public sealed class AgentGoalState
     public string RevisionId => Revisions[^1].Id;
     public IReadOnlyList<AgentOutcomeObligation> Active => Array.AsReadOnly(Obligations.Where(x=>x.Active).ToArray());
     public bool HasOutcomes => Obligations.Count != 0;
+
+    internal static AgentGoalState Restore(Guid taskId, string fallbackScope,
+        H2AgentGoalSnapshot snapshot, IReadOnlyList<H2AgentEvidence> evidence)
+    {
+        if(taskId==Guid.Empty)throw new ArgumentException("Task identity is required.",nameof(taskId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(fallbackScope);
+        ArgumentNullException.ThrowIfNull(snapshot);ArgumentNullException.ThrowIfNull(evidence);
+        if(snapshot.Revisions is null||snapshot.Outcomes is null||snapshot.MutationRevisions is null
+            ||snapshot.Revisions.Count is <1 or >MaxRevisions||snapshot.Outcomes.Count>MaxObligations)
+            throw new InvalidDataException("resume-goal-shape");
+
+        var outcomeScopes=snapshot.Outcomes.Select(x=>x.TargetScope).Where(x=>!string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.Ordinal).ToArray();
+        var scope=string.IsNullOrWhiteSpace(snapshot.Scope)
+            ? outcomeScopes.Length==1?outcomeScopes[0]:fallbackScope.Trim()
+            : snapshot.Scope.Trim();
+        if(scope.Length>8_000||scope.Any(char.IsControl)
+            ||outcomeScopes.Any(x=>!string.Equals(x,scope,StringComparison.Ordinal)))
+            throw new InvalidDataException("resume-goal-scope");
+
+        var revisions=new List<AgentGoalRevision>();string? parent=null;
+        foreach(var item in snapshot.Revisions.OrderBy(x=>x.Sequence))
+        {
+            if(item.Sequence!=revisions.Count+1||string.IsNullOrWhiteSpace(item.SourceId)
+                ||item.SourceText is null||item.SourceText.Length>8_000
+                ||item.SourceId.Length>128||item.SourceId.Any(char.IsControl)
+                ||item.Added is null||item.Retired is null)
+                throw new InvalidDataException("resume-goal-revision-shape");
+            var expected=Id("revision",taskId.ToString("N"),item.SourceId);
+            if(item.Id!=expected||item.ParentId!=parent
+                ||item.Added.Distinct(StringComparer.Ordinal).Count()!=item.Added.Count
+                ||item.Retired.Distinct(StringComparer.Ordinal).Count()!=item.Retired.Count)
+                throw new InvalidDataException("resume-goal-revision-lineage");
+            revisions.Add(new(item.Id,item.ParentId,item.Sequence,item.SourceId,item.SourceText,
+                Array.AsReadOnly(item.Added.ToArray()),Array.AsReadOnly(item.Retired.ToArray())));
+            parent=item.Id;
+        }
+        if(snapshot.RevisionId!=revisions[^1].Id)throw new InvalidDataException("resume-goal-current-revision");
+
+        var evidenceById=evidence.GroupBy(x=>x.EvidenceId,StringComparer.Ordinal)
+            .ToDictionary(g=>g.Key,g=>g.ToArray(),StringComparer.Ordinal);
+        var obligations=new List<AgentOutcomeObligation>();
+        foreach(var item in snapshot.Outcomes)
+        {
+            if(string.IsNullOrWhiteSpace(item.Id)||item.Id.Length>128||item.Id.Any(char.IsControl)
+                ||string.IsNullOrWhiteSpace(item.Requirement)||item.Requirement.Length>8_000
+                ||string.IsNullOrWhiteSpace(item.SourceId)||string.IsNullOrWhiteSpace(item.RevisionId)
+                ||item.EvidenceIds is null||!revisions.Any(r=>r.Id==item.RevisionId&&r.SourceId==item.SourceId)
+                ||!Enum.TryParse<AgentObligationStatus>(item.Status,false,out var status))
+                throw new InvalidDataException("resume-goal-outcome-shape");
+            var refs=new List<AgentEvidenceReference>();
+            foreach(var id in item.EvidenceIds.Distinct(StringComparer.Ordinal))
+            {
+                if(!evidenceById.TryGetValue(id,out var matches)||matches.Length!=1
+                    ||!Enum.TryParse<AgentEvidenceKind>(matches[0].Kind,false,out var kind))
+                    throw new InvalidDataException("resume-goal-evidence-missing");
+                refs.Add(new(kind,id,matches[0].Sha256,matches[0].Summary));
+            }
+            obligations.Add(new(item.Id,item.Requirement,item.SourceId,item.RevisionId,scope,status,
+                Array.AsReadOnly(refs.ToArray()),item.ReplacedBy));
+        }
+        if(obligations.Select(x=>x.Id).Distinct(StringComparer.Ordinal).Count()!=obligations.Count
+            ||obligations.Any(x=>x.ReplacedBy is not null&&!obligations.Any(y=>y.Id==x.ReplacedBy))
+            ||revisions.SelectMany(x=>x.Added.Concat(x.Retired)).Any(id=>!obligations.Any(o=>o.Id==id))
+            ||snapshot.MutationRevisions.Any(id=>!revisions.Any(r=>r.Id==id))
+            ||obligations.Where(x=>x.Active).Sum(x=>x.Requirement.Length)>8_000)
+            throw new InvalidDataException("resume-goal-cross-reference");
+
+        return new(taskId,scope,revisions,obligations,snapshot.MutationRevisions);
+    }
 
     public static AgentGoalState Create(Guid taskId, string scope, AgentGoalInput input)
     {

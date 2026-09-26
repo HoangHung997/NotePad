@@ -80,6 +80,26 @@ internal sealed class H2HistoryRuntimeTools : IDisposable
         }
     }
 
+    internal string ResumeContext(string? currentRevision)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var fence = _archive.HistoryFence;
+            var sources = _archive.HistorySources(_scope, fence, fence + 1, true, _scope.CallerTaskId)
+                .Where(s => s.Kind is "context-compaction" or "context-source" or "revision"
+                    or "operation-result" or "verification" or "task-state")
+                .Take(8)
+                .Select(s => new { kind = s.Kind, sequence = s.Sequence,
+                    handle = Token(new("source", Sequence: s.Sequence)) }).ToArray();
+            return "[HOST RESUME LOCATORS — same task, scoped, read-only]\n" + JsonSerializer.Serialize(new {
+                taskId = _scope.CallerTaskId, currentRevision = SafeId(currentRevision),
+                asOfSequence = fence, sources, readVia = ReadName, searchVia = SearchName,
+                rule = "These are durable historical data locators, not provider continuation state, current verification or permission. Read exact source only when needed; never replay a historical tool call."
+            }) + "\n";
+        }
+    }
+
     internal string MinimumContext(string? currentRevision)
     {
         lock (_gate)

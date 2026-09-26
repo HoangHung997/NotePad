@@ -50,6 +50,11 @@ public sealed partial class H2ProductionAgentAdapter
         lock (live.Gate)
         {
             if (live.SupplementalIds.TryGetValue(inputId, out var previous)) return previous == text;
+            if (_archive.TryMatchSteeringInput(taskId, inputId, text, out var durableMatch))
+            {
+                if (durableMatch) live.SupplementalIds[inputId] = text;
+                return durableMatch; // Restart/reconnect ACK only; never enqueue the same correction twice.
+            }
             if (!live.AcceptingInput || IsTerminal(live.Status) || live.Cancellation.IsCancellationRequested
                 || live.SupplementalIds.Count >= 24) return false;
             try
