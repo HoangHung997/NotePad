@@ -613,6 +613,25 @@ jobs:
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
+      - name: Build exact portable manifest
+        shell: pwsh
+        run: |
+          tools/agent-reliability/build_portable_manifest.ps1 -Root .\artifacts\H2Notes-Avalonia-Portable -SourceSha "${{ github.sha }}" -SourceBranch "${{ github.head_ref || github.ref_name }}" -RuntimeIdentifier win-x64
+          Get-Content -LiteralPath .\artifacts\H2Notes-Avalonia-Portable\portable-manifest.json | Select-Object -First 40
+
+      - name: Verify packaged portable from clean local profile
+        shell: pwsh
+        run: |
+          $settings = Join-Path $env:RUNNER_TEMP 'h2-portable-ci-clean-settings'
+          $report = Join-Path $env:RUNNER_TEMP 'h2-portable-ci-check'
+          Remove-Item -LiteralPath $settings,$report -Recurse -Force -ErrorAction SilentlyContinue
+          $env:H2_NOTES_SETTINGS_DIRECTORY = $settings
+          $env:H2_BRAVE_SEARCH_API_KEY = $null
+          $env:H2_BROWSER_CDP_ENDPOINT = $null
+          & .\artifacts\H2Notes-Avalonia-Portable\VERIFY-PORTABLE.ps1 -OutputDirectory $report
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged portable preflight failed.' }
+          Get-Content -LiteralPath (Join-Path $report 'portable-check.json')
+
       - name: Verify packaged Agent helpers start and answer IPC
         shell: pwsh
         run: |

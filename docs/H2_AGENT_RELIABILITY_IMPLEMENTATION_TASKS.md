@@ -109,7 +109,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
-| AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | NOT_STARTED |
+| AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | ACTIVE — exact-SHA manifest / clean Windows profile / dependency matrix / privacy gate |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
 | AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | NOT_STARTED |
 
@@ -646,11 +646,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-081_IMPLEMENTED_E1_E2_PASS_E4_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-082_CLEAN_PORTABLE_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-082",
   "parked_task": "AR-081",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-082_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E4 real H2 UI interaction on native Windows with configured model/provider and accessibility/DPI/IME evidence deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
