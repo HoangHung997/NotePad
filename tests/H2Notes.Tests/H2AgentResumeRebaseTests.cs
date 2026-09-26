@@ -371,7 +371,13 @@ internal static class H2AgentResumeRebaseTests
                 or H2AgentTaskStatus.Failed or H2AgentTaskStatus.Cancelled)return summary;
             Thread.Sleep(10);
         }
-        adapter.CancelTask(task);throw new TimeoutException("AR-052 task did not finish.");
+        var current=adapter.GetTaskSummary(task);
+        var progress=adapter.ObserveTask(task,-1).Progress.TakeLast(8)
+            .Select(p=>p.Kind+":"+p.Code).ToArray();
+        adapter.CancelTask(task);
+        throw new TimeoutException("AR-052 task did not finish. status="+current.Status
+            +"; error="+current.Error+"; completion="+current.Completion?.State
+            +"; progress="+string.Join(",",progress));
     }
 
     private static void Expect<T>(Action action,string contains)where T:Exception
