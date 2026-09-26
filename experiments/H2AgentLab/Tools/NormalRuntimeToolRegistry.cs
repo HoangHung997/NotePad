@@ -188,7 +188,7 @@ public static class NormalRuntimeToolRegistry
                 ("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name"),
                 ("mode", "Exactly reuse_or_launch or new_window. Use new_window for explicit new/blank/trắng/mới window requests.")),
             Evidence: true,
-            Preference: ApplicationLifecycle()),
+            Preference: ApplicationLaunch()),
         new(
             "wait_for_app_window",
             "app",
@@ -467,6 +467,44 @@ public static class NormalRuntimeToolRegistry
 
     private static ToolPreferenceMetadata ApplicationLifecycle()
         => new("application-lifecycle", ToolInteractionFidelity.Accessibility);
+
+    private static ToolPreferenceMetadata ApplicationLaunch()
+        => new(
+            "application-lifecycle",
+            ToolInteractionFidelity.Accessibility,
+            explicitRequestTerms:
+            [
+                "open app",
+                "start app",
+                "launch app",
+                "open application",
+                "start application",
+                "launch application",
+                "mở app",
+                "mở ứng dụng",
+                "file explorer",
+                "file explore",
+                "open word",
+                "start word",
+                "launch word",
+                "mở word",
+                "blank word",
+                "new word window",
+                "word trắng",
+                "word mới",
+                "open excel",
+                "start excel",
+                "launch excel",
+                "mở excel",
+                "blank excel",
+                "new excel window",
+                "excel trắng",
+                "excel mới",
+                "open autocad",
+                "start autocad",
+                "launch autocad",
+                "mở autocad"
+            ]);
 
     private abstract class ExecutorBase : IAgentToolExecutor
     {
