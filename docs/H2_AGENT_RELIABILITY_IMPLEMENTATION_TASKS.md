@@ -111,7 +111,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final portable ready; no physical-clean-machine/native-provider/E4 claim |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
-| AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | ACTIVE — machine-checked status/capability/evidence handoff; AR-083 remains deferred |
+| AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | IMPLEMENTED / FINAL_AUDIT_PASS / IMPLEMENTATION_READY_FOR_USER_TEST — AR-083 E5 and deferred native/live acceptance remain open |
 
 ### 4.1. Repair backlog từ lỗi người dùng 25/09/2026
 
@@ -616,13 +616,21 @@ The dedicated AR-082 package and full-CI package are separate builds from the sa
 
 **Đóng:** chỉ sau evidence E5 hoặc quyết định người dùng thu hẹp phạm vi multi-PC rõ ràng; quyết định thu hẹp là limitation, không phải E5_PASS. Giữ đồng bộ trạng thái H2M-116/H2M-133 và bug ledger.
 
-### [~] AR-090 — Dọn có parity, kiểm tra chéo và bàn giao
+### [x] AR-090 — Dọn có parity, kiểm tra chéo và bàn giao
 
 **Làm:** scan call path/code dư, obsolete builders/adapters thực sự không dùng; đối chiếu mọi requirement AR với file/test/evidence. Dọn từng phần có regression, không xóa history evidence hoặc source cũ ngoài scope.
 
 **Bàn giao:** capability matrix, task statuses hai trục, known limitations, exact package/commit, commands reproduce, benchmark nguồn, evidence retention, next tasks nếu chưa nghiệm thu. Một báo cáo cuối có thể sinh từ tracker/evidence; không tạo đặc tả mới thay AR.
 
 **Acceptance:** không còn task bắt buộc bị đánh x sai mức; full CI thực trên code hiện tại; AR-083 còn deferred phải hiện ngay trong báo cáo. Có thể bàn giao `IMPLEMENTATION_READY_FOR_USER_TEST` nếu chỉ còn nợ E5/khả năng được user defer; tuyệt đối không viết toàn dự án/đa-PC hoàn tất khi còn nợ đó.
+
+**AR-090 final handoff checkpoint — 2026-09-27:** exact validated code SHA `9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b`. Dedicated AR-090 run `36275926048` / job `108498548362` **SUCCESS**: focused audit **7/7**, retained AR-082 **5/5**, AR-081 **6/6**, AR-080 **4/4**, AR-042 **6/6**, AR-041 **6/6**, AR-062 **6/6**, AR-060 **6/6**, full H2 **1370/1370**, and all **75/75** required Agent suites PASS. Evidence artifact `10917498062`, 431,017 bytes, SHA256 `7f90679135bbd140ec25ce08fda75195b6822061990770130e492e7192bfff55`, was independently downloaded; ZIP integrity passed across **651** entries and `validation.json` reports audit=PASS, handoff_label=`IMPLEMENTATION_READY_FOR_USER_TEST`, project_complete_claim=false, multi_pc_claim=false, E5=`DEFERRED_BY_USER`, native_e4_pass_claim=false, clean_end=true.
+
+Full Avalonia CI `36275926014` / job `108498733688` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish, bundled Agent Python, exact manifest generation, clean local-profile verification and packaged DesktopHost/OfficeHost IPC. All **26/26** pull-request workflow identities on exact SHA completed SUCCESS, 0 failed.
+
+Final portable artifact `10917512842` is 175,483,034 bytes, SHA256 `7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c`. It was independently downloaded: ZIP integrity PASS, **2,970** entries, portable manifest source SHA exactly `9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b`, manifest inventory **2,969** files / **415,193,548** bytes, every listed file size/SHA256 matched, required H2Notes/DesktopHost/OfficeHost executables are present, and manifest content digest is `acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348`.
+
+**Handoff label:** `IMPLEMENTATION_READY_FOR_USER_TEST`. This is **not** PROJECT_COMPLETE, not E5 PASS, and not universal native/provider E4 certification. AR-083 remains **DEFERRED_BY_USER** and all per-task native/live acceptance debts remain as labelled.
 
 ## 6. Lệnh kiểm tra khởi điểm
 
@@ -641,7 +649,7 @@ Test command mới phải được đăng ký vào runner/CI phù hợp, không 
 
 The user has confirmed four serious real-application defects. Canonical details: `docs/H2_AGENT_CRITICAL_USER_REPORTED_ISSUES_2026-09-23.md`.
 
-**Current task checkpoint is AR-061: desktop application lifecycle repair is the only ACTIVE implementation task. AR-021 native E3 was explicitly deferred by the user after its E2-green portable build, so it no longer blocks the sequence. Current AR-061 source HEAD is `590e8b72c60bdf1a2e2fbd27369b0e3f134d0647`: normal runtime now exposes transport-safe `launch_app`, `list_running_apps`, `wait_for_app_window` and `activate_app`; DesktopHost resolves exact approved Windows applications, verifies HWND/PID/process-start/session identity, fails closed on ambiguous windows, supports bounded slow startup and single-instance reuse, preserves task permission presets, redacts global window titles, guards uncertain retries, and blocks shell/credential/developer plus high-risk Windows loader/admin executables. AR-061 has NOT passed E1/E2 yet because GitHub-hosted runners have not started any step for the current Windows, Avalonia or cross-build gates; do not infer PASS from source review. Last fully validated application build remains the older AR-021 code `9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd`, which does NOT contain the AR-061 launcher repair. AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
+**Historical AR-061 checkpoint (2026-09-26; retained for repair provenance, NOT current task state):** desktop application lifecycle repair was the only ACTIVE implementation task at that checkpoint. AR-021 native E3 was explicitly deferred by the user after its E2-green portable build, so it no longer blocks the sequence. Current AR-061 source HEAD is `590e8b72c60bdf1a2e2fbd27369b0e3f134d0647`: normal runtime now exposes transport-safe `launch_app`, `list_running_apps`, `wait_for_app_window` and `activate_app`; DesktopHost resolves exact approved Windows applications, verifies HWND/PID/process-start/session identity, fails closed on ambiguous windows, supports bounded slow startup and single-instance reuse, preserves task permission presets, redacts global window titles, guards uncertain retries, and blocks shell/credential/developer plus high-risk Windows loader/admin executables. AR-061 has NOT passed E1/E2 yet because GitHub-hosted runners have not started any step for the current Windows, Avalonia or cross-build gates; do not infer PASS from source review. Last fully validated application build remains the older AR-021 code `9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd`, which does NOT contain the AR-061 launcher repair. AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
 
 **AR-067 implementation checkpoint — 2026-09-24:** exact code `9be3ac78072bd3b43910a5af7f33dec67625e6f1`. Focused run `35940799654` / job `107448023895` SUCCESS: MB-43/AR-067 runtime corpus **6/6**, production/UI AR-067 focused **3/3**, full H2 **1267/1267**, and **74/74** independently invoked Agent suites. Evidence artifact `10785630429`, 416,598 bytes, SHA256 `911a1b95be08aff29c5d367bde25bde7cf64a550889e8ee8a6821fbc3553799d`. All ten pull_request workflows on the same code SHA are SUCCESS; full Avalonia run `35940802619` / job `107448032605` includes full H2/Agent/MB gates, Windows publish and packaged-helper IPC. AR-065 regression run `35940799761` / job `107448474958` also SUCCESS with **55/55** focused, full H2 **1267/1267**, **74/74** Agent suites; artifact `10784933379`, SHA256 `00ed0a39b99b5fd705b3766c3a1a16a267d3d393b3bf8075d22281a207f9f743`. E4 real H2/model/tool recovery is NOT_RUN in this session.
 
@@ -658,78 +666,62 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-090_FINAL_AUDIT_HANDOFF_ACTIVE",
-  "active_task": "AR-090",
-  "parked_task": "AR-082",
-  "implementation_status": "AR-090_ACTIVE",
-  "acceptance_status": "FINAL_AUDIT_NOT_RUN__AR083_DEFERRED_BY_USER",
-  "completed_evidence_level": "E3 clean Windows runner profile only",
-  "required_evidence_level": "Physical clean machine/native provider E4 remains deferred; AR-083 physical two-PC/NAS E5 deferred by user",
+  "phase": "AR-090_FINAL_AUDIT_PASS__IMPLEMENTATION_READY_FOR_USER_TEST",
+  "active_task": null,
+  "parked_task": "AR-083",
+  "implementation_status": "MANDATORY_IMPLEMENTATION_SEQUENCE_COMPLETE",
+  "acceptance_status": "USER_TEST_AND_DEFERRED_NATIVE_E4_E5_REMAIN",
+  "completed_evidence_level": "Final audit PASS; E3 clean Windows runner profile only where AR-082 states it",
+  "required_evidence_level": "Deferred native/live provider acceptance remains per owning AR; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "2f3a0c995307ee4615ceb647ff66322a795fc90f",
-  "last_validation_result": "AR082 5/5; retained AR081 6/6, AR080 4/4, AR042 6/6, AR041 6/6, AR062 6/6, AR060 6/6; full H2 1363/1363; 75/75 required Agent suites PASS. AR082 run 36273538823 SUCCESS; Avalonia CI 36273538843 SUCCESS; all 25/25 exact-SHA workflows SUCCESS; clean Windows runner profile/package/helper/Python gates PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 2f3a0c99; AR082 validation reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T21:55:14Z",
-  "user_decision": "User requires complete portable before personal testing. Physical clean-machine/native-provider E4 and AR-083 two-PC/NAS E5 remain deferred; do not upgrade them from the clean CI runner pass.",
+  "validated_code_sha": "9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b",
+  "last_validation_result": "AR090 7/7; retained AR082 5/5, AR081 6/6, AR080 4/4, AR042 6/6, AR041 6/6, AR062 6/6, AR060 6/6; full H2 1370/1370; 75/75 Agent suites PASS. AR090 run 36275926048 SUCCESS; Avalonia CI 36275926014 SUCCESS; all 26/26 exact-SHA workflows SUCCESS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 9ce4fd88; AR090 validation reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T22:36:45Z",
+  "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
+  "project_complete_claim": false,
+  "multi_pc_claim": false,
+  "user_decision": "User requires complete portable before personal testing. AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER; deferred native/live E3/E4 acceptance remains open per owning task.",
   "evidence_locations": [
-    "docs/agent-reliability/AR-082/implementation.md",
-    "docs/agent-reliability/AR-082/evidence.json",
-    "docs/agent-reliability/AR-082/native-acceptance.md",
-    "GitHub artifact 10916676647 AR082-E1-E3-Evidence",
-    "GitHub artifact 10917395115 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md",
+    "docs/agent-reliability/AR-090/evidence.json",
+    "docs/agent-reliability/AR-090/implementation.md",
+    "GitHub artifact 10917498062 AR090-Final-Handoff-Evidence",
+    "GitHub artifact 10917512842 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10917395115,
-    "bytes": 175482994,
-    "sha256": "7cdbbaf684f49aeb57288cfe75e1553f3795eadf5cd07c7047cace7e246521b6",
-    "expires_at_utc": "2026-12-25T21:36:52Z",
-    "source_sha": "2f3a0c995307ee4615ceb647ff66322a795fc90f",
+    "artifact_id": 10917512842,
+    "bytes": 175483034,
+    "sha256": "7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c",
+    "expires_at_utc": "2026-12-25T22:20:02Z",
+    "source_sha": "9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b",
     "zip_entries": 2970,
     "manifest_files": 2969,
     "manifest_total_bytes": 415193548,
-    "manifest_content_sha256": "47ebd73523c72f7c9eb05f3b69977598f415df405b43c9f93bd840387ff8b460",
-    "local_verification": "Downloaded through GitHub connector; artifact SHA256 matched; ZIP test PASS; every embedded-manifest file size/hash matched; required H2Notes/DesktopHost/OfficeHost executables, portable manifest/readme/verifier and bundled Python runtime are present."
+    "manifest_content_sha256": "acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348",
+    "local_verification": "Downloaded through GitHub connector; artifact SHA256 matched; ZIP test PASS; all 2969 embedded-manifest file sizes/hashes matched; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe are present."
   },
-  "dependency_matrix": {
-    "ready": [
-      "desktop.helper",
-      "office.helper",
-      "python.sandbox",
-      "helpers.ipc",
-      "documents.python"
-    ],
-    "unavailable": [
-      "office.native",
-      "autocad.live_drawing"
-    ],
-    "needs_configuration": [
-      "autocad.closed_file",
-      "ollama.endpoint",
-      "ai.online_credentials",
-      "web.search",
-      "browser.live_tab",
-      "ocr.local"
-    ],
-    "limits": "Offline preflight only; configured providers are detected but not contacted. OCR multi-GB model pack intentionally excluded."
-  },
+  "remaining_acceptance": [
+    "User may now test the final AR-090 portable on the intended Windows machine.",
+    "Any observed regression reopens the owning AR task before adding new scope.",
+    "Native/model/provider acceptance remains deferred where the tracker says so.",
+    "AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER until explicitly started.",
+    "Optional AR-071/072 remain NOT_SELECTED."
+  ],
   "safety_claims": {
     "physical_clean_machine_claim": false,
     "native_provider_claim": false,
     "network_provider_probe": false,
     "two_pc_claim": false,
+    "project_complete_claim": false,
     "personal_documents_accessed": false,
     "credentials_read_or_printed": false,
     "external_side_effects": "none"
   },
-  "remaining_in_parked_task": [
-    "Optional user acceptance: extract final ZIP on a separate clean physical Windows profile/machine and run VERIFY-PORTABLE.ps1.",
-    "Configure desired model/provider and native applications separately; clean runner did not certify native Office/AutoCAD/model/search/browser.",
-    "AR-083 physical two-PC/NAS remains DEFERRED_BY_USER and is not satisfied by the clean runner."
-  ],
   "pending_user_decisions": [],
-  "next_exact_action": "AR-090 active: run focused final-handoff audit, retained regressions, full H2/Agent suites and full Avalonia CI on the exact AR-090 code SHA; only then finalize package/evidence. AR-083 remains deferred.",
-  "next_task_if_active_done": "No new required implementation task is implied by AR-090. After green handoff, user testing/deferred native acceptance may reopen the owning AR; AR-083 remains deferred until explicitly started."
+  "next_exact_action": "User testing is the next normal action. If a regression appears, reopen the owning AR. AR-083 remains deferred until the user explicitly starts two-PC/NAS acceptance; optional AR-071/072 remain unselected.",
+  "next_task_if_active_done": "No mandatory implementation task remains implied by AR-090. Do not start AR-083 or optional AR-071/072 without explicit user direction."
 }
 ```
 

@@ -1,0 +1,75 @@
+{
+  "task": "AR-090",
+  "source_sha": "9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b",
+  "status": {
+    "audit": "PASS",
+    "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
+    "mandatory_implementation_sequence": "COMPLETE",
+    "project_complete_claim": false,
+    "multi_pc_claim": false,
+    "E5": "DEFERRED_BY_USER",
+    "native_e4_pass_claim": false
+  },
+  "tests": {
+    "focused": "7/7",
+    "retained": {
+      "AR-082": "5/5",
+      "AR-081": "6/6",
+      "AR-080": "4/4",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-062": "6/6",
+      "AR-060": "6/6"
+    },
+    "full_h2": "1370/1370",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "26/26 SUCCESS"
+  },
+  "runs": {
+    "ar090": {
+      "run_id": 36275926048,
+      "job_id": 108498548362,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36275926014,
+      "job_id": 108498733688,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10917498062,
+      "bytes": 431017,
+      "sha256": "7f90679135bbd140ec25ce08fda75195b6822061990770130e492e7192bfff55",
+      "expires_at_utc": "2026-10-26T22:36:44Z",
+      "zip_entries": 651,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10917512842,
+      "bytes": 175483034,
+      "sha256": "7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c",
+      "expires_at_utc": "2026-12-25T22:20:02Z",
+      "zip_entries": 2970,
+      "zip_integrity": "PASS",
+      "manifest_files": 2969,
+      "manifest_total_bytes": 415193548,
+      "manifest_content_sha256": "acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348",
+      "manifest_file_hashes_verified": true
+    }
+  },
+  "remaining_acceptance": {
+    "AR083": "DEFERRED_BY_USER / E5 NOT PASSED",
+    "optional": [
+      "AR-071 NOT_SELECTED",
+      "AR-072 NOT_SELECTED"
+    ],
+    "native_live": "Remain deferred/awaiting environment per owning AR"
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none"
+  }
+}

@@ -1,11 +1,15 @@
 # H2 Agent Reliability — Final Handoff
 
-Status: **IMPLEMENTATION_READY_FOR_USER_TEST_PENDING_AR090_VALIDATION**
+Status: **IMPLEMENTATION_READY_FOR_USER_TEST**
 
 This is the current reliability handoff. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
 
-- AR-090 validated code SHA: `PENDING_THIS_GATE`
-- AR-090 final portable artifact: `PENDING_THIS_GATE`
+- AR-090 validated code SHA: `9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b`
+- AR-090 final portable artifact: `10917512842`
+- Final portable SHA256: `7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c`
+- Final portable ZIP entries: `2970`
+- Final manifest inventory: `2969 files / 415193548 bytes`
+- Final manifest content SHA256: `acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348`
 - Pre-AR-090 validated code SHA: `2f3a0c995307ee4615ceb647ff66322a795fc90f`
 - Pre-AR-090 full-CI portable artifact: `10917395115`
 - Pre-AR-090 portable SHA256: `7cdbbaf684f49aeb57288cfe75e1553f3795eadf5cd07c7047cace7e246521b6`
@@ -33,7 +37,7 @@ The canonical per-task wording remains the table in `docs/H2_AGENT_RELIABILITY_I
 | AR-080/081 | Implemented | Native/live-model/accessibility E4 debt remains |
 | AR-082 | Implemented | E3 PASS only for clean GitHub-hosted Windows runner profile; physical/native E4 deferred |
 | AR-083 | Harness/work can wait | **DEFERRED_BY_USER; E5 NOT PASSED** |
-| AR-090 | Audit/handoff gate | Final CI/package evidence pending in this draft |
+| AR-090 | Audit/handoff gate PASS | **IMPLEMENTATION_READY_FOR_USER_TEST**; deferred acceptance below remains open |
 
 ## 3. Capability matrix
 
@@ -117,7 +121,7 @@ dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-
 .\tools\agent-reliability\validate_ar090.ps1
 ```
 
-The final AR-090 checkpoint replaces the pending SHA/artifact fields above only after the dedicated validation and full Avalonia CI succeed on the same code SHA.
+Final AR-090 dedicated validation and full Avalonia CI succeeded on the same code SHA. The exact final artifact/digest/manifest values above are now authoritative for this handoff.
 
 ## 8. Evidence retention
 
@@ -130,7 +134,7 @@ The final AR-090 checkpoint replaces the pending SHA/artifact fields above only 
 
 ## 9. Handoff result
 
-When AR-090 validation is green, the permitted handoff label is:
+AR-090 validation is green. The permitted handoff label is:
 
 > **IMPLEMENTATION_READY_FOR_USER_TEST**
 
