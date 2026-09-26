@@ -43,6 +43,7 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
     private readonly Dictionary<Guid, long> _taskHeads = [], _threadHeads = [];
     private readonly Dictionary<Guid, List<(long JournalSequence, H2AgentProgress Progress)>> _progress = [];
     private readonly Dictionary<(Guid TaskId, Guid InvocationId), H2AgentOperationRecord> _operations = [];
+    private readonly Dictionary<(Guid TaskId, Guid InputId), SteeringReceipt> _steeringReceipts = [];
     private readonly HashSet<Guid> _interrupted = [], _eventIds = [];
 
     internal AgentIntegrationTaskArchive(string root, AgentArchiveOptions? options = null, Action<string>? fault = null)
@@ -141,6 +142,33 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
     public H2AgentEvidence? GetEvidence(string id)
     {
         lock (_gate) return _tasks.Values.SelectMany(t => t.Evidence).FirstOrDefault(e => e.EvidenceId == id);
+    }
+
+    internal H2AgentTaskSummary? FindByTurnId(Guid turnId)
+    {
+        if (turnId == Guid.Empty) return null;
+        lock (_gate)
+        {
+            var matches = _tasks.Values.Where(t => t.TurnId == turnId).Take(2).ToArray();
+            if (matches.Length > 1) throw new InvalidDataException("duplicate-turn-identity");
+            return matches.Length == 0 ? null : Get(matches[0].TaskId);
+        }
+    }
+
+    internal bool RecordSteeringInput(Guid taskId, Guid inputId, string text)
+    {
+        if (taskId == Guid.Empty || inputId == Guid.Empty)
+            throw new ArgumentException("Task/input identity is required.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        lock (_gate)
+        {
+            if (!_tasks.ContainsKey(taskId)) throw new KeyNotFoundException("Agent task is not available.");
+            var hash = Hash(System.Text.Encoding.UTF8.GetBytes(text));
+            if (_steeringReceipts.TryGetValue((taskId, inputId), out var existing))
+                return existing.TextSha256 == hash;
+            Append(taskId, "steering-input", new SteeringReceipt(inputId, hash, DateTime.UtcNow));
+            return true;
+        }
     }
     public IReadOnlyList<H2AgentThread> Threads()
     { lock (_gate) return _threads.Values.Select(Clone).ToArray(); }
@@ -494,6 +522,13 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             var prior = _progress.GetValueOrDefault(e.StreamId)?.LastOrDefault().Progress;
             if (item.Sequence != (prior?.Sequence + 1 ?? 0)) throw new InvalidDataException("progress-gap-or-duplicate");
         }
+        if (e.Kind == "steering-input")
+        {
+            var receipt = e.Payload.Deserialize<SteeringReceipt>()!;
+            if (receipt.InputId == Guid.Empty || receipt.AcceptedUtc.Kind != DateTimeKind.Utc
+                || receipt.TextSha256.Length != 64 || _steeringReceipts.ContainsKey((e.StreamId, receipt.InputId)))
+                throw new InvalidDataException("steering-receipt-invalid");
+        }
         if (e.Kind.StartsWith("operation-", StringComparison.Ordinal))
         {
             var operation = e.Payload.Deserialize<H2AgentOperationRecord>()!;
@@ -530,6 +565,9 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
                 if (e.Kind == "operation-intent" && _operations.ContainsKey(key)) throw new InvalidDataException("duplicate-intent");
                 if (e.Kind == "operation-dispatched" && (!_operations.TryGetValue(key, out var intent) || intent.State != "Prepared")) throw new InvalidDataException("missing-intent");
                 _operations[key] = operation; break;
+            case "steering-input":
+                var steering = e.Payload.Deserialize<SteeringReceipt>()!;
+                _steeringReceipts[(e.StreamId, steering.InputId)] = steering; break;
         }
         if (e.Kind == "context-source")
         {
@@ -780,6 +818,7 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
     }
     internal sealed record JournalEntry(int Schema, Guid StoreId, Guid EventId, long Sequence, Guid StreamId,
         DateTime Utc, string Kind, string Actor, string Provenance, JsonElement Payload, string PayloadHash, string PreviousHash, string Sha256);
+    private sealed record SteeringReceipt(Guid InputId, string TextSha256, DateTime AcceptedUtc);
     private sealed record LegacySource(string Path, string Sha256);
     private sealed record StoreManifest(int Schema, Guid StoreId, DateTime CreatedUtc, string Origin, LegacySource[]? Sources = null);
     private sealed record HeadReceipt(int Schema, Guid StoreId, long Sequence, string HeadHash);

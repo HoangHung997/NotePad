@@ -29,12 +29,15 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
     internal Func<string, string, AgentWorkSummary>? WorkSummarizer { get; init; }
     private readonly IAgentTransportFactory _transportFactory;
     private readonly Func<AgentRunTelemetry, IAgentRuntimeHooks> _hooksFactory;
+    private readonly HostResourceMutationCoordinator _mutationCoordinator;
 
     public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null,
-        Func<AgentRunTelemetry, IAgentRuntimeHooks>? hooksFactory = null)
+        Func<AgentRunTelemetry, IAgentRuntimeHooks>? hooksFactory = null,
+        HostResourceMutationCoordinator? mutationCoordinator = null)
     {
         _transportFactory = transportFactory ?? new AgentTransportFactory();
         _hooksFactory = hooksFactory ?? (telemetry => new AgentRuntimeHooks(telemetry));
+        _mutationCoordinator = mutationCoordinator ?? new HostResourceMutationCoordinator();
     }
 
     public AgentRuntime Create(
@@ -71,6 +74,7 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             transport,
             contextManager,
             registry,
+            scheduler: new ToolExecutionScheduler(_mutationCoordinator),
             verifier: verifier,
             permissionPolicy: tools.ProductionSession ?? (IAgentRuntimePermissionPolicy)new ScopedAgentRuntimePermissionPolicy(
                 _ => !tools.ReadOnly),

@@ -40,6 +40,7 @@ public sealed partial class H2ProductionAgentAdapter :
     private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
     private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
     private readonly Dictionary<Guid, LiveTask> _live = [];
+    private readonly Dictionary<Guid, TurnStartReservation> _turnStarts = [];
     private IH2ProjectToolHost? _projectTools;
     private bool _disposed;
     private Task? _shutdownTask;
@@ -129,6 +130,14 @@ public sealed partial class H2ProductionAgentAdapter :
             if (previous.ThreadId != context.ThreadId || previous.ProjectId != projectId)
                 throw new ArgumentException("Queued task must belong to the same conversation and project.");
         }
+        Guid? requestedTurn = context?.TurnId is { } turn && turn != Guid.Empty ? turn : null;
+        if (requestedTurn is { } durableTurn && _archive.FindByTurnId(durableTurn) is { } archived)
+        {
+            ValidateTurnRequest(archived.TaskId, archived.ProjectId, archived.ThreadId, archived.Goal,
+                projectId, context?.ThreadId, goal);
+            return Task.FromResult(archived.TaskId);
+        }
+
         var summary = Bound(context?.Summary, 16_000);
         var version = Math.Max(0, context?.Version ?? 0);
 
@@ -142,6 +151,24 @@ public sealed partial class H2ProductionAgentAdapter :
         }
 
         var taskId = Guid.NewGuid();
+        TurnStartReservation? reservation = null;
+        if (requestedTurn is { } claimedTurn)
+        {
+            lock (_gate)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(H2ProductionAgentAdapter));
+                if (_turnStarts.TryGetValue(claimedTurn, out var existing))
+                {
+                    ValidateTurnRequest(existing.TaskId, existing.ProjectId, existing.ThreadId, existing.Goal,
+                        projectId, context?.ThreadId, goal);
+                    return existing.Completion.Task;
+                }
+                reservation = new(taskId, projectId, context?.ThreadId, goal,
+                    new(TaskCreationOptions.RunContinuationsAsynchronously));
+                _turnStarts.Add(claimedTurn, reservation);
+            }
+        }
+
         var created = DateTime.UtcNow;
         var live = new LiveTask(
             taskId,
@@ -156,7 +183,7 @@ public sealed partial class H2ProductionAgentAdapter :
         {
             RequestContext = SnapshotContext(context),
             ThreadId = context?.ThreadId ?? taskId,
-            TurnId = context?.TurnId ?? taskId,
+            TurnId = requestedTurn ?? taskId,
             Model = SnapshotModel(context)
         };
 
@@ -165,6 +192,11 @@ public sealed partial class H2ProductionAgentAdapter :
             // Disposal may have begun while request-local context was being prepared.
             if (_disposed)
             {
+                if (requestedTurn is { } failedTurn
+                    && _turnStarts.TryGetValue(failedTurn, out var claim)
+                    && claim.TaskId == taskId)
+                    _turnStarts.Remove(failedTurn);
+                reservation?.Completion.TrySetException(new ObjectDisposedException(nameof(H2ProductionAgentAdapter)));
                 live.Cancellation.Dispose();
                 throw new ObjectDisposedException(nameof(H2ProductionAgentAdapter));
             }
@@ -176,15 +208,24 @@ public sealed partial class H2ProductionAgentAdapter :
             _archive.Upsert(live.Snapshot());
             RegisterChatTask(live);
             AddProgress(live, "lifecycle", "queued", "Agent task queued by H2 production bridge.");
+            reservation?.Completion.TrySetResult(taskId);
         }
-        catch
+        catch (Exception ex)
         {
-            lock (_gate) _live.Remove(taskId);
+            lock (_gate)
+            {
+                _live.Remove(taskId);
+                if (requestedTurn is { } failedTurn
+                    && _turnStarts.TryGetValue(failedTurn, out var claim)
+                    && claim.TaskId == taskId)
+                    _turnStarts.Remove(failedTurn);
+            }
+            reservation?.Completion.TrySetException(ex);
             live.Cancellation.Dispose(); live.Finished.TrySetResult(); throw;
         }
         _ = ExecuteWhenReadyAsync(live);
 
-        return Task.FromResult(taskId);
+        return reservation?.Completion.Task ?? Task.FromResult(taskId);
     }
 
     public H2AgentTaskObservation ObserveTask(
@@ -803,6 +844,29 @@ public sealed partial class H2ProductionAgentAdapter :
         live.Progress.Add(progress);
         live.UpdatedUtc = DateTime.UtcNow;
     }
+
+    private static void ValidateTurnRequest(
+        Guid taskId,
+        Guid? existingProject,
+        Guid? existingThread,
+        string existingGoal,
+        Guid? requestedProject,
+        Guid? requestedThread,
+        string requestedGoal)
+    {
+        if (existingProject != requestedProject
+            || requestedThread is { } thread && existingThread != thread
+            || !string.Equals(existingGoal, requestedGoal, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"TurnId already belongs to a different Agent request (task {taskId:N}).");
+    }
+
+    private sealed record TurnStartReservation(
+        Guid TaskId,
+        Guid? ProjectId,
+        Guid? ThreadId,
+        string Goal,
+        TaskCompletionSource<Guid> Completion);
 
     private bool TryLive(Guid taskId, out LiveTask live)
     {

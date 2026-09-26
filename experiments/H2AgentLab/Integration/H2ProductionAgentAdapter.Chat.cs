@@ -52,6 +52,7 @@ public sealed partial class H2ProductionAgentAdapter
             if (live.SupplementalIds.TryGetValue(inputId, out var previous)) return previous == text;
             if (!live.AcceptingInput || IsTerminal(live.Status) || live.Cancellation.IsCancellationRequested
                 || live.SupplementalIds.Count >= 24) return false;
+            if (!_archive.RecordSteeringInput(taskId, inputId, text)) return false;
             live.SupplementalIds.Add(inputId, text); live.SupplementalInput.Enqueue(new(inputId, text));
             AddProgressLocked(live, "user", "supplement-received", text);
             return true;

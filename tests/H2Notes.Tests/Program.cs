@@ -708,6 +708,7 @@ H2WordPagedReadTests.Run(Test);
 H2AgentGoalRevisionTests.Run(Test);
 H2AgentArchiveJournalTests.Run(Test);
 H2AgentRestartReconcileTests.Run(Test);
+H2AgentSteeringConcurrencyTests.Run(Test);
 H2AgentHistoryRetrievalTests.Run(Test);
 H2AgentCompletionTests.Run(Test);
 H2AgentProcessDrainTests.Run(Test);

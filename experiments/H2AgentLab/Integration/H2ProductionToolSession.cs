@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using H2AgentLab.DesktopProtocol;
 using H2AgentLab.Runtime;
@@ -17,6 +18,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly SemaphoreSlim _approvalGate = new(1, 1);
     private readonly AsyncLocal<bool> _executingAuthorizedCall = new();
     private readonly HashSet<string> _declined = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, byte> _runtimeApprovedInvocations = new();
     private readonly List<IDisposable> _owned = [];
     private readonly H2AgentTaskContext? _context;
     private readonly IH2ProjectToolHost? _projects;
@@ -230,21 +232,22 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 var key = permission.ResourceKey ?? descriptor.Name;
                 if (descriptor.IsMutating)
                 {
-                    await _approvalGate.WaitAsync(ct).ConfigureAwait(false);
-                    try
+                    var runtimePrepared = call.Invocation is { } invocation
+                        && _runtimeApprovedInvocations.TryRemove(invocation.InvocationId, out _);
+                    if (!runtimePrepared)
                     {
-                        if (_declined.Contains(key)) return Rejected(call, descriptor, permission with { Allowed = false, Code = "denied", Message = "This resource was declined for this task." });
-                        if (!MayAutoApprove(descriptor, call)
-                            && !await _approve("Cho phép " + descriptor.Name + "?",
-                                "Phạm vi: " + key + "\nThay đổi đề xuất:\n" + call.Arguments.GetRawText(), ct).ConfigureAwait(false))
-                        {
-                            _declined.Add(key);
-                            return Rejected(call, descriptor, permission with { Allowed = false, Code = "denied", Message = "Người dùng đã từ chối thay đổi." });
-                        }
-                        permission = Check(descriptor, call);
+                        // Direct/legacy executor calls still use the historical approval path.
+                        // Normal AgentRuntime calls prepare approval in AuthorizeAsync BEFORE
+                        // entering the shared resource gate, so no resource lock is held while
+                        // waiting for user input.
+                        permission = await PrepareMutationAuthorizationAsync(
+                            descriptor, call, permission, rememberRuntimeInvocation: false, ct).ConfigureAwait(false);
                         if (!permission.Allowed) return Rejected(call, descriptor, permission);
                     }
-                    finally { _approvalGate.Release(); }
+                    // This check is deliberately AFTER the shared mutation gate was acquired.
+                    // A permission can expire/be revoked while another task owns the resource.
+                    permission = Check(descriptor, call);
+                    if (!permission.Allowed) return Rejected(call, descriptor, permission);
                 }
                 ct.ThrowIfCancellationRequested();
                 if (_targetPolicy is not null && _fileTargets is not null && descriptor.Namespace.Name is "files" or "autocad")
@@ -297,13 +300,71 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         return wrapped;
     }
 
-    public ValueTask<AgentRuntimePermissionDecision> AuthorizeAsync(AgentRuntimePermissionRequest request, CancellationToken cancellationToken)
+    public async ValueTask<AgentRuntimePermissionDecision> AuthorizeAsync(
+        AgentRuntimePermissionRequest request,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var permission = Check(request.Descriptor, request.Call);
+        if (!permission.Allowed || !request.Descriptor.IsMutating) return permission;
+        return await PrepareMutationAuthorizationAsync(
+            request.Descriptor, request.Call, permission, rememberRuntimeInvocation: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public ValueTask<AgentRuntimePermissionDecision> RevalidateBeforeDispatchAsync(
+        AgentRuntimePermissionRequest request,
+        AgentRuntimePermissionDecision priorDecision,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!priorDecision.Allowed || !request.Descriptor.IsMutating)
+            return ValueTask.FromResult(priorDecision);
         return ValueTask.FromResult(Check(request.Descriptor, request.Call));
     }
 
-    public void ObserveResult(AgentRuntimePermissionRequest request, string output) { }
+    public void ObserveResult(AgentRuntimePermissionRequest request, string output)
+    {
+        if (request.Call.Invocation is { } invocation)
+            _runtimeApprovedInvocations.TryRemove(invocation.InvocationId, out _);
+    }
+
+    private async ValueTask<AgentRuntimePermissionDecision> PrepareMutationAuthorizationAsync(
+        ToolDescriptor descriptor,
+        ToolCall call,
+        AgentRuntimePermissionDecision permission,
+        bool rememberRuntimeInvocation,
+        CancellationToken cancellationToken)
+    {
+        var key = permission.ResourceKey ?? descriptor.Name;
+        await _approvalGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_declined.Contains(key))
+                return AgentRuntimePermissionDecision.Deny(
+                    "denied", "This resource was declined for this task.", key);
+            if (!MayAutoApprove(descriptor, call)
+                && !await _approve("Cho phép " + descriptor.Name + "?",
+                    "Phạm vi: " + key + "\nThay đổi đề xuất:\n" + call.Arguments.GetRawText(),
+                    cancellationToken).ConfigureAwait(false))
+            {
+                _declined.Add(key);
+                return AgentRuntimePermissionDecision.Deny(
+                    "denied", "Người dùng đã từ chối thay đổi.", key);
+            }
+
+            permission = Check(descriptor, call);
+            if (!permission.Allowed) return permission;
+            if (rememberRuntimeInvocation)
+            {
+                var invocation = call.Invocation
+                    ?? throw new InvalidOperationException("Runtime mutation authorization requires a bound invocation.");
+                _runtimeApprovedInvocations[invocation.InvocationId] = 0;
+            }
+            return permission;
+        }
+        finally { _approvalGate.Release(); }
+    }
 
     private AgentRuntimePermissionDecision Check(ToolDescriptor descriptor, ToolCall call)
     {

@@ -90,7 +90,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | DONE |
 | AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E3 PASS / no exactly-once claim |
-| AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
+| AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | ACTIVE — shared same-resource mutation gate / post-wait permission recheck / TurnId+steering idempotency |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | NOT_STARTED |
@@ -568,11 +568,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-041_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-042_STEERING_CONCURRENCY_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-042",
   "parked_task": "AR-041",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-042_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3 real crash/restart reconciliation with native Office/GUI/live-resource providers deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",

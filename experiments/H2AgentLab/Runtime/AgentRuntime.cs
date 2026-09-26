@@ -1016,6 +1016,24 @@ public sealed class AgentRuntime : IAsyncDisposable
                     call,
                     permission.ResourceKey)
                 {
+                    BeforeDispatchAsync = descriptor.IsMutating
+                        ? async (bound, ct) =>
+                        {
+                            var currentRequest = permissionRequest with { Call = bound, ResourceKey = permission.ResourceKey };
+                            var current = await _permissionPolicy.RevalidateBeforeDispatchAsync(
+                                currentRequest, permission, ct).ConfigureAwait(false);
+                            return current.Allowed ? null
+                                : ToolOutcomeBridge.Failure(bound, descriptor, current.Code,
+                                    ToolErrorPhase.Preflight, ToolMutationEffect.None,
+                                    JsonSerializer.Serialize(new
+                                    {
+                                        ok = false,
+                                        error = current.Code,
+                                        message = current.Message,
+                                        scope = current.ResourceKey
+                                    }));
+                        }
+                        : null,
                     BeforeExecute = descriptor.IsMutating && journalObserver is not null
                         ? bound => journalObserver(JournalRecord(contract, turnId, bound, permission.ResourceKey, null)) : null,
                     AfterExecute = descriptor.IsMutating && journalObserver is not null

@@ -7,6 +7,7 @@ public sealed record ToolExecutionRequest(
     global::H2AgentLab.ToolCall Call,
     string? ResourceKey = null)
 {
+    public Func<global::H2AgentLab.ToolCall, CancellationToken, ValueTask<ToolExecutionOutput?>>? BeforeDispatchAsync { get; init; }
     public Action<global::H2AgentLab.ToolCall>? BeforeExecute { get; init; }
     public Action<global::H2AgentLab.ToolCall, ToolExecutionOutput>? AfterExecute { get; init; }
 }
@@ -27,11 +28,12 @@ public sealed record ToolExecutionResult(
 public sealed class ToolExecutionScheduler : IDisposable
 {
     private readonly SemaphoreSlim _serialGate = new(1, 1);
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _resourceGates =
-        new(StringComparer.Ordinal);
+    private readonly HostResourceMutationCoordinator _mutations;
     private bool _disposed;
-    private readonly ConcurrentDictionary<string, byte> _uncertainResources = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Guid, (string Resource, string JobId)> _runningJobs = new();
+
+    public ToolExecutionScheduler(HostResourceMutationCoordinator? mutationCoordinator = null)
+        => _mutations = mutationCoordinator ?? new HostResourceMutationCoordinator();
 
     // Called only after a bound host observation, never by model text or a provider's JSON.
     internal void ObserveCompletedJob(ToolOutcome outcome)
@@ -40,7 +42,7 @@ public sealed class ToolExecutionScheduler : IDisposable
         if (_runningJobs.TryGetValue(outcome.Invocation.InvocationId, out var owned)
             && owned.JobId == outcome.Job.JobId
             && _runningJobs.TryRemove(outcome.Invocation.InvocationId, out _))
-            _uncertainResources.TryRemove(owned.Resource, out _);
+            _mutations.ClearUncertain(owned.Resource);
     }
 
     public async Task<IReadOnlyList<ToolExecutionResult>> ExecuteBatchAsync(
@@ -77,9 +79,8 @@ public sealed class ToolExecutionScheduler : IDisposable
             throw new InvalidOperationException(
                 $"Mutating tool '{request.Descriptor.Name}' requires a resource key for serialization.");
 
-        SemaphoreSlim? resourceGate = null;
+        IDisposable? resourceLease = null;
         var serialTaken = false;
-        var resourceTaken = false;
         try
         {
             if (!request.Descriptor.SupportsParallel)
@@ -89,24 +90,26 @@ public sealed class ToolExecutionScheduler : IDisposable
             }
 
             if (request.Descriptor.IsMutating)
-            {
-                resourceGate = _resourceGates.GetOrAdd(resourceKey!, _ => new SemaphoreSlim(1, 1));
-                await resourceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-                resourceTaken = true;
-            }
+                resourceLease = await _mutations.AcquireAsync(resourceKey!, cancellationToken).ConfigureAwait(false);
 
             var call = request.Call with { Invocation = ToolInvocation.Bind(request.Call) };
             ToolExecutionOutput output;
             try
             {
-                if (request.Descriptor.IsMutating && _uncertainResources.ContainsKey(resourceKey!))
+                if (request.Descriptor.IsMutating && _mutations.IsUncertain(resourceKey!))
                     output = ToolOutcomeBridge.Failure(call, request.Descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None);
                 else
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    request.BeforeExecute?.Invoke(call); // Durable intent/dispatch, still under the resource gate.
-                    cancellationToken.ThrowIfCancellationRequested();
-                    output = await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+                    output = request.BeforeDispatchAsync is null
+                        ? null
+                        : await request.BeforeDispatchAsync(call, cancellationToken).ConfigureAwait(false);
+                    if (output is null)
+                    {
+                        request.BeforeExecute?.Invoke(call); // Durable intent/dispatch, still under the resource gate.
+                        cancellationToken.ThrowIfCancellationRequested();
+                        output = await ToolOutcomeBridge.ExecuteAsync(request.Descriptor, call, cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
             catch (ToolInvocationCancelledException cancelled)
@@ -114,13 +117,13 @@ public sealed class ToolExecutionScheduler : IDisposable
                 // Provider-local cancellation need not cancel the batch token. Fence the resource
                 // before releasing its gate, so queued writes cannot repeat an uncertain effect.
                 if (request.Descriptor.IsMutating && cancelled.Observed.Outcome.IsPending)
-                    _uncertainResources.TryAdd(resourceKey!, 0);
+                    _mutations.MarkUncertain(resourceKey!);
                 request.AfterExecute?.Invoke(call, cancelled.Observed);
                 throw;
             }
             if (request.Descriptor.IsMutating && output.Outcome.IsPending)
             {
-                _uncertainResources.TryAdd(resourceKey!, 0);
+                _mutations.MarkUncertain(resourceKey!);
                 if (output.Outcome.Status == ToolOutcomeStatus.Running && output.Outcome.Job is not null)
                     _runningJobs[call.Invocation!.InvocationId] = (resourceKey!, output.Outcome.Job.JobId);
             }
@@ -128,7 +131,7 @@ public sealed class ToolExecutionScheduler : IDisposable
             catch
             {
                 _runningJobs.TryRemove(call.Invocation!.InvocationId, out _); // Lost durable receipt is not a releasable running-job fence.
-                if (request.Descriptor.IsMutating) _uncertainResources.TryAdd(resourceKey!, 0);
+                if (request.Descriptor.IsMutating) _mutations.MarkUncertain(resourceKey!);
                 throw;
             }
             results[index] = new ToolExecutionResult(index, request.Descriptor.Name, output.DomainPayload)
@@ -136,7 +139,7 @@ public sealed class ToolExecutionScheduler : IDisposable
         }
         finally
         {
-            if (resourceTaken) resourceGate!.Release();
+            resourceLease?.Dispose();
             if (serialTaken) _serialGate.Release();
         }
     }
@@ -157,8 +160,5 @@ public sealed class ToolExecutionScheduler : IDisposable
         if (_disposed) return;
         _disposed = true;
         _serialGate.Dispose();
-        foreach (var gate in _resourceGates.Values)
-            gate.Dispose();
-        _resourceGates.Clear();
     }
 }
