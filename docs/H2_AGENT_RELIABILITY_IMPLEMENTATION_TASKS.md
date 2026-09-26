@@ -97,7 +97,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no live-search/browser PASS claim |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no PDF-content/layout/native-recalc PASS claim |
-| AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | ACTIVE — closed/CoreConsole preserved; external live COM selected-block attribute bridge E2 implementation |
+| AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native-live/general-dynamic-block/plot/undo-transaction PASS claim |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER — final full-build external/native provider test; no E3 PASS claim |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
 | AR-066 | LiveResource/native app semantics + no silent live→disk fallback | 012/020 | E3/E4 | USER_ACCEPTED_SEQUENCE / E1-E2_PASS / E3-E4_DEFERRED_BY_USER — test later; no E3/E4 PASS claim |
@@ -480,7 +480,7 @@ Full Avalonia CI `36249335285` / job `108424319267` **SUCCESS**, including full 
 
 **User decision — 2026-09-26:** real E3/E4 with native Word/Excel/PDF rendering/recalculation and H2 UI + configured model is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user downloads/tests the final full build. This does not convert E3/E4 to PASS and does not make AR-062 fully DONE.
 
-### [ ] AR-063 — CAD: phân định file đóng/live và triển khai phần công bố
+### [~] AR-063 — CAD: phân định file đóng/live và triển khai phần công bố
 
 **Sửa/reuse:** H2AutoCadFileTools, native provider/bridge contract, registry readiness, CAD verifier.
 
@@ -489,6 +489,18 @@ Full Avalonia CI `36249335285` / job `108424319267` **SUCCESS**, including full 
 **Test E3/E4:** RC-29; drawing đối chứng, entity IDs/layer/tag, changing selection, stale document, undo/transaction behavior được hỗ trợ. Fixture live không chứng nhận native đã triển khai.
 
 **Acceptance:** trong phạm vi công bố có execution thật và evidence; ngoài phạm vi hiện Unsupported/NotConfigured; không hạ requirement live thành closed mà không ghi rõ và xin quyết định nếu muốn defer.
+
+**AR-063 implementation checkpoint — 2026-09-26:** exact validated code SHA `da8b9daefa1bbb1e86b833a72c68ebd395e62cb0`. AR-063 preserves the existing closed-file AutoCAD/CoreConsole path and adds a distinct **external live AutoCAD COM** path; live requirements are never silently substituted by a saved DWG, HTTP fetch or unbound command. The live operation matrix advertises only implemented capabilities: list/get live document, query the current PickFirst selection, read selected block attributes/layers, update one attribute on one still-selected attributed block, and exact document/entity-token readback. General `autocad.update_entity`, live plot/verify-plot, general dynamic-block editing and arbitrary command/LISP/script injection remain unadvertised/unsupported.
+
+The live bridge reacquires the running AutoCAD application/document for each operation, validates document and entity state tokens, requires the entity to remain in the current PickFirst selection before mutation, bounds selected entities/layers/document state-token scanning, and verifies the exact written attribute value after mutation. The production Work Assistant path traverses the normal AgentRuntime/ToolRegistry/provider/verifier chain and records host verification evidence. **No transaction/undo atomicity is claimed by the external COM bridge**; the current scope is one bounded attribute write plus readback. Close/reopen/Save As/session-identity and real AutoCAD undo behavior remain native E3/E4 acceptance items.
+
+Repair history: `4caca275...` introduced the closed/live split and external COM bridge; `d9fe9c0f...` kept live readiness non-callable/testable when AutoCAD is unavailable; `a1cf5603...` fixed counting of validated live-CAD source observation; `57ccbcb7...` reduced the production slice to one verified user outcome; `da8b9dae...` preserved live-source semantics in readiness notices without changing execution logic.
+
+Dedicated AR-063 run `36254640413` / job `108439028970` **SUCCESS**: focused AR-063 **5/5**, MB-113 AutoCAD acceptance **6/6**, retained AR-062 **6/6**, AR-060 **6/6**, AR-024 **2/2**, AR-033 **42/42**, AR-012 **44/44**, full H2 **1348/1348**, and all **75/75** required Agent suites PASS. Evidence artifact `10910655601`, 432,387 bytes, SHA256 `2b966f174b87f7dc2cdd1dbacef82f90264711cbcd16b016f8123a634a4da86e`, was independently downloaded; ZIP integrity passed across **650** entries and `validation.json` reports E1=PASS, E2=PASS, E3/E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, live_native_claim=false, general_dynamic_block_claim=false and plot_claim=false.
+
+Full Avalonia CI `36254640513` / job `108438987210` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **22/22** pull-request workflow identities on exact SHA completed SUCCESS, 0 failed. Final portable artifact `10910881244` is 110,469,935 bytes, SHA256 `24b342f1378525a521678a51a0986171595045de56d4c475bf257f37c103e29f`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** real E3/E4 with a real installed AutoCAD instance, live selection changes, close/reopen/Save As/session rebinding, and any real undo/transaction behavior is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until final-build testing. This does not convert E3/E4 to PASS and does not make AR-063 fully DONE.
 
 ### [~] AR-064 — Lifecycle plugin/provider trên production
 
@@ -612,66 +624,71 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-063_CAD_CLOSED_LIVE_SCOPE_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-063",
-  "parked_task": "AR-062",
-  "implementation_status": "AR-063_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-063_IMPLEMENTED_E1_E2_PASS_E3_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-063",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E3_E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E3/E4 native document applications/rendering/recalculation and H2 UI + configured model deferred until user final-build test",
+  "required_evidence_level": "E3/E4 real installed AutoCAD live-selection and native-session acceptance deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "af0133a8728a9084c539bb4b777329daa246e76b",
+  "validated_code_sha": "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0",
   "implementation_commits": [
-    "339e406370c1027fe84fb76dbd6b8eb7c80e35b7 feat(AR-062): verify staged documents before publish",
-    "af0133a8728a9084c539bb4b777329daa246e76b fix(AR-062): import OpenXML document type enums"
+    "4caca275ea9fc8f79eb9caa1d80536e9d7830d64 feat(AR-063): separate closed and live AutoCAD paths",
+    "d9fe9c0f10488d52c6c2f079d9342c133242a007 fix(AR-063): keep live CAD readiness non-callable and testable",
+    "a1cf5603d75c5215d4d47e5d34818741874dba09 fix(AR-063): count validated live CAD source observation",
+    "57ccbcb78ade423a293316834279c71a6f737c13 test(AR-063): keep production CAD slice to one verified outcome",
+    "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0 fix(AR-063): retain live-source semantics in readiness notices"
   ],
-  "last_validation_result": "AR062 6/6; retained AR060 6/6, AR052 8/8, AR042 6/6, AR041 6/6, AR033 42/42, AR024 2/2; full H2 1343/1343; 75/75 required Agent suites PASS. Dedicated run 36249334920 SUCCESS; Avalonia CI 36249335285 SUCCESS; all 21/21 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at af0133a8; AR062 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T14:54:29Z",
-  "user_decision": "User requires a complete build before personal testing. AR-062 native/model E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR063 5/5; MB113 6/6; retained AR062 6/6, AR060 6/6, AR024 2/2, AR033 42/42, AR012 44/44; full H2 1348/1348; 75/75 required Agent suites PASS. Dedicated run 36254640413 SUCCESS; Avalonia CI 36254640513 SUCCESS; all 22/22 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at da8b9dae; AR063 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T16:30:04Z",
+  "user_decision": "User requires the complete build before personal testing. AR-063 real installed-AutoCAD E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Reconciled concurrent worker state and continued the repository-active AR-062 task instead of overwriting completed AR-042/052/060 work.",
-    "Verified exact staged artifact bytes before publish using durable verification receipts keyed to run/path/SHA.",
-    "DOCX independent readback classifies text and OpenXML structure without claiming rendered layout.",
-    "XLSX independent readback classifies stored values/formulas/structure without claiming native recalculation or visual layout.",
-    "PDF remains signature/size-only unless a separate content/render verifier is run; publication cannot manufacture content/layout proof.",
-    "Create-only and expected-hash overwrite semantics preserve exact bytes and backup prior destination content.",
-    "Validated multi-output isolation and invalidation when staged bytes change.",
-    "Validated exact SHA af0133a8 with 21/21 workflows SUCCESS and independently verified portable/evidence ZIP artifacts."
+    "Reconciled GitHub after another worker completed AR-042/052/060/062 and continued the canonical ACTIVE AR-063 task instead of applying stale uncommitted AR-042 blobs.",
+    "Preserved closed-file CoreConsole/DXF capability while adding a separate external live AutoCAD COM path.",
+    "Implemented current PickFirst selection discovery/read, selected attributed-block bounded attribute mutation and exact readback verification through production ToolRegistry.",
+    "Kept unsupported live update_entity/plot/verify_plot/general dynamic-block/arbitrary command/script operations unadvertised.",
+    "Validated stale document/entity state and changed selection before effect; production live-CAD slice completes only with host verification evidence.",
+    "Kept readiness wording explicit that a saved file/fetch/unbound command is not an equivalent source for live AutoCAD.",
+    "Validated exact SHA da8b9dae with 22/22 workflows SUCCESS and independently verified evidence/portable ZIPs."
   ],
   "remaining_in_parked_task": [
-    "Run E3/E4 later with disposable documents through H2 UI + configured model and native Word/Excel/PDF viewer paths.",
-    "For XLSX, test native recalculation/value refresh where required and distinguish stored formula/value classification from recalculated correctness.",
-    "For DOCX/PDF, test rendered layout/page count/visual fidelity with a native or configured render verifier before claiming layout.",
-    "Exercise interrupted publication/collision and user-visible artifact cards in the real H2 UI without using personal documents."
+    "Run E3/E4 later on an authorized Windows PC with real installed AutoCAD and a disposable DWG.",
+    "Confirm current selection identity, entity handle/layer/tag, attribute edit/readback, selection change rejection, stale document/entity token rejection and exact live document rebinding.",
+    "Close/reopen and Save As the drawing; verify stale session/handle is rejected and no saved-file fallback substitutes the live drawing.",
+    "Record real AutoCAD undo/transaction behavior. Current external COM bridge does not claim transaction/undo atomicity.",
+    "Do not expand the claim to general dynamic blocks, general entity mutation, plot or arbitrary command/LISP/script execution unless separately implemented and verified."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-062/implementation.md",
-    "docs/agent-reliability/AR-062/evidence.json",
-    "docs/agent-reliability/AR-062/native-acceptance.md",
-    "GitHub artifact 10908538609 AR062-E1-E2-Evidence",
-    "GitHub artifact 10908970510 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-063/implementation.md",
+    "docs/agent-reliability/AR-063/evidence.json",
+    "docs/agent-reliability/AR-063/native-acceptance.md",
+    "GitHub artifact 10910655601 AR063-E1-E2-Evidence",
+    "GitHub artifact 10910881244 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10908970510,
-    "bytes": 110448458,
-    "sha256": "ea52592229ce2aaae42d6c35a427721f852a74f650e9c21da6af5fbf3ef3728c",
-    "expires_at_utc": "2026-12-25T14:41:01Z",
-    "source_sha": "af0133a8728a9084c539bb4b777329daa246e76b",
+    "artifact_id": 10910881244,
+    "bytes": 110469935,
+    "sha256": "24b342f1378525a521678a51a0986171595045de56d4c475bf257f37c103e29f",
+    "expires_at_utc": "2026-12-25T16:12:43Z",
+    "source_sha": "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "pdf_content_claim": false,
-    "layout_claim": false,
-    "native_recalc_claim": false,
+    "live_native_claim": false,
+    "general_dynamic_block_claim": false,
+    "plot_claim": false,
+    "undo_transaction_claim": false,
+    "saved_file_equivalent_to_live": false,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-062 unless native final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-062 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-063 unless real native final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-063 turn."
 }
 ```
 
