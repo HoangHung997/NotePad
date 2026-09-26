@@ -278,7 +278,7 @@ Repair history in this AR-024 turn: `58ba74ef...` added the production-slice gat
 
 Dedicated AR-024 run `36221310522` / job `108346988677` **SUCCESS**: focused AR-024 **2/2**, OfficeHost **19/19**, retained AR-023 **9/9**, AR-022 **8/8**, AR-021 **14/14**, AR-020 **36/36**, AR-012 **44/44**, AR-001 **13/13**, full H2 **1311/1311**, and all **75** required Agent suites PASS. Full Avalonia CI `36221310599` / job `108346979174` **SUCCESS**, including self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. Evidence artifact `10899865137` (433,144 bytes, SHA256 `04570ba108eac3703d88dfbfef402281be7bef4466eb8abda0fd8f472858e543`) was downloaded independently; `validation.json` reports E1=PASS, E2=PASS, clean_end=true and E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT. Final portable artifact `10899446974` is 110,398,090 bytes, SHA256 `d6fbcdf729092a967b1d2a010736c69420ec4619aa0e48bdf60f5bc0f2417866`; ZIP integrity passed across **482** entries and the three main EXEs are present.
 
-Exact-SHA workflow note: 15 workflow identities completed SUCCESS. The first AR-023 retained run hit one transient AR-021 probe flake (`Sequence contains no elements`) although that same AR-021 case passed later in the same full H2 run, in AR-024 retained validation, and in dedicated AR-021. The AR-023 job was rerun on the same SHA; that rerun was still in progress at this checkpoint. No runtime change was made for a non-reproduced flake.
+Exact-SHA workflow note: **16/16 workflow identities completed SUCCESS**. The first AR-023 attempt hit one transient retained AR-021 probe flake (`Sequence contains no elements`), while that same case passed later in the same full H2 run, in AR-024 retained validation and in dedicated AR-021. The AR-023 job was rerun on the same SHA and **SUCCESS**, confirming a one-off flake. No runtime change was made for a non-reproduced failure.
 
 **User decision — 2026-09-26:** real E4 (H2 UI + configured model + native Word/Excel provider on an authorized machine) is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user downloads the final full build and tests it. This does not convert E4 to PASS and AR-024/MB-127 remain acceptance-deferred.
 
@@ -601,7 +601,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "Initial AR-024 test compile missed H2AgentLab.OfficeProtocol; fixed without runtime change.",
     "Global fixture initially used a fake captured-window context that OfficeHost fixture cannot prove; removed rather than weakening native binding.",
     "Global FullAccess without capture still blocked because a model session ID is not target authority; final fixture grounds the exact workbook path in the user prompt.",
-    "One retained AR021 probe flaked once inside AR023 workflow; the same test passed elsewhere on the exact SHA and a same-SHA rerun was started instead of changing runtime without reproduction."
+    "One retained AR021 probe flaked once inside the first AR023 workflow attempt; the same test passed elsewhere on the exact SHA and the same-SHA AR023 rerun completed SUCCESS, confirming a one-off flake without runtime change."
   ],
   "remaining_in_parked_task": [
     "Run E4 later with H2 UI, a configured allowed model and real Word/Excel on an authorized Windows PC.",
