@@ -1,0 +1,89 @@
+{
+  "task": "AR-081",
+  "source_sha": "46ec1218d535fa0def938f9393e13e40a705605d",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "NOT_REQUIRED",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "native_ui_claim": false,
+    "private_chain_of_thought_claim": false
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-080": "4/4",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-068": "3/3",
+      "H2M-132": "1/1"
+    },
+    "full_h2": "1358/1358",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "24/24 SUCCESS"
+  },
+  "runs": {
+    "ar081": {
+      "run_id": 36263139290,
+      "job_id": 108462640014,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36263139306,
+      "job_id": 108462672872,
+      "result": "SUCCESS"
+    },
+    "ar052_rerun": {
+      "run_id": 36263139222,
+      "result": "SUCCESS",
+      "note": "same-SHA rerun after one retained AR-030 RC-12 timeout"
+    },
+    "ar042_rerun": {
+      "run_id": 36263139228,
+      "result": "SUCCESS",
+      "note": "same-SHA rerun after one retained AR-066 source-consent timeout"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10913940085,
+      "bytes": 428960,
+      "sha256": "86b7ac1a665e26f63447ac1391ea0334b082daf65ac370c6e73b2058547db0f0",
+      "expires_at_utc": "2026-10-10T18:56:45Z",
+      "zip_entries": 647,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10913361711,
+      "bytes": 110474571,
+      "sha256": "12cc6b2ed831326600d24a1975c990a0d1d58105cd64d4f2963cab42146311e2",
+      "expires_at_utc": "2026-12-25T18:36:25Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "ui_assertions": {
+    "typed_state_projection": true,
+    "heartbeat_collapse_presentation_only": true,
+    "durable_event_count_preserved": true,
+    "reconnect_dedup": true,
+    "open_thread_executes_tool": false,
+    "approval_stale_fail_closed": true,
+    "large_spreadsheet_paged": true,
+    "accessibility_metadata": true,
+    "headless_performance_only": true
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "hidden_reasoning_exposed": false
+  }
+}
