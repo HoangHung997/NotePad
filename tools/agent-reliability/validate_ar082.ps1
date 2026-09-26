@@ -59,6 +59,13 @@ if(Test-Path -LiteralPath $cleanReport){Copy-Item -LiteralPath $cleanReport -Des
 if([int]$cleanExit -ne 0){throw 'Clean-profile portable verification failed'}
 $clean=Get-Content -LiteralPath $cleanReport -Raw|ConvertFrom-Json
 if(!$clean.passed -or $clean.manifest.sourceSha -ne $sha){throw 'Clean portable report did not bind exact source SHA'}
+# Verification itself must not mutate packaged bytes. Re-run the package manifest check by
+# invoking the verifier a second time only after the first report has completed; any package
+# mutation must fail immediately rather than surfacing later as an unexplained configured-profile drift.
+$cleanRecheckOut=Join-Path $env:RUNNER_TEMP 'ar082-clean-recheck-output'
+Remove-Item -LiteralPath $cleanRecheckOut -Recurse -Force -ErrorAction SilentlyContinue
+$cleanRecheckExit=Invoke-PortableVerify $portable $cleanRecheckOut
+if([int]$cleanRecheckExit -ne 0){throw 'Portable package mutated during clean-profile verification'}
 foreach($id in @('ollama.endpoint','ai.online_credentials','web.search','browser.live_tab')){
   $row=$clean.dependencies|Where-Object id -eq $id
   if($row.state -ne 'NeedsConfiguration'){throw "Clean profile fabricated readiness for $id"}
