@@ -37,11 +37,19 @@ $oldSearch=$env:H2_BRAVE_SEARCH_API_KEY;$oldBrowser=$env:H2_BROWSER_CDP_ENDPOINT
 $env:H2_BRAVE_SEARCH_API_KEY=$null;$env:H2_BROWSER_CDP_ENDPOINT=$null
 $env:DOTNET_ROOT='Z:\missing-dotnet-runtime'
 $env:PATH="$env:SystemRoot\System32;$env:SystemRoot"
+$pwshExe=Join-Path $PSHOME 'pwsh.exe'
+if(-not (Test-Path -LiteralPath $pwshExe -PathType Leaf)){throw 'PowerShell child executable is unavailable for portable verifier isolation'}
+function Invoke-PortableVerify([string]$root,[string]$output) {
+  & $pwshExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'VERIFY-PORTABLE.ps1') -OutputDirectory $output
+  return $LASTEXITCODE
+}
 $cleanOut=Join-Path $env:RUNNER_TEMP 'ar082-clean-output'
 Remove-Item -LiteralPath $cleanOut -Recurse -Force -ErrorAction SilentlyContinue
-& (Join-Path $portable 'VERIFY-PORTABLE.ps1') -OutputDirectory $cleanOut
-if($LASTEXITCODE){throw 'Clean-profile portable verification failed'}
-$clean=Get-Content -LiteralPath (Join-Path $cleanOut 'portable-check.json') -Raw|ConvertFrom-Json
+$cleanExit=Invoke-PortableVerify $portable $cleanOut
+$cleanReport=Join-Path $cleanOut 'portable-check.json'
+if(Test-Path -LiteralPath $cleanReport){Copy-Item -LiteralPath $cleanReport -Destination artifacts/ar082/clean-profile-portable-check.json -Force}
+if($cleanExit){throw 'Clean-profile portable verification failed'}
+$clean=Get-Content -LiteralPath $cleanReport -Raw|ConvertFrom-Json
 if(!$clean.passed -or $clean.manifest.sourceSha -ne $sha){throw 'Clean portable report did not bind exact source SHA'}
 foreach($id in @('ollama.endpoint','ai.online_credentials','web.search','browser.live_tab')){
   $row=$clean.dependencies|Where-Object id -eq $id
@@ -64,9 +72,11 @@ try{$protected=[Security.Cryptography.ProtectedData]::Protect($plain,$null,[Secu
 $env:H2_NOTES_SETTINGS_DIRECTORY=$configured;$env:H2_BRAVE_SEARCH_API_KEY=$sentinel;$env:H2_BROWSER_CDP_ENDPOINT='http://127.0.0.1:9222'
 $configuredOut=Join-Path $env:RUNNER_TEMP 'ar082-configured-output'
 Remove-Item -LiteralPath $configuredOut -Recurse -Force -ErrorAction SilentlyContinue
-& (Join-Path $portable 'VERIFY-PORTABLE.ps1') -OutputDirectory $configuredOut
-if($LASTEXITCODE){throw 'Configured-profile portable verification failed'}
-$configuredText=Get-Content -LiteralPath (Join-Path $configuredOut 'portable-check.json') -Raw
+$configuredExit=Invoke-PortableVerify $portable $configuredOut
+$configuredReport=Join-Path $configuredOut 'portable-check.json'
+if(Test-Path -LiteralPath $configuredReport){Copy-Item -LiteralPath $configuredReport -Destination artifacts/ar082/configured-profile-portable-check.json -Force}
+if($configuredExit){throw 'Configured-profile portable verification failed'}
+$configuredText=Get-Content -LiteralPath $configuredReport -Raw
 if($configuredText.Contains($sentinel)){throw 'Portable preflight leaked synthetic credential'}
 $configuredJson=$configuredText|ConvertFrom-Json
 foreach($id in @('ollama.endpoint','ai.online_credentials','web.search','browser.live_tab')){
@@ -78,15 +88,15 @@ foreach($id in @('ollama.endpoint','ai.online_credentials','web.search','browser
 $badHelper=Join-Path $env:RUNNER_TEMP 'ar082-bad-helper';Remove-Item $badHelper -Recurse -Force -ErrorAction SilentlyContinue;Copy-Item $portable $badHelper -Recurse
 Remove-Item -LiteralPath (Join-Path $badHelper 'H2AgentLab.OfficeHost.exe') -Force
 $badHelperOut=Join-Path $env:RUNNER_TEMP 'ar082-bad-helper-out';Remove-Item $badHelperOut -Recurse -Force -ErrorAction SilentlyContinue
-& (Join-Path $badHelper 'VERIFY-PORTABLE.ps1') -OutputDirectory $badHelperOut 2>$null
-if($LASTEXITCODE -eq 0){throw 'Portable with missing OfficeHost unexpectedly passed'}
+$badHelperExit=Invoke-PortableVerify $badHelper $badHelperOut
+if($badHelperExit -eq 0){throw 'Portable with missing OfficeHost unexpectedly passed'}
 
 # Negative bootstrap: hostfxr missing must fail before app start with typed bootstrap code.
 $badRuntime=Join-Path $env:RUNNER_TEMP 'ar082-bad-runtime';Remove-Item $badRuntime -Recurse -Force -ErrorAction SilentlyContinue;Copy-Item $portable $badRuntime -Recurse
 Remove-Item -LiteralPath (Join-Path $badRuntime 'hostfxr.dll') -Force
 $badRuntimeOut=Join-Path $env:RUNNER_TEMP 'ar082-bad-runtime-out';Remove-Item $badRuntimeOut -Recurse -Force -ErrorAction SilentlyContinue
-& (Join-Path $badRuntime 'VERIFY-PORTABLE.ps1') -OutputDirectory $badRuntimeOut 2>$null
-if($LASTEXITCODE -eq 0){throw 'Portable with missing hostfxr unexpectedly passed'}
+$badRuntimeExit=Invoke-PortableVerify $badRuntime $badRuntimeOut
+if($badRuntimeExit -eq 0){throw 'Portable with missing hostfxr unexpectedly passed'}
 $boot=Get-Content -LiteralPath (Join-Path $badRuntimeOut 'portable-bootstrap-check.json') -Raw|ConvertFrom-Json
 if($boot.code -ne 'runtime_component_missing'){throw 'Missing runtime did not produce typed bootstrap diagnostic'}
 
@@ -112,8 +122,8 @@ $ax=$LASTEXITCODE;if($ax){$failed+='AGENT-SUITES'}
 
 $manifest=Get-Content -LiteralPath (Join-Path $portable 'portable-manifest.json') -Raw|ConvertFrom-Json
 Copy-Item -LiteralPath (Join-Path $portable 'portable-manifest.json') -Destination artifacts/ar082/portable-manifest.json
-Copy-Item -LiteralPath (Join-Path $cleanOut 'portable-check.json') -Destination artifacts/ar082/clean-profile-portable-check.json
-Copy-Item -LiteralPath (Join-Path $configuredOut 'portable-check.json') -Destination artifacts/ar082/configured-profile-portable-check.json
+if(-not (Test-Path -LiteralPath artifacts/ar082/clean-profile-portable-check.json)){Copy-Item -LiteralPath $cleanReport -Destination artifacts/ar082/clean-profile-portable-check.json}
+if(-not (Test-Path -LiteralPath artifacts/ar082/configured-profile-portable-check.json)){Copy-Item -LiteralPath $configuredReport -Destination artifacts/ar082/configured-profile-portable-check.json}
 @{task='AR-082';code_sha=$sha;focused_result=($fm.Value -join ';');focused_pass_lines=$fp;retained=$retained;full_result=($m.Value -join ';');full_pass_lines=$p;agent_suites_exit=$ax;package_content_sha256=$manifest.contentSha256;package_file_count=$manifest.fileCount;package_total_bytes=$manifest.totalBytes;unicode_space_path=$portable;E1='PASS';E2=if($full -and $ax -eq 0 -and $failed.Count -eq 0){'PASS'}else{'FAIL'};E3='PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY';E4='DEFERRED_BY_USER_AWAITING_ENVIRONMENT';E5='DEFERRED_BY_USER';physical_clean_machine_claim=$false;native_provider_claim=$false;two_pc_claim=$false;network_provider_probe=$false;clean_end=(!(git status --porcelain))}|ConvertTo-Json -Depth 10|Set-Content artifacts/ar082/validation.json
 if(!$full){$failed+='FULL'};if(git status --porcelain){$failed+='DIRTY-END'}
 if($failed.Count){throw ('AR-082 validation failed: '+($failed -join ', '))}
