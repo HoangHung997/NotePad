@@ -378,7 +378,14 @@ internal static class H2ProductAcceptanceScenarioTests
                 try
                 {
                     var compact = OpenCompact(app);
-                    compact.SelectedPermissionMode = H2AgentPermissionMode.AllowScopedChanges;
+                    // OfficeHost fixture has no real HWND/PID identity. Do not fabricate a captured
+                    // native window just to satisfy an E2 gate: drop the capture chip and exercise
+                    // the same production Global UI/adapter/runtime path with an explicit task-local
+                    // FullAccess grant plus the exact OfficeHost session selected by the scripted model.
+                    compact.RemoveContextScope(WorkAssistantContextScope.All);
+                    Check(compact.SelectedContextScope == WorkAssistantContextScope.None,
+                        "AR-024 Global fixture retained a fake captured-window authority.");
+                    compact.SelectedPermissionMode = H2AgentPermissionMode.FullAccess;
                     compact.PromptText = "Đọc A1:A2 của workbook đang mở rồi đổi A2 thành 84 và xác minh.";
                     ClickSend(compact);
                     WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
@@ -386,7 +393,8 @@ internal static class H2ProductAcceptanceScenarioTests
                     var summary = WaitTerminal(adapter, taskId, 20_000);
 
                     Check(summary.Status == H2AgentTaskStatus.Completed,
-                        "Global production Office slice did not complete: " + summary.Error);
+                        "Global production Office slice did not complete: status=" + summary.Status
+                        + "; error=" + summary.Error + "; final=" + summary.FinalText);
                     Check(summary.ProjectId is null, "Global Work Assistant unexpectedly became project-scoped.");
                     Check(summary.Evidence.Any(x => x.Kind.Contains("verification", StringComparison.OrdinalIgnoreCase)),
                         "Global Excel mutation has no production verification evidence.");
