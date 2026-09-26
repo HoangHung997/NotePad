@@ -287,7 +287,7 @@ internal static class H2AgentResumeRebaseTests
         public async IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest request,
             [System.Runtime.CompilerServices.EnumeratorCancellation]CancellationToken cancellationToken=default)
         {
-            await Release.Task.WaitAsync(cancellationToken);
+            await Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             yield return AgentTransportEvent.TextDeltaEvent("resumed");
             yield return AgentTransportEvent.Complete();
         }
@@ -309,7 +309,7 @@ internal static class H2AgentResumeRebaseTests
         public async IAsyncEnumerable<AgentTransportEvent> StartAsync(AgentTransportStartRequest request,
             [System.Runtime.CompilerServices.EnumeratorCancellation]CancellationToken cancellationToken=default)
         {
-            await Task.Yield();
+            await Task.Delay(1,cancellationToken).ConfigureAwait(false);
             throw new IOException("provider-A unavailable");
 #pragma warning disable CS0162
             yield break;
@@ -317,7 +317,7 @@ internal static class H2AgentResumeRebaseTests
         }
         public async IAsyncEnumerable<AgentTransportEvent> ContinueAsync(AgentTransportContinuationRequest request,
             [System.Runtime.CompilerServices.EnumeratorCancellation]CancellationToken cancellationToken=default)
-        {await Task.Yield();yield break;}
+        {await Task.Delay(1,cancellationToken).ConfigureAwait(false);yield break;}
         public void Cancel(){}
         public ValueTask DisposeAsync()=>ValueTask.CompletedTask;
     }
