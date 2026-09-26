@@ -116,7 +116,7 @@ internal static class H2AgentSteeringConcurrencyTests
             Task.WhenAll(holder,queued).GetAwaiter().GetResult();
             var result=queued.Result.Single();
             Check(rechecks==1&&queuedEffects==0&&queuedDispatches==0
-                && result.Outcome?.Error?.Code=="expired_permission"
+                && result.Outcome?.Error?.Code=="permission_denied"
                 && result.Outcome.Effect==ToolMutationEffect.None,
                 "Expired permission crossed the post-wait pre-dispatch boundary. "
                 + $"rechecks={rechecks}; effects={queuedEffects}; dispatches={queuedDispatches}; "
