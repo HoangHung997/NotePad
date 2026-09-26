@@ -393,7 +393,8 @@ internal static class H2ProductAcceptanceScenarioTests
                     Check(compact.SelectedContextScope == WorkAssistantContextScope.None,
                         "AR-024 Global fixture retained a fake captured-window authority.");
                     compact.SelectedPermissionMode = H2AgentPermissionMode.FullAccess;
-                    compact.PromptText = "Đọc A1:A2 của workbook đang mở rồi đổi A2 thành 84 và xác minh.";
+                    compact.PromptText = "Đọc A1:A2 trong \"" + before.FullName
+                        + "\" rồi đổi A2 thành 84 và xác minh.";
                     ClickSend(compact);
                     WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
                     var taskId = app.CurrentWorkAssistantTaskId!.Value;
