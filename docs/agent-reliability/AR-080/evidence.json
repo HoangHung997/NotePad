@@ -1,0 +1,97 @@
+{
+  "task": "AR-080",
+  "source_sha": "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "NOT_REQUIRED_FOR_THIS_GATE",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "e4_pass_claim": false,
+    "native_office_claim": false,
+    "live_model_claim": false,
+    "long_hours_claim": false
+  },
+  "corpus": {
+    "focused": "4/4",
+    "files": 12,
+    "repetitions_per_group": 3,
+    "groups": [
+      "RC-33 golden restart/reconcile/resume without duplicate deterministic side effects",
+      "changed requirement + exact compaction source recall",
+      "missing PDF cannot become Completed from model claim",
+      "UNSAVED-only exact live Word session + near-name control"
+    ],
+    "deterministic_duplicate_side_effect_claim": "0 in golden corpus only",
+    "deterministic_unintended_side_effect_claim": "0 in golden corpus only"
+  },
+  "tests": {
+    "retained": {
+      "AR-063": "5/5",
+      "AR-062": "6/6",
+      "AR-060": "6/6",
+      "AR-052": "8/8",
+      "AR-051": "37/37",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-024": "2/2",
+      "AR-033": "42/42"
+    },
+    "full_h2": "1352/1352",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "23/23 SUCCESS"
+  },
+  "runs": {
+    "ar080": {
+      "run_id": 36260548933,
+      "job_id": 108455390604,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36260548852,
+      "job_id": 108455418228,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10912588420,
+      "bytes": 440312,
+      "sha256": "57077ca0f09fa591aedb038bc42a2db17782e06ef749840a9fdc5c2e091f6244",
+      "expires_at_utc": "2026-10-10T18:19:14Z",
+      "zip_entries": 663,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10912351776,
+      "bytes": 110469834,
+      "sha256": "43a7e48528e70c2bcf13b96bdb6ecd8e77377db17dd154d833d71eb052512bb2",
+      "expires_at_utc": "2026-12-25T17:52:10Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "component_reality": {
+    "production_adapter": "real",
+    "journal_history": "real",
+    "compaction": "real",
+    "request_budget": "real",
+    "chat_completions_serializer": "real serializer with intercepted HTTP",
+    "word_mutation": "synthetic disposable DOCX crash fixture",
+    "unsaved_word": "synthetic Office client with exact captured identity",
+    "model": "scripted fixture",
+    "native_office": "NOT_RUN"
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "results_combined_across_providers": false
+  }
+}
