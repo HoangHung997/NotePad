@@ -548,9 +548,10 @@ public static class MbDesktopComputerUseAcceptanceTests
             var registry = NormalRuntimeToolRegistry.Create(tools);
             var verifiers = new List<IAgentRuntimeDomainVerifier>();
             registry = session.Configure(tools, registry, verifiers);
-            Check(registry.TryGet("excel.get_active_workbook", out var getWorkbook)
-                && registry.TryGet("excel.write_range", out var writeRange),
-                "Workspace AskBeforeChanges did not expose launched-window Office tools.");
+            Check(registry.TryGet("excel.get_active_workbook", out var getWorkbook),
+                "Workspace AskBeforeChanges did not expose launched-window Excel read tool.");
+            Check(registry.TryGet("excel.write_range", out var writeRange),
+                "Workspace AskBeforeChanges did not expose launched-window Excel write tool.");
 
             var launchedWindow = new DesktopWindowInfo(
                 "desktop-launched-excel",
