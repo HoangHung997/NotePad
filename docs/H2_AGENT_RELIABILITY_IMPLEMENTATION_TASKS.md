@@ -96,7 +96,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E4/native-provider PASS claim |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no live-search/browser PASS claim |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
-| AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | ACTIVE — exact-byte artifact receipts / independent DOCX-XLSX readback / safe publish |
+| AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no PDF-content/layout/native-recalc PASS claim |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER — final full-build external/native provider test; no E3 PASS claim |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
@@ -460,7 +460,7 @@ Dedicated AR-061 run `36208050660` / job `108308672263` **SUCCESS**: focused AR-
 
 **User decision — 2026-09-26:** native H2 E3/E4 is explicitly **DEFERRED_BY_USER** until the user downloads/tests the final full build. This removes AR-061 native acceptance from blocking the implementation sequence, but **does not convert E3/E4 to PASS and does not make AR-061 fully DONE**. Reopen AR-061 if that native test reports a launcher/activation regression.
 
-### [ ] AR-062 — Tạo/xuất tài liệu và publish có verifier
+### [~] AR-062 — Tạo/xuất tài liệu và publish có verifier
 
 **Sửa/reuse:** file/Python/OpenXML/native tools, artifact publishing và inspector. Không bắt tạo 20 tool mới nếu adapter có operation contracts đủ dùng.
 
@@ -469,6 +469,16 @@ Dedicated AR-061 run `36208050660` / job `108308672263` **SUCCESS**: focused AR-
 **Test E3/E4:** RC-10/11; tạo file mới, sửa file giữ phần cũ, thêm trang PDF, publish collision, interrupted publish, export nhiều output còn một output thiếu. Independent library reader và native test khi cần recalc/layout.
 
 **Acceptance:** artifact card mở đúng bytes/path; không “file tồn tại” thay verification toàn nội dung; không mở Office không cần thiết làm khóa input.
+
+**AR-062 implementation checkpoint — 2026-09-26:** exact validated code SHA `af0133a8728a9084c539bb4b777329daa246e76b`. The existing Python/AppContainer + ScriptWorkspace path now uses exact-byte artifact verification receipts before publication. DOCX artifacts are independently reopened with H2 document safety checks and the closed OpenXML Word structure reader; body/header/footer/table/section structure and extracted text are classified, but rendered layout is **not** certified. XLSX artifacts are independently reopened with H2 document safety checks and the closed workbook reader; stored cell values, formulas, styles/merges/sheet structure are classified, but formulas are **not recalculated** and rendered layout/charts are not certified. PDF publication records signature/size only; content/layout remains explicitly unverified.
+
+Publish is create-only for absent destinations and expected-hash guarded for overwrite. Existing destination bytes are backed up before replacement. Publication preserves the exact verified staged bytes and returns the verification evidence ID plus `requiresFurtherVerification`; changed staged bytes invalidate the old receipt. Multi-output runs cannot use verification of one output to publish another uninspected output. The runtime file verifier refuses to treat signature-only PDF publication as content/layout completion proof.
+
+Dedicated AR-062 run `36249334920` / job `108424301064` **SUCCESS**: focused AR-062 **6/6**, retained AR-060 **6/6**, AR-052 **8/8**, AR-042 **6/6**, AR-041 **6/6**, AR-033 **42/42**, AR-024 **2/2**, full H2 **1343/1343**, and all **75/75** required Agent suites PASS. Evidence artifact `10908538609`, 429,469 bytes, SHA256 `f2bb2b44f7eb47a0780507d817004ab1fc0432d4d9452d73ec00668d6782c97f`, was independently downloaded; ZIP integrity passed across **648** entries and `validation.json` reports E1=PASS, E2=PASS, E3/E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, pdf_content_claim=false, layout_claim=false and native_recalc_claim=false.
+
+Full Avalonia CI `36249335285` / job `108424319267` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **21/21** pull-request workflow identities on exact SHA completed SUCCESS, 0 failed. Final portable artifact `10908970510` is 110,448,458 bytes, SHA256 `ea52592229ce2aaae42d6c35a427721f852a74f650e9c21da6af5fbf3ef3728c`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** real E3/E4 with native Word/Excel/PDF rendering/recalculation and H2 UI + configured model is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user downloads/tests the final full build. This does not convert E3/E4 to PASS and does not make AR-062 fully DONE.
 
 ### [ ] AR-063 — CAD: phân định file đóng/live và triển khai phần công bố
 
@@ -602,63 +612,66 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-062_ARTIFACT_PUBLICATION_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-062",
-  "parked_task": "AR-060",
-  "implementation_status": "AR-062_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-062_IMPLEMENTED_E1_E2_PASS_E3_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-062",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E3_E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E3/E4 real configured search/fetch/browser through H2 UI/model deferred until user final-build test",
+  "required_evidence_level": "E3/E4 native document applications/rendering/recalculation and H2 UI + configured model deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "b550855946e2378767917e0c5611f20497a9f791",
+  "validated_code_sha": "af0133a8728a9084c539bb4b777329daa246e76b",
   "implementation_commits": [
-    "b550855946e2378767917e0c5611f20497a9f791 feat(AR-060): add real web search and browser backends"
+    "339e406370c1027fe84fb76dbd6b8eb7c80e35b7 feat(AR-062): verify staged documents before publish",
+    "af0133a8728a9084c539bb4b777329daa246e76b fix(AR-062): import OpenXML document type enums"
   ],
-  "last_validation_result": "AR060 6/6; retained AR052 8/8, AR042 6/6, AR041 6/6, AR024 2/2; full H2 1337/1337; 75/75 required Agent suites PASS. AR060 run 36245687613 SUCCESS; Avalonia CI 36245687565 SUCCESS; all 20/20 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at b5508559; AR060 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T13:57:16Z",
-  "user_decision": "User requires complete build before personal testing. AR-060 live search/browser E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR062 6/6; retained AR060 6/6, AR052 8/8, AR042 6/6, AR041 6/6, AR033 42/42, AR024 2/2; full H2 1343/1343; 75/75 required Agent suites PASS. Dedicated run 36249334920 SUCCESS; Avalonia CI 36249335285 SUCCESS; all 21/21 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at af0133a8; AR062 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T14:54:29Z",
+  "user_decision": "User requires a complete build before personal testing. AR-062 native/model E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Reconciled concurrent worker state; AR-042 and AR-052 were already completed and were not overwritten.",
-    "Validated configurable Brave Search production backend with preserved source provenance and fail-closed missing configuration.",
-    "Validated guarded HTTP fetch with redirect/public-network/body-size policy before context ingestion.",
-    "Validated optional local-CDP browser with exact tab identity and read-vs-action separation; endpoint configuration is loopback-only.",
-    "Confirmed prompt-injection web text remains untrusted data and legacy URL-only browser fallback is not advertised as real browser control.",
-    "Validated exact SHA b5508559 with 20/20 workflows SUCCESS and independently verified portable/evidence ZIP artifacts."
+    "Reconciled concurrent worker state and continued the repository-active AR-062 task instead of overwriting completed AR-042/052/060 work.",
+    "Verified exact staged artifact bytes before publish using durable verification receipts keyed to run/path/SHA.",
+    "DOCX independent readback classifies text and OpenXML structure without claiming rendered layout.",
+    "XLSX independent readback classifies stored values/formulas/structure without claiming native recalculation or visual layout.",
+    "PDF remains signature/size-only unless a separate content/render verifier is run; publication cannot manufacture content/layout proof.",
+    "Create-only and expected-hash overwrite semantics preserve exact bytes and backup prior destination content.",
+    "Validated multi-output isolation and invalidation when staged bytes change.",
+    "Validated exact SHA af0133a8 with 21/21 workflows SUCCESS and independently verified portable/evidence ZIP artifacts."
   ],
   "remaining_in_parked_task": [
-    "Run E3/E4 later with a user-authorized Brave Search API key and a dedicated authorized Chrome/Edge CDP session.",
-    "Exercise real current search, explicit URL fetch, 429/auth/timeout/redirect behavior, browser tab inspect/query/navigation/click/type on disposable sample pages.",
-    "Do not submit real forms, upload private data, use logged-in personal browser profiles or test paid/external side effects without separate permission.",
-    "Confirm live source citations/provenance and prompt-injection resistance through H2 UI with configured model."
+    "Run E3/E4 later with disposable documents through H2 UI + configured model and native Word/Excel/PDF viewer paths.",
+    "For XLSX, test native recalculation/value refresh where required and distinguish stored formula/value classification from recalculated correctness.",
+    "For DOCX/PDF, test rendered layout/page count/visual fidelity with a native or configured render verifier before claiming layout.",
+    "Exercise interrupted publication/collision and user-visible artifact cards in the real H2 UI without using personal documents."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-060/implementation.md",
-    "docs/agent-reliability/AR-060/evidence.json",
-    "docs/agent-reliability/AR-060/native-acceptance.md",
-    "GitHub artifact 10907149185 AR060-E1-E2-Evidence",
-    "GitHub artifact 10907333886 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-062/implementation.md",
+    "docs/agent-reliability/AR-062/evidence.json",
+    "docs/agent-reliability/AR-062/native-acceptance.md",
+    "GitHub artifact 10908538609 AR062-E1-E2-Evidence",
+    "GitHub artifact 10908970510 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10907333886,
-    "bytes": 110442910,
-    "sha256": "ad03e82be0a72b91a8d9b57ef5f03db79123b8dcbae4795f42182a0b23dd4ba6",
-    "expires_at_utc": "2026-12-25T13:35:40Z",
-    "source_sha": "b550855946e2378767917e0c5611f20497a9f791",
+    "artifact_id": 10908970510,
+    "bytes": 110448458,
+    "sha256": "ea52592229ce2aaae42d6c35a427721f852a74f650e9c21da6af5fbf3ef3728c",
+    "expires_at_utc": "2026-12-25T14:41:01Z",
+    "source_sha": "af0133a8728a9084c539bb4b777329daa246e76b",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "live_search_claim": false,
-    "live_browser_claim": false,
-    "external_form_submission_claim": false,
+    "pdf_content_claim": false,
+    "layout_claim": false,
+    "native_recalc_claim": false,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-060 unless live final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-060 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-062 unless native final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-062 turn."
 }
 ```
 
