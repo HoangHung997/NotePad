@@ -222,6 +222,26 @@ public static class V2OfficeHostTests
                     [new ExcelCellPatch("A1", Value: "DENIED")])));
         });
 
+        await Test("0805B AR-022 Excel batch preflight prevents late invalid writes and returns operation evidence", async () =>
+        {
+            using var client=new OfficeHostClient(hostExecutable,fixtureMode:true);
+            var session=(await client.DiscoverExcelAsync()).ActiveSessionId!;var before=await client.SnapshotExcelAsync(session);
+            OfficeHostClientException? rejected=null;
+            try{_=await client.PatchExcelAsync(new ExcelPatchRequest(session,before.StateToken,true,"Data",
+                [new("A1",Value:"MUST-NOT-WRITE"),new("C99",Value:"INVALID-LATE")]){ContentToken=ExcelPatchMutationRules.ContentToken(before)});}
+            catch(OfficeHostClientException ex){rejected=ex;}
+            var unchanged=await client.SnapshotExcelAsync(session);
+            Check(rejected?.Code=="cell_not_found"&&rejected.NoEffect,"Late invalid cell was not whole-batch no-effect preflight.");
+            Check(unchanged.Sheets.Single().Cells.Single(x=>x.Address=="A1").Value==before.Sheets.Single().Cells.Single(x=>x.Address=="A1").Value,
+                "Prefix cell was written before preflight completed.");
+            var applied=await client.PatchExcelAsync(new ExcelPatchRequest(session,unchanged.StateToken,true,"Data",
+                [new("A1",Value:"BATCH-A"),new("A2",Value:"BATCH-B")]){ContentToken=ExcelPatchMutationRules.ContentToken(unchanged),
+                LogicalOperationId="ar022-op",BatchId="ar022-batch",ChunkId="ar022-chunk"});
+            Check(applied.MutationStatus==ExcelPatchMutationStatus.Applied&&applied.MutationEffect==ExcelPatchMutationEffect.Applied
+                &&applied.ReadbackComplete&&applied.AppliedCells.SequenceEqual(["A1","A2"])&&applied.UnknownCells.Count==0
+                &&applied.LogicalOperationId=="ar022-op"&&applied.BatchId=="ar022-batch","Applied batch evidence is incomplete.");
+        });
+
         await Test("0806 Excel recalc and save-copy preserve original identity and never overwrite", async () =>
         {
             using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);

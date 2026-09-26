@@ -1193,7 +1193,7 @@ public sealed class AgentRuntime : IAsyncDisposable
     private static bool SameMutationWithFreshToken(JsonElement failed, JsonElement retry)
     {
         if (failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
-        static bool Token(string name) => name is "expectedHash" or "expected_hash" or "state_token";
+        static bool Token(string name) => name is "expectedHash" or "expected_hash" or "state_token" or "content_token";
         var before = failed.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         var after = retry.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         return before.Count > 0 && before.Count == after.Count && before.All(p => after.TryGetValue(p.Key, out var value) && JsonElement.DeepEquals(p.Value, value));

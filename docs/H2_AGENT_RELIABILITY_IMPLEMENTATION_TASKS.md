@@ -81,7 +81,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER |
-| AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | NOT_STARTED |
+| AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | ACTIVE — whole-batch preflight / partial-unknown readback |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
@@ -532,11 +532,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
   "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-061_IMPLEMENTATION_SEQUENCE_COMPLETE_E2_PASS_E3_E4_DEFERRED_BY_USER_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-022_EXCEL_BATCH_MUTATION_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-022",
   "parked_task": "AR-061",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_E4_DEFERRED_BY_USER",
+  "implementation_status": "AR-022_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3/E4 native H2 acceptance deferred until user tests final build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",

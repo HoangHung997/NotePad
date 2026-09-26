@@ -61,6 +61,7 @@ public sealed record ExcelLiveSnapshot(
     string StateToken)
 {
     public OfficeNativeIdentity? NativeIdentity { get; init; }
+    public string? ContentToken { get; init; }
 }
 
 
@@ -76,22 +77,23 @@ public sealed record ExcelCellPatch(
     long? FillColor = null,
     string? NumberFormat = null);
 
-public sealed record ExcelPatchRequest(
-    string SessionId,
-    string StateToken,
-    bool PermissionGranted,
-    string SheetName,
-    IReadOnlyList<ExcelCellPatch> Cells);
-
-public sealed record ExcelPatchResult(
-    ExcelLiveSnapshot Before,
-    ExcelLiveSnapshot After,
-    IReadOnlyList<string> ChangedCells);
-
-public sealed record ExcelRecalculateRequest(
-    string SessionId,
-    string StateToken,
-    bool PermissionGranted);
+public sealed record ExcelPatchRequest(string SessionId,string StateToken,bool PermissionGranted,string SheetName,IReadOnlyList<ExcelCellPatch> Cells)
+{
+    public string? ContentToken { get; init; } public string? LogicalOperationId { get; init; } public string? BatchId { get; init; }
+    public string? ChunkId { get; init; } public int ChunkIndex { get; init; } public int ChunkCount { get; init; }=1;
+}
+public sealed record ExcelPatchResult(ExcelLiveSnapshot Before,ExcelLiveSnapshot After,IReadOnlyList<string> ChangedCells)
+{
+    public string LogicalOperationId { get; init; }=""; public string BatchId { get; init; }=""; public string ChunkId { get; init; }="";
+    public int ChunkIndex { get; init; } public int ChunkCount { get; init; }=1;
+    public ExcelPatchMutationStatus MutationStatus { get; init; }=ExcelPatchMutationStatus.Applied;
+    public ExcelPatchMutationEffect MutationEffect { get; init; }=ExcelPatchMutationEffect.Applied;
+    public bool ReadbackComplete { get; init; }=true; public string? ErrorCode { get; init; } public string? ErrorMessage { get; init; }
+    public IReadOnlyList<string> AppliedCells { get; init; }=[]; public IReadOnlyList<string> UnappliedCells { get; init; }=[];
+    public IReadOnlyList<string> UnknownCells { get; init; }=[]; public string? ContentTokenBefore { get; init; } public string? ContentTokenAfter { get; init; }
+}
+public sealed record ExcelRecalculateRequest(string SessionId,string StateToken,bool PermissionGranted)
+{ public string? ContentToken { get; init; } public string? SheetName { get; init; } public string? Range { get; init; } }
 
 public sealed record OfficeSaveCopyRequest(
     string SessionId,
@@ -237,6 +239,6 @@ public sealed record OfficePingResult(
 
 public static class OfficeProtocolConstants
 {
-    public const string Version = "1.1";
+    public const string Version = "1.2";
     public const int MaxMessageBytes = 4 * 1024 * 1024;
 }

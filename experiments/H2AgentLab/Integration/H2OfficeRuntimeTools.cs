@@ -78,8 +78,10 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             var properties = new Dictionary<string, object>();
             var required = new List<string>();
             if (!discovery) { properties["session_id"] = new { type = "string", description = "Exact SessionId from discovery." }; required.Add("session_id"); }
-            if (capability.Access == AgentToolAccess.Mutating || name is "word.get_spelling_errors" or "word.get_grammar_candidates" or "word.extract_legal_citations")
+            var excelContentMutation=name is "excel.write_range" or "excel.set_formula" or "excel.apply_format" or "excel.recalculate";
+            if (capability.Access == AgentToolAccess.Mutating && !excelContentMutation || name is "word.get_spelling_errors" or "word.get_grammar_candidates" or "word.extract_legal_citations")
             { properties["state_token"] = new { type = "string", description = "Latest observed StateToken. Stale values are rejected." }; required.Add("state_token"); }
+            if(excelContentMutation){properties["content_token"]=new{type="string",description="Latest Excel ContentToken; stable across selection/focus-only changes."};required.Add("content_token");}
             if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles"
                 or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
             {
@@ -104,6 +106,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     fillColor = new { type = "integer" }, numberFormat = new { type = "string" } }, required = new[] { "address" }, additionalProperties = false } };
                 required.AddRange(["sheet_name", "cells"]);
             }
+            if(name=="excel.recalculate"){properties["sheet_name"]=new{type="string",description="Optional exact worksheet scope."};properties["range"]=new{type="string",description="Optional A1 range; requires sheet_name."};}
             if (name is "word.replace_range" or "word.apply_format")
             {
                 properties["paragraphs"] = new { type = "array", minItems = 1, maxItems = 100, items = new { type = "object", properties = new {
@@ -124,12 +127,17 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             var description = capability.Description + " Discovery lists metadata only, with no usable state token. Get the host-bound document or an explicit session snapshot before any mutation. A model-supplied session cannot resolve ambiguous targets or override captured active/selection intent. Word replacement/format uses paragraph indexes; Excel patches use observed cell addresses.";
             if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles" or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
                 description += " Read only the requested range page. Continue with both nextCursor and contentVersion. If stale_content is returned, restart from page 1; never combine pages from different content versions. Selection/focus changes alone do not invalidate contentVersion.";
+            if(name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")description+=" The host preflights the whole batch before any write and reports Applied, PartiallyApplied or OutcomeUnknown with exact cell evidence.";
+            if(name=="excel.recalculate")description+=" Recalculation is workbook-scoped by default or can be narrowed to exact sheet/range; returned values are read back.";
             if (name is "word.replace_range" or "word.insert_text")
                 description += " Newlines in text create real Word paragraphs and inherit the original paragraph style/format. All paragraph indexes refer to the BEFORE snapshot, even when earlier replacements add paragraphs. To rewrite a CV, use newline-separated text on existing paragraphs, never invent new paragraph indexes. Mixed character formatting requires a separate explicit formatting operation. Read back the new snapshot before further edits.";
+            IAgentToolExecutor executor=name is "excel.write_range" or "excel.set_formula" or "excel.apply_format"
+                ?new DelegatingOutcomeToolExecutor("h2-office-host",ExecuteExcelPatchOutcomeAsync)
+                :new DelegatingToolExecutor("h2-office-host",ExecuteAsync);
             registry.Register(new ToolDescriptor(name, new(capability.Namespace, "Structured live OfficeHost operations."), description,
                 capability.Risk, capability.Access, false, "v1", JsonSerializer.SerializeToElement(new { type = "function", function = new { name, description,
                     parameters = new { type = "object", properties, required, additionalProperties = false } } }),
-                new DelegatingToolExecutor("h2-office-host", ExecuteAsync), resourceScope: new(capability.ResourceScope, "observed-session"),
+                executor, resourceScope: new(capability.ResourceScope, "observed-session"),
                 serializationKey: "office-host", canProvideVerificationEvidence: true,
                 preference: new("active-content", ToolInteractionFidelity.Structured),
                 readiness: new(_clientFactory is not null ? ToolReadinessState.Ready : !OperatingSystem.IsWindows() ? ToolReadinessState.Unsupported
@@ -141,12 +149,10 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
 
     private static ToolExecutionOutput? CountPreflight(ToolCall call)
     {
-        if (call.Name is not ("excel.write_range" or "excel.set_formula" or "excel.apply_format")) return null;
-        var count = call.Arguments.TryGetProperty("cells", out var batch) && batch.ValueKind == JsonValueKind.Array ? batch.GetArrayLength() : -1;
-        return ExcelPatchLimits.ValidationError(count) is { } problem
-            ? ToolOutcomeBridge.Failure(call, null, ExcelPatchLimits.ErrorCode, ToolErrorPhase.Preflight, ToolMutationEffect.None,
-                JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode, message = problem, mutationApplied = false }))
-            : null;
+        if(call.Name is not("excel.write_range" or "excel.set_formula" or "excel.apply_format"))return null;
+        try{var cells=call.Arguments.TryGetProperty("cells",out var batch)&&batch.ValueKind==JsonValueKind.Array?batch.Deserialize<ExcelCellPatch[]>(Json):null;_=ExcelPatchMutationRules.ValidateAndNormalize(cells);return null;}
+        catch(Exception ex) when(ex is ArgumentException or JsonException){return ToolOutcomeBridge.Failure(call,null,ExcelPatchLimits.ErrorCode,ToolErrorPhase.Preflight,ToolMutationEffect.None,
+            JsonSerializer.Serialize(new{ok=false,error=ExcelPatchLimits.ErrorCode,message=ex.Message,mutationApplied=false}));}
     }
 
     private async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken ct)
@@ -155,11 +161,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         // Count preflight precedes discovery/snapshot/IPC and any native write.
         if (call.Name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
         {
-            var count = call.Arguments.TryGetProperty("cells", out var batch)
-                && batch.ValueKind == JsonValueKind.Array ? batch.GetArrayLength() : -1;
-            if (ExcelPatchLimits.ValidationError(count) is { } problem)
-                return JsonSerializer.Serialize(new { ok = false, error = ExcelPatchLimits.ErrorCode,
-                    message = problem, mutationApplied = false });
+            try{var cells=call.Arguments.TryGetProperty("cells",out var batch)&&batch.ValueKind==JsonValueKind.Array?batch.Deserialize<ExcelCellPatch[]>(Json):null;_=ExcelPatchMutationRules.ValidateAndNormalize(cells);}
+            catch(Exception ex) when(ex is ArgumentException or JsonException){return JsonSerializer.Serialize(new{ok=false,error=ExcelPatchLimits.ErrorCode,message=ex.Message,mutationApplied=false});}
         }
         var application = call.Name.StartsWith("excel.", StringComparison.Ordinal) ? H2ApplicationKind.Excel : H2ApplicationKind.Word;
         await _gate.WaitAsync(ct).ConfigureAwait(false);
@@ -167,8 +170,9 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         {
             object result;
             var name = call.Name;
-            var session = H2ProductionToolSession.Arg(call, "session_id") ?? "";
-            var token = H2ProductionToolSession.Arg(call, "state_token") ?? "";
+            var session=H2ProductionToolSession.Arg(call,"session_id")??"";
+            var token=H2ProductionToolSession.Arg(call,"state_token")??"";
+            var contentToken=H2ProductionToolSession.Arg(call,"content_token")??"";
             var listing = name is "excel.list_workbooks" or "word.list_documents";
             var observed = await DiscoverAsync(application, ct).ConfigureAwait(false);
             H2AgentTargetResolution? target = null;
@@ -282,45 +286,60 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
                     }
                 }
-                else if (name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
+                else if(name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
                 {
                     RequireAuthorization();
-                    var cells = call.Arguments.GetProperty("cells").Deserialize<ExcelCellPatch[]>(Json) ?? [];
-                    if (ExcelPatchLimits.ValidationError(cells.Length) is { } problem)
-                        throw new ArgumentException(problem);
-                    var sheetName = H2ProductionToolSession.Arg(call, "sheet_name") ?? "";
-                    var beforeWrite = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, beforeWrite.SessionId, beforeWrite.FullName, beforeWrite.ActiveSheet + "!" + beforeWrite.SelectionAddress, false,
-                        _intent == H2AgentTargetIntent.CapturedSelection, native: beforeWrite.NativeIdentity);
-                    if (beforeWrite.StateToken != token) throw new ToolPreflightException("stale_resource");
-                    var patch = await Client.PatchExcelAsync(new(session, token, true, sheetName, cells), ct).ConfigureAwait(false);
-                    var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, patch.Before.SessionId, patch.Before.FullName, null, true, native: patch.Before.NativeIdentity);
-                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true, native: after.NativeIdentity);
-                    await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
-                    var sheet = after.Sheets.Single(item => item.Name == sheetName);
-                    var targets = cells.Select(cell => new LiveExcelExpectedCell(sheetName, cell.Address,
-                        OfficeMutationReadback.ExpectedExcelCell(
-                            patch.Before.Sheets.Single(s => s.Name == sheetName).Cells.Single(c => c.Address == cell.Address),
-                            cell, sheet.Cells.Single(item => item.Address == cell.Address)))).ToArray();
-                    var expectedMatch = cells.All(cell => Matches(cell, sheet.Cells.Single(item => item.Address == cell.Address)));
-                    var preserved = LiveExcelVerifier.Verify(patch.Before, after, new(targets));
-                    Record(call, expectedMatch && preserved.Passed, "office-state:" + after.StateToken);
-                    result = patch with { After = after };
+                    var cells=ExcelPatchMutationRules.ValidateAndNormalize(call.Arguments.GetProperty("cells").Deserialize<ExcelCellPatch[]>(Json));
+                    var sheetName=H2ProductionToolSession.Arg(call,"sheet_name")??"";
+                    var beforeWrite=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
+                    ValidateSnapshot(target,beforeWrite.SessionId,beforeWrite.FullName,beforeWrite.ActiveSheet+"!"+beforeWrite.SelectionAddress,false,
+                        _intent==H2AgentTargetIntent.CapturedSelection,native:beforeWrite.NativeIdentity);
+                    if(ExcelPatchMutationRules.ContentToken(beforeWrite)!=contentToken)throw new ToolPreflightException("stale_resource");
+                    var invocation=ToolInvocation.Bind(call);
+                    var request=new ExcelPatchRequest(session,beforeWrite.StateToken,true,sheetName,cells){
+                        ContentToken=contentToken,LogicalOperationId=invocation.LogicalOperationId,
+                        BatchId="batch-"+invocation.LogicalOperationId,ChunkId="chunk-"+invocation.InvocationId.ToString("N"),ChunkIndex=0,ChunkCount=1};
+                    var patch=await Client.PatchExcelAsync(request,ct).ConfigureAwait(false);
+                    ExcelPatchResult classified;
+                    try
+                    {
+                        var after=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
+                        ValidateSnapshot(target,patch.Before.SessionId,patch.Before.FullName,null,true,native:patch.Before.NativeIdentity);
+                        ValidateSnapshot(target,after.SessionId,after.FullName,null,true,native:after.NativeIdentity);
+                        await RevalidateAsync(application,target,ct,true).ConfigureAwait(false);
+                        classified=ExcelPatchMutationRules.Classify(request,patch.Before,after,cells,patch.ErrorCode,patch.ErrorMessage);
+                        var applied=classified.AppliedCells.ToHashSet(StringComparer.Ordinal);
+                        var sheet=after.Sheets.Single(item=>item.Name==sheetName);
+                        var targets=cells.Where(cell=>applied.Contains(cell.Address)).Select(cell=>new LiveExcelExpectedCell(sheetName,cell.Address,
+                            OfficeMutationReadback.ExpectedExcelCell(patch.Before.Sheets.Single(s=>s.Name==sheetName).Cells.Single(c=>c.Address==cell.Address),
+                                cell,sheet.Cells.Single(item=>item.Address==cell.Address)))).ToArray();
+                        var preserved=LiveExcelVerifier.Verify(patch.Before,after,new(targets));
+                        var full=classified.MutationStatus==ExcelPatchMutationStatus.Applied&&classified.AppliedCells.Count==cells.Count;
+                        Record(call,full&&preserved.Passed,"office-state:"+after.StateToken);
+                    }
+                    catch(Exception ex) when(ex is IOException or TimeoutException or InvalidOperationException)
+                    {
+                        classified=ExcelPatchMutationRules.Classify(request,patch.Before,null,cells,"outcome_unknown",
+                            "Independent Excel readback/revalidation was unavailable after dispatch.");
+                        Record(call,false,"office-reconcile-required:"+invocation.InvocationId.ToString("N"));
+                    }
+                    result=classified;
                 }
-                else if (name == "excel.recalculate")
+                else if(name=="excel.recalculate")
                 {
-                    RequireAuthorization();
-                    var before = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, before.SessionId, before.FullName, before.ActiveSheet + "!" + before.SelectionAddress, false, native: before.NativeIdentity);
-                    var calculated = await Client.RecalculateExcelAsync(new(session, token, true), ct).ConfigureAwait(false);
-                    var after = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
-                    ValidateSnapshot(target, after.SessionId, after.FullName, null, true, native: after.NativeIdentity);
-                    await RevalidateAsync(application, target, ct, true).ConfigureAwait(false);
-                    var preserve = before.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula)))
-                        .SequenceEqual(after.Sheets.SelectMany(s => s.Cells.Select(c => (s.Name, c.Address, c.Formula))));
-                    Record(call, preserve && calculated.StateToken == after.StateToken, "office-state:" + after.StateToken);
-                    result = after;
+                    RequireAuthorization();var before=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
+                    ValidateSnapshot(target,before.SessionId,before.FullName,before.ActiveSheet+"!"+before.SelectionAddress,false,native:before.NativeIdentity);
+                    if(ExcelPatchMutationRules.ContentToken(before)!=contentToken)throw new ToolPreflightException("stale_resource");
+                    var req=new ExcelRecalculateRequest(session,before.StateToken,true){ContentToken=contentToken,
+                        SheetName=H2ProductionToolSession.Arg(call,"sheet_name"),Range=H2ProductionToolSession.Arg(call,"range")};
+                    var calculated=await Client.RecalculateExcelAsync(req,ct).ConfigureAwait(false);
+                    var after=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
+                    ValidateSnapshot(target,after.SessionId,after.FullName,null,true,native:after.NativeIdentity);
+                    await RevalidateAsync(application,target,ct,true).ConfigureAwait(false);
+                    var preserve=before.Sheets.SelectMany(s=>s.Cells.Select(c=>(s.Name,c.Address,c.Formula)))
+                        .SequenceEqual(after.Sheets.SelectMany(s=>s.Cells.Select(c=>(s.Name,c.Address,c.Formula))));
+                    Record(call,preserve&&ExcelPatchMutationRules.ContentToken(calculated)==ExcelPatchMutationRules.ContentToken(after),"office-state:"+after.StateToken);
+                    result=after;
                 }
                 else result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
             }
@@ -394,6 +413,30 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         }
         catch { _reports.TryRemove(call.Id, out _); _observedLiveSessions.TryRemove(application, out _); throw; }
         finally { _gate.Release(); }
+    }
+
+    private async ValueTask<ToolExecutionOutput> ExecuteExcelPatchOutcomeAsync(ToolCall call,CancellationToken ct)
+    {
+        call=call with{Invocation=ToolInvocation.Bind(call)};if(CountPreflight(call) is{} rejected)return rejected;
+        string payload;try{payload=await ExecuteAsync(call,ct).ConfigureAwait(false);}
+        catch(OfficeHostClientException ex) when(ex.NoEffect){return ToolOutcomeBridge.Failure(call,null,ex.Code,ToolErrorPhase.Preflight,ToolMutationEffect.None);}
+        ExcelPatchResult result;
+        try{result=JsonSerializer.Deserialize<ExcelPatchResult>(payload,Json)??throw new JsonException();}
+        catch(JsonException)
+        {
+            try{using var doc=JsonDocument.Parse(payload);var root=doc.RootElement;if(root.TryGetProperty("ok",out var ok)&&ok.ValueKind==JsonValueKind.False){
+                var code=root.TryGetProperty("error",out var e)&&e.ValueKind==JsonValueKind.String?e.GetString()??"invalid_arguments":"invalid_arguments";
+                return ToolOutcomeBridge.Failure(call,null,code,ToolErrorPhase.Preflight,ToolMutationEffect.None,payload);}}catch(JsonException){}
+            return ToolOutcomeBridge.Failure(call,null,"invalid_result",ToolErrorPhase.Execution,ToolMutationEffect.Unknown,payload);
+        }
+        if(!string.IsNullOrWhiteSpace(result.LogicalOperationId)&&result.LogicalOperationId!=call.Invocation!.LogicalOperationId)
+            return ToolOutcomeBridge.Failure(call,null,"invalid_result",ToolErrorPhase.Execution,ToolMutationEffect.Unknown,payload);
+        var resource=new ToolOutcomeResource("excel-session:"+result.After.SessionId,result.ContentTokenAfter??result.ContentTokenBefore);
+        if(result.MutationStatus==ExcelPatchMutationStatus.Applied)return new(payload,new ToolOutcome(call.Invocation!,ToolOutcomeStatus.Succeeded,ToolMutationEffect.Applied,
+            new ToolCompleteness(true),new ToolOutcomeVerification(ToolVerificationStatus.NotRun,[]),Resource:resource));
+        var effect=result.MutationEffect switch{ExcelPatchMutationEffect.PartiallyApplied=>ToolMutationEffect.PartiallyApplied,ExcelPatchMutationEffect.Unknown=>ToolMutationEffect.Unknown,_=>ToolMutationEffect.None};
+        var code=result.MutationStatus switch{ExcelPatchMutationStatus.PartiallyApplied=>"partially_applied",ExcelPatchMutationStatus.OutcomeUnknown=>"outcome_unknown",_=>result.ErrorCode??"tool_failed"};
+        var failed=ToolOutcomeBridge.Failure(call,null,code,ToolErrorPhase.Execution,effect,payload);return failed with{Outcome=failed.Outcome with{Resource=resource}};
     }
 
     private sealed record DiscoveryObservation(object Discovery, IReadOnlyList<H2AgentResourceBinding> Resources);

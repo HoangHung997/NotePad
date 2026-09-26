@@ -297,85 +297,35 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
 
     public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var countError = ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1);
-        if (request.Cells is null || countError is not null)
-            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, countError ?? "Excel patch cells are required.");
-        var bound = _catalog.Require("excel", request.SessionId);
-        dynamic app = bound.App; dynamic workbook = bound.Document;
-        try
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        IReadOnlyList<ExcelCellPatch> cells;try{cells=ExcelPatchMutationRules.ValidateAndNormalize(request.Cells);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}
+        var bound=_catalog.Require("excel",request.SessionId);dynamic workbook=bound.Document;ExcelLiveSnapshot before;
+        try{before=SnapshotExcelInternal(bound,beforeMutation:true);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);}
+        catch(OfficeHostFaultException ex)when(!ex.NoEffect){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}
+        catch(COMException){throw new OfficeHostFaultException("application_busy","Excel could not be inspected before the batch write.",true);}
+        dynamic? sheet=null;try
         {
-            var before = SnapshotExcelInternal(bound, beforeMutation: true);
-            OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-
-            dynamic? sheet = null;
-            try
-            {
-                sheet = workbook.Worksheets[request.SheetName];
-            }
-            catch
-            {
-                throw new OfficeHostFaultException("sheet_not_found", $"Excel sheet '{request.SheetName}' is not available.");
-            }
-
-            try
-            {
-                var changed = new List<string>();
-                foreach (var patch in request.Cells)
-                {
-                    var address = ValidateSingleCellAddress(patch.Address);
-                    dynamic cell = sheet.Range[address];
-                    try
-                    {
-                        if (patch.ClearValue)
-                        {
-                            cell.ClearContents();
-                        }
-                        if (patch.Value is not null)
-                        {
-                            cell.Value2 = patch.Value;
-                        }
-                        if (patch.Formula is not null)
-                        {
-                            cell.Formula = patch.Formula;
-                        }
-                        if (patch.Bold is bool bold) cell.Font.Bold = bold;
-                        if (patch.Italic is bool italic) cell.Font.Italic = italic;
-                        if (patch.FillColor is long fill) cell.Interior.Color = fill;
-                        if (patch.NumberFormat is not null) cell.NumberFormat = patch.NumberFormat;
-                        changed.Add(address);
-                    }
-                    finally { Release(cell); }
-                }
-
-                BumpExcelRevision(request.SessionId);
-                var after = SnapshotExcelInternal(bound);
-                return new ExcelPatchResult(
-                    before,
-                    after,
-                    changed.Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray());
-            }
-            finally { Release(sheet); }
-        }
-        finally { /* Native references remain owned by the bounded STA catalog. */ }
+            try{sheet=workbook.Worksheets[request.SheetName];}catch{throw new OfficeHostFaultException("sheet_not_found",$"Excel sheet '{request.SheetName}' is not available.",true);}
+            PreflightExcelPatch(sheet,cells);var completed=0;Exception? failure=null;
+            foreach(var patch in cells){dynamic? cell=null;try{cell=sheet.Range[patch.Address];ApplyExcelPatch(cell,patch);completed++;}catch(Exception ex){failure=ex;break;}finally{Release(cell);}}
+            if(completed>0)BumpExcelRevision(request.SessionId);ExcelLiveSnapshot? after=null;try{after=SnapshotExcelInternal(bound);}catch{}
+            if(after is null)return ExcelPatchMutationRules.Classify(request,before,null,cells,"outcome_unknown","Excel write may have occurred but native readback was unavailable.");
+            var code=failure switch{OfficeHostFaultException known=>known.Code,COMException busy when busy.HResult is unchecked((int)0x80010001) or unchecked((int)0x8001010A)=>"application_busy",null=>null,_=>"excel_patch_failed"};
+            return ExcelPatchMutationRules.Classify(request,before,after,cells,code,failure is null?null:"Excel stopped before the whole batch completed; readback classified every requested cell.");
+        }finally{Release(sheet);}
     }
 
     public ExcelLiveSnapshot RecalculateExcel(ExcelRecalculateRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var bound = _catalog.Require("excel", request.SessionId);
-        dynamic app = bound.App; dynamic workbook = bound.Document;
-        try
-        {
-            var before = SnapshotExcelInternal(bound, beforeMutation: true);
-            OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-            app.Calculate();
-            BumpExcelRevision(request.SessionId);
-            return SnapshotExcelInternal(bound);
-        }
-        finally { /* Native references remain owned by the bounded STA catalog. */ }
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        var bound=_catalog.Require("excel",request.SessionId);dynamic workbook=bound.Document;dynamic? sheet=null;dynamic? range=null;
+        try{var before=SnapshotExcelInternal(bound,beforeMutation:true);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);
+            if(!string.IsNullOrWhiteSpace(request.Range)&&string.IsNullOrWhiteSpace(request.SheetName))throw new OfficeHostFaultException("invalid_request","Scoped Excel recalculation requires sheet name.",true);
+            if(!string.IsNullOrWhiteSpace(request.SheetName)){try{sheet=workbook.Worksheets[request.SheetName];}catch{throw new OfficeHostFaultException("sheet_not_found",$"Excel sheet '{request.SheetName}' is not available.",true);}
+                if(!string.IsNullOrWhiteSpace(request.Range)){ExcelRangeBounds bounds;try{bounds=ExcelRangeReadRules.ParseRange(request.Range);}catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}
+                    range=sheet.Range[bounds.Address];range.Calculate();}else sheet.Calculate();}else workbook.Calculate();
+            BumpExcelRevision(request.SessionId);return SnapshotExcelInternal(bound);}finally{Release(range);Release(sheet);}
     }
 
     public OfficeSaveCopyResult SaveExcelCopy(OfficeSaveCopyRequest request)
@@ -783,6 +733,25 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         });
     }
 
+    private static void RequireExcelMutationPrecondition(string stateToken,string? contentToken,ExcelLiveSnapshot current)
+    {if(!string.IsNullOrWhiteSpace(contentToken)){if(contentToken!=ExcelPatchMutationRules.ContentToken(current))throw new OfficeHostFaultException("stale_content","Excel content changed since the caller observed it.",true);return;}
+     try{OfficeHostSafety.RequireState(stateToken,current.StateToken);}catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}}
+    private static void PreflightExcelPatch(dynamic sheet,IReadOnlyList<ExcelCellPatch> cells)
+    {
+        bool protectedContents;try{protectedContents=Convert.ToBoolean(sheet.ProtectContents,CultureInfo.InvariantCulture);}catch{throw new OfficeHostFaultException("excel_preflight_failed","Excel worksheet protection state could not be inspected.",true);}
+        foreach(var patch in cells){dynamic? cell=null;dynamic? area=null;try{cell=sheet.Range[patch.Address];
+            var actual=SafeString(()=>cell.Address[false,false]).Replace("$","",StringComparison.Ordinal).ToUpperInvariant();if(actual!=patch.Address)throw new OfficeHostFaultException("invalid_request","Excel target did not resolve to the requested cell.",true);
+            if(protectedContents&&SafeBool(()=>cell.Locked))throw new OfficeHostFaultException("protected_cell",$"Excel cell '{patch.Address}' is locked on a protected worksheet.",true);
+            if(SafeBool(()=>cell.MergeCells)){area=cell.MergeArea;var m=ExcelRangeReadRules.ParseRange(SafeString(()=>area.Address[false,false]).Replace("$","",StringComparison.Ordinal).ToUpperInvariant());
+                if(ExcelRangeReadRules.CellAddress(m.StartRow,m.StartColumn)!=patch.Address)throw new OfficeHostFaultException("merged_cell_non_anchor",$"Excel cell '{patch.Address}' is not the top-left cell of its merged range.",true);}
+            _=SafeObject(()=>cell.Value2);_=SafeString(()=>cell.Formula);if(patch.Bold is not null)_=SafeObject(()=>cell.Font.Bold);if(patch.Italic is not null)_=SafeObject(()=>cell.Font.Italic);
+            if(patch.FillColor is not null)_=SafeObject(()=>cell.Interior.Color);if(patch.NumberFormat is not null)_=SafeString(()=>cell.NumberFormat);}
+            catch(OfficeHostFaultException){throw;}catch(Exception){throw new OfficeHostFaultException("excel_preflight_failed",$"Excel cell '{patch.Address}' could not be validated before write.",true);}finally{Release(area);Release(cell);}}
+    }
+    private static void ApplyExcelPatch(dynamic cell,ExcelCellPatch patch)
+    {if(patch.ClearValue)cell.ClearContents();if(patch.Value is not null)cell.Value2=patch.Value;if(patch.Formula is not null)cell.Formula=patch.Formula;
+     if(patch.Bold is bool b)cell.Font.Bold=b;if(patch.Italic is bool i)cell.Font.Italic=i;if(patch.FillColor is long f)cell.Interior.Color=f;if(patch.NumberFormat is not null)cell.NumberFormat=patch.NumberFormat;}
+
     private void BumpExcelRevision(string sessionId)
         => _excelRevisions.AddOrUpdate(
             sessionId,
@@ -932,15 +901,9 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             selectionAddress,
             sheets
         };
-        var observed = new ExcelLiveSnapshot(
-            sessionId,
-            name,
-            fullName,
-            saved,
-            activeSheetName,
-            selectionAddress,
-            sheets,
-            OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
+        _excelRevisions.TryGetValue(sessionId,out var mutationRevision);var contentBasis=new{sessionId,name,fullName,saved,sheets,mutationRevision};
+        var observed=new ExcelLiveSnapshot(sessionId,name,fullName,saved,activeSheetName,selectionAddress,sheets,OfficeHostSafety.StableToken(basis))
+        {NativeIdentity=bound.Identity,ContentToken=OfficeHostSafety.StableToken(contentBasis)};
         _catalog.ValidateCurrent(bound, beforeMutation);
         return observed;
     }

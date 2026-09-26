@@ -8,10 +8,14 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
     private readonly ExcelFixture _excel = new();
     private readonly WordFixture _word = new();
     private long _excelRevision = 1;
+    private readonly int _excelPatchFaultAfterWrites; private readonly bool _excelPatchReadbackFailsAfterFault; private readonly bool _excelSheetProtected;
 
-    public FixtureOfficeBackend(int extraExcelRows = 0, int sparseExcelLastRow = 0)
+    public FixtureOfficeBackend(int extraExcelRows=0,int sparseExcelLastRow=0,int excelPatchFaultAfterWrites=-1,
+        bool excelPatchReadbackFailsAfterFault=false,bool excelSheetProtected=false)
     {
         if (extraExcelRows is < 0 or > 20_000) throw new ArgumentOutOfRangeException(nameof(extraExcelRows));
+        if(excelPatchFaultAfterWrites < -1 || excelPatchFaultAfterWrites > ExcelPatchLimits.MaxCells)throw new ArgumentOutOfRangeException(nameof(excelPatchFaultAfterWrites));
+        _excelPatchFaultAfterWrites=excelPatchFaultAfterWrites;_excelPatchReadbackFailsAfterFault=excelPatchReadbackFailsAfterFault;_excelSheetProtected=excelSheetProtected;
         if (sparseExcelLastRow is < 0 or > ExcelRangeReadRules.MaxExcelRows) throw new ArgumentOutOfRangeException(nameof(sparseExcelLastRow));
         for (var row = 3; row < 3 + extraExcelRows; row++)
         {
@@ -192,64 +196,33 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
 
     public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var countError = ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1);
-        if (request.Cells is null || countError is not null)
-            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, countError ?? "Excel patch cells are required.");
-        var before = SnapshotExcel(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-
-        if (!string.Equals(request.SheetName, _excel.SheetName, StringComparison.Ordinal))
-            throw new OfficeHostFaultException("sheet_not_found", "Fixture Excel sheet not found.");
-
-        var changed = new List<string>();
-        foreach (var patch in request.Cells)
-        {
-            var address = NormalizeCellAddress(patch.Address);
-            if (!_excel.Cells.TryGetValue(address, out var cell))
-                throw new OfficeHostFaultException("cell_not_found", $"Excel cell '{address}' is outside the fixture scope.");
-
-            if (patch.ClearValue)
-            {
-                cell.Value = "";
-                cell.Formula = "";
-            }
-            if (patch.Value is not null)
-            {
-                cell.Value = patch.Value;
-                cell.Formula = "";
-            }
-            if (patch.Formula is not null)
-                cell.Formula = patch.Formula;
-            if (patch.Bold is bool bold) cell.Bold = bold;
-            if (patch.Italic is bool italic) cell.Italic = italic;
-            if (patch.FillColor is long fill) cell.FillColor = fill;
-            if (patch.NumberFormat is not null) cell.NumberFormat = patch.NumberFormat;
-            changed.Add(address);
-        }
-
-        _excel.Saved = false;
-        _excelRevision++;
-        var after = ExcelSnapshot();
-        return new ExcelPatchResult(before, after, changed.Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray());
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        IReadOnlyList<ExcelCellPatch> cells;try{cells=ExcelPatchMutationRules.ValidateAndNormalize(request.Cells);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}
+        var before=SnapshotExcel(request.SessionId);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);
+        if(request.SheetName!=_excel.SheetName)throw new OfficeHostFaultException("sheet_not_found","Fixture Excel sheet not found.",true);
+        if(_excelSheetProtected)throw new OfficeHostFaultException("protected_cell","The fixture worksheet is protected; no cells were written.",true);
+        foreach(var patch in cells){if(!_excel.Cells.ContainsKey(patch.Address))throw new OfficeHostFaultException("cell_not_found",$"Excel cell '{patch.Address}' is outside the fixture scope.",true);
+            if(IsMergedNonAnchor(patch.Address,"A1:B1"))throw new OfficeHostFaultException("merged_cell_non_anchor",$"Excel cell '{patch.Address}' is not the top-left cell of its merged range.",true);}
+        var applied=0;Exception? failure=null;
+        foreach(var patch in cells){if(_excelPatchFaultAfterWrites>=0&&applied>=_excelPatchFaultAfterWrites){failure=new IOException("Injected Excel write failure.");break;}
+            try{Apply(_excel.Cells[patch.Address],patch);applied++;}catch(Exception ex){failure=ex;break;}}
+        if(applied>0){_excel.Saved=false;_excelRevision++;}
+        if(failure is not null&&_excelPatchReadbackFailsAfterFault)return ExcelPatchMutationRules.Classify(request,before,null,cells,"outcome_unknown","Fixture readback was intentionally unavailable after a possible write.");
+        return ExcelPatchMutationRules.Classify(request,before,ExcelSnapshot(),cells,failure is null?null:"injected_write_failure",
+            failure is null?null:"Excel stopped before the whole fixture batch completed.");
     }
 
     public ExcelLiveSnapshot RecalculateExcel(ExcelRecalculateRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var before = SnapshotExcel(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-
-        if (_excel.Cells.TryGetValue("B1", out var b1)
-            && string.Equals(b1.Formula, "=A1", StringComparison.OrdinalIgnoreCase)
-            && _excel.Cells.TryGetValue("A1", out var a1))
-            b1.Value = a1.Value;
-
-        _excel.Saved = false;
-        _excelRevision++;
-        return ExcelSnapshot();
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        var before=SnapshotExcel(request.SessionId);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);
+        if(!string.IsNullOrWhiteSpace(request.SheetName)&&request.SheetName!=_excel.SheetName)throw new OfficeHostFaultException("sheet_not_found","Fixture Excel sheet not found.",true);
+        if(!string.IsNullOrWhiteSpace(request.Range)&&string.IsNullOrWhiteSpace(request.SheetName))throw new OfficeHostFaultException("invalid_request","Scoped Excel recalculation requires sheet name.",true);
+        var includesB1=true;if(!string.IsNullOrWhiteSpace(request.Range)){ExcelRangeBounds scope;try{scope=ExcelRangeReadRules.ParseRange(request.Range);}
+            catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}includesB1=ExcelRangeReadRules.Intersects(scope,ExcelRangeReadRules.ParseRange("B1"));}
+        if(includesB1&&_excel.Cells.TryGetValue("B1",out var b1)&&b1.Formula.Equals("=A1",StringComparison.OrdinalIgnoreCase)&&_excel.Cells.TryGetValue("A1",out var a1))b1.Value=a1.Value;
+        _excel.Saved=false;_excelRevision++;return ExcelSnapshot();
     }
 
     public OfficeSaveCopyResult SaveExcelCopy(OfficeSaveCopyRequest request)
@@ -377,6 +350,15 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             extent.CellCount);
     }
 
+    private static void Apply(ExcelCellFixture cell,ExcelCellPatch patch)
+    {if(patch.ClearValue){cell.Value="";cell.Formula="";}if(patch.Value is not null){cell.Value=patch.Value;cell.Formula="";}if(patch.Formula is not null)cell.Formula=patch.Formula;
+     if(patch.Bold is bool b)cell.Bold=b;if(patch.Italic is bool i)cell.Italic=i;if(patch.FillColor is long f)cell.FillColor=f;if(patch.NumberFormat is not null)cell.NumberFormat=patch.NumberFormat;}
+    private static bool IsMergedNonAnchor(string address,string mergedRange){var m=ExcelRangeReadRules.ParseRange(mergedRange);
+        return ExcelRangeReadRules.Intersects(ExcelRangeReadRules.ParseRange(address),m)&&address!=ExcelRangeReadRules.CellAddress(m.StartRow,m.StartColumn);}
+    private static void RequireExcelMutationPrecondition(string stateToken,string? contentToken,ExcelLiveSnapshot current)
+    {if(!string.IsNullOrWhiteSpace(contentToken)){if(contentToken!=ExcelPatchMutationRules.ContentToken(current))throw new OfficeHostFaultException("stale_content","Excel content changed since the caller observed it.",true);return;}
+     try{OfficeHostSafety.RequireState(stateToken,current.StateToken);}catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}}
+
     private ExcelLiveSnapshot ExcelSnapshot()
     {
         var cells = _excel.Cells.Values
@@ -409,15 +391,9 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             _excel.SelectionAddress,
             Sheet = sheet
         };
-        return new ExcelLiveSnapshot(
-            _excel.SessionId,
-            _excel.Name,
-            _excel.FullName,
-            _excel.Saved,
-            _excel.SheetName,
-            _excel.SelectionAddress,
-            [sheet],
-            OfficeHostSafety.StableToken(basis));
+        var contentBasis=new{_excel.SessionId,_excel.Name,_excel.FullName,_excel.Saved,_excel.SheetName,Sheet=sheet,Revision=_excelRevision};
+        return new ExcelLiveSnapshot(_excel.SessionId,_excel.Name,_excel.FullName,_excel.Saved,_excel.SheetName,_excel.SelectionAddress,[sheet],
+            OfficeHostSafety.StableToken(basis)){ContentToken=OfficeHostSafety.StableToken(contentBasis)};
     }
 
     private WordLiveSnapshot WordSnapshot()
