@@ -231,6 +231,20 @@ internal sealed partial class H2ProductionToolSession
                 lock (_sourceGate) _liveObservationStamps[kind] = ObservationStamp();
             return;
         }
+        if (descriptor.Namespace.Name == "autocad"
+            && string.Equals(descriptor.Provenance?.ProviderId, "autocad-com-live", StringComparison.Ordinal)
+            && result.Outcome.Status == ToolOutcomeStatus.Succeeded
+            && _context?.ActiveWorkContext is { ApplicationKind: H2ApplicationKind.AutoCAD } capture
+            && SourceCaptureCurrent()
+            && string.Equals(Arg(call, "document_session_id") ?? Arg(call, "session_id"),
+                capture.DocumentSessionId, StringComparison.Ordinal))
+        {
+            // Only the external live bridge observing the exact current captured AutoCAD session
+            // may satisfy the live-source observation requirement. Closed-file Core Console tools
+            // share the autocad namespace but have different provenance and never reach this branch.
+            lock (_sourceGate) _liveObservationStamps[H2ApplicationKind.AutoCAD] = ObservationStamp();
+            return;
+        }
         var requested = Arg(call, "path") ?? (call.Name == "publish_artifact" ? Arg(call, "destination") : null);
         if (_fileTargets is null || requested is null
             || !(descriptor.Namespace.Name is "files" or "office" || call.Name == "publish_artifact")) return;
@@ -275,8 +289,12 @@ internal sealed partial class H2ProductionToolSession
         if (replacements.Length == 0)
         {
             var stamp = ObservationStamp();
-            lock (_sourceGate) return _liveObservationStamps.GetValueOrDefault(requirement.ApplicationKind) == stamp
-                && _liveOffice?.HasCompletedLiveObservation(requirement.ApplicationKind) == true;
+            lock (_sourceGate)
+            {
+                if (_liveObservationStamps.GetValueOrDefault(requirement.ApplicationKind) != stamp) return false;
+                return requirement.ApplicationKind == H2ApplicationKind.AutoCAD
+                    || _liveOffice?.HasCompletedLiveObservation(requirement.ApplicationKind) == true;
+            }
         }
         if (replacements.Length != 1) return false;
         foreach (var decision in replacements)
