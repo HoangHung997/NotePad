@@ -11,6 +11,7 @@ using H2AgentLab.Context;
 using H2AgentLab.Integration;
 using H2AgentLab.Metrics;
 using H2AgentLab.Office;
+using H2AgentLab.OfficeProtocol;
 using H2AgentLab.Runtime;
 using H2AgentLab.Session;
 using H2AgentLab.Tasking;
