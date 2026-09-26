@@ -440,6 +440,14 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 _ => true
             };
         }
+        if (descriptor.Namespace.Name == "browser")
+        {
+            // Browser interaction can change external state. A document/project grant never
+            // expands into browser authority. AskBeforeChanges permits the exact tab operation
+            // only after its per-call approval; FullAccess was handled above.
+            return _scope.Mode == H2AgentPermissionMode.AskBeforeChanges
+                && !string.IsNullOrWhiteSpace(Arg(call, "tab_id"));
+        }
         if (descriptor.Namespace.Name is "excel" or "word"
             && IsTaskLaunchedOfficeSession(descriptor.Namespace.Name, Arg(call, "session_id")))
         {
@@ -494,6 +502,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             return call.Name == "activate_app"
                 ? "app-window:" + (Arg(call, "session_id") ?? "unbound")
                 : "app:" + (Arg(call, "application") ?? "inventory").Trim().ToLowerInvariant();
+        if (descriptor.Namespace.Name == "browser")
+            return "browser:tab:" + (Arg(call, "tab_id") ?? "unbound");
         if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)
             return descriptor.Namespace.Name + ":session:" + session;
         var path = Arg(call, "destination") ?? Arg(call, "path");
