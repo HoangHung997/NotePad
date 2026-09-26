@@ -107,7 +107,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
-| AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | ACTIVE — three-repeat production-path E2 corpus; E4 native/model long-work pending |
+| AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | NOT_STARTED |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | NOT_STARTED |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
@@ -544,7 +544,7 @@ Full Avalonia CI `36254640513` / job `108438987210` **SUCCESS**, including full 
 
 **Acceptance:** báo cáo đề nghị giữ/thay/thử tiếp có evidence; không auto-switch production, không hai engine cùng điều khiển task. Nếu không được giao thì giữ NOT_SELECTED_BY_USER và không block mục tiêu chính.
 
-### [ ] AR-080 — Corpus công việc dài, nhớ và restart qua production
+### [~] AR-080 — Corpus công việc dài, nhớ và restart qua production
 
 **Làm:** RC-33 golden scenario và các RC long-work/recall; chạy độc lập từng failure case để dễ tìm nguyên nhân; ghi real vs fixture từng component. Goal coverage, exact recall và side effects là tiêu chí chính.
 
@@ -553,6 +553,16 @@ Full Avalonia CI `36254640513` / job `108438987210` **SUCCESS**, including full 
 **Measurement:** toàn bộ request budget, compaction/retrieval overhead, fulfilled obligations, unintended/duplicate side effects, unknown outcomes, blockers và repeatability. Long-session target được chốt sau baseline; synthetic 200 vòng không thay cho live work nhiều giờ nếu claim đó còn trong scope.
 
 **Acceptance:** không quên yêu cầu mới, không làm lại phần đã applied, không đụng DOC-B, không bỏ PDF rồi Completed; exact source truy hồi được. MB-124–127 chỉ đóng khi crosswalk đủ evidence, không tự ghi pass trước.
+
+**AR-080 implementation checkpoint — 2026-09-27 (UTC+7):** exact validated code SHA `3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c`. This task adds an E2 long-work production-path corpus and no new runtime engine. The corpus drives the real `H2ProductionAgentAdapter`, durable Agent journal/history, typed goal revisions, restart/reconcile/resume, `RuntimeCompactionCoordinator`, request budgeting and the real ChatCompletions serializer with intercepted HTTP; Word mutation/native Office/model responses remain synthetic fixtures and are labelled as such.
+
+Four boundary groups each repeat **three independent times**: (1) RC-33 crash-after-write restart/reconcile/resume with zero duplicate/unintended side effects in the deterministic corpus; (2) changed requirement + exact early-source recall through compaction; (3) missing PDF outcome stays Blocked even when model final text claims completion; (4) UNSAVED-only live Word source retains exact session/current revision while a near-name control document remains unchanged. The corpus writes **12 JSON evidence files**. Golden restart runs record `duplicateSideEffects=0` and `unintendedSideEffects=0`; recall runs retain an exact early-source hash, one compaction and five budgeted requests; UNSAVED runs preserve five request-budget receipts and exact live session identity.
+
+Dedicated AR-080 run `36260548933` / job `108455390604` **SUCCESS**: focused AR-080 **4/4**, retained AR-063 **5/5**, AR-062 **6/6**, AR-060 **6/6**, AR-052 **8/8**, AR-051 **37/37**, AR-042 **6/6**, AR-041 **6/6**, AR-024 **2/2**, AR-033 **42/42**, full H2 **1352/1352**, and all **75** required Agent suites PASS. Evidence artifact `10912588420`, 440,312 bytes, SHA256 `57077ca0f09fa591aedb038bc42a2db17782e06ef749840a9fdc5c2e091f6244`, was independently downloaded; ZIP integrity passed across **663** entries and `validation.json` reports E1=PASS, E2=PASS, E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, three_repetitions=true, native_office_claim=false, live_model_claim=false and long_hours_claim=false.
+
+Full Avalonia CI `36260548852` / job `108455418228` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **23/23** pull-request workflow identities on exact SHA completed SUCCESS, 0 failed. Final portable artifact `10912351776` is 110,469,834 bytes, SHA256 `43a7e48528e70c2bcf13b96bdb6ecd8e77377db17dd154d833d71eb052512bb2`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**Acceptance boundary / user decision:** real E4 remains **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user tests the final full build with the H2 UI, configured allowed local/cloud model(s), native Word/Office and genuinely long work. The deterministic three-repeat corpus does **not** certify native Office, live model quality, or multi-hour sessions; results from local/cloud providers must be recorded separately if/when run.
 
 ### [ ] AR-081 — UI trạng thái thật, responsiveness và accessibility
 
@@ -624,71 +634,72 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-080_LONG_WORK_CORPUS_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-080",
-  "parked_task": "AR-063",
-  "implementation_status": "AR-080_ACTIVE",
-  "acceptance_status": "E4_NOT_RUN",
+  "phase": "AR-080_IMPLEMENTED_E1_E2_PASS_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-080",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E3/E4 real installed AutoCAD live-selection and native-session acceptance deferred until user final-build test",
+  "required_evidence_level": "E4 real H2 UI + configured local/cloud model + native Office + genuinely long-work acceptance deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0",
+  "validated_code_sha": "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c",
   "implementation_commits": [
-    "4caca275ea9fc8f79eb9caa1d80536e9d7830d64 feat(AR-063): separate closed and live AutoCAD paths",
-    "d9fe9c0f10488d52c6c2f079d9342c133242a007 fix(AR-063): keep live CAD readiness non-callable and testable",
-    "a1cf5603d75c5215d4d47e5d34818741874dba09 fix(AR-063): count validated live CAD source observation",
-    "57ccbcb78ade423a293316834279c71a6f737c13 test(AR-063): keep production CAD slice to one verified outcome",
-    "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0 fix(AR-063): retain live-source semantics in readiness notices"
+    "9ad0de9a3ff86b040d534e56c95b1707e3ac86c8 test(AR-080): add long-work production corpus",
+    "bdc79c4fba9fff361a819ab889534770bb556d6c fix(AR-080): qualify DOCX document type",
+    "01a9cba13a1d92561c6bafdf23b254bb51e716a6 test(AR-080): assert typed recall and live source identity",
+    "2c3e7224479555738cd20585b73ec86209abdc19 test(AR-080): bind UNSAVED fixture as captured active",
+    "bed71950cda0c61195fb17d78da034286bbf6bd7 test(AR-080): observe exact unsaved live Word source",
+    "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c test(AR-080): retain all UNSAVED request budgets"
   ],
-  "last_validation_result": "AR063 5/5; MB113 6/6; retained AR062 6/6, AR060 6/6, AR024 2/2, AR033 42/42, AR012 44/44; full H2 1348/1348; 75/75 required Agent suites PASS. Dedicated run 36254640413 SUCCESS; Avalonia CI 36254640513 SUCCESS; all 22/22 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at da8b9dae; AR063 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T16:30:04Z",
-  "user_decision": "User requires the complete build before personal testing. AR-063 real installed-AutoCAD E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR080 4/4; retained AR063 5/5, AR062 6/6, AR060 6/6, AR052 8/8, AR051 37/37, AR042 6/6, AR041 6/6, AR024 2/2, AR033 42/42; 12 corpus JSON files; full H2 1352/1352; 75/75 required Agent suites PASS. Dedicated run 36260548933 SUCCESS; Avalonia CI 36260548852 SUCCESS; all 23/23 exact-SHA workflow identities SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 3ec3ef86; AR080 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T18:19:16Z",
+  "user_decision": "User requires complete build before personal testing. AR-080 real E4 long-work/native Office/configured model acceptance is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Reconciled GitHub after another worker completed AR-042/052/060/062 and continued the canonical ACTIVE AR-063 task instead of applying stale uncommitted AR-042 blobs.",
-    "Preserved closed-file CoreConsole/DXF capability while adding a separate external live AutoCAD COM path.",
-    "Implemented current PickFirst selection discovery/read, selected attributed-block bounded attribute mutation and exact readback verification through production ToolRegistry.",
-    "Kept unsupported live update_entity/plot/verify_plot/general dynamic-block/arbitrary command/script operations unadvertised.",
-    "Validated stale document/entity state and changed selection before effect; production live-CAD slice completes only with host verification evidence.",
-    "Kept readiness wording explicit that a saved file/fetch/unbound command is not an equivalent source for live AutoCAD.",
-    "Validated exact SHA da8b9dae with 22/22 workflows SUCCESS and independently verified evidence/portable ZIPs."
+    "Reconciled repository truth after another worker completed AR-042/052/060/062/063 and started AR-080; discarded stale unpushed AR-042 blobs instead of overwriting newer work.",
+    "Validated the four AR-080 long-work boundary groups with three independent repetitions each through the production adapter/journal/compaction/budget/serializer path.",
+    "Confirmed crash/reconcile/resume does not duplicate the already-applied DOC-A effect in the deterministic corpus and preserves the near-name DOC-B control.",
+    "Confirmed changed requirements supersede the old outcome and exact early source remains retrievable after compaction/restart.",
+    "Confirmed a missing PDF outcome blocks completion despite model final text claiming done.",
+    "Confirmed UNSAVED-only source resumes against the exact live session/current revision with five retained request-budget receipts and no near-name document mutation.",
+    "Downloaded and independently verified AR080 evidence artifact 10912588420 and portable artifact 10912351776.",
+    "Confirmed all 23/23 exact-SHA pull-request workflows completed SUCCESS."
   ],
   "remaining_in_parked_task": [
-    "Run E3/E4 later on an authorized Windows PC with real installed AutoCAD and a disposable DWG.",
-    "Confirm current selection identity, entity handle/layer/tag, attribute edit/readback, selection change rejection, stale document/entity token rejection and exact live document rebinding.",
-    "Close/reopen and Save As the drawing; verify stale session/handle is rejected and no saved-file fallback substitutes the live drawing.",
-    "Record real AutoCAD undo/transaction behavior. Current external COM bridge does not claim transaction/undo atomicity.",
-    "Do not expand the claim to general dynamic blocks, general entity mutation, plot or arbitrary command/LISP/script execution unless separately implemented and verified."
+    "Run E4 later with the real H2 UI, configured allowed local model and cloud model separately, native Word/Office and disposable documents.",
+    "Repeat the long-work boundaries with real near-name Word documents, an actual unsaved live document, real PDF creation/inspection, real user correction, real restart after effect-before-response and Continue.",
+    "Measure model/provider request usage, compaction/retrieval overhead, fulfilled obligations, duplicate/unintended side effects, blockers and repeatability separately per provider.",
+    "Do not call three deterministic E2 repetitions a multi-hour/live-model/native-Office pass."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-063/implementation.md",
-    "docs/agent-reliability/AR-063/evidence.json",
-    "docs/agent-reliability/AR-063/native-acceptance.md",
-    "GitHub artifact 10910655601 AR063-E1-E2-Evidence",
-    "GitHub artifact 10910881244 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-080/implementation.md",
+    "docs/agent-reliability/AR-080/evidence.json",
+    "docs/agent-reliability/AR-080/native-acceptance.md",
+    "GitHub artifact 10912588420 AR080-E1-E2-Evidence",
+    "GitHub artifact 10912351776 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10910881244,
-    "bytes": 110469935,
-    "sha256": "24b342f1378525a521678a51a0986171595045de56d4c475bf257f37c103e29f",
-    "expires_at_utc": "2026-12-25T16:12:43Z",
-    "source_sha": "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0",
+    "artifact_id": 10912351776,
+    "bytes": 110469834,
+    "sha256": "43a7e48528e70c2bcf13b96bdb6ecd8e77377db17dd154d833d71eb052512bb2",
+    "expires_at_utc": "2026-12-25T17:52:10Z",
+    "source_sha": "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "live_native_claim": false,
-    "general_dynamic_block_claim": false,
-    "plot_claim": false,
-    "undo_transaction_claim": false,
-    "saved_file_equivalent_to_live": false,
+    "native_office_claim": false,
+    "live_model_claim": false,
+    "long_hours_claim": false,
+    "three_repetitions": true,
+    "duplicate_side_effect_claim": "deterministic corpus only",
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-063 unless real native final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-063 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-080 unless real E4 final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-080 turn."
 }
 ```
 
