@@ -52,9 +52,23 @@ public sealed partial class H2ProductionAgentAdapter
             if (live.SupplementalIds.TryGetValue(inputId, out var previous)) return previous == text;
             if (!live.AcceptingInput || IsTerminal(live.Status) || live.Cancellation.IsCancellationRequested
                 || live.SupplementalIds.Count >= 24) return false;
-            if (!_archive.RecordSteeringInput(taskId, inputId, text)) return false;
-            live.SupplementalIds.Add(inputId, text); live.SupplementalInput.Enqueue(new(inputId, text));
-            AddProgressLocked(live, "user", "supplement-received", text);
+            try
+            {
+                if (!_archive.RecordSteeringInput(taskId, inputId, text)) return false;
+                // Do not expose the input to AgentRuntime until both the idempotency receipt
+                // and the public acknowledgement are durable. A journal fault therefore
+                // cannot produce an acknowledged-but-lost steering revision.
+                AddProgressLocked(live, "user", "supplement-received", text);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                live.Status = H2AgentTaskStatus.Blocked;
+                live.PendingApproval = null;
+                live.Error = "Agent archive cần phục hồi; steering chưa được xác nhận bền vững.";
+                throw;
+            }
+            live.SupplementalIds.Add(inputId, text);
+            live.SupplementalInput.Enqueue(new(inputId, text));
             return true;
         }
     }

@@ -170,14 +170,15 @@ internal static class H2AgentSteeringConcurrencyTests
                         && factory.Inputs.SequenceEqual([steering]),
                         done.Error??"Steering/reconnect production path failed.");
 
-                    var journal=string.Join("\n",Directory.EnumerateFiles(
+                    var journalFiles=Directory.EnumerateFiles(
                         Path.Combine(state,"integration","journal-v2"),"event-*.json")
-                        .Order(StringComparer.Ordinal).Select(File.ReadAllText));
+                        .Order(StringComparer.Ordinal).Select(File.ReadAllText).ToArray();
+                    var steeringEvents=journalFiles.Where(x=>x.Contains("steering-input",StringComparison.Ordinal)).ToArray();
                     var hash=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(steering))).ToLowerInvariant();
-                    Check(journal.Contains("steering-input",StringComparison.Ordinal)
-                        && journal.Contains(hash,StringComparison.Ordinal)
-                        && !journal.Contains(steering,StringComparison.Ordinal),
-                        "Durable steering receipt is missing or persisted raw steering text.");
+                    Check(steeringEvents.Length==1
+                        && steeringEvents[0].Contains(hash,StringComparison.Ordinal)
+                        && !steeringEvents[0].Contains(steering,StringComparison.Ordinal),
+                        "Durable steering receipt is missing, duplicated, or persisted raw steering text.");
                 }
 
                 var restartedFactory=new HoldTransportFactory();
