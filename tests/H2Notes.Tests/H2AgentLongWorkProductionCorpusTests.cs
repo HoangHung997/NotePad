@@ -364,7 +364,7 @@ internal static class H2AgentLongWorkProductionCorpusTests
     private static byte[] Docx(string title,string body)
     {
         using var stream=new MemoryStream();
-        using(var doc=WordprocessingDocument.Create(stream,WordprocessingDocumentType.Document,true))
+        using(var doc=WordprocessingDocument.Create(stream,DocumentFormat.OpenXml.WordprocessingDocumentType.Document,true))
         {
             var main=doc.AddMainDocumentPart();
             main.Document=new W.Document(new W.Body(
