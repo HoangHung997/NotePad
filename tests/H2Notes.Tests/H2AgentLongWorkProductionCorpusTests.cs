@@ -120,8 +120,10 @@ internal static class H2AgentLongWorkProductionCorpusTests
         Check(exact.Contains(seed.EarlyMarker,StringComparison.Ordinal),
             "Exact early fact disappeared from compaction source.");
         Check(journal.Where(x=>x.Kind is "task-state" or "revision")
-            .Any(x=>x.Payload.GetRawText().Contains(seed.Correction,StringComparison.Ordinal)),
-            "Current user correction is not retrievable from durable source.");
+            .Select(x=>x.Payload.Deserialize<H2AgentTaskSummary>())
+            .Where(x=>x?.GoalState is not null)
+            .Any(x=>x!.GoalState!.Revisions.Any(r=>r.SourceText==seed.Correction)),
+            "Current user correction is not retrievable from typed durable goal source.");
         Check(summary.GoalState!.Outcomes.Single(x=>x.Requirement==OldRequirement).Status=="Superseded"
             && summary.GoalState.Outcomes.Single(x=>x.Requirement==NewRequirement).Status=="Verified",
             "Latest revision did not supersede the old requirement deterministically.");
@@ -162,7 +164,7 @@ internal static class H2AgentLongWorkProductionCorpusTests
     private static void UnsavedControl(string root,int iteration)
     {
         var seed=Seed(root,iteration,includePdf:false,unknownOperation:false);
-        var factory=new FinalOnlyChatFactory();
+        var factory=new FinalOnlyChatFactory(inspectSource:true);
         using var adapter=Adapter(seed.StateRoot,factory);
         var context=ResumeContext(seed,iteration);
         var resumed=adapter.ResumeTaskAsync(seed.TaskId,context,true).GetAwaiter().GetResult();
@@ -170,10 +172,12 @@ internal static class H2AgentLongWorkProductionCorpusTests
         Check(done.Status==H2AgentTaskStatus.Completed,
             "All-verified UNSAVED-only resume did not complete: "+done.Error);
         AssertGoalState(done,expectPdfPending:false);
-        Check(factory.Bodies.Count==1
-            && factory.Bodies[0].Contains(seed.UnsavedSession,StringComparison.Ordinal)
-            && factory.Bodies[0].Contains(NewRequirement,StringComparison.Ordinal),
-            "Fresh request lost UNSAVED-only session/current revision.");
+        Check(factory.Bodies.Count==3
+            && factory.Bodies[0].Contains(NewRequirement,StringComparison.Ordinal)
+            && factory.Bodies[0].Contains("Host source requirement: LiveResource (Word)",StringComparison.Ordinal)
+            && factory.Bodies[2].Contains(seed.UnsavedSession,StringComparison.Ordinal)
+            && factory.Bodies[2].Contains("resource_sources",StringComparison.Ordinal),
+            "Fresh resume lost current revision or exact UNSAVED host source identity.");
         Check(Hash(File.ReadAllBytes(seed.DocBPath))==seed.DocBHash
             && Hash(File.ReadAllBytes(seed.DocAPath))==seed.DocAHash,
             "Read-only resume modified one of the near-name documents.");
@@ -321,8 +325,10 @@ internal static class H2AgentLongWorkProductionCorpusTests
         Check(exact.Contains(seed.EarlyMarker,StringComparison.Ordinal),
             "Restart lost exact source backing the compaction.");
         Check(journal.Where(x=>x.Kind is "task-state" or "revision")
-            .Any(x=>x.Payload.GetRawText().Contains(seed.Correction,StringComparison.Ordinal)),
-            "Restart lost exact correction source.");
+            .Select(x=>x.Payload.Deserialize<H2AgentTaskSummary>())
+            .Where(x=>x?.GoalState is not null)
+            .Any(x=>x!.GoalState!.Revisions.Any(r=>r.SourceText==seed.Correction)),
+            "Restart lost exact typed correction source.");
         var current=archive.Get(seed.TaskId)!;
         Check(current.GoalState?.RevisionId==seed.Goals.RevisionId,
             "Restart changed current goal revision.");
@@ -420,25 +426,33 @@ internal static class H2AgentLongWorkProductionCorpusTests
             JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}),new UTF8Encoding(false));
     }
 
-    private sealed class FinalOnlyChatFactory:IAgentTransportFactory
+    private sealed class FinalOnlyChatFactory(bool inspectSource=false):IAgentTransportFactory
     {
         public List<string> Bodies{get;}=[];
         public List<AgentRequestBudgetReceipt> Budgets{get;}=[];
         public IAgentTransport Create(AiProfile profile,string apiKey,AgentRunTelemetry telemetry)
         {
-            var transport=new ChatCompletionsTransport(profile,apiKey,new Handler(this));
+            var transport=new ChatCompletionsTransport(profile,apiKey,new Handler(this,inspectSource));
             ((IAgentRequestBudgetSource)transport).RequestBudgetEvaluated+=Budgets.Add;
             return transport;
         }
-        private sealed class Handler(FinalOnlyChatFactory owner):HttpMessageHandler
+        private sealed class Handler(FinalOnlyChatFactory owner,bool inspectSource):HttpMessageHandler
         {
+            private int _request;
             protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
             {
                 owner.Bodies.Add(await request.Content!.ReadAsStringAsync(token));
-                var frame=JsonSerializer.Serialize(new{
-                    choices=new[]{new{index=0,delta=JsonSerializer.SerializeToElement(new{content="MODEL CLAIMED DONE"}),
-                        finish_reason="stop"}}
-                });
+                string frame;
+                if(inspectSource&&_request==0)
+                    frame="""{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"ar080-search","type":"function","function":{"name":"tool_search","arguments":"{\"query\":\"resource_sources\"}"}}]},"finish_reason":"tool_calls"}]}""";
+                else if(inspectSource&&_request==1)
+                    frame="""{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"ar080-source","type":"function","function":{"name":"resource_sources","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""";
+                else
+                    frame=JsonSerializer.Serialize(new{
+                        choices=new[]{new{index=0,delta=JsonSerializer.SerializeToElement(new{content="MODEL CLAIMED DONE"}),
+                            finish_reason="stop"}}
+                    });
+                _request++;
                 var raw="data: "+frame+"\n\ndata: [DONE]\n\n";
                 return new(HttpStatusCode.OK){Content=new StringContent(raw,Encoding.UTF8,"text/event-stream")};
             }
