@@ -43,6 +43,8 @@ Dedicated AR-024 run `36221310522` / job `108346988677`: SUCCESS.
 
 Full Avalonia CI `36221310599` / job `108346979174`: SUCCESS, including self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC.
 
+All **16/16** pull-request workflow identities on the exact validated code SHA completed SUCCESS. The first AR-023 attempt contained one transient retained AR-021 probe failure; a same-SHA rerun completed SUCCESS, so no runtime change was made for that non-reproduced flake.
+
 ## Acceptance boundary
 
 E1/E2 are PASS. This is not E4 because the model transport is scripted and OfficeHost uses its fixture backend. Real E4 requires an allowed configured model plus native Word/Excel on an authorized Windows machine. The user deferred E4 until testing the final full build. No E4 PASS claim is made.

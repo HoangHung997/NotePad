@@ -26,7 +26,8 @@
       "AR-001": "13/13"
     },
     "full_h2": "1311/1311",
-    "required_agent_suites": "75/75"
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "16/16 SUCCESS"
   },
   "runs": {
     "ar024": {
@@ -38,6 +39,11 @@
       "run_id": 36221310599,
       "job_id": 108346979174,
       "result": "SUCCESS"
+    },
+    "ar023_rerun": {
+      "run_id": 36221310620,
+      "result": "SUCCESS",
+      "purpose": "same-SHA confirmation of one-off retained AR-021 probe flake"
     }
   },
   "artifacts": {
@@ -63,7 +69,7 @@
       ]
     }
   },
-  "workflow_note": "15 workflow identities completed SUCCESS on the exact code SHA. The first AR-023 retained run had a one-off AR-021 probe flake while the same test passed elsewhere on the same SHA; a same-SHA AR-023 rerun was started. No runtime change was made for an un-reproduced flake.",
+  "workflow_note": "16/16 workflow identities completed SUCCESS on the exact code SHA. The first AR-023 attempt hit one transient retained AR-021 probe flake (Sequence contains no elements); the same test passed elsewhere on the same SHA, and the same-SHA AR-023 rerun completed SUCCESS. No runtime change was made for the non-reproduced flake.",
   "safety": {
     "personal_documents_accessed": false,
     "credentials_accessed": false,

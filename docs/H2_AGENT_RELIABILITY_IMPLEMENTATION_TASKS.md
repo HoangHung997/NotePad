@@ -578,7 +578,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "535927717fa3d9c97e9b0f60a82b8707ffdfb881 test(AR-024): fail fast on focused slice",
     "4e6b4a07f4103edd654b680ca9af7f485f8b04d8 test(AR-024): ground Global Excel by exact path"
   ],
-  "last_validation_result": "AR024 2/2; OfficeHost 19/19; retained AR023 9/9, AR022 8/8, AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13; full H2 1311/1311; 75/75 required Agent suites PASS. AR024 run 36221310522 SUCCESS; Avalonia CI 36221310599 SUCCESS; Windows x64 publish and packaged helper IPC PASS. 15 workflow identities SUCCESS; AR023 same-SHA rerun in progress after a one-off retained AR021 flake.",
+  "last_validation_result": "AR024 2/2; OfficeHost 19/19; retained AR023 9/9, AR022 8/8, AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13; full H2 1311/1311; 75/75 required Agent suites PASS. AR024 run 36221310522 SUCCESS; Avalonia CI 36221310599 SUCCESS; Windows x64 publish and packaged helper IPC PASS. 16/16 workflow identities SUCCESS after same-SHA AR023 rerun confirmed the one-off retained AR021 flake was not reproducible.",
   "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 4e6b4a07; AR024 validation artifact reports clean_end=true. No reset/force-push/main merge.",
   "checkpoint_evidence_at_utc": "2026-09-26T05:51:53Z",
   "user_decision": "User requires the complete build before personal testing. AR-024 native/model E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
