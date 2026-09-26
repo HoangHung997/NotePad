@@ -89,7 +89,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | DONE |
 | AR-033 | Completion gate theo toàn mục tiêu | 030/031/011 | E2/E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-040 | Job/process session dài | 011/031 | E2 + process thật | DONE |
-| AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | NOT_STARTED |
+| AR-041 | Uncertain mutation + restart reconcile | 022/031/033/040 | E3 | ACTIVE — durable restart reconcile receipts / exact resource rebind / no blind replay |
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | NOT_STARTED |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
@@ -558,11 +558,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-024_IMPLEMENTED_E1_E2_PASS_E4_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-041_RESTART_RECONCILE_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-041",
   "parked_task": "AR-024",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-041_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E4 real H2 UI + configured model + native Office acceptance deferred until user tests final build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",

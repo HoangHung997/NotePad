@@ -80,6 +80,16 @@ public sealed partial class H2ProductionAgentAdapter :
 
     public H2AgentArchiveStatus GetArchiveStatus() => _archive.Status;
 
+    public H2AgentReconcileResult ReconcileInterruptedTask(
+        Guid taskId,
+        IReadOnlyList<H2AgentReconcileObservation> observations)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (TryLive(taskId, out _))
+            throw new InvalidOperationException("A live task cannot be reconciled as a restarted task.");
+        return _archive.Reconcile(taskId, observations ?? Array.Empty<H2AgentReconcileObservation>());
+    }
+
     public void BindProjectToolHost(IH2ProjectToolHost host)
         => _projectTools = host ?? throw new ArgumentNullException(nameof(host));
 

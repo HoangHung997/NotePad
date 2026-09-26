@@ -122,7 +122,7 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             if (!_tasks.TryGetValue(taskId, out var item)) return null;
             var operations = _operations.Where(p => p.Key.TaskId == taskId).Select(p => p.Value).ToArray();
             var interrupted = _interrupted.Contains(taskId);
-            var pending = _readOnly || operations.Any(o => o.State == "Dispatched" || o.Effect is "Unknown" or "PartiallyApplied" || o.Status == "Running");
+            var pending = _readOnly || operations.Any(o => RequiresReconciliation(o, interrupted || !IsTerminal(item.Status)));
             var copy = Clone(item) with { PendingApproval = null,
                 Recovery = new(interrupted, pending, _sequence, Array.AsReadOnly(operations)) };
             return interrupted || pending ? copy with { Status = H2AgentTaskStatus.Blocked,
@@ -169,6 +169,192 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             Append(taskId, item.State == "Dispatched" ? "operation-dispatched" : "operation-result", item);
         }
     }
+    internal H2AgentReconcileResult Reconcile(Guid taskId, IReadOnlyList<H2AgentReconcileObservation> observations)
+    {
+        lock (_gate)
+        {
+            EnsureWritable();
+            if (taskId == Guid.Empty) throw new ArgumentException("TaskId cannot be empty.", nameof(taskId));
+            if (!_tasks.TryGetValue(taskId, out var task)) throw new KeyNotFoundException("Agent task is not available.");
+            observations ??= Array.Empty<H2AgentReconcileObservation>();
+            if (observations.GroupBy(x => x.InvocationId).Any(g => g.Key == Guid.Empty || g.Count() > 1))
+                throw new ArgumentException("Reconciliation observations require unique non-empty invocation IDs.", nameof(observations));
+
+            // A prepared-only receipt is durable proof that BeforeExecute never returned, therefore the
+            // executor never ran. Reconcile it to a terminal no-effect receipt without touching the resource.
+            foreach (var item in _operations.Where(p => p.Key.TaskId == taskId).Select(p => p.Value).ToArray())
+            {
+                if (item.State == "Prepared")
+                {
+                    RecordOperation(taskId, item with
+                    {
+                        State = "Result",
+                        Status = "RejectedBeforeEffect",
+                        Effect = "None",
+                        ReconciliationState = "NoEffect",
+                        ReconciledObservedVersion = "not-dispatched",
+                        ReconciledUtc = DateTime.UtcNow
+                    });
+                    continue;
+                }
+
+                // Current job policy is CancelOnHostExit. A persisted Running receipt after a new host
+                // process starts is therefore known dead/interrupted, never proof the worker is still alive.
+                if (item.Job is { Status: "Running", HostExitPolicy: "CancelOnHostExit" }
+                    && string.IsNullOrWhiteSpace(item.ReconciliationState))
+                {
+                    RecordOperation(taskId, item with
+                    {
+                        State = "Result",
+                        Status = "OutcomeUnknown",
+                        Effect = "Unknown",
+                        ReconciliationState = "NeedsUserWorkerDead",
+                        ErrorCode = "worker_interrupted_on_host_exit",
+                        ReconciledUtc = DateTime.UtcNow
+                    });
+                }
+            }
+
+            foreach (var observation in observations)
+            {
+                if (!Enum.IsDefined(observation.Disposition)
+                    || observation.ObservedUtc.Kind != DateTimeKind.Utc
+                    || observation.ObservedUtc > DateTime.UtcNow.AddMinutes(1))
+                    throw new ArgumentException("Invalid restart reconciliation observation.", nameof(observations));
+                if (!_operations.TryGetValue((taskId, observation.InvocationId), out var operation))
+                    throw new KeyNotFoundException("Reconciliation operation is not available for this task.");
+
+                var resourceMismatch = operation.ResourceKeySha256 is not null
+                    && (string.IsNullOrWhiteSpace(observation.ResourceKey)
+                        || Hash(System.Text.Encoding.UTF8.GetBytes(observation.ResourceKey.Trim())) != operation.ResourceKeySha256);
+                var terminal = operation.ReconciliationState is "Verified" or "NoEffect";
+                if (terminal)
+                {
+                    var expected = observation.Disposition == H2AgentReconcileDisposition.Verified ? "Verified"
+                        : observation.Disposition == H2AgentReconcileDisposition.NoEffect ? "NoEffect" : null;
+                    if (!resourceMismatch
+                        && expected == operation.ReconciliationState
+                        && string.Equals(operation.ReconciledObservedVersion, BoundObservation(observation.ObservedVersion, 512), StringComparison.Ordinal))
+                        continue; // Idempotent duplicate host observation on the exact same resource.
+                    throw new InvalidOperationException("A terminal reconciliation receipt cannot be rewritten or rebound.");
+                }
+
+                var disposition = observation.Disposition;
+                if (resourceMismatch && (disposition is H2AgentReconcileDisposition.Verified
+                    or H2AgentReconcileDisposition.AppliedUnverified
+                    or H2AgentReconcileDisposition.NoEffect))
+                    disposition = H2AgentReconcileDisposition.NeedsUser;
+
+                if ((disposition is H2AgentReconcileDisposition.Verified
+                    or H2AgentReconcileDisposition.AppliedUnverified
+                    or H2AgentReconcileDisposition.NoEffect)
+                    && string.IsNullOrWhiteSpace(observation.ObservedVersion))
+                    throw new ArgumentException("A conclusive reconciliation requires an observed resource version.", nameof(observations));
+
+                var reconciliationState = disposition switch
+                {
+                    H2AgentReconcileDisposition.NoEffect => "NoEffect",
+                    H2AgentReconcileDisposition.AppliedUnverified => "AppliedUnverified",
+                    H2AgentReconcileDisposition.Verified => "Verified",
+                    H2AgentReconcileDisposition.RepairRequired => "RepairRequired",
+                    _ => resourceMismatch ? "NeedsUserResourceMismatch" : "NeedsUser"
+                };
+                var status = disposition switch
+                {
+                    H2AgentReconcileDisposition.NoEffect => "RejectedBeforeEffect",
+                    H2AgentReconcileDisposition.AppliedUnverified => "Succeeded",
+                    H2AgentReconcileDisposition.Verified => "Succeeded",
+                    H2AgentReconcileDisposition.RepairRequired => "PartiallyApplied",
+                    _ => "OutcomeUnknown"
+                };
+                var effect = disposition switch
+                {
+                    H2AgentReconcileDisposition.NoEffect => "None",
+                    H2AgentReconcileDisposition.AppliedUnverified => "Applied",
+                    H2AgentReconcileDisposition.Verified => "Applied",
+                    H2AgentReconcileDisposition.RepairRequired => "PartiallyApplied",
+                    _ => "Unknown"
+                };
+
+                string? evidenceId = null;
+                if (disposition is H2AgentReconcileDisposition.Verified
+                    or H2AgentReconcileDisposition.NoEffect
+                    or H2AgentReconcileDisposition.AppliedUnverified)
+                    evidenceId = RecordReconciliationEvidence(taskId, operation, observation,
+                        disposition == H2AgentReconcileDisposition.Verified);
+
+                RecordOperation(taskId, operation with
+                {
+                    State = "Result",
+                    Status = status,
+                    Effect = effect,
+                    ErrorCode = disposition == H2AgentReconcileDisposition.NeedsUser
+                        ? resourceMismatch ? "resource_rebind_mismatch" : "needs_user"
+                        : disposition == H2AgentReconcileDisposition.RepairRequired ? "repair_required" : null,
+                    ReconciliationState = reconciliationState,
+                    ReconciliationEvidenceId = evidenceId,
+                    ReconciledObservedVersion = BoundObservation(observation.ObservedVersion, 512),
+                    ReconciledUtc = observation.ObservedUtc
+                });
+            }
+
+            var current = _operations.Where(p => p.Key.TaskId == taskId).Select(p => p.Value)
+                .OrderBy(x => x.InvocationId).ToArray();
+            var pending = current.Any(o => RequiresReconciliation(o, interruptedTask: true));
+            var state = !pending ? "ReadyForResume"
+                : current.Any(o => o.ReconciliationState?.StartsWith("NeedsUser", StringComparison.Ordinal) == true) ? "NeedsUser"
+                : current.Any(o => o.ReconciliationState == "RepairRequired") ? "RepairRequired"
+                : "ReconcileRequired";
+            return new(taskId, state, pending, true, Array.AsReadOnly(current),
+                pending
+                    ? "Restart reconciliation is incomplete. Do not replay the mutation; reobserve the exact resource or ask the user."
+                    : "All durable operations are reconciled. A later continuation still requires fresh permission and fresh resource binding.");
+        }
+    }
+
+    private string RecordReconciliationEvidence(Guid taskId, H2AgentOperationRecord operation,
+        H2AgentReconcileObservation observation, bool verified)
+    {
+        var version = BoundObservation(observation.ObservedVersion, 512) ?? "none";
+        var evidenceId = "reconcile:" + taskId.ToString("N") + ":" + operation.InvocationId.ToString("N")
+            + ":" + Hash(System.Text.Encoding.UTF8.GetBytes(observation.Disposition + "|" + version))[..16];
+        var current = _tasks[taskId];
+        if (current.Evidence.Any(e => e.EvidenceId == evidenceId)) return evidenceId;
+        // Observation.Note is intentionally not persisted: it may contain transient document text.
+        // The durable receipt keeps only typed disposition, operation identity and bounded version metadata.
+        var summary = operation.ToolName + " restart observation: " + observation.Disposition;
+        var evidence = new H2AgentEvidence(evidenceId, "reconciliation", null, summary,
+            Provenance: "H2AgentLab.Integration.RestartReconcile",
+            VerificationPassed: verified ? true : null);
+        var next = current with
+        {
+            Evidence = current.Evidence.Concat([evidence]).ToArray(),
+            UpdatedUtc = observation.ObservedUtc
+        };
+        Append(taskId, "task-state", next with { PendingApproval = null, Recovery = null });
+        return evidenceId;
+    }
+
+    private static string? BoundObservation(string? value, int max)
+    {
+        value = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (value.Length == 0) return null;
+        return value.Length <= max ? value : value[..max];
+    }
+
+    private static bool RequiresReconciliation(H2AgentOperationRecord item, bool interruptedTask)
+    {
+        if (item.ReconciliationState is "Verified" or "NoEffect") return false;
+        if (item.ReconciliationState is "AppliedUnverified" or "RepairRequired"
+            || item.ReconciliationState?.StartsWith("NeedsUser", StringComparison.Ordinal) == true)
+            return true;
+        if (item.State == "Dispatched" || item.Status == "Running"
+            || item.Effect is "Unknown" or "PartiallyApplied")
+            return true;
+        return interruptedTask && item.State == "Result"
+            && item.Status == "Succeeded" && item.Effect == "Applied";
+    }
+
     public void RecordJob(Guid taskId, Guid invocationId, H2AgentProcessJobInfo job)
     {
         lock (_gate)

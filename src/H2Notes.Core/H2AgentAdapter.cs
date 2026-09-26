@@ -292,6 +292,11 @@ public interface IH2AgentAdapter
 
     H2AgentEvidence? GetEvidence(string evidenceId);
 
+    H2AgentReconcileResult ReconcileInterruptedTask(
+        Guid taskId,
+        IReadOnlyList<H2AgentReconcileObservation> observations)
+        => throw new NotSupportedException("Restart reconciliation is not supported by this Agent adapter.");
+
     bool AttachProject(
         Guid taskId,
         Guid projectId);
