@@ -1,3 +1,5 @@
+using H2AgentLab.DesktopProtocol;
+
 namespace H2AgentLab.DesktopHost;
 
 public static class DesktopHostSelfTests
