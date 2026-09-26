@@ -303,7 +303,8 @@ internal static class H2AgentLongWorkProductionCorpusTests
             ActiveWorkContext:new H2ActiveWorkContext(
                 4000+iteration,DateTime.UtcNow.AddMinutes(-1).Ticks,"WINWORD",H2ApplicationKind.Word,
                 7000+iteration,"win32-ar080-"+iteration,"Unsaved DOC-A - Word",
-                seed.UnsavedSession,null,"paragraph 1","ar080-fixture",DateTime.UtcNow));
+                seed.UnsavedSession,null,"paragraph 1","ar080-fixture",DateTime.UtcNow),
+            TargetIntent:H2AgentTargetIntent.CapturedActive);
 
     private static H2ProductionAgentAdapter Adapter(string state,FinalOnlyChatFactory factory)
         => new(state,()=>new(Profile("ar080-resume"),""),factory);
