@@ -25,11 +25,10 @@ if($LASTEXITCODE){throw 'AR-082 publish failed'}
 $portable=Join-Path $env:RUNNER_TEMP 'AR082 Gói sạch Việt Nam\Ứng dụng 测试'
 Remove-Item -LiteralPath (Split-Path $portable -Parent) -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $portable -Force|Out-Null
-Copy-Item -LiteralPath (Join-Path $publish '*') -Destination $portable -Recurse -Force
-# Copy-Item -LiteralPath does not expand wildcard; copy children explicitly.
-Remove-Item -LiteralPath $portable -Recurse -Force
-New-Item -ItemType Directory -Path $portable -Force|Out-Null
-Get-ChildItem -LiteralPath $publish -Force|ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $portable -Recurse -Force }
+# -LiteralPath intentionally does not expand wildcards; enumerate exact children and preserve Unicode paths.
+Get-ChildItem -LiteralPath $publish -Force|ForEach-Object {
+  Copy-Item -LiteralPath $_.FullName -Destination $portable -Recurse -Force
+}
 
 $cleanSettings=Join-Path $env:RUNNER_TEMP 'AR082 clean profile Việt Nam'
 Remove-Item -LiteralPath $cleanSettings -Recurse -Force -ErrorAction SilentlyContinue
