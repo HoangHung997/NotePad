@@ -9,7 +9,7 @@ H2 Notes là ứng dụng Windows quản lý dự án, công việc, ghi chú, t
 - Giao diện dự án và Agent theo thiết kế `2026-09-21-agent-documents-demo`, có lịch sử hội thoại, ô soạn phía dưới, quyền theo tác vụ và xem tài liệu.
 - Assistant nổi: hình tròn khi rảnh hoặc chat đang mở; một dòng hoạt động cuộn ngang khi đang làm và chat bị ẩn. Khung chat đi theo bong bóng.
 - Bổ sung và sửa các luồng Word/Excel/PDF, AutoCAD, OCR, đọc tin; báo kết quả theo bằng chứng kiểm tra.
-- Kiểm tra ứng dụng gần nhất: **590/590 đạt**. Xem [kiểm thử chức năng và giới hạn](docs/H2_AGENT_CAPABILITY_ACCEPTANCE_2026-09-22.md), [sửa Word/CV](docs/H2_WORD_CV_REPAIR_2026-09-22.md) và [kiểm chứng bong bóng](docs/H2_BUBBLE_COMPACT_2026-09-22.md).
+- Mốc **590/590** ngày 22/09 là baseline lịch sử, không còn là số kiểm thử mới nhất. Trạng thái reliability/package hiện tại được chốt tại [AR-090 final handoff](docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md); các biên bản cũ vẫn được giữ làm evidence lịch sử.
 
 Kết quả này không chứng nhận mọi khả năng của model, độ chính xác OCR trên mọi tài liệu hay đồng bộ trên hai máy thật. Các vấn đề còn mở được ghi trong biên bản nghiệm thu.
 
@@ -48,4 +48,4 @@ Giải nén toàn bộ gói trước khi chạy. Cấu hình AI và API key thu�
 
 ## Agent reliability implementation — AR checkpoint (2026-09-22)
 
-The approved [AR specification](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. [AR-000 baseline](docs/agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.
+The approved [AR specification](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. The current user-test handoff is [AR-090 final handoff](docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md). [AR-000 baseline](docs/agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.

@@ -1,5 +1,7 @@
 # H2 Agent — Final Architecture Report
 
+> **HISTORICAL MB-120 BASELINE — not current AR reliability status.** This 2026-09-19 snapshot is retained for evidence compatibility. For current implementation/acceptance/package state, use [`docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md`](agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md). Statements such as “No H2 Notes production integration yet” below describe that historical snapshot only.
+
 Status: **MB-120 integration-readiness architecture baseline**  
 Date: **2026-09-19**  
 Canonical architecture: `docs/H2_AGENT_MASTER_SPEC.md`  

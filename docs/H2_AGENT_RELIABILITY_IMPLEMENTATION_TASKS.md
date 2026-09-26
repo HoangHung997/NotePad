@@ -111,7 +111,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final portable ready; no physical-clean-machine/native-provider/E4 claim |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
-| AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | NOT_STARTED |
+| AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | ACTIVE — machine-checked status/capability/evidence handoff; AR-083 remains deferred |
 
 ### 4.1. Repair backlog từ lỗi người dùng 25/09/2026
 
@@ -616,7 +616,7 @@ The dedicated AR-082 package and full-CI package are separate builds from the sa
 
 **Đóng:** chỉ sau evidence E5 hoặc quyết định người dùng thu hẹp phạm vi multi-PC rõ ràng; quyết định thu hẹp là limitation, không phải E5_PASS. Giữ đồng bộ trạng thái H2M-116/H2M-133 và bug ledger.
 
-### [ ] AR-090 — Dọn có parity, kiểm tra chéo và bàn giao
+### [~] AR-090 — Dọn có parity, kiểm tra chéo và bàn giao
 
 **Làm:** scan call path/code dư, obsolete builders/adapters thực sự không dùng; đối chiếu mọi requirement AR với file/test/evidence. Dọn từng phần có regression, không xóa history evidence hoặc source cũ ngoài scope.
 
@@ -658,11 +658,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-082_IMPLEMENTED_E1_E2_PASS_E3_CLEAN_RUNNER_PASS_E4_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-090_FINAL_AUDIT_HANDOFF_ACTIVE",
+  "active_task": "AR-090",
   "parked_task": "AR-082",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY__E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-090_ACTIVE",
+  "acceptance_status": "FINAL_AUDIT_NOT_RUN__AR083_DEFERRED_BY_USER",
   "completed_evidence_level": "E3 clean Windows runner profile only",
   "required_evidence_level": "Physical clean machine/native provider E4 remains deferred; AR-083 physical two-PC/NAS E5 deferred by user",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
@@ -728,8 +728,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "AR-083 physical two-PC/NAS remains DEFERRED_BY_USER and is not satisfied by the clean runner."
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task. With AR-083 deferred and AR-071/072 optional-not-selected, AR-090 is the expected required handoff/audit task if tracker remains unchanged. Do not implement AR-090 in this AR-082 turn.",
-  "next_task_if_active_done": "AR-090 if current tracker/dependencies remain unchanged; AR-083 stays deferred by user."
+  "next_exact_action": "AR-090 active: run focused final-handoff audit, retained regressions, full H2/Agent suites and full Avalonia CI on the exact AR-090 code SHA; only then finalize package/evidence. AR-083 remains deferred.",
+  "next_task_if_active_done": "No new required implementation task is implied by AR-090. After green handoff, user testing/deferred native acceptance may reopen the owning AR; AR-083 remains deferred until explicitly started."
 }
 ```
 
