@@ -1,0 +1,84 @@
+{
+  "task": "AR-062",
+  "source_sha": "af0133a8728a9084c539bb4b777329daa246e76b",
+  "implementation_commits": [
+    "339e406370c1027fe84fb76dbd6b8eb7c80e35b7",
+    "af0133a8728a9084c539bb4b777329daa246e76b"
+  ],
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "pdf_content_claim": false,
+    "layout_claim": false,
+    "native_recalc_claim": false
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-060": "6/6",
+      "AR-052": "8/8",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-033": "42/42",
+      "AR-024": "2/2"
+    },
+    "full_h2": "1343/1343",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "21/21 SUCCESS"
+  },
+  "runs": {
+    "ar062": {
+      "run_id": 36249334920,
+      "job_id": 108424301064,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36249335285,
+      "job_id": 108424319267,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10908538609,
+      "bytes": 429469,
+      "sha256": "f2bb2b44f7eb47a0780507d817004ab1fc0432d4d9452d73ec00668d6782c97f",
+      "expires_at_utc": "2026-10-10T14:53:27Z",
+      "zip_entries": 648,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10908970510,
+      "bytes": 110448458,
+      "sha256": "ea52592229ce2aaae42d6c35a427721f852a74f650e9c21da6af5fbf3ef3728c",
+      "expires_at_utc": "2026-12-25T14:41:01Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "guarantees": {
+    "exact_staged_bytes_preserved": true,
+    "create_only_or_expected_hash_update": true,
+    "stale_verification_receipt_rejected": true,
+    "multi_output_verification_isolated": true,
+    "docx_structure_readback": true,
+    "xlsx_stored_formula_value_readback": true,
+    "pdf_signature_only": true
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "native_office_opened": false,
+    "external_forms_submitted": false
+  }
+}
