@@ -2,7 +2,7 @@ using System.Text.Json;
 using H2AgentLab.Cad;
 using H2AgentLab.Tools;
 
-internal static class H2AutoCadLiveBridgeTests
+public static class H2AutoCadLiveBridgeTests
 {
     public static void Run(Action<string,Action> test)
     {
@@ -191,15 +191,15 @@ internal static class H2AutoCadLiveBridgeTests
     private static void Check(bool value,string message)
     {if(!value)throw new InvalidOperationException(message);}
 
-    private sealed class FakeComApplication
+    public sealed class FakeComApplication
     {
         public int HWND{get;}=777;
         public FakeDocument ActiveDocument{get;}
         public FakeCollection<FakeDocument> Documents{get;}
-        private FakeComApplication(FakeDocument document){ActiveDocument=document;Documents=new([document]);}
+        public FakeComApplication(FakeDocument document){ActiveDocument=document;Documents=new([document]);}
         public static FakeComApplication Create()=>new(new FakeDocument());
     }
-    private sealed class FakeDocument
+    public sealed class FakeDocument
     {
         public string Name{get;}="Drawing1.dwg";
         public string FullName{get;}=@"C:\fixture\Drawing1.dwg";
@@ -212,7 +212,7 @@ internal static class H2AutoCadLiveBridgeTests
             ?Entity:throw new KeyNotFoundException();
         public void Regen(int mode){}
     }
-    private sealed class FakeEntity
+    public sealed class FakeEntity
     {
         public string Handle{get;}="ABCD";
         public string ObjectName{get;}="AcDbBlockReference";
@@ -222,19 +222,19 @@ internal static class H2AutoCadLiveBridgeTests
         public object[] GetAttributes()=>Attributes.Cast<object>().ToArray();
         public void Update(){}
     }
-    private sealed class FakeAttribute(string tag,string value)
+    public sealed class FakeAttribute(string tag,string value)
     {
         public string TagString{get;}=tag;
         public string TextString{get;set;}=value;
         public void Update(){}
     }
-    private sealed class FakeLayer(string name)
+    public sealed class FakeLayer(string name)
     {
         public string Name{get;}=name;
         public bool Freeze{get;}=false;
         public bool Lock{get;}=false;
     }
-    private sealed class FakeCollection<T>(IReadOnlyList<T> items)
+    public sealed class FakeCollection<T>(IReadOnlyList<T> items)
     {
         public int Count=>items.Count;
         public T Item(int index)=>items[index];

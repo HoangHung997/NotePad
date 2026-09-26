@@ -67,9 +67,6 @@ internal sealed partial class H2ProductionToolSession
             liveCad.Register(registry);
             verifiers.Add(liveCad);
             _owned.Add(liveCad);
-            registry.RegisterCapabilityNotice(new("autocad.live_drawing",
-                "Live AutoCAD external COM bridge is ready. Scope is current PickFirst selection for entity reads and bounded block-attribute edit/readback; general dynamic-block/update_entity/plot is not advertised.",
-                new(ToolReadinessState.Ready, "external_com_live")));
         }
         else
         {
