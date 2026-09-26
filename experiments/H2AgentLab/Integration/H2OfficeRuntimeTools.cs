@@ -97,6 +97,38 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         items = new { type = "string", @enum = new[] { "value", "formula", "format", "merge", "hidden" } },
                         description = "Fields to materialize. Defaults to value + formula; formatting/merge/hidden are on-demand." };
             }
+            if(name is "word.read_paragraphs" or "word.read_runs" or "word.read_styles" or "word.find_text" or "word.read_outline")
+            {
+                properties["start_paragraph"]=new{type="integer",minimum=0,description="Zero-based first paragraph for the requested scan."};
+                properties["page_size"]=new{type="integer",minimum=1,maximum=WordPagedReadLimits.MaxParagraphs,
+                    description=$"Maximum paragraphs scanned in this page (1..{WordPagedReadLimits.MaxParagraphs})."};
+                properties["cursor"]=new{type="string",description="nextCursor from the previous paragraph page."};
+                properties["content_version"]=new{type="string",description="contentVersion from the previous page; required with cursor."};
+            }
+            if(name is "word.read_range" or "word.verify_range")
+            {
+                properties["start"]=new{type="integer",minimum=0,description="Zero-based Word character start."};
+                properties["length"]=new{type="integer",minimum=1,maximum=WordPagedReadLimits.MaxRequestedRangeCharacters,
+                    description="Requested character length. Pages remain bounded by page_size."};
+                properties["page_size"]=new{type="integer",minimum=1,maximum=WordPagedReadLimits.MaxRangeCharacters,
+                    description=$"Maximum characters returned in this page (1..{WordPagedReadLimits.MaxRangeCharacters})."};
+                properties["cursor"]=new{type="string",description="nextCursor from the previous range page."};
+                properties["content_version"]=new{type="string",description="contentVersion from the previous page; required with cursor."};
+                required.AddRange(["start","length"]);
+            }
+            if(name=="word.read_tables")
+            {
+                properties["start_table"]=new{type="integer",minimum=0,description="Zero-based first table."};
+                properties["page_size"]=new{type="integer",minimum=1,maximum=WordPagedReadLimits.MaxTables,
+                    description=$"Maximum tables returned in this page (1..{WordPagedReadLimits.MaxTables})."};
+                properties["cursor"]=new{type="string",description="nextCursor from the previous table page."};
+                properties["content_version"]=new{type="string",description="contentVersion from the previous page; required with cursor."};
+            }
+            if(name is "word.replace_range" or "word.apply_format" or "word.insert_text")
+            {
+                properties["content_version"]=new{type="string",description="ContentVersion observed for the paragraph/range indexes. New callers must preserve it through the write."};
+                required.Add("content_version");
+            }
             if (name.StartsWith("excel.") && name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")
             {
                 properties["sheet_name"] = new { type = "string" };
@@ -127,6 +159,11 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             var description = capability.Description + " Discovery lists metadata only, with no usable state token. Get the host-bound document or an explicit session snapshot before any mutation. A model-supplied session cannot resolve ambiguous targets or override captured active/selection intent. Word replacement/format uses paragraph indexes; Excel patches use observed cell addresses.";
             if (name is "excel.read_range" or "excel.read_formulas" or "excel.read_styles" or "excel.read_merges" or "excel.read_hidden_state" or "excel.verify_range")
                 description += " Read only the requested range page. Continue with both nextCursor and contentVersion. If stale_content is returned, restart from page 1; never combine pages from different content versions. Selection/focus changes alone do not invalidate contentVersion.";
+            if(name is "word.read_paragraphs" or "word.read_runs" or "word.read_styles" or "word.find_text" or "word.read_outline"
+                or "word.read_range" or "word.verify_range" or "word.read_tables")
+                description+=" Reads are bounded pages. Continue only with nextCursor plus the same contentVersion; stale_content means restart. Formatting runs are materialized only by read_runs/read_styles/verify_range. StructuralKinds explicitly marks tables, fields or embedded content instead of silently flattening them.";
+            if(name is "word.replace_range" or "word.apply_format" or "word.insert_text")
+                description+=" Keep the content_version that supplied the paragraph/range indexes. A different content version is rejected before write; legacy state-token callers are retained only for compatibility.";
             if(name is "excel.write_range" or "excel.set_formula" or "excel.apply_format")description+=" The host preflights the whole batch before any write and reports Applied, PartiallyApplied or OutcomeUnknown with exact cell evidence.";
             if(name=="excel.recalculate")description+=" Recalculation is workbook-scoped by default or can be narrowed to exact sheet/range; returned values are read back.";
             if (name is "word.replace_range" or "word.insert_text")
@@ -173,6 +210,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
             var session=H2ProductionToolSession.Arg(call,"session_id")??"";
             var token=H2ProductionToolSession.Arg(call,"state_token")??"";
             var contentToken=H2ProductionToolSession.Arg(call,"content_token")??"";
+            var wordContentVersion=H2ProductionToolSession.Arg(call,"content_version")??"";
             var listing = name is "excel.list_workbooks" or "word.list_documents";
             var observed = await DiscoverAsync(application, ct).ConfigureAwait(false);
             H2AgentTargetResolution? target = null;
@@ -353,6 +391,36 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 }
                 else result = await Client.SnapshotExcelAsync(session, ct).ConfigureAwait(false);
             }
+            else if(Client is IWordPagedReadClient wordPages
+                && name is "word.read_paragraphs" or "word.read_runs" or "word.read_styles" or "word.find_text" or "word.read_outline"
+                    or "word.read_range" or "word.verify_range" or "word.read_tables")
+            {
+                if(name is "word.read_paragraphs" or "word.read_runs" or "word.read_styles" or "word.find_text" or "word.read_outline")
+                {
+                    var start=IntArg(call,"start_paragraph");var pageSize=IntArg(call,"page_size");
+                    var page=await wordPages.ReadWordParagraphsAsync(new(session,start,pageSize,
+                        IncludeFormatting:name is "word.read_runs" or "word.read_styles",
+                        Query:name=="word.find_text"?H2ProductionToolSession.Arg(call,"query"):null,
+                        OutlineOnly:name=="word.read_outline",
+                        Cursor:H2ProductionToolSession.Arg(call,"cursor"),
+                        ContentVersion:H2ProductionToolSession.Arg(call,"content_version")),ct).ConfigureAwait(false);
+                    ValidateWordPage(target,page.SessionId,page.FullName,page.NativeIdentity);result=page;
+                }
+                else if(name is "word.read_range" or "word.verify_range")
+                {
+                    var page=await wordPages.ReadWordRangeAsync(new(session,IntArg(call,"start"),IntArg(call,"length"),IntArg(call,"page_size"),
+                        IncludeFormatting:name=="word.verify_range",
+                        Cursor:H2ProductionToolSession.Arg(call,"cursor"),
+                        ContentVersion:H2ProductionToolSession.Arg(call,"content_version")),ct).ConfigureAwait(false);
+                    ValidateWordPage(target,page.SessionId,page.FullName,page.NativeIdentity);result=page;
+                }
+                else
+                {
+                    var page=await wordPages.ReadWordTablesAsync(new(session,IntArg(call,"start_table"),IntArg(call,"page_size"),
+                        H2ProductionToolSession.Arg(call,"cursor"),H2ProductionToolSession.Arg(call,"content_version")),ct).ConfigureAwait(false);
+                    ValidateWordPage(target,page.SessionId,page.FullName,page.NativeIdentity);result=page;
+                }
+            }
             else if (name is "word.get_spelling_errors" or "word.get_grammar_candidates" or "word.extract_legal_citations")
                 result = await Client.InspectWordLanguageAsync(new(session, token), ct).ConfigureAwait(false);
             else if (name is "word.replace_range" or "word.apply_format" or "word.insert_text")
@@ -360,9 +428,17 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 RequireAuthorization();
                 var beforeWord = await Client.SnapshotWordAsync(session, ct).ConfigureAwait(false);
                 ValidateSnapshot(target, beforeWord.SessionId, beforeWord.FullName, WordSelection(beforeWord), false, native: beforeWord.NativeIdentity);
-                // This mismatch is observed BEFORE PatchWordAsync. Preserve the no-effect
-                // proof instead of converting a safe preflight reject into an uncertain write.
-                if (token != beforeWord.StateToken) throw new ToolPreflightException("stale_resource");
+                // New AR-023 callers bind paragraph/range indexes to ContentVersion. Legacy
+                // state-token-only callers remain accepted only after an exact current snapshot match.
+                if(!string.IsNullOrWhiteSpace(wordContentVersion))
+                {
+                    if(wordContentVersion!=beforeWord.ContentVersion)throw new ToolPreflightException("stale_resource");
+                }
+                else
+                {
+                    if(token!=beforeWord.StateToken)throw new ToolPreflightException("stale_resource");
+                    wordContentVersion=beforeWord.ContentVersion??"";
+                }
                 WordParagraphPatch[] paragraphs;
                 if (name == "word.insert_text")
                 {
@@ -381,7 +457,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         failureId = _wordRecovery.Reject(name, beforeWord, paragraphs), mutationApplied = false,
                         next = "No document content was changed. Correct the patch for the same original paragraphs and retry. A verified correction resolves this rejected attempt." });
                 WordPatchResult patch;
-                try { patch = await Client.PatchWordAsync(new(session, token, true, paragraphs), ct).ConfigureAwait(false); }
+                var wordRequest=new WordPatchRequest(session,beforeWord.StateToken,true,paragraphs){ContentVersion=wordContentVersion};
+                try { patch = await Client.PatchWordAsync(wordRequest, ct).ConfigureAwait(false); }
                 catch (OfficeHostClientException rejected) when (rejected.Code == "word_patch_rejected")
                 {
                     return JsonSerializer.Serialize(new { ok = false, error = rejected.Code, message = rejected.Message,
@@ -483,6 +560,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
 
     private void ValidateRangePage(H2AgentTargetResolution target, ExcelRangeReadPage page)
         => ValidateSnapshot(target, page.SessionId, page.FullName, null, false, native: page.NativeIdentity);
+
+    private void ValidateWordPage(H2AgentTargetResolution target,string session,string path,OfficeNativeIdentity? native)
+        => ValidateSnapshot(target,session,path,null,false,native:native);
+
+    private static int IntArg(ToolCall call,string name)
+        => call.Arguments.TryGetProperty(name,out var node)&&node.TryGetInt32(out var value)?value:0;
 
     private static string WordSelection(WordLiveSnapshot snapshot) => snapshot.NativeIdentity is null ? snapshot.SelectionText
         : $"word-range:{snapshot.SelectionStart}:{snapshot.SelectionEnd}";

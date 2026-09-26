@@ -7,7 +7,7 @@ using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
 
-public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IExcelRangeReadBackend, IDisposable
+public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IExcelRangeReadBackend, IWordPagedReadBackend, IDisposable
 {
     private const int MaxExcelCells = 5_000;
     private const int MaxWordParagraphs = 2_000;
@@ -24,6 +24,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
 
     private readonly OfficeWindowCatalog _catalog;
     private readonly ConcurrentDictionary<string, long> _excelRevisions = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _wordRevisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ExcelWorkbookEventSubscription> _excelWorkbookSubscriptions = new(StringComparer.Ordinal);
     private long _excelTrackingGeneration;
 
@@ -368,6 +369,127 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         finally { /* Native references remain owned by the bounded STA catalog. */ }
     }
 
+    public WordParagraphReadPage ReadWordParagraphs(WordParagraphReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var bound=_catalog.Require("word",request.SessionId);_catalog.ValidateCurrent(bound,noEffect:true);
+        dynamic document=bound.Document;var started=Environment.TickCount64;
+        var version=WordContentVersion(bound,document);
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var total=Convert.ToInt32(document.Paragraphs.Count,CultureInfo.InvariantCulture);
+        if(total<=0)throw new OfficeHostFaultException("resource_not_found","Word document has no paragraphs.",true);
+        var size=WordPagedReadLimits.ParagraphPageSize(request.PageSize);int start;
+        try{start=WordPagedReadRules.Start(request.Cursor,"p",request.StartParagraph,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var end=Math.Min(total,start+size);var result=new List<WordParagraphPageItem>();var chars=0;var runBudget=WordPagedReadLimits.MaxPageRuns;
+        for(var index=start;index<end;index++)
+        {
+            dynamic? paragraph=null;dynamic? range=null;
+            try
+            {
+                paragraph=document.Paragraphs[index+1];range=paragraph.Range;
+                var text=CleanWordText(SafeString(()=>range.Text));chars+=text.Length;var style=StyleName(range);
+                var include=string.IsNullOrWhiteSpace(request.Query)||text.Contains(request.Query,StringComparison.OrdinalIgnoreCase);
+                if(request.OutlineOnly)include=include&&style.StartsWith("Heading",StringComparison.OrdinalIgnoreCase);
+                if(!include)continue;
+                var runs=request.IncludeFormatting?ReadWordRuns(document,range,ref runBudget):Array.Empty<WordRunState>();
+                result.Add(new(index,text,style,runs,WordStructureKinds(range)));
+            }
+            finally{Release(range);Release(paragraph);}
+        }
+        var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading this paragraph page.",true);
+        _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=total;
+        return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+            total,result,version,complete?null:WordPagedReadRules.Cursor("p",end),complete,"LiveDocument",
+            new(result.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(result).Length,Math.Max(0,Environment.TickCount64-started)))
+        {NativeIdentity=bound.Identity};
+    }
+
+    public WordRangeReadPage ReadWordRange(WordRangeReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var bound=_catalog.Require("word",request.SessionId);_catalog.ValidateCurrent(bound,noEffect:true);
+        dynamic document=bound.Document;dynamic? content=null;dynamic? range=null;var started=Environment.TickCount64;
+        try
+        {
+            var version=WordContentVersion(bound,document);
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+            content=document.Content;var documentLength=Math.Max(0,Convert.ToInt32(content.End,CultureInfo.InvariantCulture)-1);
+            if(request.Start<0||request.Length<1||request.Length>WordPagedReadLimits.MaxRequestedRangeCharacters
+                ||request.Start>documentLength||request.Start+request.Length>documentLength)
+                throw new OfficeHostFaultException("invalid_request","Word range is outside the document or exceeds the bounded request limit.",true);
+            var requestedEnd=request.Start+request.Length;int current;
+            try{current=WordPagedReadRules.Start(request.Cursor,"r",request.Start,request.Start,requestedEnd);}
+            catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+            var size=WordPagedReadLimits.RangePageSize(request.PageSize);var end=Math.Min(requestedEnd,current+size);
+            range=document.Range(current,end);var text=CleanWordText(SafeString(()=>range.Text));var kinds=WordStructureKinds(range);
+            var runBudget=WordPagedReadLimits.MaxPageRuns;
+            var runs=request.IncludeFormatting?ReadWordRuns(document,range,ref runBudget):Array.Empty<WordRunState>();
+            var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading this range page.",true);
+            _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=requestedEnd;
+            return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+                request.Start,request.Length,current,end-current,text,runs,kinds,kinds.Count==0,version,
+                complete?null:WordPagedReadRules.Cursor("r",end),complete,"LiveDocument",
+                new(1,1,text.Length,JsonSerializer.SerializeToUtf8Bytes(new{text,runs,kinds}).Length,Math.Max(0,Environment.TickCount64-started)))
+            {NativeIdentity=bound.Identity};
+        }
+        finally{Release(range);Release(content);}
+    }
+
+    public WordTableReadPage ReadWordTables(WordTableReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var bound=_catalog.Require("word",request.SessionId);_catalog.ValidateCurrent(bound,noEffect:true);
+        dynamic document=bound.Document;var started=Environment.TickCount64;
+        var version=WordContentVersion(bound,document);
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var total=Convert.ToInt32(document.Tables.Count,CultureInfo.InvariantCulture);
+        if(total==0)return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+            0,[],version,null,true,"LiveDocument",new(0,0,0,2,0)){NativeIdentity=bound.Identity};
+        int start;try{start=WordPagedReadRules.Start(request.Cursor,"t",request.StartTable,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var size=WordPagedReadLimits.TablePageSize(request.PageSize);var end=Math.Min(total,start+size);var tables=new List<WordTableState>();
+        for(var t=start;t<end;t++)
+        {
+            dynamic? table=null;
+            try
+            {
+                table=document.Tables[t+1];var rows=new List<IReadOnlyList<string>>();
+                var rowCount=Convert.ToInt32(table.Rows.Count,CultureInfo.InvariantCulture);
+                for(var r=1;r<=rowCount;r++)
+                {
+                    dynamic? row=null;
+                    try
+                    {
+                        row=table.Rows[r];var cells=new List<string>();var cellCount=Convert.ToInt32(row.Cells.Count,CultureInfo.InvariantCulture);
+                        for(var col=1;col<=cellCount;col++)
+                        {
+                            dynamic? cell=null;dynamic? cellRange=null;
+                            try{cell=row.Cells[col];cellRange=cell.Range;cells.Add(CleanWordText(SafeString(()=>cellRange.Text)));}
+                            finally{Release(cellRange);Release(cell);}
+                        }
+                        rows.Add(cells);
+                    }
+                    finally{Release(row);}
+                }
+                tables.Add(new(t,rows));
+            }
+            finally{Release(table);}
+        }
+        var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading table page.",true);
+        _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=total;var chars=tables.SelectMany(x=>x.Rows).SelectMany(x=>x).Sum(x=>x.Length);
+        return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+            total,tables,version,complete?null:WordPagedReadRules.Cursor("t",end),complete,"LiveDocument",
+            new(tables.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(tables).Length,Math.Max(0,Environment.TickCount64-started)))
+        {NativeIdentity=bound.Identity};
+    }
+
     public WordPatchResult PatchWord(WordPatchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -377,7 +499,16 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         try
         {
             var before = SnapshotWordInternal(bound, beforeMutation: true);
-            OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
+            if(!string.IsNullOrWhiteSpace(request.ContentVersion))
+            {
+                if(request.ContentVersion!=before.ContentVersion)
+                    throw new OfficeHostFaultException("stale_content","Word content changed since the caller observed it.",true);
+            }
+            else
+            {
+                try{OfficeHostSafety.RequireState(request.StateToken,before.StateToken);}
+                catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}
+            }
             if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
                 throw new OfficeHostFaultException("word_patch_rejected", problem);
 
@@ -423,6 +554,7 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
                 }
             }
 
+            if(changed.Count>0)BumpWordRevision(request.SessionId);
             var after = SnapshotWordInternal(bound);
             return new WordPatchResult(
                 before,
@@ -972,7 +1104,8 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             sections,
             headers,
             footers,
-            OfficeHostSafety.StableToken(basis)) { NativeIdentity = bound.Identity };
+            OfficeHostSafety.StableToken(basis))
+        { NativeIdentity = bound.Identity, ContentVersion = WordContentVersion(bound,document) };
         _catalog.ValidateCurrent(bound, beforeMutation);
         return observed;
     }
@@ -1132,6 +1265,49 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         {
             Release(content);
         }
+    }
+
+    private string WordContentVersion(OfficeViewLease bound,dynamic document)
+    {
+        _wordRevisions.TryGetValue(bound.SessionId,out var revision);dynamic? content=null;
+        try
+        {
+            content=document.Content;
+            return OfficeHostSafety.StableToken(new{
+                bound.SessionId,
+                Name=SafeString(()=>document.Name,bound.Name),
+                FullName=SafeString(()=>document.FullName,bound.FullName),
+                Saved=SafeBool(()=>document.Saved),
+                ContentEnd=Convert.ToInt32(content.End,CultureInfo.InvariantCulture),
+                Paragraphs=Convert.ToInt32(document.Paragraphs.Count,CultureInfo.InvariantCulture),
+                Words=Convert.ToInt32(document.Words.Count,CultureInfo.InvariantCulture),
+                Tables=Convert.ToInt32(document.Tables.Count,CultureInfo.InvariantCulture),
+                Sections=Convert.ToInt32(document.Sections.Count,CultureInfo.InvariantCulture),
+                Revision=revision
+            });
+        }
+        finally{Release(content);}
+    }
+
+    private void BumpWordRevision(string sessionId)
+        => _wordRevisions.AddOrUpdate(sessionId,1,static(_,revision)=>checked(revision+1));
+
+    private static void RequireWordPageVersion(string? supplied,string current)
+    {
+        if(!string.IsNullOrWhiteSpace(supplied)&&supplied!=current)
+            throw new OfficeHostFaultException("stale_content","Word content changed after the previous page; restart the read.",true);
+    }
+
+    private static IReadOnlyList<string> WordStructureKinds(dynamic range)
+    {
+        var kinds=new List<string>();
+        if(SafeLong(()=>range.Tables.Count) is >0)kinds.Add("table");
+        if(SafeLong(()=>range.Fields.Count) is >0)kinds.Add("field");
+        if(SafeLong(()=>range.InlineShapes.Count) is >0)kinds.Add("inline_shape");
+        if(SafeLong(()=>range.ContentControls.Count) is >0)kinds.Add("content_control");
+        var text=SafeString(()=>range.Text);
+        if(text.Contains('\f'))kinds.Add("section_break");
+        return kinds;
     }
 
     private static IReadOnlyList<WordParagraphState> ReadWordParagraphs(dynamic document)

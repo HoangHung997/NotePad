@@ -33,3 +33,12 @@ public interface IExcelRangeReadClient
         ExcelReadRangeRequest request,
         CancellationToken cancellationToken = default);
 }
+
+
+/// <summary>Additive AR-023 contract for bounded, versioned Word paragraph/range/table reads.</summary>
+public interface IWordPagedReadClient
+{
+    Task<WordParagraphReadPage> ReadWordParagraphsAsync(WordParagraphReadRequest request, CancellationToken cancellationToken = default);
+    Task<WordRangeReadPage> ReadWordRangeAsync(WordRangeReadRequest request, CancellationToken cancellationToken = default);
+    Task<WordTableReadPage> ReadWordTablesAsync(WordTableReadRequest request, CancellationToken cancellationToken = default);
+}

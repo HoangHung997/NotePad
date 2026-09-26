@@ -360,6 +360,24 @@ public static class V2OfficeHostTests
                 "Word structured snapshot is incomplete.");
         });
 
+        await Test("0810B AR-023 bounded Word paragraph pages cross OfficeHost IPC and reject stale continuation", async () =>
+        {
+            using var client=new OfficeHostClient(hostExecutable,fixtureMode:true);
+            var session=(await client.DiscoverWordAsync()).ActiveSessionId!;
+            var first=await client.ReadWordParagraphsAsync(new(session,0,2));
+            Check(first.Paragraphs.Count==2&&!first.Complete&&first.NextCursor is not null
+                &&first.Paragraphs.All(p=>p.Runs.Count==0),"Word paragraph page did not stay bounded/lazy across IPC.");
+            var second=await client.ReadWordParagraphsAsync(new(session,0,2,false,null,false,first.NextCursor,first.ContentVersion));
+            Check(second.Complete&&second.ContentVersion==first.ContentVersion,"Word continuation did not complete on one revision.");
+            var snapshot=await client.SnapshotWordAsync(session);
+            _=await client.PatchWordAsync(new WordPatchRequest(session,snapshot.StateToken,true,[new(0,Text:"CHANGED-AFTER-PAGE")])
+                {ContentVersion=snapshot.ContentVersion});
+            await ExpectCode("stale_content",()=>client.ReadWordParagraphsAsync(
+                new(session,0,2,false,null,false,first.NextCursor,first.ContentVersion)));
+            var formatted=await client.ReadWordParagraphsAsync(new(session,0,2,true));
+            Check(formatted.Paragraphs.All(p=>p.Runs.Count>0),"Word formatting was not available on demand.");
+        });
+
         await Test("0811 Word structured text/format patch returns before/after and stale-state protection", async () =>
         {
             using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);

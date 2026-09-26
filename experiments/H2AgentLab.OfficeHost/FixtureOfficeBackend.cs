@@ -3,17 +3,19 @@ using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
 
-public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBackend
+public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBackend, IWordPagedReadBackend
 {
     private readonly ExcelFixture _excel = new();
     private readonly WordFixture _word = new();
     private long _excelRevision = 1;
+    private long _wordRevision = 1;
     private readonly int _excelPatchFaultAfterWrites; private readonly bool _excelPatchReadbackFailsAfterFault; private readonly bool _excelSheetProtected;
 
     public FixtureOfficeBackend(int extraExcelRows=0,int sparseExcelLastRow=0,int excelPatchFaultAfterWrites=-1,
-        bool excelPatchReadbackFailsAfterFault=false,bool excelSheetProtected=false)
+        bool excelPatchReadbackFailsAfterFault=false,bool excelSheetProtected=false,int extraWordParagraphs=0)
     {
         if (extraExcelRows is < 0 or > 20_000) throw new ArgumentOutOfRangeException(nameof(extraExcelRows));
+        if (extraWordParagraphs is < 0 or > 20_000) throw new ArgumentOutOfRangeException(nameof(extraWordParagraphs));
         if(excelPatchFaultAfterWrites < -1 || excelPatchFaultAfterWrites > ExcelPatchLimits.MaxCells)throw new ArgumentOutOfRangeException(nameof(excelPatchFaultAfterWrites));
         _excelPatchFaultAfterWrites=excelPatchFaultAfterWrites;_excelPatchReadbackFailsAfterFault=excelPatchReadbackFailsAfterFault;_excelSheetProtected=excelSheetProtected;
         if (sparseExcelLastRow is < 0 or > ExcelRangeReadRules.MaxExcelRows) throw new ArgumentOutOfRangeException(nameof(sparseExcelLastRow));
@@ -27,6 +29,8 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             var address = "Z" + sparseExcelLastRow;
             _excel.Cells[address] = new ExcelCellFixture(address, "SPARSE-END", "", false, false, null, "General");
         }
+        for(var i=0;i<extraWordParagraphs;i++)
+            _word.Paragraphs.Add(new WordParagraphFixture($"WORD-LONG-{i + 3:D5}", false, false, false));
     }
 
     public ExcelDiscovery DiscoverExcel()
@@ -254,12 +258,106 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         return WordSnapshot();
     }
 
+    public void MoveWordSelectionForFixture(int start,int end)
+    {
+        if(start<0||end<start)throw new ArgumentOutOfRangeException(nameof(start));
+        _word.SelectionStart=start;_word.SelectionEnd=end;
+    }
+
+    public void SetWordParagraphForFixture(int index,string text)
+    {
+        if(index<0||index>=_word.Paragraphs.Count)throw new ArgumentOutOfRangeException(nameof(index));
+        _word.Paragraphs[index].Text=text??"";_word.Saved=false;_wordRevision++;
+    }
+
+    public WordParagraphReadPage ReadWordParagraphs(WordParagraphReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var total=_word.Paragraphs.Count;if(total==0)throw new OfficeHostFaultException("resource_not_found","Fixture Word document has no paragraphs.",true);
+        var pageSize=WordPagedReadLimits.ParagraphPageSize(request.PageSize);
+        int start;try{start=WordPagedReadRules.Start(request.Cursor,"p",request.StartParagraph,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var end=Math.Min(total,start+pageSize);var items=new List<WordParagraphPageItem>();var chars=0;
+        for(var i=start;i<end;i++)
+        {
+            var p=_word.Paragraphs[i];var text=p.Text;chars+=text.Length;
+            var style="Normal";
+            var include=string.IsNullOrWhiteSpace(request.Query)||text.Contains(request.Query,StringComparison.OrdinalIgnoreCase);
+            if(request.OutlineOnly)include=include&&style.StartsWith("Heading",StringComparison.OrdinalIgnoreCase);
+            if(!include)continue;
+            IReadOnlyList<WordRunState> runs=request.IncludeFormatting
+                ? [new WordRunState(0,text,"DefaultParagraphFont",p.Bold,p.Italic,p.Underline)] : [];
+            items.Add(new(i,text,style,runs,[]));
+        }
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading the page.",true);
+        var complete=end>=total;var payload=JsonSerializer.SerializeToUtf8Bytes(items).Length;
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,total,items,version,
+            complete?null:WordPagedReadRules.Cursor("p",end),complete,"FixtureLiveDocument",
+            new(items.Count,end-start,chars,payload,0));
+    }
+
+    public WordRangeReadPage ReadWordRange(WordRangeReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var all=string.Join("\r",_word.Paragraphs.Select(p=>p.Text));
+        if(request.Start<0||request.Length<1||request.Length>WordPagedReadLimits.MaxRequestedRangeCharacters
+            || request.Start>all.Length||request.Start+request.Length>all.Length)
+            throw new OfficeHostFaultException("invalid_request","Word range is outside the document or exceeds the bounded request limit.",true);
+        var requestedEnd=request.Start+request.Length;int current;
+        try{current=WordPagedReadRules.Start(request.Cursor,"r",request.Start,request.Start,requestedEnd);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var size=WordPagedReadLimits.RangePageSize(request.PageSize);var end=Math.Min(requestedEnd,current+size);
+        var text=all[current..end];IReadOnlyList<WordRunState> runs=request.IncludeFormatting
+            ? [new WordRunState(0,text,"DefaultParagraphFont",false,false,false)] : [];
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading the range.",true);
+        var complete=end>=requestedEnd;var payload=JsonSerializer.SerializeToUtf8Bytes(text).Length;
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,request.Start,request.Length,current,end-current,text,runs,[],true,
+            version,complete?null:WordPagedReadRules.Cursor("r",end),complete,"FixtureLiveDocument",
+            new(1,1,text.Length,payload,0));
+    }
+
+    public WordTableReadPage ReadWordTables(WordTableReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var all=FixtureWordTables();var total=all.Count;if(total==0)
+            return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,0,[],version,null,true,"FixtureLiveDocument",new(0,0,0,2,0));
+        int start;try{start=WordPagedReadRules.Start(request.Cursor,"t",request.StartTable,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var size=WordPagedReadLimits.TablePageSize(request.PageSize);var end=Math.Min(total,start+size);var page=all.Skip(start).Take(end-start).ToArray();
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading tables.",true);
+        var complete=end>=total;var chars=page.SelectMany(t=>t.Rows).SelectMany(r=>r).Sum(x=>x.Length);
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,total,page,version,
+            complete?null:WordPagedReadRules.Cursor("t",end),complete,"FixtureLiveDocument",
+            new(page.Length,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(page).Length,0));
+    }
+
     public WordPatchResult PatchWord(WordPatchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
         var before = SnapshotWord(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
+        if(!string.IsNullOrWhiteSpace(request.ContentVersion))
+        {
+            if(request.ContentVersion!=before.ContentVersion)
+                throw new OfficeHostFaultException("stale_content","Word content changed since the caller observed it.",true);
+        }
+        else
+        {
+            try{OfficeHostSafety.RequireState(request.StateToken,before.StateToken);}
+            catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}
+        }
 
         if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
             throw new OfficeHostFaultException("word_patch_rejected", problem);
@@ -283,6 +381,7 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         }
 
         _word.Saved = false;
+        _wordRevision++;
         var after = WordSnapshot();
         return new WordPatchResult(before, after, changed.Distinct().OrderBy(x => x).ToArray());
     }
@@ -416,14 +515,7 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
                         x.Underline)
                 ]))
             .ToArray();
-        var tables = new[]
-        {
-            new WordTableState(
-                0,
-                [
-                    (IReadOnlyList<string>)new[] { "A", "B" }
-                ])
-        };
+        var tables = FixtureWordTables();
         var sections = new[]
         {
             new WordSectionState(0, 612, 792, 72, 72, 72, 72)
@@ -480,7 +572,8 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
             sections,
             headers,
             footers,
-            OfficeHostSafety.StableToken(basis));
+            OfficeHostSafety.StableToken(basis))
+        { ContentVersion = WordContentVersion() };
     }
 
     private static ExcelWorkbookInfo Info(ExcelLiveSnapshot snapshot)
@@ -553,14 +646,30 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
         public string NumberFormat { get; set; } = numberFormat;
     }
 
+    private IReadOnlyList<WordTableState> FixtureWordTables()
+        => [new WordTableState(0,[(IReadOnlyList<string>)new[]{"A","B"}])];
+
+    private string WordContentVersion()
+        => OfficeHostSafety.StableToken(new {
+            _word.SessionId,_word.Name,_word.FullName,_word.Saved,
+            Revision=_wordRevision,ParagraphCount=_word.Paragraphs.Count,
+            TableCount=1,SectionCount=1
+        });
+
+    private static void RequireWordPageVersion(string? supplied,string current)
+    {
+        if(!string.IsNullOrWhiteSpace(supplied)&&supplied!=current)
+            throw new OfficeHostFaultException("stale_content","Word content changed after the previous page; restart the read.",true);
+    }
+
     private sealed class WordFixture
     {
         public string SessionId { get; } = "word-fixture-1";
         public string Name { get; } = "UnsavedFixture.docx";
         public string FullName { get; } = Path.Combine(Path.GetTempPath(), "H2AgentLab", "UnsavedFixture.docx");
         public bool Saved { get; set; }
-        public int SelectionStart { get; } = 0;
-        public int SelectionEnd { get; } = 12;
+        public int SelectionStart { get; set; } = 0;
+        public int SelectionEnd { get; set; } = 12;
         public string SelectionText => Paragraphs[0].Text;
         public List<WordParagraphFixture> Paragraphs { get; } =
         [

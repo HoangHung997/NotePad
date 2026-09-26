@@ -40,3 +40,13 @@ public sealed class OfficeHostFaultException : Exception
     public string Code { get; }
     public bool NoEffect { get; }
 }
+
+
+/// <summary>Additive bounded Word page reader. Production and fixture backends opt in without
+/// expanding the base Office mutation interface.</summary>
+public interface IWordPagedReadBackend
+{
+    WordParagraphReadPage ReadWordParagraphs(WordParagraphReadRequest request);
+    WordRangeReadPage ReadWordRange(WordRangeReadRequest request);
+    WordTableReadPage ReadWordTables(WordTableReadRequest request);
+}

@@ -17,7 +17,7 @@ public sealed class OfficeHostClientException : IOException
     public bool NoEffect { get; }
 }
 
-public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient, IExcelRangeReadClient
+public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient, IExcelRangeReadClient, IWordPagedReadClient
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -102,6 +102,15 @@ public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClien
             new WordSnapshotRequest(sessionId),
             null,
             cancellationToken);
+
+    public Task<WordParagraphReadPage> ReadWordParagraphsAsync(WordParagraphReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordParagraphReadPage>("word.readParagraphs", request, null, cancellationToken);
+
+    public Task<WordRangeReadPage> ReadWordRangeAsync(WordRangeReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordRangeReadPage>("word.readRange", request, null, cancellationToken);
+
+    public Task<WordTableReadPage> ReadWordTablesAsync(WordTableReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordTableReadPage>("word.readTables", request, null, cancellationToken);
 
     public Task<WordPatchResult> PatchWordAsync(WordPatchRequest request, CancellationToken cancellationToken = default)
         => CallAsync<WordPatchResult>("word.patch", request, null, cancellationToken);

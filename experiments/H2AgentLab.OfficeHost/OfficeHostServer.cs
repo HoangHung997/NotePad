@@ -173,6 +173,15 @@ public sealed class OfficeHostServer
 
             "word.discover" => _backend.DiscoverWord(),
             "word.snapshot" => _backend.SnapshotWord(Parameters<WordSnapshotRequest>(request).SessionId),
+            "word.readParagraphs" => _backend is IWordPagedReadBackend wordPages
+                ? wordPages.ReadWordParagraphs(Parameters<WordParagraphReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word paragraph reads.", true),
+            "word.readRange" => _backend is IWordPagedReadBackend wordRanges
+                ? wordRanges.ReadWordRange(Parameters<WordRangeReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word range reads.", true),
+            "word.readTables" => _backend is IWordPagedReadBackend wordTables
+                ? wordTables.ReadWordTables(Parameters<WordTableReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word table reads.", true),
             "word.patch" => _backend.PatchWord(Parameters<WordPatchRequest>(request)),
             "word.languageEvidence" => _backend.InspectWordLanguage(Parameters<WordLanguageEvidenceRequest>(request)),
             "word.saveCopy" => _backend.SaveWordCopy(Parameters<OfficeSaveCopyRequest>(request)),

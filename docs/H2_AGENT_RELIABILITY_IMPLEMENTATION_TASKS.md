@@ -82,7 +82,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER — final full build ready; no E3 PASS claim |
-| AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
+| AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | ACTIVE — bounded paragraph/range/table paging + content-version patch binding |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
@@ -539,16 +539,16 @@ Do not claim these defects were already covered by historical Office/transport/U
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
-  "phase": "AR-022_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-023_WORD_PAGED_READ_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-023",
   "parked_task": "AR-022",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_DEFERRED_BY_USER",
+  "implementation_status": "AR-023_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3 native Excel acceptance deferred until user tests final full build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar022-final-build-2026-09-26",
+  "owner_session": "chatgpt-ar023-implementation-2026-09-26",
   "implementation_commits": [
     "090519c480882011fde9093e14c4f5f2fa9748f7 feat(AR-022): make Excel batch effects reconcilable",
     "a0b442c4cd669744c7fc6927feeedc341cfb8404 fix(AR-022): remove C# local shadowing",

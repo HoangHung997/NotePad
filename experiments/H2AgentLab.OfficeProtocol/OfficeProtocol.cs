@@ -175,6 +175,7 @@ public sealed record WordLiveSnapshot(
     string StateToken)
 {
     public OfficeNativeIdentity? NativeIdentity { get; init; }
+    public string? ContentVersion { get; init; }
 }
 
 
@@ -191,7 +192,10 @@ public sealed record WordPatchRequest(
     string SessionId,
     string StateToken,
     bool PermissionGranted,
-    IReadOnlyList<WordParagraphPatch> Paragraphs);
+    IReadOnlyList<WordParagraphPatch> Paragraphs)
+{
+    public string? ContentVersion { get; init; }
+}
 
 public sealed record WordPatchResult(
     WordLiveSnapshot Before,
@@ -239,6 +243,6 @@ public sealed record OfficePingResult(
 
 public static class OfficeProtocolConstants
 {
-    public const string Version = "1.2";
+    public const string Version = "1.3";
     public const int MaxMessageBytes = 4 * 1024 * 1024;
 }
