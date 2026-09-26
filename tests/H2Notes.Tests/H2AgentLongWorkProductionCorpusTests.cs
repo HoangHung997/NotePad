@@ -5,6 +5,8 @@ using DocumentFormat.OpenXml.Packaging;
 using H2AgentLab.Context;
 using H2AgentLab.Integration;
 using H2AgentLab.Metrics;
+using H2AgentLab.Office;
+using H2AgentLab.OfficeProtocol;
 using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Transport;
@@ -164,20 +166,23 @@ internal static class H2AgentLongWorkProductionCorpusTests
     private static void UnsavedControl(string root,int iteration)
     {
         var seed=Seed(root,iteration,includePdf:false,unknownOperation:false);
-        var factory=new FinalOnlyChatFactory(inspectSource:true);
-        using var adapter=Adapter(seed.StateRoot,factory);
         var context=ResumeContext(seed,iteration);
+        var factory=new FinalOnlyChatFactory(inspectSource:true,liveWordSession:seed.UnsavedSession);
+        var office=new UnsavedWordOfficeClient(context.ActiveWorkContext!,seed.UnsavedSession);
+        using var adapter=Adapter(seed.StateRoot,factory,()=>office,captureValidator:_=>true);
         var resumed=adapter.ResumeTaskAsync(seed.TaskId,context,true).GetAwaiter().GetResult();
         var done=Wait(adapter,resumed);
         Check(done.Status==H2AgentTaskStatus.Completed,
             "All-verified UNSAVED-only resume did not complete: "+done.Error);
         AssertGoalState(done,expectPdfPending:false);
-        Check(factory.Bodies.Count==3
+        Check(factory.Bodies.Count==5
             && factory.Bodies[0].Contains(NewRequirement,StringComparison.Ordinal)
             && factory.Bodies[0].Contains("Host source requirement: LiveResource (Word)",StringComparison.Ordinal)
             && factory.Bodies[2].Contains(seed.UnsavedSession,StringComparison.Ordinal)
-            && factory.Bodies[2].Contains("resource_sources",StringComparison.Ordinal),
-            "Fresh resume lost current revision or exact UNSAVED host source identity.");
+            && factory.Bodies[2].Contains("resource_sources",StringComparison.Ordinal)
+            && factory.Bodies[^1].Contains("word.get_active_document",StringComparison.Ordinal)
+            && office.Discoveries>=2 && office.SnapshotReads==1,
+            "Fresh resume did not inspect metadata then reobserve the exact UNSAVED live Word source.");
         Check(Hash(File.ReadAllBytes(seed.DocBPath))==seed.DocBHash
             && Hash(File.ReadAllBytes(seed.DocAPath))==seed.DocAHash,
             "Read-only resume modified one of the near-name documents.");
@@ -298,16 +303,26 @@ internal static class H2AgentLongWorkProductionCorpusTests
         }).WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
 
     private static H2AgentTaskContext ResumeContext(SeedFixture seed,int iteration)
-        => new(seed.Workspace,"AR-080 resume "+iteration,
+    {
+        var processId=4000+iteration;
+        var processStart=DateTime.UtcNow.AddMinutes(-1).Ticks;
+        var rootWindow=(long)(7000+iteration);
+        return new(seed.Workspace,"AR-080 resume "+iteration,
             ThreadId:seed.ThreadId,TurnId:Guid.NewGuid(),
             ActiveWorkContext:new H2ActiveWorkContext(
-                4000+iteration,DateTime.UtcNow.AddMinutes(-1).Ticks,"WINWORD",H2ApplicationKind.Word,
-                7000+iteration,"win32-ar080-"+iteration,"Unsaved DOC-A - Word",
-                seed.UnsavedSession,null,"paragraph 1","ar080-fixture",DateTime.UtcNow),
+                processId,processStart,"WINWORD",H2ApplicationKind.Word,
+                rootWindow,$"win32:{rootWindow:x}:{processId}:{processStart}","Unsaved DOC-A - Word",
+                seed.UnsavedSession,null,"paragraph 1","office-host",DateTime.UtcNow),
             TargetIntent:H2AgentTargetIntent.CapturedActive);
+    }
 
-    private static H2ProductionAgentAdapter Adapter(string state,FinalOnlyChatFactory factory)
-        => new(state,()=>new(Profile("ar080-resume"),""),factory);
+    private static H2ProductionAgentAdapter Adapter(
+        string state,
+        FinalOnlyChatFactory factory,
+        Func<IOfficeSessionClient>? officeClientFactory=null,
+        Func<H2ActiveWorkContext,bool>? captureValidator=null)
+        => new(state,()=>new(Profile("ar080-resume"),""),factory,
+            officeClientFactory:officeClientFactory,captureValidator:captureValidator);
 
     private static AiProfile Profile(string model)=>new()
     {
@@ -427,17 +442,17 @@ internal static class H2AgentLongWorkProductionCorpusTests
             JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}),new UTF8Encoding(false));
     }
 
-    private sealed class FinalOnlyChatFactory(bool inspectSource=false):IAgentTransportFactory
+    private sealed class FinalOnlyChatFactory(bool inspectSource=false,string? liveWordSession=null):IAgentTransportFactory
     {
         public List<string> Bodies{get;}=[];
         public List<AgentRequestBudgetReceipt> Budgets{get;}=[];
         public IAgentTransport Create(AiProfile profile,string apiKey,AgentRunTelemetry telemetry)
         {
-            var transport=new ChatCompletionsTransport(profile,apiKey,new Handler(this,inspectSource));
+            var transport=new ChatCompletionsTransport(profile,apiKey,new Handler(this,inspectSource,liveWordSession));
             ((IAgentRequestBudgetSource)transport).RequestBudgetEvaluated+=Budgets.Add;
             return transport;
         }
-        private sealed class Handler(FinalOnlyChatFactory owner,bool inspectSource):HttpMessageHandler
+        private sealed class Handler(FinalOnlyChatFactory owner,bool inspectSource,string? liveWordSession):HttpMessageHandler
         {
             private int _request;
             protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
@@ -448,6 +463,15 @@ internal static class H2AgentLongWorkProductionCorpusTests
                     frame="""{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"ar080-search","type":"function","function":{"name":"tool_search","arguments":"{\"query\":\"resource_sources\"}"}}]},"finish_reason":"tool_calls"}]}""";
                 else if(inspectSource&&_request==1)
                     frame="""{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"ar080-source","type":"function","function":{"name":"resource_sources","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""";
+                else if(inspectSource&&_request==2)
+                    frame="""{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"ar080-live-search","type":"function","function":{"name":"tool_search","arguments":"{\"query\":\"word.get_active_document\"}"}}]},"finish_reason":"tool_calls"}]}""";
+                else if(inspectSource&&_request==3)
+                    frame=JsonSerializer.Serialize(new{
+                        choices=new[]{new{index=0,delta=JsonSerializer.SerializeToElement(new{
+                            tool_calls=new[]{new{index=0,id="ar080-live-read",type="function",
+                                function=new{name="word.get_active_document",arguments="{}"}}}
+                        }),finish_reason="tool_calls"}}
+                    });
                 else
                     frame=JsonSerializer.Serialize(new{
                         choices=new[]{new{index=0,delta=JsonSerializer.SerializeToElement(new{content="MODEL CLAIMED DONE"}),
@@ -458,6 +482,56 @@ internal static class H2AgentLongWorkProductionCorpusTests
                 return new(HttpStatusCode.OK){Content=new StringContent(raw,Encoding.UTF8,"text/event-stream")};
             }
         }
+    }
+
+    private sealed class UnsavedWordOfficeClient : IOfficeSessionClient
+    {
+        private readonly string _session;
+        private readonly OfficeNativeIdentity _native;
+        private readonly WordLiveSnapshot _snapshot;
+        public int Discoveries { get; private set; }
+        public int SnapshotReads { get; private set; }
+        public string InstanceIdentity => "ar080-office-connection";
+
+        public UnsavedWordOfficeClient(H2ActiveWorkContext capture,string session)
+        {
+            _session=session;
+            _native=new(capture.ProcessId,capture.ProcessStartUtcTicks,1,
+                capture.NativeWindowHandle,capture.NativeWindowHandle+100,capture.NativeWindowHandle+200,
+                "ar080-doc-"+session,"AR080-E2");
+            Check(_native.WindowIdentity==capture.WindowIdentity,
+                "AR-080 synthetic native identity does not match captured HWND/PID/start identity.");
+            _snapshot=new WordLiveSnapshot(session,"Unsaved DOC-A","Unsaved DOC-A",false,
+                0,0,"",[new(0,"TITLE REV-B","Normal",[new(0,"TITLE REV-B","Normal",false,false,false)])],
+                [],[],[],[],"ar080-state-v1")
+            {NativeIdentity=_native,ContentVersion="ar080-content-v1"};
+        }
+
+        public Task<WordDiscovery> DiscoverWordAsync(CancellationToken ct=default)
+        {
+            ct.ThrowIfCancellationRequested();Discoveries++;
+            var info=new WordDocumentInfo(_session,_snapshot.Name,_snapshot.FullName,false,0,0,"",_snapshot.StateToken)
+                {NativeIdentity=_native};
+            return Task.FromResult(new WordDiscovery([info],_session)
+            {Report=new(true,OfficeDiscoveryLimits.Coverage,1,1,1,[])});
+        }
+        public Task<WordLiveSnapshot> SnapshotWordAsync(string sessionId,CancellationToken ct=default)
+        {
+            ct.ThrowIfCancellationRequested();
+            Check(sessionId==_session,"AR-080 live Word fixture received another session.");
+            SnapshotReads++;
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<ExcelLiveSnapshot> SnapshotExcelAsync(string sessionId,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<ExcelPatchResult> PatchExcelAsync(ExcelPatchRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<ExcelLiveSnapshot> RecalculateExcelAsync(ExcelRecalculateRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<OfficeSaveCopyResult> SaveExcelCopyAsync(OfficeSaveCopyRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<WordPatchResult> PatchWordAsync(WordPatchRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<WordLanguageEvidenceResult> InspectWordLanguageAsync(WordLanguageEvidenceRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public Task<OfficeSaveCopyResult> SaveWordCopyAsync(OfficeSaveCopyRequest request,CancellationToken ct=default)=>throw new NotSupportedException();
+        public void Dispose(){}
     }
 
     private sealed record CompactionMeasurement(
