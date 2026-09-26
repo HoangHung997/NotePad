@@ -683,4 +683,5 @@ jobs:
         with:
           name: H2Notes-Avalonia-Portable-win-x64
           path: artifacts/H2Notes-Avalonia-Portable/
+          include-hidden-files: true
           if-no-files-found: warn
