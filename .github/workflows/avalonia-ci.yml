@@ -23,8 +23,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -629,7 +633,7 @@ jobs:
       - name: Build exact portable manifest
         shell: pwsh
         run: |
-          tools/agent-reliability/build_portable_manifest.ps1 -Root .\artifacts\H2Notes-Avalonia-Portable -SourceSha "${{ github.sha }}" -SourceBranch "${{ github.head_ref || github.ref_name }}" -RuntimeIdentifier win-x64
+          tools/agent-reliability/build_portable_manifest.ps1 -Root .\artifacts\H2Notes-Avalonia-Portable -SourceSha "${{ github.event.pull_request.head.sha || github.sha }}" -SourceBranch "${{ github.head_ref || github.ref_name }}" -RuntimeIdentifier win-x64
           Get-Content -LiteralPath .\artifacts\H2Notes-Avalonia-Portable\portable-manifest.json | Select-Object -First 40
 
       - name: Verify packaged portable from clean local profile
@@ -660,7 +664,7 @@ jobs:
           dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
           @"
           Source branch: ${{ github.ref_name }}
-          Source commit: ${{ github.sha }}
+          Source commit: ${{ github.event.pull_request.head.sha || github.sha }}
           Actions run: ${{ github.run_id }}
           Built UTC: $([DateTime]::UtcNow.ToString('O'))
           "@ | Set-Content -LiteralPath .\artifacts\H2Notes-NasAcceptance\SOURCE.txt -Encoding UTF8
