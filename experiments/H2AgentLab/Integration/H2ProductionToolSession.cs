@@ -33,6 +33,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly H2AgentTargetBindingPolicy? _targetPolicy;
     private readonly Action<H2AgentTargetResolution>? _targetObserved;
     private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
+    private readonly Func<Cad.IAutoCadNativeBridge?>? _autoCadLiveBridgeFactory;
     private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
     private readonly object _launchedOfficeGate = new();
     private readonly Dictionary<H2ApplicationKind, TaskLaunchedOfficeWindow> _launchedOfficeWindows = [];
@@ -44,6 +45,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         H2AgentTargetBindingPolicy? targetPolicy = null,
         Action<H2AgentTargetResolution>? targetObserved = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+        Func<Cad.IAutoCadNativeBridge?>? autoCadLiveBridgeFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
         Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
         Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null,
@@ -56,7 +58,7 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
         _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
         _targetPolicy = targetPolicy; _targetObserved = targetObserved;
-        _officeClientFactory = officeClientFactory; _captureValidator = captureValidator;
+        _officeClientFactory = officeClientFactory; _autoCadLiveBridgeFactory = autoCadLiveBridgeFactory; _captureValidator = captureValidator;
     }
 
     public bool IsExecutingAuthorizedCall => _executingAuthorizedCall.Value;

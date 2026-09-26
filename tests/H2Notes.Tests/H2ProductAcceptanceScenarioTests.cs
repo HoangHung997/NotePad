@@ -614,6 +614,71 @@ internal static class H2ProductAcceptanceScenarioTests
             }
         });
 
+        test("AR-063 E2 Work Assistant crosses production live AutoCAD bridge for selected attribute edit and readback", () =>
+        {
+            var root = Temp("ar063-live-cad");
+            Directory.CreateDirectory(root);
+            try
+            {
+                var bridge = new H2AutoCadLiveBridgeTests.Ar063LiveCadFixtureBridge();
+                var transport = new ScriptedToolTransportFactory(
+                [
+                    new("autocad.query_entities",
+                        "{\"document_session_id\":\"dwg-live-01\",\"document_state_token\":\"doc-v1\",\"query\":{\"selection\":\"current\",\"object_type\":\"BlockReference\",\"layer\":\"OTC\",\"max_results\":10}}"),
+                    new("autocad.read_attributes",
+                        "{\"document_session_id\":\"dwg-live-01\",\"document_state_token\":\"doc-v1\",\"entity_handle\":\"ABCD\",\"object_type\":\"AcDbBlockReference\",\"layer\":\"OTC\",\"entity_state_token\":\"ent-v1\"}"),
+                    new("autocad.update_attribute",
+                        "{\"document_session_id\":\"dwg-live-01\",\"document_state_token\":\"doc-v1\",\"entity_handle\":\"ABCD\",\"object_type\":\"AcDbBlockReference\",\"layer\":\"OTC\",\"entity_state_token\":\"ent-v1\",\"attribute_tag\":\"KM\",\"value\":\"12+345\"}")
+                ],
+                "Đã sửa đúng attribute KM của block đang chọn và H2 đã đọc lại trạng thái live.");
+                var stateRoot = Path.Combine(root, "agent-state");
+                using var adapter = ProductionAdapter(
+                    root,
+                    transport,
+                    stateRoot: stateRoot,
+                    autoCadLiveBridgeFactory: () => bridge,
+                    captureValidator: _ => true);
+
+                var context = Context(
+                    H2ApplicationKind.AutoCAD,
+                    "acad",
+                    "Drawing1.dwg - AutoCAD",
+                    session: H2AutoCadLiveBridgeTests.Ar063LiveCadFixtureBridge.Session,
+                    path: @"C:\fixture\Drawing1.dwg",
+                    selection: "PickFirst: BlockReference Handle=ABCD Layer=OTC",
+                    provider: "AutoCADExternalCom");
+                var app = WorkAssistantApp(root, adapter, context);
+                try
+                {
+                    var compact = OpenCompact(app);
+                    compact.SelectedPermissionMode = H2AgentPermissionMode.AllowScopedChanges;
+                    compact.PromptText = "Trong drawing AutoCAD đang mở, đọc block đang chọn và đổi attribute KM thành 12+345; chỉ sửa đúng block đang chọn rồi xác minh.";
+                    ClickSend(compact);
+                    WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
+                    var taskId = app.CurrentWorkAssistantTaskId!.Value;
+                    var summary = WaitTerminal(adapter, taskId, 20_000);
+
+                    Check(summary.Status == H2AgentTaskStatus.Completed,
+                        "AR-063 production live CAD slice did not complete: " + summary.Error);
+                    Check(bridge.MutationCount == 1 && bridge.AttributeValue == "12+345",
+                        "AR-063 live CAD bridge did not execute exactly one bounded attribute mutation.");
+                    Check(summary.Evidence.Any(x => x.Kind.Contains("verification", StringComparison.OrdinalIgnoreCase)),
+                        "AR-063 live CAD mutation has no host verification evidence.");
+
+                    var outcomes = File.ReadAllText(Path.Combine(stateRoot, "tasks", taskId.ToString("N"), "tool-outcomes.jsonl"));
+                    Check(outcomes.Contains("\"autocad.query_entities\"", StringComparison.Ordinal)
+                        && outcomes.Contains("\"autocad.read_attributes\"", StringComparison.Ordinal)
+                        && outcomes.Contains("\"autocad.update_attribute\"", StringComparison.Ordinal),
+                        "AR-063 Work Assistant did not traverse production live CAD tools.");
+                    Check(!outcomes.Contains("\"autocad.update_entity\"", StringComparison.Ordinal)
+                        && !outcomes.Contains("\"autocad.plot\"", StringComparison.Ordinal),
+                        "AR-063 production path used an unsupported live CAD operation.");
+                }
+                finally { CloseAssistant(app); }
+            }
+            finally { Delete(root); }
+        });
+
         test("H2M-115 legacy migration preserves project history attachments saved files layout and new Agent work", () =>
         {
             var root = Temp("legacy");
@@ -851,6 +916,7 @@ internal static class H2ProductAcceptanceScenarioTests
         IAgentRuntimeFactory? runtimeFactory = null,
         string? stateRoot = null,
         Func<IOfficeSessionClient>? officeClientFactory = null,
+        Func<IAutoCadNativeBridge?>? autoCadLiveBridgeFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null)
         => new(
             stateRoot ?? Path.Combine(workspace, ".agent-state-" + Guid.NewGuid().ToString("N")),
@@ -866,6 +932,7 @@ internal static class H2ProductAcceptanceScenarioTests
             transport,
             runtimeFactory,
             officeClientFactory: officeClientFactory,
+            autoCadLiveBridgeFactory: autoCadLiveBridgeFactory,
             captureValidator: captureValidator);
 
     private static ScenarioRuntimeFactory ScenarioRuntime(

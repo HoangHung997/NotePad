@@ -38,6 +38,7 @@ public sealed partial class H2ProductionAgentAdapter :
     private readonly IAgentRuntimeFactory _runtimeFactory;
     private readonly AgentIntegrationTaskArchive _archive;
     private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
+    private readonly Func<Cad.IAutoCadNativeBridge?>? _autoCadLiveBridgeFactory;
     private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
     private readonly Dictionary<Guid, LiveTask> _live = [];
     private readonly Dictionary<Guid, TurnStartReservation> _turnStarts = [];
@@ -52,6 +53,7 @@ public sealed partial class H2ProductionAgentAdapter :
         IAgentRuntimeFactory? runtimeFactory = null,
         Func<Guid?, string?, H2ProductionAgentModel>? requestModelResolver = null,
         Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+        Func<Cad.IAutoCadNativeBridge?>? autoCadLiveBridgeFactory = null,
         Func<H2ActiveWorkContext, bool>? captureValidator = null,
         AgentArchiveOptions? archiveOptions = null,
         IEnumerable<Providers.ICapabilityProvider>? extensionProviders = null,
@@ -62,6 +64,7 @@ public sealed partial class H2ProductionAgentAdapter :
         _modelResolver = modelResolver ?? throw new ArgumentNullException(nameof(modelResolver));
         _requestModelResolver = requestModelResolver;
         _officeClientFactory = officeClientFactory;
+        _autoCadLiveBridgeFactory = autoCadLiveBridgeFactory;
         _captureValidator = captureValidator;
         _runtimeFactory = runtimeFactory ?? new AgentRuntimeFactory(
             transportFactory ?? new AgentTransportFactory());
@@ -590,7 +593,7 @@ public sealed partial class H2ProductionAgentAdapter :
                 live.RequestContext, _projectTools,
                 (title, details, ct) => RequestApprovalAsync(live, title, details, ct), targetPolicy,
                 resolution => { lock (live.Gate) AddProgressLocked(live, "target", "target-bound",
-                    resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _captureValidator, history,
+                    resolution.ScopeLabel, targetBinding: resolution); }, _officeClientFactory, _autoCadLiveBridgeFactory, _captureValidator, history,
                 () => { lock (live.Gate) return live.GoalState?.RevisionId ?? throw new InvalidOperationException("Goal revision unavailable."); },
                 live.Cancellation.Token, (call, job) => _archive.RecordJob(live.TaskId, call.Invocation!.InvocationId, job), live.Goal,
                 async (title, details, ct) =>

@@ -1,3 +1,4 @@
+using H2AgentLab.Cad;
 using H2AgentLab.Providers;
 using H2AgentLab.Runtime;
 using H2AgentLab.Tools;
@@ -26,12 +27,56 @@ internal sealed partial class H2ProductionToolSession
         // App lifecycle is independent of a preselected window; click/type remain unavailable
         // when no selected Desktop controller exists, but launch/activate can still be verified.
         verifiers.Add(new H2DesktopRuntimeVerifier());
-        if (_scope?.Mode == H2Notes.Core.H2AgentPermissionMode.FullAccess && H2AutoCadFileTools.FindExecutable() is { } cadExecutable)
+        var coreConsole = H2AutoCadFileTools.FindExecutable();
+        if (_scope?.Mode == H2Notes.Core.H2AgentPermissionMode.FullAccess && coreConsole is not null)
         {
-            var cad = new H2AutoCadFileTools(cadExecutable, tools.Workspace, tools.StateRoot); cad.Register(registry); verifiers.Add(cad);
+            var cad = new H2AutoCadFileTools(coreConsole, tools.Workspace, tools.StateRoot);
+            cad.Register(registry);
+            verifiers.Add(cad);
+        }
+        else if (coreConsole is null)
+        {
+            registry.RegisterCapabilityNotice(new("autocad.closed_file",
+                "Closed DWG create/inspect/update/export requires an installed Autodesk AutoCAD Core Console. This does not affect the separate live AutoCAD capability.",
+                new(ToolReadinessState.NeedsConfiguration, "autocad_core_console_not_found")));
         }
 
-        registry.RegisterCapabilityNotice(new("autocad.live_drawing", "No live AutoCAD drawing/SelectionSet provider is composed here. Core Console operates on disk files, not the current unsaved drawing.", new(ToolReadinessState.Unsupported, "live_resource_required")));
+        IAutoCadNativeBridge? liveCadBridge = null;
+        var liveCadReason = "live_autocad_not_running";
+        try
+        {
+            if (_autoCadLiveBridgeFactory is not null)
+            {
+                liveCadBridge = _autoCadLiveBridgeFactory();
+                liveCadReason = liveCadBridge is null ? "live_autocad_bridge_unavailable" : "ready";
+            }
+            else
+            {
+                _ = AutoCadComLiveBridge.TryCreate(out liveCadBridge, out liveCadReason);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            liveCadBridge = null;
+            liveCadReason = "live_autocad_bridge_unavailable";
+        }
+
+        if (liveCadBridge is not null)
+        {
+            var liveCad = new H2AutoCadLiveTools(liveCadBridge, () => IsExecutingAuthorizedCall);
+            liveCad.Register(registry);
+            verifiers.Add(liveCad);
+            _owned.Add(liveCad);
+            registry.RegisterCapabilityNotice(new("autocad.live_drawing",
+                "Live AutoCAD external COM bridge is ready. Scope is current PickFirst selection for entity reads and bounded block-attribute edit/readback; general dynamic-block/update_entity/plot is not advertised.",
+                new(ToolReadinessState.Ready, "external_com_live")));
+        }
+        else
+        {
+            registry.RegisterCapabilityNotice(new("autocad.live_drawing",
+                "Live AutoCAD is unavailable. Start AutoCAD in the same Windows user session and select target entities. Closed-file Core Console is a separate capability and never substitutes for an unsaved live drawing.",
+                new(ToolReadinessState.Unavailable, liveCadReason)));
+        }
 
         var webConfig = WebResearchProductionOptions.FromEnvironment();
         if (!webConfig.SearchConfigured)
