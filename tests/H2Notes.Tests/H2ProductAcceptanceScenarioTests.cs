@@ -317,6 +317,201 @@ internal static class H2ProductAcceptanceScenarioTests
             }
         });
 
+        test("AR-024 E2 Global Work Assistant crosses production bridge into OfficeHost Excel", () =>
+        {
+            var root = Temp("ar024-global-excel");
+            Directory.CreateDirectory(root);
+            try
+            {
+                var host = OfficeHostExecutable();
+                ExcelLiveSnapshot before;
+                using (var probe = new OfficeHostClient(host, fixtureMode: true))
+                {
+                    var session = probe.DiscoverExcelAsync().GetAwaiter().GetResult().ActiveSessionId
+                        ?? throw new Exception("AR-024 Excel fixture has no active session.");
+                    before = probe.SnapshotExcelAsync(session).GetAwaiter().GetResult();
+                }
+
+                var transport = new ScriptedToolTransportFactory(
+                [
+                    new("excel.read_range", JsonSerializer.Serialize(new
+                    {
+                        session_id = before.SessionId,
+                        sheet_name = "Data",
+                        range = "A1:A2",
+                        page_size = 2
+                    })),
+                    new("excel.write_range", JsonSerializer.Serialize(new
+                    {
+                        session_id = before.SessionId,
+                        content_token = before.ContentToken,
+                        sheet_name = "Data",
+                        cells = new[] { new { address = "A2", value = "84" } }
+                    }))
+                ],
+                "Đã đọc đúng vùng, cập nhật A2 và xác minh bằng readback production.");
+
+                var spawned = new List<OfficeHostClient>();
+                IOfficeSessionClient OfficeFactory()
+                {
+                    var client = new OfficeHostClient(host, fixtureMode: true, defaultTimeout: TimeSpan.FromSeconds(30));
+                    spawned.Add(client);
+                    return client;
+                }
+
+                var stateRoot = Path.Combine(root, "agent-state");
+                using var adapter = ProductionAdapter(root, transport,
+                    stateRoot: stateRoot,
+                    officeClientFactory: OfficeFactory,
+                    captureValidator: _ => true);
+
+                var context = Context(
+                    H2ApplicationKind.Excel,
+                    "excel",
+                    "UnsavedFixture.xlsx - Excel",
+                    before.SessionId,
+                    before.FullName,
+                    "Data!A1:A2",
+                    "OfficeHost");
+                var app = WorkAssistantApp(root, adapter, context);
+                try
+                {
+                    var compact = OpenCompact(app);
+                    compact.SelectedPermissionMode = H2AgentPermissionMode.AllowScopedChanges;
+                    compact.PromptText = "Đọc A1:A2 của workbook đang mở rồi đổi A2 thành 84 và xác minh.";
+                    ClickSend(compact);
+                    WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
+                    var taskId = app.CurrentWorkAssistantTaskId!.Value;
+                    var summary = WaitTerminal(adapter, taskId, 20_000);
+
+                    Check(summary.Status == H2AgentTaskStatus.Completed,
+                        "Global production Office slice did not complete: " + summary.Error);
+                    Check(summary.ProjectId is null, "Global Work Assistant unexpectedly became project-scoped.");
+                    Check(summary.Evidence.Any(x => x.Kind.Contains("verification", StringComparison.OrdinalIgnoreCase)),
+                        "Global Excel mutation has no production verification evidence.");
+                    var outcomes = File.ReadAllText(Path.Combine(stateRoot, "tasks", taskId.ToString("N"), "tool-outcomes.jsonl"));
+                    Check(outcomes.Contains("\"excel.read_range\"", StringComparison.Ordinal)
+                        && outcomes.Contains("\"excel.write_range\"", StringComparison.Ordinal),
+                        "Global UI did not traverse production Office tools.");
+                    Check(spawned.Any(client => client.StartCount > 0),
+                        "Global production Office slice did not start an OfficeHost process.");
+                }
+                finally
+                {
+                    CloseAssistant(app);
+                }
+            }
+            finally
+            {
+                Delete(root);
+            }
+        });
+
+        test("AR-024 E2 Project Agent crosses production bridge into OfficeHost Word", () =>
+        {
+            var root = Temp("ar024-project-word");
+            Directory.CreateDirectory(root);
+            try
+            {
+                var host = OfficeHostExecutable();
+                WordLiveSnapshot before;
+                using (var probe = new OfficeHostClient(host, fixtureMode: true))
+                {
+                    var session = probe.DiscoverWordAsync().GetAwaiter().GetResult().ActiveSessionId
+                        ?? throw new Exception("AR-024 Word fixture has no active session.");
+                    before = probe.SnapshotWordAsync(session).GetAwaiter().GetResult();
+                }
+
+                var project = Project("AR-024 production project", 0, 1, "Cập nhật Word", DateTime.UtcNow);
+                project.Links.Add(new ProjectLink(Guid.NewGuid(), "Bound live Word fixture", before.FullName));
+                var conversation = new AiConversation
+                {
+                    Title = "AR-024 production",
+                    PermissionMode = AiPermissionMode.ProjectAccess
+                };
+                project.Conversations.Add(conversation);
+                project.SelectedAiConversationId = conversation.Id;
+                var board = new NoteRecord { Title = "AR-024", NoteKind = "project-hub", Projects = [project] };
+
+                var transport = new ScriptedToolTransportFactory(
+                [
+                    new("word.read_paragraphs", JsonSerializer.Serialize(new
+                    {
+                        session_id = before.SessionId,
+                        page_size = 2
+                    })),
+                    new("word.replace_range", JsonSerializer.Serialize(new
+                    {
+                        session_id = before.SessionId,
+                        content_version = before.ContentVersion,
+                        paragraphs = new[] { new { paragraphIndex = 1, text = "AR-024-PROJECT-WORD" } }
+                    }))
+                ],
+                "Đã đọc đúng tài liệu Word liên kết của dự án, cập nhật đoạn mục tiêu và xác minh.");
+
+                var spawned = new List<OfficeHostClient>();
+                IOfficeSessionClient OfficeFactory()
+                {
+                    var client = new OfficeHostClient(host, fixtureMode: true, defaultTimeout: TimeSpan.FromSeconds(30));
+                    spawned.Add(client);
+                    return client;
+                }
+
+                var stateRoot = Path.Combine(root, "agent-state");
+                using var adapter = ProductionAdapter(root, transport,
+                    stateRoot: stateRoot,
+                    officeClientFactory: OfficeFactory,
+                    captureValidator: _ => true);
+                var app = new App { AgentAdapter = adapter };
+                app.State.Notes.Add(board);
+                SetStorage(app, new ProjectWorkspaceStore(root, writerId: "ar024-project"));
+                app.LocalSettings.Ai.ProjectAccessConversationIds.Add(conversation.Id);
+                H2UiTestNavigation.ConfigureAgentProfile(app);
+
+                var panel = new AiChatPanel(app);
+                panel.SetProject(project);
+                var window = new Window { Width = 760, Height = 680, Content = panel };
+                window.Show();
+                Pump();
+                try
+                {
+                    panel.GetVisualDescendants().OfType<TextBox>()
+                        .Single(x => x.Name == "ChatComposer").Text =
+                        "Đọc tài liệu Word liên kết của dự án, đổi đoạn thứ hai thành AR-024-PROJECT-WORD và xác minh.";
+                    panel.GetVisualDescendants().OfType<Button>()
+                        .Single(x => x.Name == "ChatSend")
+                        .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                    WaitUntil(() => conversation.Messages.Count >= 2
+                        && conversation.Messages[^1].Status is "complete" or "error",
+                        timeoutMs: 20_000);
+
+                    var answer = conversation.Messages[^1];
+                    var taskId = answer.AiRunId ?? throw new Exception("Project UI lost AR-024 TaskId.");
+                    var summary = adapter.GetTaskSummary(taskId);
+                    Check(answer.Status == "complete" && summary.Status == H2AgentTaskStatus.Completed,
+                        "Project production Office slice did not complete: " + (answer.ErrorText ?? summary.Error));
+                    Check(summary.ProjectId == project.Id, "Project identity did not reach production bridge.");
+                    Check(summary.Evidence.Any(x => x.Kind.Contains("verification", StringComparison.OrdinalIgnoreCase)),
+                        "Project Word mutation has no production verification evidence.");
+                    var outcomes = File.ReadAllText(Path.Combine(stateRoot, "tasks", taskId.ToString("N"), "tool-outcomes.jsonl"));
+                    Check(outcomes.Contains("\"word.read_paragraphs\"", StringComparison.Ordinal)
+                        && outcomes.Contains("\"word.replace_range\"", StringComparison.Ordinal),
+                        "Project UI did not traverse production Word tools.");
+                    Check(spawned.Any(client => client.StartCount > 0),
+                        "Project production Office slice did not start an OfficeHost process.");
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+            finally
+            {
+                Delete(root);
+            }
+        });
+
         test("H2M-114 AutoCAD Work Assistant performs bounded selected-block mutation and reread verification", () =>
         {
             var root = Temp("cad");
@@ -624,7 +819,9 @@ internal static class H2ProductAcceptanceScenarioTests
         string workspace,
         IAgentTransportFactory transport,
         IAgentRuntimeFactory? runtimeFactory = null,
-        string? stateRoot = null)
+        string? stateRoot = null,
+        Func<IOfficeSessionClient>? officeClientFactory = null,
+        Func<H2ActiveWorkContext, bool>? captureValidator = null)
         => new(
             stateRoot ?? Path.Combine(workspace, ".agent-state-" + Guid.NewGuid().ToString("N")),
             () => new H2ProductionAgentModel(
@@ -637,7 +834,9 @@ internal static class H2ProductAcceptanceScenarioTests
                 },
                 ""),
             transport,
-            runtimeFactory);
+            runtimeFactory,
+            officeClientFactory: officeClientFactory,
+            captureValidator: captureValidator);
 
     private static ScenarioRuntimeFactory ScenarioRuntime(
         IAgentTransportFactory transport,
@@ -800,6 +999,17 @@ internal static class H2ProductAcceptanceScenarioTests
            || name.Contains("click", StringComparison.OrdinalIgnoreCase)
            || name.Contains("uia.", StringComparison.OrdinalIgnoreCase)
            || name.Contains("computer", StringComparison.OrdinalIgnoreCase);
+
+    private static string OfficeHostExecutable()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "H2AgentLab.OfficeHost.exe"),
+            Path.GetFullPath(Path.Combine("experiments", "H2AgentLab.OfficeHost", "bin", "Release", "net10.0-windows", "H2AgentLab.OfficeHost.exe"))
+        };
+        return candidates.FirstOrDefault(File.Exists)
+            ?? throw new FileNotFoundException("AR-024 requires the built OfficeHost executable.");
+    }
 
     private static string Temp(string name)
         => Path.Combine(Path.GetTempPath(), "h2-h11-" + name + "-" + Guid.NewGuid().ToString("N"));

@@ -83,7 +83,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER |
 | AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER — final full build ready; no E3 PASS claim |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER — final full build ready; no E3 PASS claim |
-| AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
+| AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | ACTIVE — production UI→adapter→runtime→OfficeHost E2 slice; E4 real model/native pending |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
 | AR-031 | Agent journal/checkpoint bền vững | 030 | E1/E2 | DONE |
 | AR-032 | Retrieval có nguồn và cách ly scope | 031/012 | E2 | DONE |
@@ -546,11 +546,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-023_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-024_PRODUCTION_OFFICE_SLICE_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-024",
   "parked_task": "AR-023",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_DEFERRED_BY_USER",
+  "implementation_status": "AR-024_ACTIVE",
+  "acceptance_status": "E4_NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3 native Word acceptance deferred until user tests final full build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
