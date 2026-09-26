@@ -11,9 +11,11 @@ public sealed class HostResourceMutationCoordinator
 {
     private sealed class ResourceState
     {
+        public object Sync { get; } = new();
         public SemaphoreSlim Gate { get; } = new(1, 1);
         public int Users;
-        public int Uncertain;
+        public bool Uncertain;
+        public bool Retired;
     }
 
     private sealed class Lease(
@@ -38,8 +40,21 @@ public sealed class HostResourceMutationCoordinator
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceKey);
-        var state = _states.GetOrAdd(resourceKey, static _ => new ResourceState());
-        Interlocked.Increment(ref state.Users);
+        ResourceState state;
+        while (true)
+        {
+            state = _states.GetOrAdd(resourceKey, static _ => new ResourceState());
+            lock (state.Sync)
+            {
+                // Cleanup marks a state retired before removing it from the dictionary.
+                // A caller that raced with cleanup must retry against the replacement state,
+                // otherwise two semaphores could protect the same resource concurrently.
+                if (state.Retired) continue;
+                checked { state.Users++; }
+                break;
+            }
+        }
+
         try
         {
             await state.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -53,33 +68,55 @@ public sealed class HostResourceMutationCoordinator
     }
 
     internal bool IsUncertain(string resourceKey)
-        => _states.TryGetValue(resourceKey, out var state)
-            && Volatile.Read(ref state.Uncertain) != 0;
+    {
+        if (!_states.TryGetValue(resourceKey, out var state)) return false;
+        lock (state.Sync) return !state.Retired && state.Uncertain;
+    }
 
     internal void MarkUncertain(string resourceKey)
     {
-        var state = _states.GetOrAdd(resourceKey, static _ => new ResourceState());
-        Volatile.Write(ref state.Uncertain, 1);
+        while (true)
+        {
+            var state = _states.GetOrAdd(resourceKey, static _ => new ResourceState());
+            lock (state.Sync)
+            {
+                if (state.Retired) continue;
+                state.Uncertain = true;
+                return;
+            }
+        }
     }
 
     internal void ClearUncertain(string resourceKey)
     {
         if (!_states.TryGetValue(resourceKey, out var state)) return;
-        Volatile.Write(ref state.Uncertain, 0);
-        TryCleanup(resourceKey, state);
+        lock (state.Sync)
+        {
+            if (state.Retired) return;
+            state.Uncertain = false;
+            RetireIfUnused(resourceKey, state);
+        }
     }
 
     internal int TrackedResourceCount => _states.Count;
 
     private void Release(string key, ResourceState state)
     {
-        Interlocked.Decrement(ref state.Users);
-        TryCleanup(key, state);
+        lock (state.Sync)
+        {
+            if (state.Users <= 0)
+                throw new InvalidOperationException("Mutation coordinator resource lease underflow.");
+            state.Users--;
+            RetireIfUnused(key, state);
+        }
     }
 
-    private void TryCleanup(string key, ResourceState state)
+    private void RetireIfUnused(string key, ResourceState state)
     {
-        if (Volatile.Read(ref state.Users) != 0 || Volatile.Read(ref state.Uncertain) != 0) return;
+        // Caller holds state.Sync. Mark retired BEFORE removal so a concurrent Acquire that
+        // already read this state cannot increment it and then lose serialization.
+        if (state.Retired || state.Users != 0 || state.Uncertain) return;
+        state.Retired = true;
         ((ICollection<KeyValuePair<string, ResourceState>>)_states)
             .Remove(new(key, state));
     }
