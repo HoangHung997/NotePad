@@ -348,6 +348,13 @@ internal static class H2ProductAcceptanceScenarioTests
                         content_token = before.ContentToken,
                         sheet_name = "Data",
                         cells = new[] { new { address = "A2", value = "84" } }
+                    })),
+                    new("excel.verify_range", JsonSerializer.Serialize(new
+                    {
+                        session_id = before.SessionId,
+                        sheet_name = "Data",
+                        range = "A2",
+                        page_size = 1
                     }))
                 ],
                 "Đã đọc đúng vùng, cập nhật A2 và xác minh bằng readback production.");
@@ -400,8 +407,9 @@ internal static class H2ProductAcceptanceScenarioTests
                         "Global Excel mutation has no production verification evidence.");
                     var outcomes = File.ReadAllText(Path.Combine(stateRoot, "tasks", taskId.ToString("N"), "tool-outcomes.jsonl"));
                     Check(outcomes.Contains("\"excel.read_range\"", StringComparison.Ordinal)
-                        && outcomes.Contains("\"excel.write_range\"", StringComparison.Ordinal),
-                        "Global UI did not traverse production Office tools.");
+                        && outcomes.Contains("\"excel.write_range\"", StringComparison.Ordinal)
+                        && outcomes.Contains("\"excel.verify_range\"", StringComparison.Ordinal),
+                        "Global UI did not traverse read/mutate/verify production Office tools.");
                     Check(spawned.Any(client => client.StartCount > 0),
                         "Global production Office slice did not start an OfficeHost process.");
                 }
