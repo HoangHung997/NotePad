@@ -200,7 +200,36 @@ public sealed class FileRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
                 },
                 allowedOutputPaths: [path]));
 
-        return Task.FromResult(ToOutcome(report));
+        var baseOutcome = ToOutcome(report);
+        if (call.Name != "publish_artifact" || !baseOutcome.Passed)
+            return Task.FromResult(baseOutcome);
+
+        if (!resultJson.RootElement.TryGetProperty("artifactVerification", out var receipt)
+            || receipt.ValueKind != JsonValueKind.Object)
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, baseOutcome.EvidenceIds,
+                "Published artifact has no host verification receipt."));
+
+        var receiptSha = RequiredString(receipt, "Sha256").ToLowerInvariant();
+        var evidenceId = RequiredString(receipt, "EvidenceId");
+        var signatureVerified = RequiredBoolean(receipt, "SignatureVerified");
+        var contentVerified = RequiredBoolean(receipt, "ContentVerified");
+        var structureVerified = RequiredBoolean(receipt, "StructureVerified");
+        var format = RequiredString(receipt, "Format");
+        var further = resultJson.RootElement.TryGetProperty("requiresFurtherVerification", out var requires)
+            && requires.ValueKind == JsonValueKind.True;
+
+        var evidence = baseOutcome.EvidenceIds.Append(evidenceId).Distinct(StringComparer.Ordinal).ToArray();
+        if (receiptSha != reportedAfter || !signatureVerified)
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, evidence,
+                "Artifact verification receipt does not match the published bytes."));
+        if (further || !contentVerified || (format is "docx" or "xlsx" && !structureVerified))
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, evidence,
+                "Artifact bytes were published but content/layout remains independently unverified. Do not claim completion."));
+
+        return Task.FromResult(baseOutcome with { EvidenceIds = evidence });
     }
 
     private AgentRuntimeDomainVerification ToOutcome(VerificationReport report)
@@ -230,6 +259,15 @@ public sealed class FileRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
             && value.ValueKind == JsonValueKind.String
                 ? value.GetString()?.Trim() ?? ""
                 : "";
+
+    private static bool RequiredBoolean(JsonElement node, string name)
+    {
+        if (!node.TryGetProperty(name, out var value)
+            || value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidOperationException(
+                $"Runtime file verifier requires boolean '{name}'.");
+        return value.GetBoolean();
+    }
 }
 
 public sealed class PythonRuntimeDomainVerifier : IAgentRuntimeDomainVerifier

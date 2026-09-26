@@ -77,7 +77,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "inspect_artifact",
             "python",
-            "Read a recorded script output as bounded text or extracted Word/Excel/PDF text. This is not visual verification.",
+            "Independently reopen a recorded output and persist an exact-byte verification receipt. DOCX/XLSX use host OpenXML readers; PDF/image receipt is signature-only unless separate content/layout evidence exists.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
             true,
@@ -103,7 +103,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "publish_artifact",
             "python",
-            "Publish a verified script output to the approved workspace after confirmation. Existing destinations require the current hash.",
+            "Publish a staged output only after inspect_artifact created an exact-byte verification receipt. Existing destinations require the current hash; signature-only PDF/image publication remains explicitly unverified for content/layout.",
             AgentToolRisk.High,
             AgentToolAccess.Mutating,
             false,
@@ -799,26 +799,17 @@ public static class NormalRuntimeToolRegistry
                 case "inspect_artifact":
                 {
                     var path = Arg(call, "path");
-                    var data = Host.RuntimeScripts.Read(Arg(call, "run_id"), path);
-                    var ext = Path.GetExtension(path).ToLowerInvariant();
-                    if (ext is ".pdf" or ".png" or ".jpg" or ".jpeg" or ".webp")
-                        return new { path, hash = global::H2AgentLab.SafeWorkspace.Hash(data), bytes = data.Length,
-                            contentAvailable = false,
-                            next = ext == ".pdf" ? "Use run_python with pypdf to extract embedded text or render with pypdfium2. For scans attach the file through the configured OCR workflow. This hash can be used as expected_hash when publishing a verified edited PDF."
-                                : "Use view_artifact or the configured attachment OCR workflow to inspect the image; metadata is not image content." };
-                    var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
-                        ? Decode(data)
-                        : ext is ".docx" or ".xlsx" or ".pdf"
-                            ? H2Notes.Core.AiDocuments.Read(path, data).Text
-                            : "Binary output. Use run_python with previous_run to inspect, or view_artifact for images.";
+                    var inspection = Host.RuntimeScripts.VerifyArtifact(Arg(call, "run_id"), path);
                     return new
                     {
                         path,
-                        sha256 = global::H2AgentLab.SafeWorkspace.Hash(data),
-                        characters = text.Length,
-                        content = text[..Math.Min(16_000, text.Length)],
-                        truncated = text.Length > 16_000,
-                        visualReview = false
+                        sha256 = inspection.Verification.Sha256,
+                        characters = inspection.Characters,
+                        content = inspection.Content,
+                        truncated = inspection.Truncated,
+                        verification = inspection.Verification,
+                        visualReview = inspection.Verification.LayoutVerified,
+                        requiresFurtherVerification = inspection.Verification.RequiresFurtherVerification
                     };
                 }
 

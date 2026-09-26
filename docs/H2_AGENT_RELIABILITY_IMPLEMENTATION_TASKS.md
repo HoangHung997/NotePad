@@ -96,7 +96,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E4/native-provider PASS claim |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no live-search/browser PASS claim |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
-| AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
+| AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | ACTIVE — exact-byte artifact receipts / independent DOCX-XLSX readback / safe publish |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
 | AR-064 | Plugin/provider lifecycle thật | 010/011/031 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER — final full-build external/native provider test; no E3 PASS claim |
 | AR-065 | OpenAI/Luna Agent tool-call HTTP 400 | 010/011/050 | E2 + E4 real OpenAI | IMPLEMENTED / E2_PASS / AWAITING_ENVIRONMENT — NOT_DONE |
@@ -602,11 +602,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-060_IMPLEMENTED_E1_E2_PASS_E3_E4_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-062_ARTIFACT_PUBLICATION_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-062",
   "parked_task": "AR-060",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-062_ACTIVE",
+  "acceptance_status": "NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3/E4 real configured search/fetch/browser through H2 UI/model deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
