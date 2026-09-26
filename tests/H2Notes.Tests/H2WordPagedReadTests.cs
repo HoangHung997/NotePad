@@ -58,7 +58,7 @@ internal static class H2WordPagedReadTests
         });
 
         test("AR-023 E2 range pages are bounded and preserve exact requested extent",()=>{
-            var backend=new FixtureOfficeBackend(extraWordParagraphs:400);var reader=(IWordPagedReadBackend)backend;var session=backend.DiscoverWord().ActiveSessionId!;
+            var backend=new FixtureOfficeBackend(extraWordParagraphs:800);var reader=(IWordPagedReadBackend)backend;var session=backend.DiscoverWord().ActiveSessionId!;
             var first=reader.ReadWordRange(new(session,0,9000,1024));Check(first.PageLength<=1024&&!first.Complete&&first.NextCursor is not null,"Word range page bound failed.");
             var second=reader.ReadWordRange(new(session,0,9000,1024,false,first.NextCursor,first.ContentVersion));
             Check(second.PageStart==first.PageStart+first.PageLength&&second.ContentVersion==first.ContentVersion,"Range continuation skipped/repeated content.");
