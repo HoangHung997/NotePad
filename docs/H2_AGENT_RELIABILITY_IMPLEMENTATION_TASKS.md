@@ -81,7 +81,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-012 | Scope + resource binding nền | 011 | E1/E2 | DONE |
 | AR-020 | Office discovery đa instance/view | 012 | E3 | IMPLEMENTED / AWAITING_ENVIRONMENT |
 | AR-021 | Excel đọc vùng/paging/content token | 020 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E3_DEFERRED_BY_USER |
-| AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | ACTIVE — whole-batch preflight / partial-unknown readback |
+| AR-022 | Excel preflight/ghi dở/readback | 021 | E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER — final full build ready; no E3 PASS claim |
 | AR-023 | Word đọc phần/sửa giữ cấu trúc | 020/011 | E3 | NOT_STARTED |
 | AR-024 | Lát cắt Office qua H2 thật | 022/023 | E4 | NOT_STARTED |
 | AR-030 | Outcome obligations + goal revisions | 010/011 | E2 | DONE |
@@ -224,7 +224,7 @@ Thứ tự implementation sau AR-021 chỉ được lấy theo dependency/tracke
 
 Implemented production behavior: additive Office protocol/client/backend range-read contract; `resource + sheet + range + fields + page_size + cursor + content_version`; page limit max 512 cells; value/formula bulk page reads; formatting/merge/hidden state on demand; metadata-only discovery/active-sheet/selection; sparse UsedRange only supplies extent metadata; selection changes do not change the content token; stale content is refused before mixing continuation pages; production H2OfficeRuntimeTools uses the bounded range client and legacy injected clients remain compatible. Native Excel E3 RC-06/07 is still **NOT_RUN / AWAITING_ENVIRONMENT**; fixture/scripted E2 does not certify a real Excel build, especially external edits between pages. [Implementation evidence](agent-reliability/AR-021/evidence.json). [Native test instructions](agent-reliability/AR-021/native-acceptance.md).
 
-### [ ] AR-022 — Excel batch writes và hậu điều kiện
+### [~] AR-022 — Excel batch writes và hậu điều kiện
 
 **Sửa:** Office patch/recalc/readback, operation evidence, scheduler binding.
 
@@ -233,6 +233,14 @@ Implemented production behavior: additive Office protocol/client/backend range-r
 **Test E3 + fault injection:** RC-08; ô cuối invalid, duplicate/address overflow, locked sheet, COM fail giữa batch, lost response, selection đổi nhưng target cố định, stale content, formula/value conflict. Xác minh mọi thay đổi được ghi nhận; repair không ghi lại phần đã đúng.
 
 **Acceptance:** không có “thất bại chưa ghi” khi một phần đã ghi; không hứa atomic COM nếu không chứng minh; khung reconcile có dữ liệu cần thiết cho AR-041. Giữ các test formula và preservation cũ.
+
+**AR-022 implementation checkpoint — 2026-09-26:** exact validated runtime/test SHA `df0ae549d4146fd667fc3e3445eb5a06cc096d0b`. Excel batch mutations now preflight the whole batch before the first native write, reject invalid/duplicate/conflicting/no-op targets, keep stable logical/batch/chunk identities, use a content token that is stable across selection/focus-only changes, distinguish `Applied` / `PartiallyApplied` / `OutcomeUnknown`, preserve exact applied/unapplied/unknown cell evidence, and expose only proven unapplied cells as repair candidates. Protected cells and merged non-anchor writes fail before effect. Recalculation can be scoped to workbook/sheet/range and is verified by live readback rather than formula text alone. Legacy callers that do not yet send `content_token` remain compatible only when their exact `state_token` matches the current snapshot; the runtime then derives the current content token internally instead of weakening freshness.
+
+The initial AR-022 source `090519c480882011fde9093e14c4f5f2fa9748f7` plus compile repair `a0b442c4cd669744c7fc6927feeedc341cfb8404` exposed retained AR-001/AR-012 regressions: invalid-count native preflight messages diverged and legacy `state_token` callers were blocked before execution. Repair `df0ae549d4146fd667fc3e3445eb5a06cc096d0b` restored those contracts without removing AR-022 safety. Dedicated AR-022 run `36213894993` / job `108326259949` **SUCCESS**: focused AR-022 **8/8**, concrete OfficeHost **18/18**, retained AR-021 **14/14**, AR-020 **36/36**, AR-012 **44/44**, AR-001 **13/13**, full H2 **1300/1300**, and all **75** required Agent suites PASS. Evidence artifact `10896739058`, 431,651 bytes, SHA256 `8a50a7bb4c615c1a2c7e119ff5a312f496a6c89504dda24832367dcad3038c93`, was independently downloaded and its `validation.json` reports E1=PASS, E2=PASS, clean_end=true, E3=DEFERRED_BY_USER, E5=DEFERRED_BY_USER and no E3/E4/E5 PASS claim.
+
+Full Avalonia CI `36213894968` / job `108325894609` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged helper startup/IPC. All **14/14** workflows on exact SHA completed SUCCESS, 0 failed. Final portable artifact `10896344953` is 110,373,923 bytes, SHA256 `205fc4851d1c0c4037e772bb01fa872db41a6f7143e632c6807edf4efe7c8f47`; it was downloaded independently, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** AR-022 native Excel E3 is explicitly **DEFERRED_BY_USER** until the user tests the final full build. This does not convert E3 to PASS and does not make AR-022 fully DONE; reopen AR-022 if the disposable real-Excel acceptance reports a regression.
 
 ### [ ] AR-023 — Word đọc theo phần và sửa bảo toàn
 
@@ -531,93 +539,107 @@ Do not claim these defects were already covered by historical Office/transport/U
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
   "canonical_branch": "main",
-  "research_baseline_sha": "ad8c1082e722546a997b4e78b687980d4766622f",
-  "phase": "AR-022_EXCEL_BATCH_MUTATION_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-022",
-  "parked_task": "AR-061",
-  "implementation_status": "AR-022_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-022_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-022",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E3_DEFERRED_BY_USER",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E3/E4 native H2 acceptance deferred until user tests final build",
+  "required_evidence_level": "E3 native Excel acceptance deferred until user tests final full build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "owner_session": "chatgpt-ar061-final-build-2026-09-26",
-  "runtime_implementation_commit": "779a92bc0027be8c6194edf1fd00c1c132ae8d2e",
-  "validated_build_head": "53a1d34e10925dcb8789ac7adbd039f3a109c842",
-  "last_validation_result": "AR061 6/6; DesktopHost 10/10; MB112 16/16; full H2 1292/1292; 75/75 required Agent suites PASS; AR061 Windows run 36210557758 SUCCESS; Avalonia CI 36210557766 SUCCESS; cross-build 36210557761 SUCCESS; all 13/13 workflows on validated build HEAD SUCCESS; self-contained win-x64 publish PASS; packaged Desktop/Office helpers startup+IPC PASS; final full-CI portable 10895203473 SHA256 9c527eca4d1fdae4fd94680bff73dd73bbd5816e2eb4d6ccc2f178b6b1a71cd0; no E3/E4 native PASS claim.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkouts at 53a1d34e10925dcb8789ac7adbd039f3a109c842. Runtime/test tree is unchanged from validated AR-061 implementation; only documentation checkpoint changes follow. No reset/force-push/main merge and no known connector-side uncommitted diff.",
+  "owner_session": "chatgpt-ar022-final-build-2026-09-26",
+  "implementation_commits": [
+    "090519c480882011fde9093e14c4f5f2fa9748f7 feat(AR-022): make Excel batch effects reconcilable",
+    "a0b442c4cd669744c7fc6927feeedc341cfb8404 fix(AR-022): remove C# local shadowing",
+    "df0ae549d4146fd667fc3e3445eb5a06cc096d0b fix(AR-022): retain legacy preflight contracts"
+  ],
+  "validated_code_sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b",
+  "last_validation_result": "AR022 8/8; OfficeHost 18/18; retained AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13; full H2 1300/1300; 75/75 required Agent suites PASS; AR022 run 36213894993 SUCCESS; Avalonia CI 36213894968 SUCCESS; all 14/14 exact-SHA workflows SUCCESS; self-contained win-x64 publish PASS; packaged Desktop/Office helpers startup+IPC PASS; final portable 10896344953 SHA256 205fc4851d1c0c4037e772bb01fa872db41a6f7143e632c6807edf4efe7c8f47; no native E3 PASS claim.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkouts at df0ae549d4146fd667fc3e3445eb5a06cc096d0b; AR-022 validation artifact reports clean_end=true. No reset/force-push/main merge and no known connector-side uncommitted diff.",
   "uncommitted_files": [],
-  "checkpoint_saved_at_utc": "2026-09-26T02:15:30Z",
-  "user_decision": "User explicitly asked to continue without waiting for native application testing and will download/test only after a complete build exists. AR-061 E3/E4 is therefore DEFERRED_BY_USER, not PASS.",
+  "checkpoint_evidence_at_utc": "2026-09-26T03:30:03Z",
+  "user_decision": "User asked to finish a complete build before downloading/testing and permits required decisions to proceed. AR-022 native Excel E3 is therefore DEFERRED_BY_USER, not PASS.",
   "completed_this_session": [
-    "Reconciled resumed-session HEAD and confirmed no runtime/test source delta after the validated AR-061 implementation.",
-    "Ran exact-HEAD AR-061 Windows validation 36210557758/job 108315972945 to SUCCESS: AR061 6/6, DesktopHost 10/10, MB112 16/16, full H2 1292/1292, all 75 required Agent suites PASS, win-x64 publish PASS and packaged helper IPC PASS.",
-    "Ran exact-HEAD full Avalonia CI 36210557766/job 108315973408 to SUCCESS across H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained win-x64 publish and packaged helper IPC.",
-    "Ran exact-HEAD AR-061 cross-build 36210557761 SUCCESS; kept it explicitly classified as compile/publish evidence only, not native E3/E4.",
-    "Confirmed all 13/13 workflows associated with validated build HEAD 53a1d34e10925dcb8789ac7adbd039f3a109c842 completed SUCCESS with zero failures.",
-    "Downloaded full-CI artifact 10895203473 and independently verified SHA256 9c527eca4d1fdae4fd94680bff73dd73bbd5816e2eb4d6ccc2f178b6b1a71cd0, ZIP integrity PASS for 482 entries, and required main/DesktopHost/OfficeHost executables present.",
-    "No uncertain mutation/job was restarted, no personal document was used, no external side effect or new credential/provider was introduced."
+    "Implemented whole-batch Excel mutation preflight before the first write, including duplicate/overflow/conflicting/no-op requests and protected/merged non-anchor targets.",
+    "Added stable logical operation, batch and chunk identities plus Applied/PartiallyApplied/OutcomeUnknown effect classification and exact applied/unapplied/unknown cell readback evidence.",
+    "Added a content token stable across selection/focus-only changes while actual content changes invalidate writes; legacy state-token callers remain compatible only after exact current-state validation.",
+    "Added scoped workbook/sheet/range recalculation with live value readback.",
+    "Observed retained AR-001/AR-012 regressions on a0b442c4 and repaired exact compatibility contracts in df0ae549 without weakening AR-022 mutation safety.",
+    "Validated exact SHA df0ae549: AR022 8/8, OfficeHost 18/18, retained AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13, full H2 1300/1300 and 75 required Agent suites PASS.",
+    "Confirmed all 14/14 pull-request workflows on df0ae549 completed SUCCESS with zero failures.",
+    "Downloaded and verified AR022 evidence artifact 10896739058; validation.json reports E1/E2 PASS, clean_end=true, native E3 deferred and no higher-level PASS claim.",
+    "Downloaded full-CI portable artifact 10896344953; SHA256 matched GitHub, ZIP test passed for 482 entries, and main/DesktopHost/OfficeHost executables are present.",
+    "No personal document, credential, external service side effect or destructive native Office acceptance was used."
   ],
   "remaining_in_parked_task": [
-    "Native E3/E4 user-machine acceptance remains deferred until the user tests the final build.",
-    "When tested, cover File Explorer, blank Word, blank Excel, AutoCAD if installed, single-window reuse, multi-window ambiguity, close/reopen stale identity and ObserveOnly/AskBeforeChanges/FullAccess behavior.",
-    "If the final build shows any real launcher/activation regression, reopen AR-061 and repair that exact path before advancing further."
+    "Native E3 real Excel acceptance remains deferred until the user tests the final build on an authorized Windows PC with a disposable workbook.",
+    "When tested: valid multi-cell write/readback; selection-only move must not invalidate content token; actual content edit must stale the write; protected or merged non-anchor target must reject before effect; scoped formula recalculation must return recalculated values.",
+    "If native Excel reports any batch/preflight/readback regression, reopen AR-022 and repair that exact path before advancing."
+  ],
+  "failed_attempts_repaired": [
+    {
+      "sha": "a0b442c4cd669744c7fc6927feeedc341cfb8404",
+      "issue": "Retained AR-001 invalid-count native preflight message diverged from fixture/server; AR-012 legacy state-token writes were blocked before execution; AR-022 production partial-outcome test was not yet accepted.",
+      "resolution_sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b"
+    },
+    {
+      "issue": "Early local orchestration attempt failed before branch update due JavaScript parsing/connector call limits.",
+      "effect": "No partial branch update; later commits were reconciled from GitHub source of truth."
+    }
   ],
   "last_test_commands": [
     {
-      "command": "AR-061 desktop application lifecycle validation workflow",
-      "sha": "53a1d34e10925dcb8789ac7adbd039f3a109c842",
-      "run_id": 36210557758,
-      "job_id": 108315972945,
-      "result": "SUCCESS; AR061 6/6; DesktopHost 10/10; MB112 16/16; full H2 1292/1292; 75 required Agent suites PASS; win-x64 publish PASS; packaged helper IPC PASS"
+      "command": "AR-022 Excel batch mutation validation",
+      "sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b",
+      "run_id": 36213894993,
+      "job_id": 108326259949,
+      "result": "SUCCESS; focused 8/8; OfficeHost 18/18; retained AR021 14/14, AR020 36/36, AR012 44/44, AR001 13/13; full H2 1300/1300; 75 Agent suites PASS"
     },
     {
-      "command": "Avalonia CI full build/test/Agent gates/win-x64 publish/packaged helper IPC",
-      "sha": "53a1d34e10925dcb8789ac7adbd039f3a109c842",
-      "run_id": 36210557766,
-      "job_id": 108315973408,
+      "command": "Avalonia CI full build/test/publish/helper IPC",
+      "sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b",
+      "run_id": 36213894968,
+      "job_id": 108325894609,
       "result": "SUCCESS; full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transports PASS; Windows x64 publish PASS; packaged helper IPC PASS"
-    },
-    {
-      "command": "AR-061 Windows cross-build fallback",
-      "sha": "53a1d34e10925dcb8789ac7adbd039f3a109c842",
-      "run_id": 36210557761,
-      "job_id": 108315972854,
-      "result": "SUCCESS; compile/publish evidence only; not native E3/E4"
     }
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-061/evidence.json",
-    "docs/agent-reliability/AR-061/implementation.md",
-    "docs/agent-reliability/AR-061/native-acceptance.md",
-    "GitHub artifact 10895661060 AR061-E1-E2-Evidence",
-    "GitHub artifact 10896160458 H2Notes-Avalonia-Portable-win-x64-AR061",
-    "GitHub artifact 10895203473 H2Notes-Avalonia-Portable-win-x64 (full Avalonia CI)"
+    "docs/agent-reliability/AR-022/implementation.md",
+    "docs/agent-reliability/AR-022/evidence.json",
+    "docs/agent-reliability/AR-022/native-acceptance.md",
+    "GitHub artifact 10896739058 AR022-E1-E2-Evidence",
+    "GitHub artifact 10896344953 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10895203473,
+    "artifact_id": 10896344953,
     "name": "H2Notes-Avalonia-Portable-win-x64",
-    "bytes": 110358535,
-    "sha256": "9c527eca4d1fdae4fd94680bff73dd73bbd5816e2eb4d6ccc2f178b6b1a71cd0",
-    "expires_at_utc": "2026-12-25T02:05:05Z",
-    "source_sha": "53a1d34e10925dcb8789ac7adbd039f3a109c842",
+    "bytes": 110373923,
+    "sha256": "205fc4851d1c0c4037e772bb01fa872db41a6f7143e632c6807edf4efe7c8f47",
+    "expires_at_utc": "2026-12-25T03:08:52Z",
+    "source_sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched artifact digest; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "parked_acceptance": [
     {
+      "id": "AR-022",
+      "status": "E3_DEFERRED_BY_USER",
+      "required": "real Excel batch mutation acceptance on disposable workbook"
+    },
+    {
       "id": "AR-061",
       "status": "E3_E4_DEFERRED_BY_USER",
-      "required": "real desktop application lifecycle test on final full build"
+      "required": "real desktop application lifecycle test"
     },
     {
       "id": "AR-021",
       "status": "E3_DEFERRED_BY_USER",
-      "required": "real Word/Excel retest"
+      "required": "real Excel range read retest"
     },
     {
       "id": "AR-020",
       "status": "AWAITING_ENVIRONMENT",
-      "required": "E3"
+      "required": "E3 native Office discovery"
     },
     {
       "id": "AR-033",
@@ -637,7 +659,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     {
       "id": "AR-065",
       "status": "AWAITING_ENVIRONMENT",
-      "required": "E4"
+      "required": "E4 real OpenAI"
     },
     {
       "id": "AR-083",
@@ -646,8 +668,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     }
   ],
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile branch/CI, then select exactly one READY task from the tracker/dependency order. Do not reopen AR-061 unless the user's native test of artifact 10895203473 reports a regression.",
-  "next_task_if_active_done": "Select the next READY implementation task from the canonical tracker at the start of the next turn; do not start it in this AR-061 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker/dependency order. Do not reopen AR-022 unless native test of artifact 10896344953 reports a regression.",
+  "next_task_if_active_done": "Select one READY task from the canonical tracker at the start of the next turn; do not start it in this AR-022 turn."
 }
 ```
 
