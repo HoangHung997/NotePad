@@ -108,7 +108,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
-| AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | ACTIVE — typed reliability projection / bounded activity / accessibility / reconnect dedup |
+| AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | NOT_STARTED |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
 | AR-090 | Dọn có parity, báo cáo và bàn giao | Các task bắt buộc phù hợp phạm vi | Audit cuối | NOT_STARTED |
@@ -564,13 +564,25 @@ Full Avalonia CI `36260548852` / job `108455418228` **SUCCESS**, including full 
 
 **Acceptance boundary / user decision:** real E4 remains **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user tests the final full build with the H2 UI, configured allowed local/cloud model(s), native Word/Office and genuinely long work. The deterministic three-repeat corpus does **not** certify native Office, live model quality, or multi-hour sessions; results from local/cloud providers must be recorded separately if/when run.
 
-### [ ] AR-081 — UI trạng thái thật, responsiveness và accessibility
+### [~] AR-081 — UI trạng thái thật, responsiveness và accessibility
 
 **Sửa:** cùng AgentChatSurface, bubble/project projection, artifact inspector; không đổi layout đã duyệt.
 
 **Test E4:** RC-30; streaming/up-scroll, reconnect/reopen, approval card deny/allow/expiry, nén/job/recovery statuses, partial vs verified labels, Markdown/table/large output lazy loading; keyboard/focus/DPI; event dedup và task ownership.
 
 **Acceptance:** không fake progress/private chain-of-thought, không append hàng loạt heartbeat; bật thread không chạy lại tool; UI liveness đo thật. UI test headless vẫn dùng nhưng không đủ thay screenshot/interaction thực khi có thay UI.
+
+**AR-081 implementation checkpoint — 2026-09-26:** exact validated code SHA `46ec1218d535fa0def938f9393e13e40a705605d`. The existing Global/Project `AgentChatSurface`, `AgentTurnView`, approval panel, task window and artifact inspector now project reliability state from authoritative H2 task/progress/evidence facts through one pure `AgentUiProjector`; the UI does not infer hidden reasoning or turn model prose into verification.
+
+Typed presentation distinguishes Queued, Running, WaitingForApproval, Compacting, WaitingForJob, Reconnecting, ReconcileRequired, Interrupted, AppliedUnverified, Verified, CancelRequested, Completed, Blocked, Cancelled and Failed. Repeated heartbeat/job-poll progress is coalesced **only for display** while durable event identity/count stays intact. Reopen/reconnect reuses the same turn/progress/final and does not execute a tool. Up-scroll preserves user position and exposes a keyboard-focusable “latest activity” action. Approval allow/deny has automation names and a stale approval remains visibly stale instead of disappearing as success. Artifact controls expose automation names; large spreadsheet preview remains page-bounded/lazy instead of materializing all rows. Task-detail state text/tooltip/accessibility comes from the same typed projection.
+
+Dedicated AR-081 run `36263139290` / job `108462640014` **SUCCESS**: focused AR-081 **6/6**, retained AR-080 **4/4**, AR-042 **6/6**, AR-041 **6/6**, AR-068 **3/3**, H2M-132 **1/1**, full H2 **1358/1358**, and all **75** required Agent suites PASS. Evidence artifact `10913940085`, 428,960 bytes, SHA256 `86b7ac1a665e26f63447ac1391ea0334b082daf65ac370c6e73b2058547db0f0`, was independently downloaded; ZIP integrity passed across **647** entries and `validation.json` reports E1=PASS, E2=PASS, E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, native_ui_claim=false and private_chain_of_thought_claim=false.
+
+Full Avalonia CI `36263139306` / job `108462672872` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. Final portable artifact `10913361711` is 110,474,571 bytes, SHA256 `12cc6b2ed831326600d24a1975c990a0d1d58105cd64d4f2963cab42146311e2`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+All **24/24** exact-SHA workflow identities completed SUCCESS after same-SHA reruns confirmed two unrelated one-off retained flakes: the first AR-052 attempt timed out in `AR-030 RC-12 actual supplement boundary retains exact IDs and supersedes PDF once`, and the first AR-042 attempt timed out in `AR-066 source consent ungrounded project=True`. Both tests passed in the same exact-SHA full CI/other retained runs, and their workflow reruns completed SUCCESS. No runtime/UI change was made for a non-reproduced timeout.
+
+**User decision — 2026-09-26:** real E4 native interaction remains **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user tests the final full build. Headless Avalonia E2 does not certify native DPI behavior, IME, keyboard/focus traversal on a real desktop, screen-reader announcements, real interactive screenshots, or real-model/native-Office UI liveness.
 
 ### [ ] AR-082 — Gói portable, dependency preflight và môi trường sạch
 
@@ -634,72 +646,73 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-081_UI_RELIABILITY_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-081",
-  "parked_task": "AR-080",
-  "implementation_status": "AR-081_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-081_IMPLEMENTED_E1_E2_PASS_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-081",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E4 real H2 UI + configured local/cloud model + native Office + genuinely long-work acceptance deferred until user final-build test",
+  "required_evidence_level": "E4 real H2 UI interaction on native Windows with configured model/provider and accessibility/DPI/IME evidence deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c",
+  "validated_code_sha": "46ec1218d535fa0def938f9393e13e40a705605d",
   "implementation_commits": [
-    "9ad0de9a3ff86b040d534e56c95b1707e3ac86c8 test(AR-080): add long-work production corpus",
-    "bdc79c4fba9fff361a819ab889534770bb556d6c fix(AR-080): qualify DOCX document type",
-    "01a9cba13a1d92561c6bafdf23b254bb51e716a6 test(AR-080): assert typed recall and live source identity",
-    "2c3e7224479555738cd20585b73ec86209abdc19 test(AR-080): bind UNSAVED fixture as captured active",
-    "bed71950cda0c61195fb17d78da034286bbf6bd7 test(AR-080): observe exact unsaved live Word source",
-    "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c test(AR-080): retain all UNSAVED request budgets"
+    "46ec1218d535fa0def938f9393e13e40a705605d feat(AR-081): project reliable Agent UI states"
   ],
-  "last_validation_result": "AR080 4/4; retained AR063 5/5, AR062 6/6, AR060 6/6, AR052 8/8, AR051 37/37, AR042 6/6, AR041 6/6, AR024 2/2, AR033 42/42; 12 corpus JSON files; full H2 1352/1352; 75/75 required Agent suites PASS. Dedicated run 36260548933 SUCCESS; Avalonia CI 36260548852 SUCCESS; all 23/23 exact-SHA workflow identities SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 3ec3ef86; AR080 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T18:19:16Z",
-  "user_decision": "User requires complete build before personal testing. AR-080 real E4 long-work/native Office/configured model acceptance is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR081 6/6; retained AR080 4/4, AR042 6/6, AR041 6/6, AR068 3/3, H2M132 1/1; full H2 1358/1358; 75/75 required Agent suites PASS. Dedicated run 36263139290 SUCCESS; Avalonia CI 36263139306 SUCCESS; all 24/24 exact-SHA workflow identities SUCCESS after same-SHA AR052/AR042 reruns confirmed two unrelated timeout flakes; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 46ec1218; AR081 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T18:56:47Z",
+  "user_decision": "User requires complete build before personal testing. AR-081 native UI E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Reconciled repository truth after another worker completed AR-042/052/060/062/063 and started AR-080; discarded stale unpushed AR-042 blobs instead of overwriting newer work.",
-    "Validated the four AR-080 long-work boundary groups with three independent repetitions each through the production adapter/journal/compaction/budget/serializer path.",
-    "Confirmed crash/reconcile/resume does not duplicate the already-applied DOC-A effect in the deterministic corpus and preserves the near-name DOC-B control.",
-    "Confirmed changed requirements supersede the old outcome and exact early source remains retrievable after compaction/restart.",
-    "Confirmed a missing PDF outcome blocks completion despite model final text claiming done.",
-    "Confirmed UNSAVED-only source resumes against the exact live session/current revision with five retained request-budget receipts and no near-name document mutation.",
-    "Downloaded and independently verified AR080 evidence artifact 10912588420 and portable artifact 10912351776.",
-    "Confirmed all 23/23 exact-SHA pull-request workflows completed SUCCESS."
+    "Reconciled GitHub truth after another worker completed AR-042/052/060/062/063/080 and started AR-081; did not push stale local/blob-only AR-042 work over newer repository state.",
+    "Confirmed one pure AgentUiProjector maps authoritative task/progress/recovery/evidence facts to typed reliability states without model inference or private reasoning exposure.",
+    "Confirmed 1000 durable heartbeat events remain durable while presentation coalesces them into bounded rows.",
+    "Confirmed reconnect/reopen reuses the same turn, progress and final response and does not execute tools.",
+    "Confirmed up-scroll remains stable and exposes a keyboard-focusable latest-activity action.",
+    "Confirmed approval allow/deny accessibility plus stale approval fail-closed presentation.",
+    "Confirmed artifact inspector accessibility and bounded/lazy spreadsheet paging.",
+    "Downloaded and independently verified evidence artifact 10913940085 and portable artifact 10913361711.",
+    "Reran AR-052 and AR-042 on the same code SHA; both succeeded, confirming their initial unrelated full-suite timeouts were non-reproduced flakes.",
+    "Confirmed all 24/24 exact-SHA pull-request workflow identities completed SUCCESS."
+  ],
+  "failed_attempts_repaired": [
+    "AR-052 first exact-SHA attempt: full H2 had one AR-030 RC-12 timeout while dedicated AR-030/full CI were green; same-SHA AR-052 rerun SUCCESS, no product change.",
+    "AR-042 first exact-SHA attempt: full H2 had one AR-066 source-consent fixture timeout while full CI was green; same-SHA AR-042 rerun SUCCESS, no product change."
   ],
   "remaining_in_parked_task": [
-    "Run E4 later with the real H2 UI, configured allowed local model and cloud model separately, native Word/Office and disposable documents.",
-    "Repeat the long-work boundaries with real near-name Word documents, an actual unsaved live document, real PDF creation/inspection, real user correction, real restart after effect-before-response and Continue.",
-    "Measure model/provider request usage, compaction/retrieval overhead, fulfilled obligations, duplicate/unintended side effects, blockers and repeatability separately per provider.",
-    "Do not call three deterministic E2 repetitions a multi-hour/live-model/native-Office pass."
+    "Run E4 later on real Windows UI with configured allowed model/provider: keyboard-only traversal, focus order, approval actions, reconnect/reopen, up-scroll, streaming and artifact inspector.",
+    "Exercise multiple DPI/scaling settings and window sizes on a native desktop; capture screenshots/interactions where layout/state changes materially matter.",
+    "Exercise Vietnamese/Unicode IME composition in the real composer without duplicate send or focus loss.",
+    "Exercise a supported screen reader/automation client and verify meaningful names/states for approval, status, latest activity and artifact controls.",
+    "Verify real long-running job/compaction/reconnect/reconcile state transitions remain responsive; do not treat headless timing as native FPS/liveness certification.",
+    "Do not expose hidden chain-of-thought; only public commentary/tool activity/host evidence is eligible for UI."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-080/implementation.md",
-    "docs/agent-reliability/AR-080/evidence.json",
-    "docs/agent-reliability/AR-080/native-acceptance.md",
-    "GitHub artifact 10912588420 AR080-E1-E2-Evidence",
-    "GitHub artifact 10912351776 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-081/implementation.md",
+    "docs/agent-reliability/AR-081/evidence.json",
+    "docs/agent-reliability/AR-081/native-acceptance.md",
+    "GitHub artifact 10913940085 AR081-E1-E2-Evidence",
+    "GitHub artifact 10913361711 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10912351776,
-    "bytes": 110469834,
-    "sha256": "43a7e48528e70c2bcf13b96bdb6ecd8e77377db17dd154d833d71eb052512bb2",
-    "expires_at_utc": "2026-12-25T17:52:10Z",
-    "source_sha": "3ec3ef86f99e796b0ee3dbb5f1de4e061dbec73c",
+    "artifact_id": 10913361711,
+    "bytes": 110474571,
+    "sha256": "12cc6b2ed831326600d24a1975c990a0d1d58105cd64d4f2963cab42146311e2",
+    "expires_at_utc": "2026-12-25T18:36:25Z",
+    "source_sha": "46ec1218d535fa0def938f9393e13e40a705605d",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "native_office_claim": false,
-    "live_model_claim": false,
-    "long_hours_claim": false,
-    "three_repetitions": true,
-    "duplicate_side_effect_claim": "deterministic corpus only",
+    "native_ui_claim": false,
+    "private_chain_of_thought_claim": false,
+    "headless_performance_only": true,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-080 unless real E4 final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-080 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-081 unless native E4 final-build testing reports a regression.",
+  "next_task_if_active_done": "AR-082 is dependency-ready after AR-081 implementation; select exactly one task at the start of the next turn and do not implement it in this AR-081 turn."
 }
 ```
 
