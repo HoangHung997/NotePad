@@ -490,6 +490,12 @@ internal sealed partial class AgentIntegrationTaskArchive : IDisposable
             case "progress":
                 var progress = e.Payload.Deserialize<H2AgentProgress>()!;
                 if (progress is null || progress.Sequence < 0 || progress.AtUtc.Kind != DateTimeKind.Utc) throw new InvalidDataException("progress-shape"); break;
+            case "steering-input":
+                var steering = e.Payload.Deserialize<SteeringReceipt>()!;
+                if (steering is null || steering.InputId == Guid.Empty || steering.TextSha256 is not { Length: 64 }
+                    || steering.AcceptedUtc.Kind != DateTimeKind.Utc)
+                    throw new InvalidDataException("steering-receipt-shape");
+                break;
             case "operation-intent": case "operation-dispatched": case "operation-result":
                 var operation = e.Payload.Deserialize<H2AgentOperationRecord>()!;
                 if (operation is null || operation.InvocationId == Guid.Empty || string.IsNullOrWhiteSpace(operation.LogicalOperationId)

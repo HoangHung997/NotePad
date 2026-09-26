@@ -355,12 +355,8 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
 
             permission = Check(descriptor, call);
             if (!permission.Allowed) return permission;
-            if (rememberRuntimeInvocation)
-            {
-                var invocation = call.Invocation
-                    ?? throw new InvalidOperationException("Runtime mutation authorization requires a bound invocation.");
+            if (rememberRuntimeInvocation && call.Invocation is { } invocation)
                 _runtimeApprovedInvocations[invocation.InvocationId] = 0;
-            }
             return permission;
         }
         finally { _approvalGate.Release(); }
