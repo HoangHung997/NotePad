@@ -1,0 +1,119 @@
+{
+  "task": "AR-082",
+  "source_sha": "2f3a0c995307ee4615ceb647ff66322a795fc90f",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "physical_clean_machine_claim": false,
+    "native_provider_claim": false,
+    "network_provider_probe": false,
+    "two_pc_claim": false
+  },
+  "tests": {
+    "focused": "5/5",
+    "retained": {
+      "AR-081": "6/6",
+      "AR-080": "4/4",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-062": "6/6",
+      "AR-060": "6/6"
+    },
+    "full_h2": "1363/1363",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "25/25 SUCCESS"
+  },
+  "runs": {
+    "ar082": {
+      "run_id": 36273538823,
+      "job_id": 108491843442,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36273538843,
+      "job_id": 108491844035,
+      "result": "SUCCESS"
+    }
+  },
+  "dedicated_evidence_artifact": {
+    "id": 10916676647,
+    "bytes": 580901,
+    "sha256": "11ea0537b3d2fd779efc38efb4a3c47f008be73a7d7df20b74b95a40a59ebc52",
+    "zip_entries": 652,
+    "zip_integrity": "PASS",
+    "validation": {
+      "focused": "5/5",
+      "full_h2": "1363/1363",
+      "e3": "PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY",
+      "clean_end": true
+    }
+  },
+  "portable": {
+    "id": 10917395115,
+    "bytes": 175482994,
+    "sha256": "7cdbbaf684f49aeb57288cfe75e1553f3795eadf5cd07c7047cace7e246521b6",
+    "zip_entries": 2970,
+    "zip_integrity": "PASS",
+    "manifest": {
+      "source_sha": "2f3a0c995307ee4615ceb647ff66322a795fc90f",
+      "runtime": "win-x64",
+      "self_contained": true,
+      "file_count": 2969,
+      "total_bytes": 415193548,
+      "content_sha256": "47ebd73523c72f7c9eb05f3b69977598f415df405b43c9f93bd840387ff8b460",
+      "all_file_hashes_verified": true
+    },
+    "required_executables": [
+      "H2Notes.Avalonia.exe",
+      "H2AgentLab.DesktopHost.exe",
+      "H2AgentLab.OfficeHost.exe"
+    ],
+    "supporting_files": [
+      "portable-manifest.json",
+      "PORTABLE-README.txt",
+      "VERIFY-PORTABLE.ps1",
+      "python/.ready"
+    ]
+  },
+  "clean_profile_dependency_matrix": {
+    "ready": [
+      "desktop.helper",
+      "office.helper",
+      "local.settings",
+      "python.sandbox",
+      "helpers.ipc",
+      "documents.python"
+    ],
+    "unavailable": [
+      "office.native",
+      "autocad.live_drawing"
+    ],
+    "needs_configuration": [
+      "autocad.closed_file",
+      "ollama.endpoint",
+      "ai.online_credentials",
+      "web.search",
+      "browser.live_tab",
+      "ocr.local"
+    ]
+  },
+  "privacy": {
+    "h2_local_config_bundled": false,
+    "credential_vault_bundled": false,
+    "agent_journal_bundled": false,
+    "workspace_bundled": false,
+    "standard_ocr_models_bundled": false,
+    "configured_secret_values_read_or_printed": false
+  },
+  "limitations": [
+    "Fresh GitHub Windows runner profile is not a separate physical clean machine.",
+    "No live model/search/browser network provider was contacted.",
+    "No native Office/AutoCAD user document was attached.",
+    "No bit-for-bit reproducible-build claim between separate package builds.",
+    "AR-083 physical two-PC/NAS acceptance remains deferred."
+  ]
+}
