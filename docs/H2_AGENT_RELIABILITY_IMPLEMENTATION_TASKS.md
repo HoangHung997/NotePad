@@ -93,7 +93,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-042 | Steering/cancel/concurrency an toàn | 030/040/041 | E2/E3 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E3/E5/distributed-lock claim |
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
-| AR-052 | Rebase model và resume context | 041/051 | E2/E4 | ACTIVE — same-TaskId fresh-turn rebase from canonical journal/checkpoint; no opaque provider continuation |
+| AR-052 | Rebase model và resume context | 041/051 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E4/native-provider PASS claim |
 | AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | NOT_STARTED |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
@@ -402,7 +402,7 @@ Full Avalonia CI `36231762357` / job `108376125362` **SUCCESS**, including full 
 
 **AR-051 E2 checkpoint 2026-09-23:** IMPLEMENTED / AWAITING_ENVIRONMENT, **not DONE**. Exact tested `28e34454c7f44deebaa867121e661739a79470b5`; focused 35835063919 **37/37 x3**, old coordinator **six expected cancellation failures**, all retained AR suites and **74/74** Agent suites pass. Full 35835069955 **1002/1002**, publish/helper IPC PASS. Same-provider concrete serializers, ten source-backed cycles, real temporary files and Agent journal; deterministic extracts are not live-model semantic recall. Required E4 remains NOT_RUN. [Evidence](agent-reliability/AR-051/acceptance.json). Independent AR-064 may proceed under section 2.2; AR-020/033 and deferred AR-083 unchanged.
 
-### [ ] AR-052 — Đổi model/context và tiếp tục từ state chuẩn
+### [~] AR-052 — Đổi model/context và tiếp tục từ state chuẩn
 
 **Sửa:** transport rebase/start from checkpoint, provider selection approved, resumed task builder.
 
@@ -411,6 +411,16 @@ Full Avalonia CI `36231762357` / job `108376125362` **SUCCESS**, including full 
 **Test E2/E4:** RC-18/22; scripted Ollama/Chat/Responses protocol matrix, rồi những model endpoints thực được người dùng cấp phép. Sau đổi model còn biết yêu cầu hiện hành, pending jobs và thao tác trước mất response.
 
 **Acceptance:** cùng task identity và outcome history; không lặp mutation; combination chưa thử ghi rõ. Đủ cho parent MB-125/126 khi các task liên quan cũng qua.
+
+**AR-052 implementation checkpoint — 2026-09-26:** exact validated code SHA `a2263e47a804d2f9f386296b1330b8a1c4231e2b`. Resume now reuses the original **TaskId** and durable thread/history, but always starts a **fresh TurnId and fresh provider request** from canonical H2 journal/goal/evidence state; no provider-specific continuation/response ID is copied between models/backends. The active goal state is rehydrated from the durable `H2AgentGoalSnapshot` plus evidence references, preserving verified outcomes and historical mutation revisions without replaying old mutations or old transcript text.
+
+Resume fails closed before provider allocation when AR-041 still reports `ReconcileRequired`. Mutation resume requires a fresh active permission scope; an expired/revoked old grant is never restored. The selected model/profile is resolved explicitly for the resume turn; provider failure does not auto-fallback. A later explicit provider/model rebase is allowed only as another fresh turn on the same TaskId. Durable steering receipts are ACKed after reconnect without enqueuing the same correction twice. Scoped history exposes bounded durable source locators so a smaller-context model can retrieve exact prior facts without converting old history into current authority or verification.
+
+Dedicated AR-052 run `36237795203` / job `108392677499` **SUCCESS**: focused AR-052 **8/8**; retained AR-041 **6/6**, AR-042 **6/6**, AR-051 **37/37**, AR-031 **39/39**, AR-050 **50/50**; full H2 **1331/1331**; all **75/75** required Agent suites PASS. Protocol matrix covers **Ollama / OpenAI Chat Completions / OpenAI Responses** using their real serializer/transport implementations with deterministic local handlers. Evidence artifact `10905007711`, 429,854 bytes, SHA256 `88e026887d8dbb030a34ab3c1bdfd47300f2128e52cd865bff248e42bb6cab66`, was independently downloaded; ZIP integrity passed across **647** entries and `validation.json` reports E1=PASS, E2=PASS, E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, old_provider_continuation_reused=false, auto_provider_fallback=false, mutation_replay_claim=false, fresh_turn_required=true and fresh_permission_for_mutation=true.
+
+Full Avalonia CI `36237795173` / job `108392643192` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **19/19** pull-request workflow identities on exact code SHA completed SUCCESS, 0 failed. Final portable artifact `10905665137` is 110,421,122 bytes, SHA256 `513e11d60c1f3ce9528aed532255e67a00e6754cc4bd9861c957ee15f597e112`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** real E4 with the user's configured live model/provider combinations is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user downloads/tests the final full build. This does not convert E4 to PASS and does not make AR-052 fully DONE.
 
 ### [ ] AR-060 — Search/fetch/browser thật và trạng thái riêng
 
@@ -582,82 +592,72 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-052_MODEL_CONTEXT_RESUME_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-052",
-  "parked_task": "AR-042",
-  "implementation_status": "AR-052_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-052_IMPLEMENTED_E1_E2_PASS_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-052",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E3 real native Office/GUI multi-task steering/cancel/concurrency acceptance deferred until user final-build test",
+  "required_evidence_level": "E4 real configured model/provider resume combinations deferred until user tests final full build",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "51c74339c05602efc13180dcffbb41a9aed6277b",
+  "validated_code_sha": "a2263e47a804d2f9f386296b1330b8a1c4231e2b",
   "implementation_commits": [
-    "27d6632b222e5a4233c9ee9fe9a53969220b66b2 feat(AR-042): make steering and mutation concurrency safe",
-    "7d98f2107d255de700d29409612a64af89931e19 fix(AR-042): remove redundant task unwrap",
-    "d4c9c00ededf3c93ff2ae3b882c7df27258db68d fix(AR-042): validate steering receipts and direct permission probes",
-    "15363438f6da96e9c51753c5f5dfef821f67dfb6 fix(AR-042): fence steering persistence before runtime queue",
-    "e0633c0cc652bce005a093255d15bb7b9f3e99eb test(AR-042): use valid serialization key",
-    "3757dae159e94b2e13efb66afea42347bbc18566 test(AR-042): make expiry race deterministic",
-    "8db2458b5500daf93e084bb691964c693d7e45f0 fix(AR-042): retire resource gates without split-lock race",
-    "9af4d05e43d17962aa90dfdde9c2fce6753d3c32 test(AR-042): expose expiry-boundary diagnostics",
-    "51c74339c05602efc13180dcffbb41a9aed6277b test(AR-042): expect normalized permission denial"
+    "ccc86f5c82e600c9a8b246e3a92b716f66261a28 feat(AR-052): resume canonical task state on fresh model turn",
+    "e9bd288a06464c49a67ce0dd22f79d852107a678 fix(AR-052): disambiguate resume fixture type",
+    "0f6d8fb7b220df5d23871f6a01206037b798ad64 fix(AR-052): compile transport response fixtures",
+    "46cdf3d5a25bed3c247f90a5d51795261eb9bf2e test(AR-052): expose stuck resume lifecycle state",
+    "a2263e47a804d2f9f386296b1330b8a1c4231e2b test(AR-052): avoid fixture sync-context deadlock"
   ],
-  "last_validation_result": "AR042 6/6; retained AR041 6/6, AR040 57/57, AR031 39/39, AR030 39/39, AR024 2/2; full H2 1323/1323; required Agent suites PASS. Dedicated run 36231762267 SUCCESS; Avalonia CI 36231762357 SUCCESS; all 18/18 exact-SHA workflows SUCCESS after AR021 same-SHA rerun; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 51c74339; AR042 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T09:24:57Z",
-  "user_decision": "User requires a complete build before personal testing. AR-042 native E3 multi-task concurrency acceptance is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR052 8/8; retained AR041 6/6, AR042 6/6, AR051 37/37, AR031 39/39, AR050 50/50; full H2 1331/1331; 75/75 required Agent suites PASS. Dedicated run 36237795203 SUCCESS; Avalonia CI 36237795173 SUCCESS; all 19/19 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at a2263e47; AR052 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T11:21:59Z",
+  "user_decision": "User requires the complete build before personal testing. AR-052 real configured-model/provider E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Shared one host-local mutation coordinator across production AgentRuntime instances; same-resource mutations serialize while distinct resources remain parallel.",
-    "Shared uncertainty fences prevent another task from blindly mutating a resource with an ambiguous prior effect.",
-    "Moved approval ahead of the resource wait and added post-wait pre-dispatch permission revalidation before durable dispatch/effect.",
-    "Preserved the original GoalRevisionId of an already-dispatched mutation while later steering remains prospective.",
-    "Added concurrent TurnId dedup across live and durable task identities so UI reconnect does not create another task.",
-    "Journaled steering idempotency receipts before runtime exposure using InputId+SHA256 only; raw steering text is not persisted in the receipt.",
-    "Retained queued-turn cancellation isolation: cancelling queued work does not cancel/start the running owner.",
-    "Validated exact SHA 51c74339 with 18/18 workflows SUCCESS and independently verified portable/evidence ZIPs."
+    "Rehydrated canonical AgentGoalState from durable goal/evidence snapshots without replaying old transcript or mutations.",
+    "Added same-TaskId ResumeTaskAsync with a fresh TurnId/provider request; old provider continuation/response identity is never reused.",
+    "Blocked resume before model/provider allocation while any AR-041 operation remains ReconcileRequired.",
+    "Required a fresh active mutation permission scope; expired/revoked grants never survive resume.",
+    "Explicit selected-provider failure does not auto-fallback; later provider/model change requires a new explicit fresh turn on the same TaskId.",
+    "Added scoped resume history locators so smaller-context models can retrieve exact durable facts without history becoming current authority.",
+    "Durable steering receipt ACKs reconnect without reapplying the same correction.",
+    "Validated Ollama/OpenAI Chat/OpenAI Responses fresh-start protocol matrix and exact SHA all-green CI."
   ],
   "remaining_in_parked_task": [
-    "Run E3 later with two real H2 tasks targeting the same disposable Excel/Word live resource and confirm serialized writes plus independent reads.",
-    "Change user target/path while a real native mutation is in flight; the in-flight operation must keep its dispatch revision and later work must use the new revision.",
-    "Let a mutation grant expire/revoke while waiting behind another task; verify no durable dispatch/effect occurs after the gate is acquired.",
-    "Cancel queued work while another task owns a long native/process operation; verify the owner continues and no foreign process/resource is cancelled.",
-    "Reconnect/duplicate UI submission with the same TurnId and steering InputId; verify one task/one revision/one mutation only.",
-    "Coordinator/NAS fencing remains a separate contract; do not interpret the local gate as E5."
+    "Run E4 later with user-approved real configured model/provider combinations, including smaller-context switch and model change after a provider failure.",
+    "Confirm the resumed model still knows current requirements, verified outcomes, pending/reconciled operations and can retrieve exact earlier facts through scoped history.",
+    "Confirm native provider continuation IDs are never transferred across incompatible backends and no historical mutation is replayed.",
+    "For a mutation resume, expire/revoke the prior grant and verify a fresh permission is required before any new effect.",
+    "Record untested provider/model/platform combinations explicitly."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-042/implementation.md",
-    "docs/agent-reliability/AR-042/evidence.json",
-    "docs/agent-reliability/AR-042/native-acceptance.md",
-    "GitHub artifact 10903400379 AR042-E1-E2-Evidence",
-    "GitHub artifact 10903620313 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-052/implementation.md",
+    "docs/agent-reliability/AR-052/evidence.json",
+    "docs/agent-reliability/AR-052/native-acceptance.md",
+    "GitHub artifact 10905007711 AR052-E1-E2-Evidence",
+    "GitHub artifact 10905665137 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10903620313,
-    "bytes": 110412220,
-    "sha256": "27f61daa9b8ab9e5312f71d80d8ae53d72d5b910a9b6c1d3e854a84efaf08283",
-    "expires_at_utc": "2026-12-25T09:06:18Z",
-    "source_sha": "51c74339c05602efc13180dcffbb41a9aed6277b",
+    "artifact_id": 10905665137,
+    "bytes": 110421122,
+    "sha256": "513e11d60c1f3ce9528aed532255e67a00e6754cc4bd9861c957ee15f597e112",
+    "expires_at_utc": "2026-12-25T11:06:29Z",
+    "source_sha": "a2263e47a804d2f9f386296b1330b8a1c4231e2b",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "host_local_only": true,
-    "distributed_lock_claim": false,
-    "e5_claim": false,
-    "raw_steering_receipt_text_persisted": false,
-    "post_wait_permission_recheck": true,
-    "foreign_task_cancel": false,
+    "old_provider_continuation_reused": false,
+    "auto_provider_fallback": false,
+    "mutation_replay": false,
+    "fresh_turn_required": true,
+    "fresh_permission_for_mutation": true,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
-  "failed_attempts_repaired": [
-    "Initial AR042 implementation required several deterministic fixture/validation repairs; all are retained in the commit sequence above.",
-    "One AR021 focused probe failed once with Sequence contains no elements while the same test passed in full H2 on the exact SHA; same-SHA rerun completed SUCCESS, so no unrelated runtime change was made."
-  ],
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-042 unless native E3 final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-042 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-052 unless real E4 final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-052 turn."
 }
 ```
 
