@@ -1,0 +1,2301 @@
+{
+  "task": "AR-064",
+  "status": "PARTIAL / E1_E2_FOUNDATION_PASS / NOT_DONE",
+  "runtime_commit": "da71d65da0d08de5ec211ac38059aa30c2a4b2f7",
+  "tested_code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+  "focused": {
+    "run": 35864935194,
+    "job": 107194023082,
+    "status": "SUCCESS",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-23T13:07:45Z",
+        "completed_at": "2026-09-23T13:07:46Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-23T13:07:46Z",
+        "completed_at": "2026-09-23T13:08:37Z"
+      },
+      {
+        "name": "Run actions/setup-dotnet@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-23T13:08:37Z",
+        "completed_at": "2026-09-23T13:09:39Z"
+      },
+      {
+        "name": "Record exact source and build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-23T13:09:39Z",
+        "completed_at": "2026-09-23T13:11:24Z"
+      },
+      {
+        "name": "Reproduce old plugin metadata loss then restore exact current source",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-23T13:11:24Z",
+        "completed_at": "2026-09-23T13:12:01Z"
+      },
+      {
+        "name": "Repeat lifecycle and chat then retain all AR regressions",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-23T13:12:01Z",
+        "completed_at": "2026-09-23T13:17:35Z"
+      },
+      {
+        "name": "Independently execute required Agent suites",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-23T13:17:35Z",
+        "completed_at": "2026-09-23T13:19:26Z"
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-23T13:19:26Z",
+        "completed_at": "2026-09-23T13:19:29Z"
+      },
+      {
+        "name": "Post Run actions/setup-dotnet@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-09-23T13:19:29Z",
+        "completed_at": "2026-09-23T13:19:29Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-09-23T13:19:29Z",
+        "completed_at": "2026-09-23T13:19:31Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-09-23T13:19:31Z",
+        "completed_at": "2026-09-23T13:19:31Z"
+      }
+    ]
+  },
+  "focused_artifact": {
+    "id": 10751613347,
+    "name": "AR064-Lifecycle-Evidence",
+    "size_in_bytes": 3024593,
+    "digest": "sha256:51c4309607c63130acc99d5ef73b0e62dd24e80cd7fbae64ac514e2a14eba5ba"
+  },
+  "full": {
+    "run": 35864940427,
+    "job": 107194043953,
+    "status": "SUCCESS",
+    "actual_checkout": "f1eb0d19e80b535b25574a6c95a72cbec3255ea0",
+    "source_equal": true,
+    "ar064_inventory": {
+      "count": 75,
+      "matches_focused": true,
+      "names": [
+        "AR-064 revocation pending discovery cannot republish after removal loaded=False",
+        "AR-064 revocation pending discovery cannot republish after removal loaded=True",
+        "AR-064 revocation retained descriptor is unavailable after removal permanent=False",
+        "AR-064 revocation retained descriptor is unavailable after removal permanent=True",
+        "AR-064 revocation older discovery cannot overwrite a newer committed selected binding",
+        "AR-064 revocation disjoint loads preserve unrelated descriptor and executor",
+        "AR-064 revocation reload invalidates readiness only for the selected binding",
+        "AR-064 outcome wrapper preserves typed metadata before host validation Succeeded",
+        "AR-064 outcome wrapper preserves typed metadata before host validation Running",
+        "AR-064 outcome wrapper preserves typed metadata before host validation Rejected",
+        "AR-064 outcome wrapper preserves typed metadata before host validation Failed",
+        "AR-064 outcome wrapper preserves typed metadata before host validation Cancelled",
+        "AR-064 outcome wrapper preserves typed metadata before host validation PartiallyApplied",
+        "AR-064 outcome wrapper preserves typed metadata before host validation OutcomeUnknown",
+        "AR-064 outcome wrapper fences queued and later same-resource writes Running",
+        "AR-064 outcome wrapper fences queued and later same-resource writes OutcomeUnknown",
+        "AR-064 outcome wrapper fences queued and later same-resource writes PartiallyApplied",
+        "AR-064 outcome wrapper cannot hide contradictory identity from the host bridge",
+        "AR-064 outcome wrapper legacy callers receive exact domain bytes from one typed execution",
+        "AR-064 outcome wrapper retains legacy-only executor compatibility",
+        "AR-064 outcome wrapper captured typed executor cannot bypass version revocation disable",
+        "AR-064 outcome wrapper captured typed executor cannot bypass version revocation quarantine",
+        "AR-064 outcome wrapper captured typed executor cannot bypass version revocation update",
+        "AR-064 outcome wrapper captured typed executor cannot bypass version revocation uninstall",
+        "AR-064 outcome wrapper exact callable is checked before the typed resolver",
+        "AR-064 outcome wrapper precancel dispatches nothing and leaves no version lease",
+        "AR-064 outcome wrapper holds and releases the actual typed-call lease success",
+        "AR-064 outcome wrapper holds and releases the actual typed-call lease throw",
+        "AR-064 outcome wrapper holds and releases the actual typed-call lease cancel",
+        "AR-064 outcome wrapper corrupt package is rejected before dispatch tools.json",
+        "AR-064 outcome wrapper corrupt package is rejected before dispatch admission.json",
+        "AR-064 outcome wrapper quarantine stays disabled when fallback is corrupt tools.json",
+        "AR-064 outcome wrapper quarantine stays disabled when fallback is corrupt admission.json",
+        "AR-064 registry duplicate registration cannot leak a new namespace",
+        "AR-064 registry invalid batch preserves previous descriptors and version duplicate",
+        "AR-064 registry invalid batch preserves previous descriptors and version namespace",
+        "AR-064 registry invalid batch preserves previous descriptors and version commit",
+        "AR-064 registry atomic replacement retains unrelated descriptor identity",
+        "AR-064 registry snapshots never expose a partially published batch",
+        "AR-064 provider rejected projection preserves currently callable tools schema",
+        "AR-064 provider rejected projection preserves currently callable tools unselected",
+        "AR-064 provider rejected projection preserves currently callable tools duplicate",
+        "AR-064 provider rejected projection preserves currently callable tools cancel",
+        "AR-064 provider removal revokes a previously captured executor before disconnect",
+        "AR-064 provider reload revokes selected binding without changing an unrelated provider",
+        "AR-064 provider cannot resurrect from discovery that finishes after unregistration",
+        "AR-064 provider requested names are snapshotted before awaiting discovery",
+        "AR-064 provider disconnection prevents a retained executor from starting work",
+        "AR-064 provider in-flight lease prevents disposal until the actual call ends",
+        "AR-064 only-version quarantine revokes both discovery and captured executor",
+        "AR-064 quarantine selects clean fallback and cannot roll back to quarantined bytes",
+        "AR-064 disable and re-enable never resurrect an old captured executor",
+        "AR-064 update revokes old binding without changing unrelated tool",
+        "AR-064 actual in-flight executor fences only its plugin and releases after cancellation",
+        "AR-064 task version pin blocks its update but permits explicit revocation",
+        "AR-064 altered admitted file is rejected before executor invocation tools.json",
+        "AR-064 altered admitted file is rejected before executor invocation manifest.json",
+        "AR-064 altered admitted file is rejected before executor invocation admission.json",
+        "AR-064 failed installation preserves the previous active package hash",
+        "AR-064 failed installation preserves the previous active package trust",
+        "AR-064 failed installation preserves the previous active package permission",
+        "AR-064 failed installation preserves the previous active package selftest",
+        "AR-064 failed installation preserves the previous active package minimum",
+        "AR-064 second descriptor namespace conflict cannot partially activate a package",
+        "AR-064 uninstall removes only package bytes and keeps historical artifact readable",
+        "AR-064 skill-only package disappears from canonical skill source after disable",
+        "AR-064 restart preserves disabled state and requires a fresh verified binding",
+        "AR-064 lifecycle refuses noncanonical version path ../outside",
+        "AR-064 lifecycle refuses noncanonical version path 1.0.0/../other",
+        "AR-064 lifecycle refuses noncanonical version path 01.0.0",
+        "AR-064 lifecycle refuses noncanonical version path 1.0.0:stream",
+        "AR-064 package rejects reserved or escaping archive entry ADMISSION.JSON",
+        "AR-064 package rejects reserved or escaping archive entry ../outside.txt",
+        "AR-064 package rejects reserved or escaping archive entry /rooted.txt",
+        "AR-064 package rejects reserved or escaping archive entry folder./file.txt"
+      ]
+    },
+    "whole_log_summaries": [
+      [
+        "1077",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "18",
+        "0"
+      ],
+      [
+        "35",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "15",
+        "0"
+      ],
+      [
+        "15",
+        "0"
+      ],
+      [
+        "15",
+        "0"
+      ],
+      [
+        "15",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "2",
+        "0"
+      ],
+      [
+        "2",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "2",
+        "0"
+      ],
+      [
+        "2",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "1",
+        "0"
+      ],
+      [
+        "1",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "1",
+        "0"
+      ],
+      [
+        "12",
+        "0"
+      ],
+      [
+        "12",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "15",
+        "0"
+      ],
+      [
+        "10",
+        "0"
+      ],
+      [
+        "16",
+        "0"
+      ],
+      [
+        "10",
+        "0"
+      ],
+      [
+        "10",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "1",
+        "0"
+      ],
+      [
+        "12",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "3",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "10",
+        "0"
+      ],
+      [
+        "10",
+        "0"
+      ],
+      [
+        "16",
+        "0"
+      ],
+      [
+        "16",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "4",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "5",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "7",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "6",
+        "0"
+      ],
+      [
+        "13",
+        "0"
+      ],
+      [
+        "13",
+        "0"
+      ]
+    ],
+    "passed": 1077,
+    "failed": 0,
+    "log_sha256": "dbc0f57fe8eafa5b68cf8cdf3e5daa6b05650605c9e69a1376a7b36570fc4218",
+    "build_warnings": 38,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-23T13:07:48Z",
+        "completed_at": "2026-09-23T13:07:50Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-23T13:07:50Z",
+        "completed_at": "2026-09-23T13:07:59Z"
+      },
+      {
+        "name": "Setup .NET 10",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-23T13:07:59Z",
+        "completed_at": "2026-09-23T13:08:31Z"
+      },
+      {
+        "name": "Restore Avalonia solution",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-23T13:08:31Z",
+        "completed_at": "2026-09-23T13:08:45Z"
+      },
+      {
+        "name": "Build Avalonia solution",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-23T13:08:45Z",
+        "completed_at": "2026-09-23T13:09:15Z"
+      },
+      {
+        "name": "Run H2 Notes tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-23T13:09:15Z",
+        "completed_at": "2026-09-23T13:14:30Z"
+      },
+      {
+        "name": "Run H2 NAS acceptance harness self-test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-23T13:14:30Z",
+        "completed_at": "2026-09-23T13:14:35Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab DesktopHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-23T13:14:35Z",
+        "completed_at": "2026-09-23T13:14:36Z"
+      },
+      {
+        "name": "Build H2 Agent Lab DesktopHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-23T13:14:36Z",
+        "completed_at": "2026-09-23T13:14:38Z"
+      },
+      {
+        "name": "Run H2 Agent Lab DesktopHost safety self-tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-23T13:14:38Z",
+        "completed_at": "2026-09-23T13:14:39Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab OfficeHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-23T13:14:39Z",
+        "completed_at": "2026-09-23T13:14:40Z"
+      },
+      {
+        "name": "Build H2 Agent Lab OfficeHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-23T13:14:40Z",
+        "completed_at": "2026-09-23T13:14:42Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-23T13:14:42Z",
+        "completed_at": "2026-09-23T13:14:43Z"
+      },
+      {
+        "name": "Build H2 Agent Lab",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-09-23T13:14:43Z",
+        "completed_at": "2026-09-23T13:14:45Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v1 self-test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-09-23T13:14:45Z",
+        "completed_at": "2026-09-23T13:14:47Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 architecture guard",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-09-23T13:14:47Z",
+        "completed_at": "2026-09-23T13:14:49Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 metrics tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-09-23T13:14:49Z",
+        "completed_at": "2026-09-23T13:14:50Z"
+      },
+      {
+        "name": "Run H2 Agent Lab initial A B baseline",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-09-23T13:14:50Z",
+        "completed_at": "2026-09-23T13:14:52Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 session context tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-09-23T13:14:52Z",
+        "completed_at": "2026-09-23T13:14:53Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 artifact store tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-23T13:14:53Z",
+        "completed_at": "2026-09-23T13:14:54Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 compaction tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-09-23T13:14:54Z",
+        "completed_at": "2026-09-23T13:14:56Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 context cache acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-09-23T13:14:56Z",
+        "completed_at": "2026-09-23T13:14:57Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 orchestrator tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-09-23T13:14:57Z",
+        "completed_at": "2026-09-23T13:14:58Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 tool registry tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-09-23T13:14:58Z",
+        "completed_at": "2026-09-23T13:15:00Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 verification gate tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-09-23T13:15:00Z",
+        "completed_at": "2026-09-23T13:15:01Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 closed file acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 26,
+        "started_at": "2026-09-23T13:15:01Z",
+        "completed_at": "2026-09-23T13:15:03Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Phase 10 acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 27,
+        "started_at": "2026-09-23T13:15:03Z",
+        "completed_at": "2026-09-23T13:15:04Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Phase 11 acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28,
+        "started_at": "2026-09-23T13:15:05Z",
+        "completed_at": "2026-09-23T13:15:06Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 extensibility refinement tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29,
+        "started_at": "2026-09-23T13:15:06Z",
+        "completed_at": "2026-09-23T13:15:08Z"
+      },
+      {
+        "name": "Run H2 Agent MB-10 runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30,
+        "started_at": "2026-09-23T13:15:08Z",
+        "completed_at": "2026-09-23T13:15:09Z"
+      },
+      {
+        "name": "Run H2 Agent MB-11 orchestrator runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31,
+        "started_at": "2026-09-23T13:15:09Z",
+        "completed_at": "2026-09-23T13:15:11Z"
+      },
+      {
+        "name": "Run H2 Agent MB-12 provider runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 32,
+        "started_at": "2026-09-23T13:15:11Z",
+        "completed_at": "2026-09-23T13:15:12Z"
+      },
+      {
+        "name": "Run H2 Agent MB-20 bounded context tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 33,
+        "started_at": "2026-09-23T13:15:12Z",
+        "completed_at": "2026-09-23T13:15:14Z"
+      },
+      {
+        "name": "Run H2 Agent MB-21 runtime compaction tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 34,
+        "started_at": "2026-09-23T13:15:14Z",
+        "completed_at": "2026-09-23T13:15:15Z"
+      },
+      {
+        "name": "Run H2 Agent MB-22 prompt cache runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 35,
+        "started_at": "2026-09-23T13:15:15Z",
+        "completed_at": "2026-09-23T13:15:17Z"
+      },
+      {
+        "name": "Run H2 Agent MB-30 initial tool exposure tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 36,
+        "started_at": "2026-09-23T13:15:17Z",
+        "completed_at": "2026-09-23T13:15:18Z"
+      },
+      {
+        "name": "Run H2 Agent MB-31 ToolRegistry execution tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 37,
+        "started_at": "2026-09-23T13:15:18Z",
+        "completed_at": "2026-09-23T13:15:20Z"
+      },
+      {
+        "name": "Run H2 Agent MB-32 deferred tool loading tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 38,
+        "started_at": "2026-09-23T13:15:20Z",
+        "completed_at": "2026-09-23T13:15:21Z"
+      },
+      {
+        "name": "Run H2 Agent MB-33 scheduler runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 39,
+        "started_at": "2026-09-23T13:15:21Z",
+        "completed_at": "2026-09-23T13:15:23Z"
+      },
+      {
+        "name": "Run H2 Agent MB-40 permission runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 40,
+        "started_at": "2026-09-23T13:15:23Z",
+        "completed_at": "2026-09-23T13:15:24Z"
+      },
+      {
+        "name": "Run H2 Agent MB-41 evidence runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 41,
+        "started_at": "2026-09-23T13:15:24Z",
+        "completed_at": "2026-09-23T13:15:26Z"
+      },
+      {
+        "name": "Run H2 Agent MB-42 verification runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 42,
+        "started_at": "2026-09-23T13:15:26Z",
+        "completed_at": "2026-09-23T13:15:28Z"
+      },
+      {
+        "name": "Run H2 Agent MB-43 bounded repair runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 43,
+        "started_at": "2026-09-23T13:15:28Z",
+        "completed_at": "2026-09-23T13:15:29Z"
+      },
+      {
+        "name": "Run H2 Agent MB-44 host completion gate tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 44,
+        "started_at": "2026-09-23T13:15:29Z",
+        "completed_at": "2026-09-23T13:15:30Z"
+      },
+      {
+        "name": "Run H2 Agent MB-50 canonical SkillCatalog tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 45,
+        "started_at": "2026-09-23T13:15:30Z",
+        "completed_at": "2026-09-23T13:15:32Z"
+      },
+      {
+        "name": "Run H2 Agent MB-51 Codex-style skill discovery tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 46,
+        "started_at": "2026-09-23T13:15:32Z",
+        "completed_at": "2026-09-23T13:15:33Z"
+      },
+      {
+        "name": "Run H2 Agent MB-52 progressive skill loading tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 47,
+        "started_at": "2026-09-23T13:15:33Z",
+        "completed_at": "2026-09-23T13:15:35Z"
+      },
+      {
+        "name": "Run H2 Agent MB-60 extension registration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 48,
+        "started_at": "2026-09-23T13:15:35Z",
+        "completed_at": "2026-09-23T13:15:36Z"
+      },
+      {
+        "name": "Run H2 Agent MB-61 generic tool preference tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 49,
+        "started_at": "2026-09-23T13:15:36Z",
+        "completed_at": "2026-09-23T13:15:37Z"
+      },
+      {
+        "name": "Run H2 Agent MB-62 computer provider registration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 50,
+        "started_at": "2026-09-23T13:15:37Z",
+        "completed_at": "2026-09-23T13:15:39Z"
+      },
+      {
+        "name": "Run H2 Agent MB-63 first-party extension card tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 51,
+        "started_at": "2026-09-23T13:15:39Z",
+        "completed_at": "2026-09-23T13:15:40Z"
+      },
+      {
+        "name": "Run H2 Agent MB-70 domain-neutral capability search tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 52,
+        "started_at": "2026-09-23T13:15:40Z",
+        "completed_at": "2026-09-23T13:15:42Z"
+      },
+      {
+        "name": "Run H2 Agent MB-71 installed capability projection tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 53,
+        "started_at": "2026-09-23T13:15:42Z",
+        "completed_at": "2026-09-23T13:15:43Z"
+      },
+      {
+        "name": "Run H2 Agent MB-72 available capability search tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 54,
+        "started_at": "2026-09-23T13:15:43Z",
+        "completed_at": "2026-09-23T13:15:45Z"
+      },
+      {
+        "name": "Run H2 Agent MB-73 thin CapabilityResolver tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 55,
+        "started_at": "2026-09-23T13:15:45Z",
+        "completed_at": "2026-09-23T13:15:46Z"
+      },
+      {
+        "name": "Run H2 Agent MB-74 runtime capability install tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 56,
+        "started_at": "2026-09-23T13:15:46Z",
+        "completed_at": "2026-09-23T13:15:48Z"
+      },
+      {
+        "name": "Run H2 Agent MB-75 task capability pinning tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 57,
+        "started_at": "2026-09-23T13:15:48Z",
+        "completed_at": "2026-09-23T13:15:49Z"
+      },
+      {
+        "name": "Run H2 Agent MB-80 minimal catalog source tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 58,
+        "started_at": "2026-09-23T13:15:49Z",
+        "completed_at": "2026-09-23T13:15:50Z"
+      },
+      {
+        "name": "Run H2 Agent MB-81 package retriever boundary tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 59,
+        "started_at": "2026-09-23T13:15:50Z",
+        "completed_at": "2026-09-23T13:15:52Z"
+      },
+      {
+        "name": "Run H2 Agent MB-82 end-to-end install-and-continue test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 60,
+        "started_at": "2026-09-23T13:15:52Z",
+        "completed_at": "2026-09-23T13:15:53Z"
+      },
+      {
+        "name": "Run H2 Agent MB-90 retire AgentRunner tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 61,
+        "started_at": "2026-09-23T13:15:53Z",
+        "completed_at": "2026-09-23T13:15:55Z"
+      },
+      {
+        "name": "Run H2 Agent MB-91 retire AgentTools giant switch tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 62,
+        "started_at": "2026-09-23T13:15:55Z",
+        "completed_at": "2026-09-23T13:15:56Z"
+      },
+      {
+        "name": "Run H2 Agent MB-92 retire V1 ToolRegistry adapter tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 63,
+        "started_at": "2026-09-23T13:15:56Z",
+        "completed_at": "2026-09-23T13:15:57Z"
+      },
+      {
+        "name": "Run H2 Agent MB-93 retire duplicate SkillCatalog tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 64,
+        "started_at": "2026-09-23T13:15:57Z",
+        "completed_at": "2026-09-23T13:15:59Z"
+      },
+      {
+        "name": "Run H2 Agent MB-94 retire ComputerTools tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 65,
+        "started_at": "2026-09-23T13:15:59Z",
+        "completed_at": "2026-09-23T13:16:01Z"
+      },
+      {
+        "name": "Run H2 Agent MB-95 trace journal boundary tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 66,
+        "started_at": "2026-09-23T13:16:01Z",
+        "completed_at": "2026-09-23T13:16:02Z"
+      },
+      {
+        "name": "Run H2 Agent MB-100 Minimum Bootable Agent acceptance corpus",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 67,
+        "started_at": "2026-09-23T13:16:02Z",
+        "completed_at": "2026-09-23T13:16:04Z"
+      },
+      {
+        "name": "Run H2 Agent MB-101 fully V2 normal UI path acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 68,
+        "started_at": "2026-09-23T13:16:04Z",
+        "completed_at": "2026-09-23T13:16:06Z"
+      },
+      {
+        "name": "Run H2 Agent MB-102 context boundedness gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 69,
+        "started_at": "2026-09-23T13:16:06Z",
+        "completed_at": "2026-09-23T13:16:07Z"
+      },
+      {
+        "name": "Run H2 Agent MB-103 extension bus gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 70,
+        "started_at": "2026-09-23T13:16:07Z",
+        "completed_at": "2026-09-23T13:16:09Z"
+      },
+      {
+        "name": "Run H2 Agent MB-104 permission and scope gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 71,
+        "started_at": "2026-09-23T13:16:09Z",
+        "completed_at": "2026-09-23T13:16:16Z"
+      },
+      {
+        "name": "Run H2 Agent MB-105 core correctness gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 72,
+        "started_at": "2026-09-23T13:16:16Z",
+        "completed_at": "2026-09-23T13:16:18Z"
+      },
+      {
+        "name": "Run H2 Agent MB-110 Office acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 73,
+        "started_at": "2026-09-23T13:16:18Z",
+        "completed_at": "2026-09-23T13:16:21Z"
+      },
+      {
+        "name": "Run H2 Agent MB-111 Web freshness legal acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 74,
+        "started_at": "2026-09-23T13:16:21Z",
+        "completed_at": "2026-09-23T13:16:22Z"
+      },
+      {
+        "name": "Run H2 Agent MB-112 Desktop computer-use acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 75,
+        "started_at": "2026-09-23T13:16:22Z",
+        "completed_at": "2026-09-23T13:16:24Z"
+      },
+      {
+        "name": "Run H2 Agent MB-113 AutoCAD extension acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 76,
+        "started_at": "2026-09-23T13:16:24Z",
+        "completed_at": "2026-09-23T13:16:26Z"
+      },
+      {
+        "name": "Run H2 Agent MB-114 MCP acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 77,
+        "started_at": "2026-09-23T13:16:26Z",
+        "completed_at": "2026-09-23T13:16:27Z"
+      },
+      {
+        "name": "Run H2 Agent MB-115 plugin package lifecycle acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 78,
+        "started_at": "2026-09-23T13:16:27Z",
+        "completed_at": "2026-09-23T13:16:29Z"
+      },
+      {
+        "name": "Run H2 Agent MB-120 final architecture report acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 79,
+        "started_at": "2026-09-23T13:16:29Z",
+        "completed_at": "2026-09-23T13:16:30Z"
+      },
+      {
+        "name": "Run H2 Agent MB-121 public integration boundary acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 80,
+        "started_at": "2026-09-23T13:16:30Z",
+        "completed_at": "2026-09-23T13:16:31Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 DesktopHost acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 81,
+        "started_at": "2026-09-23T13:16:31Z",
+        "completed_at": "2026-09-23T13:16:34Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OfficeHost acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 82,
+        "started_at": "2026-09-23T13:16:34Z",
+        "completed_at": "2026-09-23T13:16:39Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 transport contract tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 83,
+        "started_at": "2026-09-23T13:16:39Z",
+        "completed_at": "2026-09-23T13:16:40Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Ollama transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 84,
+        "started_at": "2026-09-23T13:16:40Z",
+        "completed_at": "2026-09-23T13:16:42Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Chat Completions transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 85,
+        "started_at": "2026-09-23T13:16:42Z",
+        "completed_at": "2026-09-23T13:16:43Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OpenAI Responses HTTP transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 86,
+        "started_at": "2026-09-23T13:16:43Z",
+        "completed_at": "2026-09-23T13:16:44Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OpenAI Responses WebSocket tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 87,
+        "started_at": "2026-09-23T13:16:44Z",
+        "completed_at": "2026-09-23T13:16:46Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 provider transport resilience matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 88,
+        "started_at": "2026-09-23T13:16:46Z",
+        "completed_at": "2026-09-23T13:16:47Z"
+      },
+      {
+        "name": "Publish self-contained Windows x64",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 89,
+        "started_at": "2026-09-23T13:16:47Z",
+        "completed_at": "2026-09-23T13:17:13Z"
+      },
+      {
+        "name": "Verify packaged Agent helpers start and answer IPC",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 90,
+        "started_at": "2026-09-23T13:17:13Z",
+        "completed_at": "2026-09-23T13:17:15Z"
+      },
+      {
+        "name": "Publish H2 NAS acceptance probe Windows x64",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 91,
+        "started_at": "2026-09-23T13:17:15Z",
+        "completed_at": "2026-09-23T13:17:19Z"
+      },
+      {
+        "name": "Upload H2 NAS acceptance probe",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 92,
+        "started_at": "2026-09-23T13:17:19Z",
+        "completed_at": "2026-09-23T13:17:23Z"
+      },
+      {
+        "name": "Upload Avalonia portable build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 93,
+        "started_at": "2026-09-23T13:17:23Z",
+        "completed_at": "2026-09-23T13:17:32Z"
+      },
+      {
+        "name": "Post Setup .NET 10",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 185,
+        "started_at": "2026-09-23T13:17:32Z",
+        "completed_at": "2026-09-23T13:17:32Z"
+      },
+      {
+        "name": "Post Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 186,
+        "started_at": "2026-09-23T13:17:32Z",
+        "completed_at": "2026-09-23T13:17:35Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 187,
+        "started_at": "2026-09-23T13:17:35Z",
+        "completed_at": "2026-09-23T13:17:35Z"
+      }
+    ]
+  },
+  "observed": {
+    "identity": {
+      "E1": "Atomic registry and provider selection / revocation",
+      "network": "No model, credential or external service calls",
+      "E4": "NOT_RUN",
+      "E2": "Real temporary ZIP package/activation/artifact files with declared fixture executors",
+      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+      "working_tree": "CLEAN",
+      "E3": "NOT_RUN until concrete production package scenario",
+      "E5": "AR-083 DEFERRED_BY_USER"
+    },
+    "corpora": {
+      "results": [
+        {
+          "name": "AR-064-1",
+          "exit_code": 0,
+          "result": "RESULT: 75 passed, 0 failed"
+        },
+        {
+          "name": "AR-064-2",
+          "exit_code": 0,
+          "result": "RESULT: 75 passed, 0 failed"
+        },
+        {
+          "name": "AR-064-3",
+          "exit_code": 0,
+          "result": "RESULT: 75 passed, 0 failed"
+        },
+        {
+          "name": "CHAT-1",
+          "exit_code": 0,
+          "result": "RESULT: 10 passed, 0 failed"
+        },
+        {
+          "name": "CHAT-2",
+          "exit_code": 0,
+          "result": "RESULT: 10 passed, 0 failed"
+        },
+        {
+          "name": "CHAT-3",
+          "exit_code": 0,
+          "result": "RESULT: 10 passed, 0 failed"
+        },
+        {
+          "name": "AR-051",
+          "exit_code": 0,
+          "result": "RESULT: 37 passed, 0 failed"
+        },
+        {
+          "name": "AR-050",
+          "exit_code": 0,
+          "result": "RESULT: 50 passed, 0 failed"
+        },
+        {
+          "name": "AR-040",
+          "exit_code": 0,
+          "result": "RESULT: 57 passed, 0 failed"
+        },
+        {
+          "name": "AR-033",
+          "exit_code": 0,
+          "result": "RESULT: 42 passed, 0 failed"
+        },
+        {
+          "name": "AR-032",
+          "exit_code": 0,
+          "result": "RESULT: 19 passed, 0 failed"
+        },
+        {
+          "name": "AR-031",
+          "exit_code": 0,
+          "result": "RESULT: 39 passed, 0 failed"
+        },
+        {
+          "name": "AR-030",
+          "exit_code": 0,
+          "result": "RESULT: 39 passed, 0 failed"
+        },
+        {
+          "name": "AR-020",
+          "exit_code": 0,
+          "result": "RESULT: 36 passed, 0 failed"
+        },
+        {
+          "name": "AR-012",
+          "exit_code": 0,
+          "result": "RESULT: 44 passed, 0 failed"
+        },
+        {
+          "name": "AR-011",
+          "exit_code": 0,
+          "result": "RESULT: 25 passed, 0 failed"
+        },
+        {
+          "name": "AR-010",
+          "exit_code": 0,
+          "result": "RESULT: 11 passed, 0 failed"
+        },
+        {
+          "name": "AR-001",
+          "exit_code": 0,
+          "result": "RESULT: 13 passed, 0 failed"
+        }
+      ],
+      "failed": []
+    },
+    "agent_suites": 74,
+    "control": {
+      "code_sha": "146cb813c7dd4a4f4abe9da7fc0d81a18d7c3869",
+      "old_source_sha": "1aef7d3386ea22ae1f8dd30e6ff1ad4948a6016e",
+      "level": "C# counterfactual component control; not native E3/E4",
+      "expected_failures": 7,
+      "result": "EXPECTED_BEHAVIOR_REPRODUCED",
+      "restoration": "PASS",
+      "current_rebuild": "PASS",
+      "working_bytes_before": {
+        "experiments/H2AgentLab/Plugins/PluginManager.cs": "f6e68639e1d3737cc7c308b8bfdff32ed6de975047cd022fe6e538d670f26fac",
+        "experiments/H2AgentLab/Plugins/PluginManager.Lifecycle.cs": "e8b1d0cc70974cb4d449568c3cf265c36eec3b060f7b8cfaa23064549dceeccd"
+      },
+      "old_build_exit": 0,
+      "old_test_exit": 1,
+      "expected_failure_messages": 7,
+      "result_lines": [
+        [
+          "0",
+          "7"
+        ]
+      ],
+      "working_bytes_after": {
+        "experiments/H2AgentLab/Plugins/PluginManager.cs": "f6e68639e1d3737cc7c308b8bfdff32ed6de975047cd022fe6e538d670f26fac",
+        "experiments/H2AgentLab/Plugins/PluginManager.Lifecycle.cs": "e8b1d0cc70974cb4d449568c3cf265c36eec3b060f7b8cfaa23064549dceeccd"
+      },
+      "clean_after_restore": true
+    },
+    "source_files": 802,
+    "source_bytes": 9055393,
+    "receipts": {
+      "AR-064-1/outcome-metadata-Cancelled.json": {
+        "status": "Cancelled",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "37d390cc-f330-4e60-b4c8-7783c80f2447",
+          "LogicalOperationId": "op-02ad5d1a8c9beb291f42d0635ec76d76228f20cf3065c926b4e9857a7deba705"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-Failed.json": {
+        "status": "Failed",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "0d8d610b-db54-4a15-9167-80c93c52d06d",
+          "LogicalOperationId": "op-a4c0a9ca1339ac6833bc2fcdfa14bc6f7ea2ba36b8d08712c5263b2fb3bb9b44"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "123f8807-0b1a-477d-9435-60e409ff10a9",
+          "LogicalOperationId": "op-da91b86f047540ef6ab04cd54e8df185a964d453ef3e67ef0eed838583072a61"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "effect": "PartiallyApplied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "2411ddb3-a962-47ca-a1ce-455904c43b20",
+          "LogicalOperationId": "op-e7b84b0692039082c00d6fc7acc7bb807d0fa3366a800a3b5288347f9b2a229e"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-Running.json": {
+        "status": "Running",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "6ed677e4-d19d-4c1d-ac43-c544eaaaed32",
+          "LogicalOperationId": "op-3030f833ae87e25ac95a832ae1b98132c1e282829fe1b248f073ba85f9474d1e"
+        },
+        "Job": {
+          "JobId": "job-fixture",
+          "OutputCursor": "output-cursor"
+        },
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-Rejected.json": {
+        "status": "Rejected",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "f9fbcd11-d243-4702-981d-5bbbe61d53fd",
+          "LogicalOperationId": "op-747bbc70148701b09417a1983f091d2c3587fd78e50fd679e6452a2f2d486c81"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-metadata-Succeeded.json": {
+        "status": "Succeeded",
+        "effect": "Applied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "80c10a4f-c551-4c8b-b2ac-a2e8ad4ec413",
+          "LogicalOperationId": "op-69f47a1e9cb7716b9599da788288f64c38fed17a8aa37b4be2a86f6940fdec90"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": true,
+          "NextCursor": null,
+          "Reason": null
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-1/outcome-quarantine-admission.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-1/outcome-quarantine-tools.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-1/outcome-scheduler-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-1/outcome-scheduler-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-1/outcome-scheduler-Running.json": {
+        "status": "Running",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-2/outcome-metadata-Cancelled.json": {
+        "status": "Cancelled",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "2820c8b5-7a00-4e85-9ce6-d82239c79114",
+          "LogicalOperationId": "op-1060f4d889ba743b76ff26b9cb957c0ddc9f75a925c769f429c8f90d8ad64a37"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-Failed.json": {
+        "status": "Failed",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "6986ecc6-ea0c-4d81-b042-d7815cbc8e9d",
+          "LogicalOperationId": "op-181a4e42140d3f0ad341b9ae761f9bfeb1996c62fc7888eff469d0eff6d0f1f7"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "59b88c5d-3181-458d-8f98-f297411be51f",
+          "LogicalOperationId": "op-2282459b2b73d20dcdadb6af4eb87b1e63ef0561d27b61b5b571885f4d3ab617"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "effect": "PartiallyApplied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "c6fceb91-1ef9-487b-8ce1-0ac517721f58",
+          "LogicalOperationId": "op-82425b6af089c2a8e7b43c25044bb41a0ea38e6da378f5a5399e3a8160c71558"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-Rejected.json": {
+        "status": "Rejected",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "74d8b279-20bb-41b2-8303-33cae430b6de",
+          "LogicalOperationId": "op-0e6dc435a36dd186f726a01d1f448358f845e632e91764661981b5b587964501"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-Running.json": {
+        "status": "Running",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "3971c5a9-5aaa-4eee-806c-3e92ab7f30c8",
+          "LogicalOperationId": "op-c2d67106c892df046fcceba605cb3449b85253a246396b2fa7d8953f538c2ad2"
+        },
+        "Job": {
+          "JobId": "job-fixture",
+          "OutputCursor": "output-cursor"
+        },
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-metadata-Succeeded.json": {
+        "status": "Succeeded",
+        "effect": "Applied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "31f2609c-0e3c-4e83-bfa2-e6adbf07d794",
+          "LogicalOperationId": "op-0fdef0cd90f4a04f235249adec6663947dc1a87218c658adfc3167f45a613043"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": true,
+          "NextCursor": null,
+          "Reason": null
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-2/outcome-quarantine-admission.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-2/outcome-quarantine-tools.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-2/outcome-scheduler-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-2/outcome-scheduler-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-2/outcome-scheduler-Running.json": {
+        "status": "Running",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-3/outcome-metadata-Cancelled.json": {
+        "status": "Cancelled",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "83e4059c-deb3-4ba6-9fdd-887fa79b5e41",
+          "LogicalOperationId": "op-9a8c1083203ff80e459a5188cd55ca57d019b6598bffed854aa51dc9f3e09281"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "8c42ad02-2a59-43ab-b6f8-0ca67964175c",
+          "LogicalOperationId": "op-8e128ea2c3b3adabbefab4ee7c05b790f695723ed73b472faba824af986cd182"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-Failed.json": {
+        "status": "Failed",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "9e0eafb8-6dce-4a80-8c75-bbe1b82b387e",
+          "LogicalOperationId": "op-c05b199ad96c937ce2f258723869b46e671e57271e0e37591f9ce23883a7bc56"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "effect": "PartiallyApplied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "704e82ba-f624-4e01-ba2e-7f624581b2e5",
+          "LogicalOperationId": "op-eb0052756c5ff372a9f0fad492857d9332612368b1c7984c3421a3b4e8ed386b"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-Rejected.json": {
+        "status": "Rejected",
+        "effect": "None",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "a5d354e0-5ae8-4a81-8361-885419f33113",
+          "LogicalOperationId": "op-dc606d88ff72f0adae600d2565a1b400f1cb86ef950d40fffa5ab7366405ac9f"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-Running.json": {
+        "status": "Running",
+        "effect": "Unknown",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "061619c2-e85f-4252-919a-089b6b9b2a56",
+          "LogicalOperationId": "op-3eebb25b763f41ecfaa35a7f5799f530c606f0c3c81a8c55b1e900ac117e4b50"
+        },
+        "Job": {
+          "JobId": "job-fixture",
+          "OutputCursor": "output-cursor"
+        },
+        "Completeness": {
+          "Complete": false,
+          "NextCursor": "next-page",
+          "Reason": "fixture_pending"
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-metadata-Succeeded.json": {
+        "status": "Succeeded",
+        "effect": "Applied",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "Invocation": {
+          "InvocationId": "c99f685a-c04d-4db0-9918-c5b7c3ee2f77",
+          "LogicalOperationId": "op-a9e6e41eeb3f14bbc6dd1567acf78cb21d12eaa1c39d94164719b635149d7ea1"
+        },
+        "Job": null,
+        "Completeness": {
+          "Complete": true,
+          "NextCursor": null,
+          "Reason": null
+        },
+        "verification": "NotRun",
+        "artifactHash": "34890d0a8ca4dc2a5b3e3f499e224c709dfadcd1e23a83fedba70d94cba35577"
+      },
+      "AR-064-3/outcome-quarantine-admission.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-3/outcome-quarantine-tools.json.json": {
+        "disabled": true,
+        "TypedCalls": 0,
+        "LegacyCalls": 0,
+        "corruptSha256": "B8E755843A58C4E28EC7D1ADC4C95415F0BA18E5F0C20AF68BE32A4502934174"
+      },
+      "AR-064-3/outcome-scheduler-OutcomeUnknown.json": {
+        "status": "OutcomeUnknown",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-3/outcome-scheduler-PartiallyApplied.json": {
+        "status": "PartiallyApplied",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      },
+      "AR-064-3/outcome-scheduler-Running.json": {
+        "status": "Running",
+        "queued": "Rejected",
+        "later": "Rejected",
+        "TypedCalls": 1,
+        "LegacyCalls": 0,
+        "effectSha256": "83015213A1F971A2C9BC467EF3C703BCA5C18A610A701E687F3027794CEB5D5B",
+        "unrelatedSha256": "F4D1C3F9921585D1F16ACDC3DAE58947D1FE04C2B444781B29F973C9F05B0373"
+      }
+    },
+    "warnings": 38
+  },
+  "native_limits": {
+    "E3": "NOT_RUN; production package composition remains missing",
+    "E4": "NOT_RUN",
+    "E5": "AR083 DEFERRED_BY_USER"
+  },
+  "next": "Save partial checkpoint, then critical AR065-069 per current user-reported gate; no whole-AR064 DONE.",
+  "previous_failures": [
+    "35866508066 and 35867273075 docs-only checkpoints rejected the whole-log RESULT list before any documentation writes. The corrected parser isolates the H2Notes.Tests command and verifies its summary against every executed PASS line and all 75 focused AR064 names. Product assertions and tests are unchanged.",
+    "35845044820 cancelled before complete corpus",
+    "35849927400:31 pass/11 invalid-data expectation failures x3, Agent73/74",
+    "35849931111 full failure",
+    "35836793456 fixture archive teardown failure"
+  ],
+  "baseline": "1aef7d3 focused49/49 x3 / Agent74 pass belongs to the earlier foundation. This result validates the added typed wrapper."
+}

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using H2AgentLab.Context;
 using H2AgentLab.Prompting;
+using H2AgentLab.Session;
 using H2AgentLab.Tasking;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
@@ -27,7 +28,16 @@ public sealed record AgentRuntimeRequest(
     Action<string>? PublicTextObserver = null,
     Action<string>? CommentaryObserver = null,
     Action<IReadOnlyList<AgentEvidenceReference>>? EvidenceObserver = null,
-    Action<VerificationReport, int>? VerificationObserver = null);
+    Action<VerificationReport, int>? VerificationObserver = null,
+    AgentRuntimeInvocation? Invocation = null,
+    RuntimeCompactionResult? ContextCheckpoint = null,
+    Func<bool, IReadOnlyList<AgentGoalInput>>? TakeGoalInput = null,
+    Action<AgentTaskContract>? ContractObserver = null,
+    Action<H2AgentOperationRecord>? JournalObserver = null,
+    Action<H2AgentCompletionAssessment>? CompletionObserver = null,
+    Func<IReadOnlyList<AgentRuntimeJobObservation>>? ObserveJobResults = null,
+    Action<AgentContextCompactionRecord>? ContextCheckpointObserver = null,
+    Action<AgentContextSourceRecord>? ContextSourceObserver = null);
 
 public sealed record AgentRuntimeUsage(
     long InputTokens,
@@ -50,6 +60,7 @@ public sealed record AgentRuntimeResult(
     public IReadOnlyList<AgentEvidenceReference> Evidence { get; init; }
         = Array.Empty<AgentEvidenceReference>();
     public AgentTaskContract? EffectiveContract { get; init; }
+    public H2AgentCompletionAssessment? Completion { get; init; }
 }
 
 public sealed record AgentRuntimeVerificationContext(
@@ -64,6 +75,7 @@ public sealed record AgentRuntimeVerificationContext(
     public IReadOnlyDictionary<string, string> RawToolOutputs { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
     public IReadOnlyList<string> MutationCallIds { get; init; } = [];
+    public IReadOnlyList<AgentVerificationAttempt> Attempts { get; init; } = [];
 }
 
 public interface IAgentRuntimeVerifier
@@ -75,6 +87,10 @@ public interface IAgentRuntimeVerifier
 
 public sealed class AgentVerificationRequiredException : InvalidOperationException
 {
+    public H2AgentCompletionAssessment? Completion { get; init; }
+    /// <summary>User-facing host fallback only when the model transport itself cannot produce
+    /// an explanation. Normal blocked answers remain model-generated.</summary>
+    public string? PublicText { get; init; }
     public AgentVerificationRequiredException(string message)
         : base(message)
     {
@@ -94,7 +110,7 @@ public sealed class AgentVerificationRequiredException : InvalidOperationExcepti
 public sealed class AgentRuntime : IAsyncDisposable
 {
     // MB-10: this is the new provider-neutral runtime path; UI ownership moves here in MB-11.
-    private const int MaxToolOutputCharacters = 64_000;
+    private const int MaxToolOutputCharacters = ToolOutcomeBridge.MaxModelOutputCharacters;
 
     private readonly IAgentTransport _transport;
     private readonly AgentContextManager _contextManager;
@@ -105,6 +121,10 @@ public sealed class AgentRuntime : IAsyncDisposable
     private readonly IAgentRuntimeVerifier? _verifier;
     private readonly IAgentRuntimePermissionPolicy _permissionPolicy;
     private readonly AgentRuntimeEvidenceProjector? _evidenceProjector;
+    private readonly IAgentRuntimeHooks _hooks;
+    private readonly RuntimeCompactionCoordinator? _workCompaction;
+    internal AgentCompactionOptions WorkCompactionOptions { get; init; } = new();
+    internal Func<string, string, AgentWorkSummary>? WorkSummarizer { get; init; }
     private bool _disposed;
 
     public AgentRuntime(
@@ -116,7 +136,9 @@ public sealed class AgentRuntime : IAsyncDisposable
         AgentRepairController? repairController = null,
         IAgentRuntimeVerifier? verifier = null,
         IAgentRuntimePermissionPolicy? permissionPolicy = null,
-        AgentRuntimeEvidenceProjector? evidenceProjector = null)
+        AgentRuntimeEvidenceProjector? evidenceProjector = null,
+        IAgentRuntimeHooks? hooks = null,
+        RuntimeCompactionCoordinator? compactionCoordinator = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
@@ -127,6 +149,8 @@ public sealed class AgentRuntime : IAsyncDisposable
         _verifier = verifier;
         _permissionPolicy = permissionPolicy ?? new ScopedAgentRuntimePermissionPolicy();
         _evidenceProjector = evidenceProjector;
+        _hooks = hooks ?? new AgentRuntimeHooks();
+        _workCompaction = compactionCoordinator;
     }
 
     public async Task<AgentRuntimeResult> RunAsync(
@@ -144,6 +168,19 @@ public sealed class AgentRuntime : IAsyncDisposable
         if (request.MaxRepairRounds is < 0 or > 16)
             throw new ArgumentOutOfRangeException(nameof(request.MaxRepairRounds));
 
+        if (request.TakeGoalInput is not null && request.TakeSupplementalInput is not null)
+            throw new ArgumentException("Use one authoritative user-input source, not two queues.");
+        if ((request.ContextCheckpointObserver is null) != (request.ContextSourceObserver is null))
+            throw new ArgumentException("Context source and activation journals must be paired.");
+        var initialContract = request.Contract.Goals is null
+            ? request.Contract.WithUserInput(new(request.Contract.TaskId, request.UserInput)) : request.Contract;
+        request.ContractObserver?.Invoke(initialContract);
+        cancellationToken.ThrowIfCancellationRequested();
+        var invocation = request.Invocation ?? new AgentRuntimeInvocation(AgentRuntimeEntryPoint.Lab);
+        invocation.Validate();
+        // Both composition roots use this same bounded-context primitive. Lab may also pass
+        // metadata for the real CompactionManager checkpoint it prepared; production does not
+        // invent a durable checkpoint when its current context is only an in-memory snapshot.
         var contextSnapshot = _contextManager.Build(request.Context);
         var initialExposure = _discovery.BuildInitialExposure();
         var stable = request.StablePrefix with
@@ -155,7 +192,7 @@ public sealed class AgentRuntime : IAsyncDisposable
         var layout = AgentPromptLayout.Create(
             stable,
             contextSnapshot.RuntimeContext,
-            request.UserInput);
+            request.UserInput + (initialContract.Goals!.HasOutcomes ? "\n" + initialContract.Goals.Describe() : ""));
         var messages = layout.Messages.ToArray();
         var userIndex = Array.FindLastIndex(messages, message => message.Role == AgentTransportMessageRole.User);
         if (userIndex >= 0)
@@ -174,6 +211,8 @@ public sealed class AgentRuntime : IAsyncDisposable
 
         var taskId = request.Contract.TaskId;
         var turnId = Guid.NewGuid();
+        var hookScope = new AgentRuntimeHookScope(taskId, turnId, invocation);
+        var modelRequests = 0;
         var initialTools = initialExposure.CallableSchemas
             .Select(ToTransportTool)
             .ToArray();
@@ -186,26 +225,191 @@ public sealed class AgentRuntime : IAsyncDisposable
         var toolCalls = 0;
         var repairRounds = 0;
         var failedMutationSignatures = new HashSet<string>(StringComparer.Ordinal);
-        var effectiveContract = request.Contract;
+        var effectiveContract = initialContract;
+        IReadOnlyList<string> TakeInput(bool closing)
+        {
+            var inputs = request.TakeGoalInput?.Invoke(closing)
+                ?? (request.TakeSupplementalInput?.Invoke(closing) ?? [])
+                    .Select(text => new AgentGoalInput(Guid.NewGuid(), text)).ToArray();
+            foreach (var input in inputs) effectiveContract = effectiveContract.WithUserInput(input);
+            if (inputs.Count > 0)
+            {
+                // Keep historical reports, but a prospective user waiver/supersession changes
+                // only active goal coverage. It cannot remove a host mutation failure/unknown.
+                if (latestVerification is not null)
+                {
+                    var retired = effectiveContract.Goals!.Obligations.Where(x => !x.Active).Select(x => x.Id).ToHashSet();
+                    latestVerification = new(latestVerification.VerifierId,
+                        latestVerification.Criteria.Where(x => !retired.Contains(x.CriterionId)), latestVerification.ReportEvidenceIds)
+                        { ContributingVerifierIds = latestVerification.ContributingVerifierIds };
+                }
+                request.ContractObserver?.Invoke(effectiveContract);
+            }
+            var messages = inputs.Select(x => x.Text).ToList();
+            if (effectiveContract.Goals!.HasOutcomes) messages.Add(effectiveContract.Goals.Describe());
+            return messages;
+        }
+        // Polling a completion boundary must distinguish new user input from our own summary.
+        IReadOnlyList<string> TakeClosingInput()
+        {
+            var before = effectiveContract.Goals!.RevisionId;
+            var messages = TakeInput(true);
+            return before == effectiveContract.Goals!.RevisionId ? [] : messages;
+        }
+        var assessment = new AgentCompletionAssessment(_evidenceProjector is not null);
+        H2AgentCompletionAssessment? completion = null;
         var mutationAwaitingVerification = false;
-        var unresolvedCalls = new List<(string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId)>();
-        var repeatedFailures = new Dictionary<string, int>(StringComparer.Ordinal);
-        var completionRepairRequested = false;
+        var unresolvedCalls = new List<RuntimeFailureObservation>();
+        var recoveryProgress = new Dictionary<Guid, int>();
+        var pendingOperations = new Dictionary<string, ToolOutcome>(StringComparer.Ordinal);
+        var uncertainResources = new HashSet<string>(StringComparer.Ordinal);
+        RuntimeFailureObservation ObserveFailure(global::H2AgentLab.ToolCall call, ToolOutcome? outcome,
+            string code, IEnumerable<string>? recoveryTools, string? failureId)
+        {
+            var target = AgentCompletionAssessment.Target(call, outcome?.Resource?.Id);
+            var observedVersion = outcome?.Resource?.ObservedVersion;
+            var previous = unresolvedCalls.LastOrDefault(f => f.Name == call.Name && f.TargetId == target);
+            var changed = previous is null
+                || string.IsNullOrWhiteSpace(previous.ObservedVersion)
+                || string.IsNullOrWhiteSpace(observedVersion)
+                    ? (bool?)null
+                    : !string.Equals(previous.ObservedVersion, observedVersion, StringComparison.Ordinal);
+            var attempt = unresolvedCalls.Count(f => f.Name == call.Name && f.TargetId == target && f.Code == code) + 1;
+            _registry.TryGet(call.Name, out var descriptor);
+            var directive = AgentRecoveryPolicy.Describe(_registry, descriptor, outcome, code, recoveryTools);
+            var retryTools = new List<string>();
+            if (code is "unknown_tool" or "tool_not_loaded")
+                retryTools.AddRange(directive.ProviderToolCandidates);
+            if (descriptor is not null && directive.Plan.RetryClass is
+                ToolRetryClass.CorrectInput or ToolRetryClass.Configure or ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
+                retryTools.Add(call.Name);
+            return new(call.Name, code, retryTools.Distinct(StringComparer.Ordinal).Take(8).ToArray(),
+                call.Arguments.Clone(), failureId, call.Invocation!.InvocationId, outcome, target,
+                observedVersion, changed, attempt, directive);
+        }
+        var jobs = new AgentRuntimeJobs(request.JournalObserver);
+        async Task ObserveFinishedJobsAsync()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedJobs = request.ObserveJobResults?.Invoke() ?? [];
+            foreach (var (call, output) in jobs.Observe(observedJobs, effectiveContract, _registry))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!_registry.TryGet(call.Name, out var descriptor)) throw new AgentVerificationRequiredException("Job tool is no longer registered.");
+                var projection = _evidenceProjector?.Project(descriptor,
+                    $"job-result:{call.Invocation!.InvocationId:N}", (long)toolRounds * 1000 + 999, output.DomainPayload);
+                var jobEvidence = (projection is null ? Array.Empty<AgentEvidenceReference>() : new[] { projection.Evidence })
+                    .Concat(_evidenceProjector is null ? [] : outcomeArtifacts()).ToArray();
+                IEnumerable<AgentEvidenceReference> outcomeArtifacts() => output.Outcome.ArtifactRefs
+                    .Select(id => _evidenceProjector!.ObserveJobOutput(id, output.Outcome.Job!.JobId));
+                var outcome = output.Outcome with { EvidenceRefs = jobEvidence.Select(x => x.ReferenceId).ToArray() };
+                var result = new AgentToolResult(call.Id, call.Name, projection?.ModelContent ?? output.DomainPayload,
+                    outcome.IsError) { Outcome = outcome };
+                var observation = new AgentRuntimeVerificationContext(effectiveContract, toolRounds, [call], [result])
+                { Evidence = jobEvidence, RawToolOutputs = new Dictionary<string, string> { [call.Id] = output.DomainPayload },
+                    MutationCallIds = descriptor.IsMutating && outcome.Effect != ToolMutationEffect.None ? [call.Id] : [] };
+                assessment.ObserveJob(observation);
+                observation = observation with { Attempts = assessment.Attempts };
+                evidenceHistory.AddRange(jobEvidence);
+                request.EvidenceObserver?.Invoke(jobEvidence);
+                request.ToolResultObserver?.Invoke(result); // Host progress only: never resend a protocol tool result ID.
+                if (outcome.IsPending) pendingOperations[outcome.Invocation.LogicalOperationId] = outcome;
+                else
+                {
+                    pendingOperations.Remove(outcome.Invocation.LogicalOperationId);
+                    if (outcome.Resource is not null && !pendingOperations.Values.Any(p => p.Resource?.Id == outcome.Resource.Id))
+                        uncertainResources.Remove(outcome.Resource.Id);
+                    _scheduler.ObserveCompletedJob(outcome);
+                }
+                if (outcome.IsError)
+                {
+                    var failure = ObserveFailure(call, outcome, outcome.Error?.Code ?? "outcome_unknown",
+                        outcome.Error?.RecoveryCandidates, null);
+                    unresolvedCalls.Add(failure);
+                    recoveryProgress[failure.InvocationId] = 0;
+                }
+                await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
+                if (_verifier is not null)
+                {
+                    var report = await _verifier.VerifyAsync(observation, cancellationToken).ConfigureAwait(false);
+                    if (report is not null)
+                    {
+                        latestVerification = assessment.Observe(observation, report);
+                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
+                            observation.Contract.Goals!.RevisionId, latestVerification, evidenceHistory.ToArray()));
+                        request.ContractObserver?.Invoke(effectiveContract);
+                        verificationHistory.Add(latestVerification);
+                        request.VerificationObserver?.Invoke(latestVerification, verificationHistory.Count - 1);
+                    }
+                }
+                mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
+            }
+        }
+
+        RuntimeContextCompactionTurn? compactedTurn = null;
+        RuntimeRound? previousRound = null;
+        async Task<RuntimeRound> SendModelAsync(AgentTransportStartRequest? start, AgentTransportContinuationRequest? next)
+        {
+            // Compaction is an explicit optional transport capability. Concrete Agent transports
+            // implement it; injected/legacy transports keep their existing guarded continuation.
+            if (start is not null && request.ContextCheckpointObserver is not null
+                && _transport is IAgentContextRebaseTransport)
+                compactedTurn = _workCompaction?.CreateWorkTurn(start, request.ContextCheckpointObserver, request.ContextSourceObserver!,
+                    WorkCompactionOptions, WorkSummarizer);
+            var requestIndex = ++modelRequests;
+            (AgentTransportStartRequest Context, string BodySha256)? rebase = null;
+            if (next is not null && compactedTurn is not null && previousRound is not null)
+            {
+                // This is a host snapshot, not a model proposal. Complete prior source and all
+                // current mandatory anchors are retained even if the new context cannot fit.
+                var anchors = JsonSerializer.SerializeToElement(new
+                {
+                    TaskId = taskId, TurnId = turnId, RevisionId = effectiveContract.Goals!.RevisionId,
+                    Invocation = invocation, Contract = effectiveContract,
+                    PendingOperations = pendingOperations.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => new { p.Key, p.Value }).ToArray(),
+                    UnresolvedCalls = unresolvedCalls.Select(f => new { f.Name, f.Code, f.FailureId, f.InvocationId, f.Arguments }).ToArray(),
+                    UncertainResources = uncertainResources.Order(StringComparer.Ordinal).ToArray(),
+                    ObservedEvidence = evidenceHistory.ToArray(), Verification = latestVerification,
+                    Completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification)
+                });
+                rebase = compactedTurn.Prepare(_transport, requestIndex, previousRound.Text,
+                    previousRound.ToolCalls, next, effectiveContract.Goals.RevisionId, anchors, cancellationToken);
+                if (rebase is not null)
+                    request.CommentaryObserver?.Invoke("Đã lưu checkpoint context có nguồn; giữ yêu cầu hiện hành, công việc còn dở và bằng chứng. Không chạy lại công cụ.");
+            }
+            try
+            {
+                previousRound = await SendRequestAsync(hookScope, contextSnapshot, requestIndex, start, next,
+                    usage, cancellationToken, request.PublicTextObserver, rebase).ConfigureAwait(false);
+                return previousRound;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (AgentVerificationRequiredException) { throw; }
+            catch (Exception ex) when (ex is IOException or TimeoutException or System.Net.Http.HttpRequestException)
+            {
+                // Initial failures and ordinary continuation failures remain owned by the provider/
+                // AR-065 path. AR-067 emits a technical fallback only when the failed continuation
+                // was already attempting to recover/explain an authoritative unresolved failure.
+                var hasRecoveryState = unresolvedCalls.Count > 0 || latestVerification is { Passed: false };
+                if (start is not null || !hasRecoveryState) throw;
+                var blocked = assessment.Snapshot(effectiveContract, unresolvedCalls.Count,
+                    pendingOperations.Count, latestVerification);
+                throw new AgentVerificationRequiredException("model_continuation_unavailable", ex)
+                {
+                    Completion = blocked with { State = blocked.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" },
+                    PublicText = BuildModelUnavailableCard("model_continuation",
+                        effectiveContract, unresolvedCalls, pendingOperations, latestVerification)
+                };
+            }
+        }
 
         try
         {
-            var round = await ReadRoundAsync(
-                _transport.StartAsync(
-                    new AgentTransportStartRequest(
-                        taskId,
-                        turnId,
-                        messages,
-                        initialTools,
-                        promptCacheKey,
-                        _transport.Capabilities.ParallelToolCalls),
-                    cancellationToken),
-                usage,
-                cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+            await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ContextPrepared,
+                contextSnapshot, ContextCheckpoint: request.ContextCheckpoint), cancellationToken).ConfigureAwait(false);
+            var round = await SendModelAsync(
+                new AgentTransportStartRequest(taskId, turnId, messages, initialTools,
+                    promptCacheKey, _transport.Capabilities.ParallelToolCalls), null).ConfigureAwait(false);
 
             while (true)
             {
@@ -213,34 +417,68 @@ public sealed class AgentRuntime : IAsyncDisposable
 
                 if (round.ToolCalls.Count == 0)
                 {
-                    var supplements = request.TakeSupplementalInput?.Invoke(true) ?? [];
+                    await ObserveFinishedJobsAsync().ConfigureAwait(false);
+                    var supplements = TakeClosingInput();
                     if (supplements.Count > 0)
                     {
                         if (++toolRounds > request.MaxToolRounds)
                             throw new InvalidOperationException("Đã tới giới hạn số lượt bổ sung; nội dung bổ sung được giữ trong lịch sử.");
-                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
-                            SupplementalUserMessages: supplements), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                        round = await SendModelAsync(null,
+                            new(taskId, turnId, [], SupplementalUserMessages: supplements)).ConfigureAwait(false);
                         continue;
                     }
-                    if (unresolvedCalls.Any(f => f.FailureId is not null) && !completionRepairRequested
-                        && toolRounds < request.MaxToolRounds && repairRounds < request.MaxRepairRounds)
-                    {
-                        completionRepairRequested = true; toolRounds++; repairRounds++;
-                        var feedback = "The host still has unresolved failed attempts: " + string.Join("; ",
-                            unresolvedCalls.Select(f => f.Name + " (failureId=" + f.FailureId + ")"))
-                            + ". Follow the failed tool's recovery instructions and verify the requested output. Do not repeat an unrelated successful call or claim completion.";
-                        round = await ReadRoundAsync(_transport.ContinueAsync(new(taskId, turnId, [],
-                            SupplementalUserMessages: [feedback]), cancellationToken), usage, cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
-                        continue;
-                    }
+                    latestVerification = assessment.ApplyRevision(effectiveContract);
+                    unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId));
+                    mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
+                    completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+                    request.CompletionObserver?.Invoke(completion with { State = "Verifying" });
+                    await _hooks.BeforeCompletionAsync(new(hookScope, effectiveContract, round.Text,
+                        latestVerification, unresolvedCalls.Count, mutationAwaitingVerification), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (pendingOperations.Count > 0)
+                        throw new AgentVerificationRequiredException("Chưa thể hoàn tất: còn công việc đang chạy hoặc tác động cần đối soát. "
+                            + string.Join("; ", pendingOperations.Values.Take(8).Select(o => o.Status + (o.Error is null ? "" : " (" + o.Error.Code + ")")
+                                + (o.Job is null ? "" : " job=" + o.Job.JobId)))
+                            + ". Không tự lặp thao tác ghi.");
+
                     if (unresolvedCalls.Count > 0)
+                    {
+                        var blocked = completion with { State = completion.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" };
+                        request.CompletionObserver?.Invoke(blocked);
                         throw new AgentVerificationRequiredException(
-                            "Chưa hoàn thành: công cụ vẫn còn lỗi — " + string.Join("; ",
-                                unresolvedCalls.Take(8).Select(f => f.Name + " (" + f.Code + ")"))
-                            + ". Kiểm tra phạm vi/thư mục hoặc thử lại.");
+                            "Agent blocked after recovery: " + string.Join("; ",
+                                unresolvedCalls.Take(8).Select(f => f.Name + " (" + f.Code + ")")))
+                        {
+                            Completion = blocked,
+                            PublicText = string.IsNullOrWhiteSpace(round.Text) ? null : round.Text
+                        };
+                    }
+
+                    if (latestVerification is { Passed: false })
+                    {
+                        var blocked = completion with { State = completion.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" };
+                        request.CompletionObserver?.Invoke(blocked);
+                        throw new AgentVerificationRequiredException("Agent blocked after verification failure.")
+                        {
+                            Completion = blocked,
+                            PublicText = string.IsNullOrWhiteSpace(round.Text) ? null : round.Text
+                        };
+                    }
+
                     if (mutationAwaitingVerification)
                         throw new AgentVerificationRequiredException("The latest mutation has no verifier report.");
+
+                    try { effectiveContract.Goals?.EnsureComplete(); }
+                    catch (InvalidOperationException ex) { throw new AgentVerificationRequiredException(ex.Message, ex); }
                     EnsureFinalCompletionAllowed(effectiveContract, latestVerification);
+                    if (_evidenceProjector is not null)
+                        _evidenceProjector.EnsureReachable(evidenceHistory.Where(e => assessment.ProofIds.Contains(e.ReferenceId)
+                            || effectiveContract.Goals!.Active.SelectMany(o => o.Evidence).Any(p => p.ReferenceId == e.ReferenceId)));
+                    await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.CompletionValidated,
+                        contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    request.CompletionObserver?.Invoke(completion);
                     return new AgentRuntimeResult(
                         round.Text,
                         toolRounds,
@@ -253,7 +491,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                         promptCacheIdentity)
                     {
                         Evidence = evidenceHistory.ToArray(),
-                        EffectiveContract = effectiveContract
+                        EffectiveContract = effectiveContract,
+                        Completion = completion
                     };
                 }
 
@@ -270,7 +509,31 @@ public sealed class AgentRuntime : IAsyncDisposable
                     toolRounds,
                     round.ToolCalls,
                     failedMutationSignatures,
+                    uncertainResources,
+                    unresolvedCalls,
+                    recoveryProgress,
+                    request.JournalObserver is null ? null : jobs.Record,
                     cancellationToken).ConfigureAwait(false);
+
+                var results = execution.Results.ToArray();
+                var observation = new AgentRuntimeVerificationContext(
+                    execution.ExecutedMutationSignatures.Count > 0 ? effectiveContract.WithExecutedMutation() : effectiveContract,
+                    toolRounds, execution.Calls, results)
+                {
+                    Evidence = execution.Evidence,
+                    RawToolOutputs = execution.RawToolOutputs,
+                    MutationCallIds = execution.Calls.Where(call =>
+                        execution.RawToolOutputs.ContainsKey(call.Id)
+                        && execution.Results.Any(r => r.ToolCallId == call.Id && r.Outcome?.Effect != ToolMutationEffect.None)
+                        && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
+                        .Select(call => call.Id).ToArray()
+                };
+                assessment.Register(observation);
+                jobs.Register(observation);
+                observation = observation with { Attempts = assessment.Attempts };
+                var retryCandidates = new List<(Guid Failed, Guid Replacement)>();
+                await _hooks.AfterToolObservationAsync(new(hookScope, observation), cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 evidenceHistory.AddRange(execution.Evidence);
                 request.EvidenceObserver?.Invoke(execution.Evidence);
@@ -284,10 +547,20 @@ public sealed class AgentRuntime : IAsyncDisposable
                     var recoveryOutput = execution.RawToolOutputs.TryGetValue(executedCall.Id, out var rawRecovery)
                         ? rawRecovery : result.Content;
                     request.ToolResultObserver?.Invoke(result);
+                    if (result.Outcome is { IsPending: true } pending)
+                    {
+                        pendingOperations[pending.Invocation.LogicalOperationId] = pending;
+                        if (pending.Resource is not null) uncertainResources.Add(pending.Resource.Id);
+                    }
                     if (result.IsError)
                     {
-                        var code = "tool_error";
-                        string[] recovery = [executedName];
+                        var code = result.Outcome?.Error?.Code ?? "tool_error";
+                        var recovery = new HashSet<string>(StringComparer.Ordinal);
+                        if (result.Outcome?.Error is { } typedError)
+                        {
+                            code = typedError.Code;
+                            foreach (var candidate in typedError.RecoveryCandidates) recovery.Add(candidate);
+                        }
                         string? failureId = null;
                         try
                         {
@@ -297,32 +570,51 @@ public sealed class AgentRuntime : IAsyncDisposable
                             if (failure.RootElement.TryGetProperty("recovery", out var detail)
                                 && detail.ValueKind == JsonValueKind.Object && detail.TryGetProperty("code", out var typedCode)
                                 && typedCode.ValueKind == JsonValueKind.String) code = typedCode.GetString() ?? code;
-                            if (failure.RootElement.TryGetProperty("recoveryTools", out var choices))
-                                recovery = choices.EnumerateArray().Select(c => c.GetString()!).ToArray();
+                            if (failure.RootElement.TryGetProperty("recoveryTools", out var choices)
+                                && choices.ValueKind == JsonValueKind.Array)
+                                foreach (var candidate in choices.EnumerateArray().Where(c => c.ValueKind == JsonValueKind.String)
+                                    .Select(c => c.GetString()).Where(c => !string.IsNullOrWhiteSpace(c)))
+                                    recovery.Add(candidate!);
                             if (failure.RootElement.TryGetProperty("failureId", out var id) && id.ValueKind == JsonValueKind.String)
                                 failureId = id.GetString();
                         }
                         catch (JsonException) { }
-                        // A prevented duplicate has no additional side effect. Its original
-                        // failed verification remains authoritative until a verified correction.
-                        if (code != "repeated_failed_mutation")
-                            unresolvedCalls.Add((executedName, code, recovery, executedCall.Arguments.Clone(), failureId));
-                        var failedSignature = MutationSignature(executedCall) + ":" + code;
-                        repeatedFailures.TryGetValue(failedSignature, out var repeated);
-                        repeatedFailures[failedSignature] = repeated + 1;
-                        if (repeated >= 2)
-                            throw new AgentVerificationRequiredException("Công cụ " + executedName + " đã lỗi 3 lần với cùng đầu vào: "
-                                + code + ". Cần xử lý nguyên nhân trước khi thử lại.");
+                        if (code is not ("repeated_failed_mutation" or "recovery_no_progress"))
+                        {
+                            var failure = ObserveFailure(executedCall, result.Outcome, code, recovery, failureId);
+                            unresolvedCalls.Add(failure);
+                            recoveryProgress[failure.InvocationId] = 0;
+                        }
+                        // Retry count is carried in RuntimeFailureObservation. Mutating duplicates
+                        // are still fail-closed before dispatch by failedMutationSignatures; all
+                        // work remains bounded by MaxToolRounds/MaxRepairRounds.
                     }
                     else if (executedName != DeferredToolDiscovery.SearchToolName
                         && _registry.TryGet(executedName, out var successful) && successful.Namespace.Name != "core")
                     {
+                        foreach (var failure in unresolvedCalls)
+                            if (AgentRecoveryPolicy.CountsAsProgress(
+                                failure.Name,
+                                failure.Arguments,
+                                failure.Outcome?.Error?.ProviderId,
+                                failure.Recovery.ProviderToolCandidates,
+                                failure.Recovery.Plan.RetryClass,
+                                executedCall,
+                                result.Outcome,
+                                successful))
+                                recoveryProgress[failure.InvocationId] =
+                                    recoveryProgress.GetValueOrDefault(failure.InvocationId) + 1;
+
                         // Recovery must match a discovered candidate and the original supplied
                         // arguments. A successful unrelated operation cannot clear earlier errors.
-                        unresolvedCalls.RemoveAll(f => f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
-                            && (CompatibleRetryArguments(f.Arguments, executedCall.Arguments,
-                                f.Code is "unknown_tool" or "tool_not_loaded")
-                                || f.Code == "stale_state" && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments)));
+                        foreach (var failure in unresolvedCalls.Where(f =>
+                            f.RecoveryTools.Contains(executedName, StringComparer.Ordinal)
+                            && (f.Name == executedName || f.Code is "unknown_tool" or "tool_not_loaded")
+                            && (CompatibleRetryArguments(f.Arguments, executedCall.Arguments, f.Code,
+                                f.Recovery.Plan.RetryClass)
+                                || ToolOutcomeBridge.NormalizeCode(f.Code) == "stale_resource"
+                                    && AgentRecoveryPolicy.FreshTokenOnly(f.Arguments, executedCall.Arguments))))
+                            retryCandidates.Add((failure.InvocationId, executedCall.Invocation!.InvocationId));
                         // Recovery references come from the executor after checking its recorded
                         // failed attempt and resource identity, not from the model's final text.
                         try
@@ -333,7 +625,11 @@ public sealed class AgentRuntime : IAsyncDisposable
                                 && resolved.ValueKind == JsonValueKind.Array)
                             {
                                 var ids = resolved.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()).ToHashSet();
-                                unresolvedCalls.RemoveAll(f => f.Name == executedName && f.FailureId is not null && ids.Contains(f.FailureId));
+                                // A provider string is not an alternate-verifier verdict. It can
+                                // nominate an exact retry only; the assessment below checks proof.
+                                foreach (var failure in unresolvedCalls.Where(f => f.Name == executedName && f.FailureId is not null
+                                    && ids.Contains(f.FailureId) && SameMutationWithFreshToken(f.Arguments, executedCall.Arguments)))
+                                    retryCandidates.Add((failure.InvocationId, executedCall.Invocation!.InvocationId));
                             }
                         }
                         catch (JsonException) { }
@@ -342,94 +638,142 @@ public sealed class AgentRuntime : IAsyncDisposable
                 if (execution.ExecutedMutationSignatures.Count > 0)
                 {
                     effectiveContract = effectiveContract.WithExecutedMutation();
+                    effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.RecordMutation(observation.Contract.Goals!.RevisionId));
+                    request.ContractObserver?.Invoke(effectiveContract);
                     // An earlier successful mutation cannot verify a later, different write.
                     mutationAwaitingVerification = true;
                 }
-                var results = execution.Results.ToArray();
                 if (_verifier is not null)
                 {
-                    var report = await _verifier.VerifyAsync(
-                        new AgentRuntimeVerificationContext(
-                            effectiveContract,
-                            toolRounds,
-                            execution.Calls,
-                            results)
-                        {
-                            Evidence = execution.Evidence,
-                            RawToolOutputs = execution.RawToolOutputs,
-                            MutationCallIds = execution.Calls.Where(call =>
-                                execution.RawToolOutputs.ContainsKey(call.Id)
-                                && _registry.TryGet(call.Name, out var descriptor) && descriptor.IsMutating)
-                                .Select(call => call.Id).ToArray()
-                        },
-                        cancellationToken).ConfigureAwait(false);
+                    var report = await _verifier.VerifyAsync(observation, cancellationToken).ConfigureAwait(false);
 
                     if (report is not null)
                     {
-                        mutationAwaitingVerification = false;
-                        var effectiveReport = MergeVerificationReports(
-                            latestVerification,
-                            report);
+                        var effectiveReport = assessment.Observe(observation, report);
+                        // The normalized target-aware report, not a contradictory raw claim,
+                        // updates outcomes. All evidence is from this run, never retrieved memory.
+                        effectiveContract = effectiveContract.WithGoals(effectiveContract.Goals!.Observe(
+                            observation.Contract.Goals!.RevisionId, effectiveReport, evidenceHistory.ToArray()));
+                        request.ContractObserver?.Invoke(effectiveContract);
+                        mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
                         latestVerification = effectiveReport;
                         verificationHistory.Add(effectiveReport);
                         request.VerificationObserver?.Invoke(effectiveReport, verificationHistory.Count - 1);
                         if (!effectiveReport.Passed)
                         {
                             if (effectiveReport.Failures.Count == 0)
-                                throw new InvalidOperationException(
-                                    "Verifier returned non-passing state without actionable failures.");
-                            if (++repairRounds > request.MaxRepairRounds)
-                                throw new InvalidOperationException(
-                                    $"AgentRuntime exceeded the {request.MaxRepairRounds}-round repair budget.");
+                                throw new AgentVerificationRequiredException(
+                                    "Result remains mechanically unverified; no successful completion is certified.")
+                                { Completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, effectiveReport) };
 
                             foreach (var signature in execution.ExecutedMutationSignatures)
                                 failedMutationSignatures.Add(signature);
 
-                            var repair = _repairController.Build(
-                                effectiveContract,
-                                effectiveReport);
                             if (results.Length == 0)
                                 throw new InvalidOperationException(
                                     "Verification failure has no tool result continuation target.");
 
-                            var feedbackIndex = FirstRepairFeedbackIndex(
-                                execution.Calls,
-                                results);
-                            results[feedbackIndex] = results[feedbackIndex] with
+                            var feedbackIndex = FirstRepairFeedbackIndex(execution.Calls, results);
+                            if (repairRounds < request.MaxRepairRounds)
                             {
-                                Content = BoundToolOutput(
-                                    results[feedbackIndex].Content
-                                    + Environment.NewLine
-                                    + Environment.NewLine
-                                    + "[HOST VERIFICATION FAILED]"
-                                    + Environment.NewLine
-                                    + repair.PromptContext),
-                                IsError = true
-                            };
+                                repairRounds++;
+                                var repair = _repairController.Build(effectiveContract, effectiveReport);
+                                results[feedbackIndex] = results[feedbackIndex] with
+                                {
+                                    Content = BoundToolOutput(results[feedbackIndex].Content
+                                        + Environment.NewLine + Environment.NewLine
+                                        + "[HOST VERIFICATION FAILED]" + Environment.NewLine + repair.PromptContext),
+                                    IsError = true
+                                };
+                            }
+                            else
+                            {
+                                results[feedbackIndex] = results[feedbackIndex] with
+                                {
+                                    Content = BoundToolOutput(results[feedbackIndex].Content
+                                        + Environment.NewLine + Environment.NewLine
+                                        + "[HOST VERIFICATION FAILED]" + Environment.NewLine
+                                        + "Repair budget is exhausted. Do not claim completion; use the authoritative host recovery state to explain what remains."),
+                                    IsError = true
+                                };
+                            }
                         }
                     }
                 }
 
-                round = await ReadRoundAsync(
-                    _transport.ContinueAsync(
-                        new AgentTransportContinuationRequest(
-                            taskId,
-                            turnId,
-                            results,
-                            execution.NewlyLoadedTools.Count == 0
-                                ? null
-                                : execution.NewlyLoadedTools,
-                            request.TakeSupplementalInput?.Invoke(false)),
-                        cancellationToken),
-                    usage,
-                    cancellationToken, request.PublicTextObserver).ConfigureAwait(false);
+                await ObserveFinishedJobsAsync().ConfigureAwait(false);
+                unresolvedCalls.RemoveAll(f => assessment.IsResolved(f.InvocationId)
+                    || retryCandidates.Any(c => c.Failed == f.InvocationId && assessment.CanResolveExactRetry(c.Failed, c.Replacement)));
+                mutationAwaitingVerification = assessment.UnverifiedMutations > 0 || assessment.OutstandingProofs > 0;
+                completion = assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+                request.CompletionObserver?.Invoke(completion);
+
+                // Keep domain/tool result bytes intact (MCP content blocks, JSON schemas, etc.).
+                // Recovery facts travel as a host supplemental message in the SAME continuation request,
+                // so there is no extra model turn and no flattening/wrapping of provider payloads.
+                var continuationMessages = TakeInput(false).ToList();
+                if ((unresolvedCalls.Count > 0 || latestVerification is { Passed: false }) && results.Length > 0)
+                    continuationMessages.Add(BuildRecoveryState(effectiveContract, completion, unresolvedCalls,
+                        pendingOperations, latestVerification));
+
+                await _hooks.OnCheckpointAsync(new(hookScope, AgentRuntimeCheckpointKind.ToolBatchObserved,
+                    contextSnapshot, toolRounds), cancellationToken).ConfigureAwait(false);
+                round = await SendModelAsync(null,
+                    new AgentTransportContinuationRequest(taskId, turnId, results,
+                        execution.NewlyLoadedTools.Count == 0 ? null : execution.NewlyLoadedTools,
+                        continuationMessages.Count == 0 ? null : continuationMessages)).ConfigureAwait(false);
             }
+        }
+        catch (AgentVerificationRequiredException ex) when (ex.Completion is null)
+        {
+            var blocked = completion ?? assessment.Snapshot(effectiveContract, unresolvedCalls.Count, pendingOperations.Count, latestVerification);
+            throw new AgentVerificationRequiredException(ex.Message, ex)
+            { Completion = blocked with { State = blocked.VerifiedOutcomes > 0 ? "PartiallyCompleted" : "Blocked" } };
+        }
+        catch (ToolInvocationCancelledException cancelled)
+        {
+            request.ToolResultObserver?.Invoke(new(cancelled.ToolCallId, cancelled.ToolName,
+                cancelled.Observed.DomainPayload, true) { Outcome = cancelled.Observed.Outcome });
+            _transport.Cancel();
+            throw;
         }
         catch (OperationCanceledException)
         {
             _transport.Cancel();
             throw;
         }
+    }
+
+    // Every engine-level start/continuation, including steering and completion-repair, goes
+    // through this awaited boundary BEFORE invoking the transport. Wire serialization and
+    // provider-native continuation state remain owned by the existing transport implementation.
+    private async Task<RuntimeRound> SendRequestAsync(AgentRuntimeHookScope scope,
+        AgentContextSnapshot context, int requestIndex, AgentTransportStartRequest? start,
+        AgentTransportContinuationRequest? continuation, MutableUsage usage,
+        CancellationToken cancellationToken, Action<string>? publicTextObserver,
+        (AgentTransportStartRequest Context, string BodySha256)? rebase = null)
+    {
+        var registeredNames = Array.AsReadOnly(_registry.Tools.Select(tool => tool.Name).ToArray());
+        await _hooks.BeforeModelRequestAsync(new(scope, requestIndex, context, registeredNames,
+            start, continuation), cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await ReadRoundAsync(rebase is { } prepared
+                ? ((IAgentContextRebaseTransport)_transport).RebaseContextAsync(prepared.Context,
+                    continuation!, prepared.BodySha256, cancellationToken)
+                : start is not null ? _transport.StartAsync(start, cancellationToken)
+                : _transport.ContinueAsync(continuation!, cancellationToken),
+            usage, cancellationToken, publicTextObserver).ConfigureAwait(false);
+    }
+
+    private static H2AgentOperationRecord JournalRecord(AgentTaskContract contract, Guid turnId,
+        global::H2AgentLab.ToolCall call, string? resourceKey, ToolExecutionOutput? output)
+    {
+        static string Hash(string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        var invocation = call.Invocation ?? throw new InvalidOperationException("Journal requires a bound invocation.");
+        return new(invocation.InvocationId, invocation.LogicalOperationId, turnId, contract.Goals!.RevisionId,
+            call.Id, call.Name, output is null ? "Dispatched" : "Result", output?.Outcome.Status.ToString() ?? "NotKnown",
+            output?.Outcome.Effect.ToString() ?? "Unknown", Hash(call.Arguments.GetRawText()),
+            resourceKey is null ? null : Hash(resourceKey), output is null ? null : Hash(output.DomainPayload), output?.Outcome.Error?.Code);
     }
 
     public void Cancel()
@@ -441,6 +785,10 @@ public sealed class AgentRuntime : IAsyncDisposable
         int toolRound,
         IReadOnlyList<AgentTransportToolCall> transportCalls,
         IReadOnlySet<string> failedMutationSignatures,
+        IReadOnlySet<string> uncertainResources,
+        IReadOnlyList<RuntimeFailureObservation> unresolvedFailures,
+        IReadOnlyDictionary<Guid, int> recoveryProgress,
+        Action<H2AgentOperationRecord>? journalObserver,
         CancellationToken cancellationToken)
     {
         var calls = new global::H2AgentLab.ToolCall[transportCalls.Count];
@@ -461,19 +809,35 @@ public sealed class AgentRuntime : IAsyncDisposable
                 throw new InvalidOperationException(
                     "Model proposed a missing or duplicate tool-call ID.");
 
-            var arguments = ParseArguments(transportCall.ArgumentsJson);
-            var call = new global::H2AgentLab.ToolCall(
-                transportCall.Id,
-                ResolveCallableName(transportCall.Name),
-                arguments);
+            JsonElement arguments;
+            var invalidArguments = false;
+            try { arguments = ParseArguments(transportCall.ArgumentsJson); }
+            catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
+            { arguments = JsonSerializer.SerializeToElement(new { }); invalidArguments = true; }
+            var resolvedName = ResolveCallableName(transportCall.Name);
+            var call = new global::H2AgentLab.ToolCall(transportCall.Id, resolvedName, arguments)
+            { Invocation = ToolInvocation.Create(contract.TaskId, resolvedName, arguments) };
             calls[i] = call;
+            if (invalidArguments)
+            {
+                var rejected = ToolOutcomeBridge.Failure(call, null, "invalid_arguments", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
 
             if (string.Equals(
                     call.Name,
                     DeferredToolDiscovery.SearchToolName,
                     StringComparison.Ordinal))
             {
-                var output = _discovery.ExecuteToolSearch(call);
+                string output;
+                try { output = _discovery.ExecuteToolSearch(call); }
+                catch (ArgumentException)
+                {
+                    var rejected = ToolOutcomeBridge.Failure(call, null, "invalid_arguments", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                    results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                    continue;
+                }
                 var trace = _discovery.LoadTrace.Last();
                 foreach (var name in trace.NewlyLoadedNames)
                 {
@@ -510,6 +874,23 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            if (descriptor.Preflight?.Invoke(call) is { } preflight)
+            {
+                preflight = ToolOutcomeBridge.Validate(preflight, call, descriptor);
+                var projected = _evidenceProjector?.Project(descriptor, $"tool-result:{turnId:N}:{toolRound}:{i}",
+                    ((long)toolRound * 1_000L) + i, preflight.DomainPayload);
+                if (projected is not null) evidence.Add(projected.Evidence);
+                results[i] = new(call.Id, transportCall.Name, BoundToolOutput(projected?.ModelContent ?? preflight.DomainPayload),
+                    preflight.Outcome.IsError) { Outcome = preflight.Outcome };
+                continue;
+            }
+            if (!descriptor.CurrentReadiness.CanExecute)
+            {
+                var rejected = ToolOutcomeBridge.Failure(call, descriptor, ToolOutcomeBridge.ReadinessCode(descriptor.CurrentReadiness),
+                    ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
             if (!_discovery.LoadedSchemaNames.Contains(
                     descriptor.Name,
                     StringComparer.Ordinal))
@@ -527,6 +908,40 @@ public sealed class AgentRuntime : IAsyncDisposable
                     }),
                     IsError: true);
                 continue;
+            }
+
+            var priorFailure = unresolvedFailures.LastOrDefault(f =>
+                f.Name == call.Name && AgentRecoveryPolicy.SameRecoveryTarget(f.Arguments, call.Arguments));
+            if (priorFailure is not null)
+            {
+                var progress = recoveryProgress.GetValueOrDefault(priorFailure.InvocationId);
+                var blockedReason = AgentRecoveryPolicy.BlockRetry(
+                    priorFailure.Code,
+                    priorFailure.Recovery.Plan,
+                    priorFailure.Arguments,
+                    call.Arguments,
+                    progress);
+                if (blockedReason is not null)
+                {
+                    var rejected = ToolOutcomeBridge.Failure(call, descriptor, "recovery_no_progress",
+                        ToolErrorPhase.Preflight, ToolMutationEffect.None,
+                        JsonSerializer.Serialize(new
+                        {
+                            ok = false,
+                            error = "recovery_no_progress",
+                            previousError = priorFailure.Code,
+                            message = blockedReason,
+                            retryClass = ToolRetryClass.Never,
+                            next = priorFailure.Recovery.SafeChoices
+                        }));
+                    results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true)
+                    { Outcome = rejected.Outcome };
+                    continue;
+                }
+                if (priorFailure.Recovery.Plan.MinimumBackoffMilliseconds > 0)
+                    await Task.Delay(
+                        Math.Min(priorFailure.Recovery.Plan.MinimumBackoffMilliseconds, 250),
+                        cancellationToken).ConfigureAwait(false);
             }
 
             var resourceKey = ResourceKey(descriptor);
@@ -566,6 +981,14 @@ public sealed class AgentRuntime : IAsyncDisposable
                 continue;
             }
 
+            if (descriptor.IsMutating && uncertainResources.Contains(OutcomeResourceId(permission.ResourceKey ?? resourceKey ?? descriptor.Name)))
+            {
+                // This attempt did not execute. The earlier pending operation remains unresolved;
+                // changing arguments or tool names does not permit blindly writing that resource.
+                var rejected = ToolOutcomeBridge.Failure(call, descriptor, "outcome_unknown", ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                results[i] = new(call.Id, transportCall.Name, rejected.DomainPayload, true) { Outcome = rejected.Outcome };
+                continue;
+            }
             var mutationSignature = descriptor.IsMutating
                 ? MutationSignature(call)
                 : null;
@@ -591,7 +1014,31 @@ public sealed class AgentRuntime : IAsyncDisposable
                 new ToolExecutionRequest(
                     descriptor,
                     call,
-                    permission.ResourceKey),
+                    permission.ResourceKey)
+                {
+                    BeforeDispatchAsync = descriptor.IsMutating
+                        ? async (bound, ct) =>
+                        {
+                            var currentRequest = permissionRequest with { Call = bound, ResourceKey = permission.ResourceKey };
+                            var current = await _permissionPolicy.RevalidateBeforeDispatchAsync(
+                                currentRequest, permission, ct).ConfigureAwait(false);
+                            return current.Allowed ? null
+                                : ToolOutcomeBridge.Failure(bound, descriptor, current.Code,
+                                    ToolErrorPhase.Preflight, ToolMutationEffect.None,
+                                    JsonSerializer.Serialize(new
+                                    {
+                                        ok = false,
+                                        error = current.Code,
+                                        message = current.Message,
+                                        scope = current.ResourceKey
+                                    }));
+                        }
+                        : null,
+                    BeforeExecute = descriptor.IsMutating && journalObserver is not null
+                        ? bound => journalObserver(JournalRecord(contract, turnId, bound, permission.ResourceKey, null)) : null,
+                    AfterExecute = descriptor.IsMutating && journalObserver is not null
+                        ? (bound, output) => journalObserver(JournalRecord(contract, turnId, bound, permission.ResourceKey, output)) : null
+                },
                 permissionRequest with { ResourceKey = permission.ResourceKey },
                 mutationSignature));
         }
@@ -609,7 +1056,8 @@ public sealed class AgentRuntime : IAsyncDisposable
                 var rawOutput = scheduledResult.Output ?? "";
                 var deniedBeforeExecution = IsPermissionDenial(rawOutput);
                 if (!deniedBeforeExecution) rawToolOutputs[calls[original].Id] = rawOutput;
-                if (!deniedBeforeExecution && scheduled[i].MutationSignature is { } mutationSignature)
+                if (!deniedBeforeExecution && scheduledResult.Outcome?.Effect != ToolMutationEffect.None
+                    && scheduled[i].MutationSignature is { } mutationSignature)
                     executedMutationSignatures.Add(mutationSignature);
                 _permissionPolicy.ObserveResult(
                     scheduled[i].Permission,
@@ -623,11 +1071,59 @@ public sealed class AgentRuntime : IAsyncDisposable
                 if (projection is not null)
                     evidence.Add(projection.Evidence);
 
-                results[original] = new AgentToolResult(
-                    calls[original].Id,
-                    transportCalls[original].Name,
-                    BoundToolOutput(projection?.ModelContent ?? rawOutput),
-                    IsError: deniedBeforeExecution || IsToolFailure(rawOutput));
+                var outcome = scheduledResult.Outcome ?? ToolOutcomeBridge.FromLegacy(calls[original], scheduled[i].Request.Descriptor, rawOutput).Outcome;
+                outcome = outcome with { Resource = outcome.Resource ?? new ToolOutcomeResource(
+                    OutcomeResourceId(scheduled[i].Permission.ResourceKey ?? scheduled[i].Request.Descriptor.Name)),
+                    EvidenceRefs = projection is null ? outcome.EvidenceRefs : [projection.Evidence.ReferenceId] };
+                var outputLimit = scheduled[i].Request.Descriptor.Limits.MaxOutputCharacters;
+                if (projection is not null && rawOutput.Length > Math.Min(AgentRuntimeEvidenceProjector.MaxInlineToolOutputCharacters, outputLimit))
+                    outcome = outcome with { Completeness = outcome.Completeness with { Complete = false, Reason = "artifact_projection" },
+                        ArtifactRefs = [projection.Evidence.ReferenceId] };
+                var modelContent = projection?.ModelContent ?? rawOutput;
+                if (modelContent.Length > outputLimit)
+                {
+                    // Never silently claim an excerpt is complete. Production always supplies
+                    // the existing artifact projector; an unconfigured test host has no cursor.
+                    outcome = outcome with { Completeness = outcome.Completeness with { Complete = false, Reason = projection is null ? "bounded_excerpt_without_artifact" : "artifact_projection" } };
+                    modelContent = projection is null ? modelContent[..Math.Max(0, outputLimit - 32)] + "…[truncated]"
+                        : JsonSerializer.Serialize(new { complete = false, artifactRef = projection.Evidence.ReferenceId, reason = "read_existing_artifact" });
+                }
+                // Transports serialize Content, not the out-of-band Outcome. Keep cursor/job/effect
+                // control data on the actual wire and reserve its space BEFORE bounding the body.
+                // Raw domain bytes remain untouched in RawToolOutputs/the existing artifact store.
+                if (outcome.IsPending || outcome.Completeness.NextCursor is not null)
+                {
+                    const string marker = "\n[HOST TOOL OUTCOME] ";
+                    var metadata = JsonSerializer.Serialize(outcome);
+                    var suffix = marker + metadata;
+                    if (suffix.Length > outputLimit - 256)
+                    {
+                        // A legal escaped cursor may exceed a small tool's whole wire budget.
+                        // Preserve exact metadata in the SAME store, not a lossy summary/new store.
+                        var stored = _evidenceProjector?.Project(scheduled[i].Request.Descriptor,
+                            $"tool-outcome:{turnId:N}:{toolRound}:{original}",
+                            ((long)toolRound * 1_000L) + original, metadata, forceEvidence: true)
+                            ?? throw new AgentVerificationRequiredException(
+                                "Tool outcome metadata exceeds the output budget and no evidence store is configured. Do not repeat the operation.");
+                        evidence.Add(stored.Evidence);
+                        suffix = marker + JsonSerializer.Serialize(new { status = outcome.Status,
+                            effect = outcome.Effect, complete = false, controlMetadataRef = stored.Evidence.ReferenceId,
+                            next = "Read exact control metadata with read_tool_output before continuing." });
+                    }
+                    var room = outputLimit - suffix.Length;
+                    if (modelContent.Length > room)
+                    {
+                        modelContent = projection is null
+                            ? modelContent[..Math.Max(0, room - 32)] + "…[domain excerpt truncated]"
+                            : JsonSerializer.Serialize(new { complete = false, artifactRef = projection.Evidence.ReferenceId,
+                                reason = "read_existing_artifact" });
+                    }
+                    if (modelContent.Length + suffix.Length > outputLimit)
+                        throw new AgentVerificationRequiredException("Tool control projection exceeds its advertised bound.");
+                    modelContent += suffix;
+                }
+                results[original] = new AgentToolResult(calls[original].Id, transportCalls[original].Name,
+                    BoundToolOutput(modelContent), IsError: deniedBeforeExecution || outcome.IsError) { Outcome = outcome };
             }
         }
 
@@ -635,6 +1131,13 @@ public sealed class AgentRuntime : IAsyncDisposable
             throw new InvalidOperationException(
                 "AgentRuntime tool batch did not produce one result per tool call.");
 
+        for (var i = 0; i < results.Length; i++)
+        {
+            if (results[i]!.Outcome is not null) continue;
+            _registry.TryGet(calls[i].Name, out var d);
+            var outcome = ToolOutcomeBridge.FromLegacy(calls[i], d, results[i]!.Content, preflight: true).Outcome;
+            results[i] = results[i]! with { Outcome = outcome };
+        }
         return new ExecutionBatch(
             calls,
             results.Select(x => x!).ToArray(),
@@ -650,6 +1153,9 @@ public sealed class AgentRuntime : IAsyncDisposable
     private static string? ResourceKey(ToolDescriptor descriptor)
         => descriptor.ResourceScope?.ScopeId;
 
+    private static string OutcomeResourceId(string key)
+        => "scope-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key))).ToLowerInvariant();
+
     private string ResolveCallableName(string supplied)
     {
         if (_registry.TryGet(supplied, out var exact)) return exact.Name;
@@ -662,40 +1168,53 @@ public sealed class AgentRuntime : IAsyncDisposable
         return supplied;
     }
 
-    private static bool CompatibleRetryArguments(JsonElement failed, JsonElement retry, bool discoveryFailure)
+    private static bool CompatibleRetryArguments(JsonElement failed, JsonElement retry, string code,
+        ToolRetryClass? retryClass)
     {
         if (JsonElement.DeepEquals(failed, retry)) return true;
-        if (!discoveryFailure || failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
-        var sharedValue = false;
-        foreach (var property in failed.EnumerateObject())
+        if (failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
+        if (code is "unknown_tool" or "tool_not_loaded")
         {
-            if (!retry.TryGetProperty(property.Name, out var actual)) continue;
-            if (!JsonElement.DeepEquals(property.Value, actual)) return false;
-            if (actual.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(actual.GetString())) sharedValue = true;
+            var sharedValue = false;
+            foreach (var property in failed.EnumerateObject())
+            {
+                if (!retry.TryGetProperty(property.Name, out var actual)) continue;
+                if (!JsonElement.DeepEquals(property.Value, actual)) return false;
+                if (actual.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(actual.GetString())) sharedValue = true;
+            }
+            return sharedValue;
         }
-        return sharedValue;
+        if (retryClass == ToolRetryClass.CorrectInput)
+            return SameTargetSelectors(failed, retry);
+        if (retryClass is ToolRetryClass.Reobserve or ToolRetryClass.WaitThenReobserve)
+            return AgentRecoveryPolicy.FreshTokenOnly(failed, retry);
+        return false;
+    }
+
+    private static bool SameTargetSelectors(JsonElement before, JsonElement after)
+    {
+        string[] selectors = ["path", "destination", "url", "session_id", "resource_id", "window_id",
+            "document_id", "sheet", "sheet_name", "range", "address"];
+        var compared = false;
+        foreach (var name in selectors)
+        {
+            var hasBefore = before.TryGetProperty(name, out var a);
+            var hasAfter = after.TryGetProperty(name, out var b);
+            if (hasBefore != hasAfter) return false;
+            if (!hasBefore) continue;
+            compared = true;
+            if (!JsonElement.DeepEquals(a, b)) return false;
+        }
+        return compared;
     }
 
     private static bool SameMutationWithFreshToken(JsonElement failed, JsonElement retry)
     {
         if (failed.ValueKind != JsonValueKind.Object || retry.ValueKind != JsonValueKind.Object) return false;
-        static bool Token(string name) => name is "expectedHash" or "expected_hash" or "state_token";
+        static bool Token(string name) => name is "expectedHash" or "expected_hash" or "state_token" or "content_token";
         var before = failed.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         var after = retry.EnumerateObject().Where(p => !Token(p.Name)).ToDictionary(p => p.Name, p => p.Value);
         return before.Count > 0 && before.Count == after.Count && before.All(p => after.TryGetValue(p.Key, out var value) && JsonElement.DeepEquals(p.Value, value));
-    }
-
-    private static bool IsToolFailure(string output)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(output);
-            var root = document.RootElement;
-            return root.ValueKind == JsonValueKind.Object
-                && ((root.TryGetProperty("ok", out var ok) && ok.ValueKind == JsonValueKind.False)
-                    || (root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False));
-        }
-        catch (JsonException) { return false; }
     }
 
     private static bool IsPermissionDenial(string output)
@@ -717,33 +1236,91 @@ public sealed class AgentRuntime : IAsyncDisposable
         return false;
     }
 
-    private static VerificationReport MergeVerificationReports(
-        VerificationReport? previous,
-        VerificationReport current)
+    private sealed record RuntimeFailureObservation(
+        string Name, string Code, string[] RecoveryTools, JsonElement Arguments, string? FailureId,
+        Guid InvocationId, ToolOutcome? Outcome, string TargetId, string? ObservedVersion,
+        bool? StateChangedSincePrevious, int Attempt, AgentRecoveryDirective Recovery);
+
+    private static string BuildRecoveryState(AgentTaskContract contract, H2AgentCompletionAssessment completion,
+        IReadOnlyList<RuntimeFailureObservation> failures, IReadOnlyDictionary<string, ToolOutcome> pending,
+        VerificationReport? verification)
     {
-        ArgumentNullException.ThrowIfNull(current);
-        if (previous is null
-            || !string.Equals(
-                previous.VerifierId,
-                current.VerifierId,
-                StringComparison.Ordinal))
-            return current;
+        var unresolved = contract.Goals!.Active.Where(x => x.Status != AgentObligationStatus.Verified)
+            .Select(x => new { id = x.Id, status = x.Status.ToString(), requirement = x.Requirement }).ToArray();
+        var verified = contract.Goals.Active.Where(x => x.Status == AgentObligationStatus.Verified).Select(x => x.Id).ToArray();
+        var payload = JsonSerializer.Serialize(new
+        {
+            schema = "h2-agent-recovery-state/v1",
+            state = "recovery_required",
+            completion,
+            failures = failures.TakeLast(8).Select(f => new
+            {
+                failureId = f.FailureId, invocationId = f.InvocationId,
+                stage = f.Outcome?.Error?.Phase.ToString() ?? "Execution", tool = f.Name,
+                providerId = f.Outcome?.Error?.ProviderId, providerVersion = f.Outcome?.Error?.ProviderVersion,
+                errorCode = f.Code, safeMessage = f.Outcome?.Error?.SafeMessage,
+                targetResourceId = f.Outcome?.Resource?.Id ?? f.TargetId, observedVersion = f.ObservedVersion,
+                retryClass = f.Recovery.Plan.RetryClass.ToString(),
+                stateChangedSinceLastAttempt = f.StateChangedSincePrevious,
+                mutationEffect = (f.Outcome?.Effect ?? ToolMutationEffect.None).ToString(),
+                attemptsAlreadyMade = f.Attempt,
+                safeRecoveryCandidates = f.Recovery.SafeChoices,
+                providerRecoveryTools = f.Recovery.ProviderToolCandidates,
+                alternateToolCandidates = f.Recovery.AlternateToolCandidates,
+                providerReadiness = f.Recovery.ProviderReadiness?.ToString(),
+                providerReadinessReason = f.Recovery.ProviderReadinessReason,
+                minimumBackoffMilliseconds = f.Recovery.Plan.MinimumBackoffMilliseconds,
+                requiresChangedEvidence = f.Recovery.Plan.RequiresChangedEvidence,
+                requiresReconciliation = f.Recovery.Plan.RequiresReconciliation,
+                preserveTargetIdentity = f.Recovery.Plan.PreserveTargetIdentity,
+                alternateBackendRequiresEquivalentTargetProof = f.Recovery.Plan.AllowsAlternateBackend,
+                forbiddenSemanticFallbacks = (f.Outcome?.Effect is ToolMutationEffect.Unknown or ToolMutationEffect.PartiallyApplied)
+                    ? new[] { "Do not replay a mutation until effects are reconciled.",
+                        "Do not change resource/source identity or broaden permission without explicit user approval." }
+                    : new[] { "Do not change resource/source identity or broaden permission without explicit user approval." },
+                evidenceOrFailureRefs = (f.Outcome?.EvidenceRefs ?? [])
+                    .Concat(string.IsNullOrWhiteSpace(f.FailureId) ? [] : [f.FailureId!]).Distinct(StringComparer.Ordinal).ToArray()
+            }).ToArray(),
+            pendingOperations = pending.Values.Take(8).Select(o => new
+            {
+                operationId = o.Invocation.LogicalOperationId, status = o.Status.ToString(),
+                mutationEffect = o.Effect.ToString(), resourceId = o.Resource?.Id,
+                observedVersion = o.Resource?.ObservedVersion, jobId = o.Job?.JobId,
+                errorCode = o.Error?.Code, retryClass = o.Error?.RetryClass.ToString()
+            }).ToArray(),
+            unresolvedObligations = unresolved, verifiedObligationIds = verified,
+            verification = verification is null ? null : new
+            {
+                verification.VerifierId, passed = verification.Passed,
+                criteria = verification.Criteria.Select(c => new
+                { c.CriterionId, status = c.Status.ToString(), c.EvidenceIds, failure = c.Failure?.Message }).ToArray()
+            }
+        });
+        var instruction = "Continue the original user goal without a new user prompt when a safe goal-preserving recovery remains. "
+            + "Do not blindly repeat the same call without changed evidence. Respect minimumBackoffMilliseconds and reobserve/provider-health choices before retry. "
+            + "Unknown/partial mutation effects require reconciliation before replay. Alternate tools are suggestions only: use them only when exact target/source semantics remain equivalent and host verification can prove the same postcondition. "
+            + "If no allowed recovery remains, call no tool and write the specific user-facing blocked/partial explanation: what succeeded, what remains, exact known cause, attempts already made, unsafe/non-equivalent fallbacks not used, and the user/app/config change needed. Do not claim completion.";
+        return "[HOST RECOVERY STATE]" + Environment.NewLine + payload
+            + Environment.NewLine + "[HOST RECOVERY INSTRUCTION]" + Environment.NewLine + instruction;
+    }
 
-        var criteria = previous.Criteria
-            .ToDictionary(x => x.CriterionId, StringComparer.Ordinal);
-        foreach (var result in current.Criteria)
-            criteria[result.CriterionId] = result;
-
-        return new VerificationReport(
-            current.VerifierId,
-            criteria.Values
-                .OrderBy(x => x.CriterionId, StringComparer.Ordinal)
-                .ToArray(),
-            previous.ReportEvidenceIds
-                .Concat(current.ReportEvidenceIds)
-                .Distinct(StringComparer.Ordinal)
-                .Take(256)
-                .ToArray());
+    private static string BuildModelUnavailableCard(string phase, AgentTaskContract contract,
+        IReadOnlyList<RuntimeFailureObservation> failures, IReadOnlyDictionary<string, ToolOutcome> pending,
+        VerificationReport? verification)
+    {
+        var remaining = contract.Goals!.Active.Where(x => x.Status != AgentObligationStatus.Verified)
+            .Select(x => x.Id).Take(8).ToArray();
+        var effects = failures.Select(f => f.Outcome?.Effect ?? ToolMutationEffect.None)
+            .Concat(pending.Values.Select(p => p.Effect)).Distinct().ToArray();
+        var effectText = effects.Length == 0 || effects.All(x => x == ToolMutationEffect.None)
+            ? "không ghi nhận tác động ghi từ phần lỗi này"
+            : "có trạng thái tác động cần giữ nguyên/đối soát: " + string.Join(", ", effects);
+        var cause = failures.LastOrDefault()?.Code ?? verification?.Failures.FirstOrDefault()?.Message ?? "model_transport_unavailable";
+        var remainText = remaining.Length == 0 ? "mục tiêu hiện hành chưa thể xác nhận hoàn tất"
+            : "còn các nghĩa vụ " + string.Join(", ", remaining);
+        return "Agent không thể tiếp tục ở pha " + phase + " vì kết nối model/API không còn khả dụng. "
+            + "Nguyên nhân kỹ thuật gần nhất: " + cause + "; " + effectText + "; " + remainText + ". "
+            + "Cần khôi phục kết nối/cấu hình model rồi tiếp tục từ trạng thái hiện có. H2 không tự lặp thao tác có tác động chưa chắc chắn.";
     }
 
     private int FirstRepairFeedbackIndex(

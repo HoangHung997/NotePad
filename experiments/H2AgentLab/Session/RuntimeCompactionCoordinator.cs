@@ -10,7 +10,7 @@ public sealed record RuntimeCompactionResult(
     bool CreatedCheckpoint,
     long CoveredThroughSequence);
 
-public sealed class RuntimeCompactionCoordinator
+public sealed partial class RuntimeCompactionCoordinator
 {
     private const int RawTailEventsToKeep = 24;
     private readonly AgentContextManager _contextManager;

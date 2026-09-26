@@ -24,8 +24,15 @@ public enum OpenAiResponsesStateMode
 /// is an explicit opt-in because OpenAI documents that store=true retains response data for later
 /// retrieval; it is never enabled silently and is restricted to the official OpenAI /v1 endpoint.
 /// </summary>
-public sealed class OpenAiResponsesTransport : IAgentTransport
+public sealed partial class OpenAiResponsesTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add => _requestBudget.Evaluated += value;
+        remove => _requestBudget.Evaluated -= value;
+    }
     private readonly AiProfile _profile;
     private readonly string _apiKey;
     private readonly HttpClient _http;
@@ -57,6 +64,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         ValidateStateMode(profile, stateMode);
 
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.OpenAiResponses;
         _stateMode = stateMode;
         _apiKey = apiKey ?? "";
@@ -86,7 +94,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         foreach (var message in request.Messages) input.Add(ToResponsesMessage(message));
         if (input.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
         _requestInput = input;
-        foreach (var tool in SnapshotTools(request.Tools)) _tools[tool.Name] = tool;
+        OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.Tools));
 
         _taskId = request.TaskId;
         _turnId = request.TurnId;
@@ -94,7 +102,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         _promptCacheKey = NormalizeCacheKey(request.PromptCacheKey);
         _started = true;
 
-        await foreach (var item in StreamOnce(cancellationToken).WithCancellation(cancellationToken))
+        await foreach (var item in StreamOnce("initial", cancellationToken).WithCancellation(cancellationToken))
             yield return item;
     }
 
@@ -124,7 +132,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         }
 
         if (request.NewlyLoadedTools is { Count: > 0 })
-            foreach (var tool in SnapshotTools(request.NewlyLoadedTools)) _tools[tool.Name] = tool;
+            OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.NewlyLoadedTools));
 
         var continuationInput = new JsonArray();
         if (_stateMode == OpenAiResponsesStateMode.Stateless)
@@ -158,7 +166,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         _completedOutputItems.Clear();
         _pendingCalls = [];
 
-        await foreach (var item in StreamOnce(cancellationToken).WithCancellation(cancellationToken))
+        await foreach (var item in StreamOnce("tool_continuation", cancellationToken).WithCancellation(cancellationToken))
             yield return item;
     }
 
@@ -178,6 +186,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
     }
 
     private async IAsyncEnumerable<AgentTransportEvent> StreamOnce(
+        string phase,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         EnsureUsable();
@@ -185,15 +194,17 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         var token = linked.Token;
         var payload = BuildPayload();
 
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "OpenAiResponsesTransport", token);
         using var request = new HttpRequestMessage(HttpMethod.Post, AiClient.Endpoint(_profile, "responses"))
         {
-            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")
+            Content = new StringContent(serialized, Encoding.UTF8, "application/json")
         };
         if (!string.IsNullOrWhiteSpace(_apiKey))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-        if (!response.IsSuccessStatusCode) throw AiFailure.FromStatus(response.StatusCode, "");
+        if (!response.IsSuccessStatusCode)
+            throw await OpenAiResponsesDiagnostics.HttpError(response, phase, token).ConfigureAwait(false);
 
         await using var stream = await response.Content.ReadAsStreamAsync(token);
         using var reader = new StreamReader(stream);
@@ -222,12 +233,12 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
             var type = String(root, "type") ?? "";
 
             if (type == "error")
-                throw new IOException("OpenAI Responses báo lỗi trong luồng phản hồi. Không tự gửi lại.");
+                throw OpenAiResponsesDiagnostics.Error(root, phase);
             if (type == "response.failed")
-                throw new IOException("OpenAI Responses kết thúc ở trạng thái failed. Không chạy function call từ phản hồi lỗi.");
+                throw OpenAiResponsesDiagnostics.Error(root, phase);
             if (type == "response.incomplete")
             {
-                incompleteReason = ReadIncompleteReason(root);
+                incompleteReason = ReadIncompleteReason(root) is "max_output_tokens" ? "max_output_tokens" : "not_exposed";
                 throw new IOException("OpenAI Responses kết thúc chưa hoàn tất" + (incompleteReason is { Length: > 0 } ? ": " + incompleteReason : "."));
             }
 
@@ -277,8 +288,11 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
                     throw new InvalidDataException("response.completed thiếu response object.");
                 responseId = String(responseObject, "id") ?? responseId;
                 usage = ReadUsage(responseObject);
-                if (outputItems.Count == 0 && responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
+                if (responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array && output.GetArrayLength() > 0)
+                {
+                    outputItems.Clear();
                     outputItems.AddRange(output.EnumerateArray().Select(x => x.GetRawText()));
+                }
                 completed = true;
                 break;
             }
@@ -302,30 +316,36 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
             _previousResponseId = responseId;
         _pendingCalls = calls;
 
+        _requestBudget.ObserveCompleted(usage, responseId);
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
         foreach (var call in calls) yield return AgentTransportEvent.Tool(call);
         yield return AgentTransportEvent.Complete(responseId, calls.Count > 0 ? "tool_calls" : "stop");
     }
 
     private JsonObject BuildPayload()
+        => BuildContextPayload(_requestInput, _tools.Values.ToArray(), _previousResponseId,
+            _allowParallelToolCalls, _promptCacheKey);
+
+    private JsonObject BuildContextPayload(JsonArray input, IReadOnlyList<AgentToolDefinition> tools,
+        string? previousResponseId, bool allowParallel, string? cacheKey)
     {
         var stored = _stateMode == OpenAiResponsesStateMode.StoredContinuation;
         var payload = new JsonObject
         {
             ["model"] = _profile.Model,
-            ["input"] = _requestInput.DeepClone(),
+            ["input"] = input.DeepClone(),
             ["stream"] = true,
             ["store"] = stored
         };
-        if (stored && _previousResponseId is { Length: > 0 })
-            payload["previous_response_id"] = _previousResponseId;
+        if (stored && previousResponseId is { Length: > 0 })
+            payload["previous_response_id"] = previousResponseId;
 
-        if (_tools.Count > 0)
+        if (tools.Count > 0)
         {
-            payload["tools"] = BuildTools();
-            payload["parallel_tool_calls"] = _allowParallelToolCalls;
+            payload["tools"] = BuildTools(tools);
+            payload["parallel_tool_calls"] = allowParallel;
         }
-        if (_promptCacheKey is { Length: > 0 }) payload["prompt_cache_key"] = _promptCacheKey;
+        if (cacheKey is { Length: > 0 }) payload["prompt_cache_key"] = cacheKey;
 
         var reasoning = new JsonObject();
         if (_profile.RequestReasoningSummary) reasoning["summary"] = "auto";
@@ -372,21 +392,8 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         return new JsonObject { ["role"] = role, ["content"] = parts };
     }
 
-    private JsonArray BuildTools()
-    {
-        var result = new JsonArray();
-        foreach (var tool in _tools.Values)
-        {
-            result.Add(new JsonObject
-            {
-                ["type"] = "function",
-                ["name"] = tool.Name,
-                ["description"] = tool.Description,
-                ["parameters"] = JsonNode.Parse(tool.Parameters.GetRawText())
-            });
-        }
-        return result;
-    }
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
+        => OpenAiResponsesWireContract.Tools(candidates ?? _tools.Values);
 
     private static List<AgentToolDefinition> SnapshotTools(IReadOnlyList<AgentToolDefinition> tools)
     {
@@ -402,7 +409,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
         return result;
     }
 
-    private static List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
+    private List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
     {
         var calls = new List<AgentTransportToolCall>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -420,7 +427,7 @@ public sealed class OpenAiResponsesTransport : IAgentTransport
             if (parsed.RootElement.ValueKind != JsonValueKind.Object)
                 throw new InvalidDataException("Responses function arguments phải giải mã thành JSON object.");
             if (!ids.Add(callId)) throw new InvalidDataException("Responses trả trùng call_id trong cùng response.");
-            calls.Add(new(callId, name, parsed.RootElement.GetRawText()));
+            calls.Add(new(callId, OpenAiResponsesWireContract.InternalName(name, _tools.Values), parsed.RootElement.GetRawText()));
         }
         return calls;
     }

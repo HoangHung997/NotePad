@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "task": "AR-021",
+  "code_sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "AWAITING_ENVIRONMENT",
+  "completed_evidence_level": "E2",
+  "required_evidence_level": "E3",
+  "behavior": {
+    "max_page_cells": 512,
+    "supports": [
+      "resource+sheet+range",
+      "values",
+      "formulas",
+      "format-on-demand",
+      "merge-on-demand",
+      "hidden-state-on-demand",
+      "cursor",
+      "content-version",
+      "completeness",
+      "used-extent metadata",
+      "cells/bytes/latency metrics"
+    ],
+    "selection_affects_content_version": false,
+    "stale_continuation_error": "stale_content",
+    "production_full_snapshot_fallback": "only for legacy injected clients without additive IExcelRangeReadClient; packaged production OfficeHost implements bounded range reads",
+    "native_direct_edit_tracking": "Workbook.SheetChange COM event advances the per-session revision for paged reads; direct user/external-link cell edits participate in the content token.",
+    "native_recalculation_tracking": "Workbook.SheetCalculate COM event advances the per-session revision after worksheet recalculation so paged value reads cannot silently mix recalculated generations.",
+    "workbook_rebind_tracking": "If the same logical session is rebound to a replacement workbook COM identity, old event sinks are detached and tracking generation changes so prior continuation tokens become stale.",
+    "content_tracking_fail_closed": "Multi-page reads return content_tracking_unavailable if Excel events are disabled or required Workbook.SheetChange/SheetCalculate event sinks cannot attach.",
+    "already_unsaved_edit_regression": "The E2 direct-edit stale-content case starts page 1 with Saved=false and then mutates another cell; invalidation depends on the content revision, not a Saved transition.",
+    "already_unsaved_recalculate_regression": "The E2 recalculation stale-content case starts page 1 with Saved=false and recalculates before continuation; the old token must be rejected.",
+    "continuation_contract_binding": "contentVersion is bound to normalized requested range, canonical normalized fields and page size; cursor/version replay with a drifted contract is rejected stale_content/no-effect.",
+    "sheet_identity_continuation": "A continuation against a renamed/deleted worksheet returns stale_content/no-effect; native post-page validation re-reads the actual worksheet name so a rename racing the page invalidates the response.",
+    "structural_paging_policy": "format/merge/hidden reads are supported only when the requested structural range completes in one bounded page; any structural request requiring continuation returns content_tracking_unavailable/no-effect because native Excel does not provide a reliable structural-edit revision signal.",
+    "transient_native_object_retry": "OfficeWindowCatalog retries only no-effect native object acquisition classified provider_busy or native_object_unavailable with a finite initial/40 ms/100 ms schedule; stale_resource and other non-transient classes fail immediately; no mutation/effect is replayed.",
+    "bound_session_targeted_scan_retry": "Require(sessionId) uses the already-validated session's known root and may repeat only targeted scans that fail with provider_busy/native_object_unavailable. First capture and broad discovery remain single-scan/no-retry so failed enumeration cannot invent or guess a live resource.",
+    "exact_window_rot_com_fallback": "NativeOM remains primary. If the exact observed Office root lacks a usable EXCEL7/_WwG NativeOM view or NativeOM Open fails only with provider_busy/native_object_unavailable, H2 may enumerate the Windows ROT and accept only a Word/Excel Application.Window whose Hwnd equals the observed root and whose PID/process-start/desktop-session identity independently matches. No filename, ROT-order, ActiveDocument/ActiveWorkbook or fuzzy-name selection is allowed.",
+    "rot_fallback_non_transient_policy": "stale_resource, permission/identity failures do not enter the ROT fallback; no mutation is replayed."
+  },
+  "validation": {
+    "dedicated": {
+      "run_id": 36111369647,
+      "job_id": 107996232046,
+      "result": "SUCCESS",
+      "focused": "14/14",
+      "office_host": "17/17",
+      "retained_ar020": "36/36",
+      "retained_ar012": "44/44",
+      "retained_ar001": "13/13",
+      "full_h2": "1286/1286",
+      "artifact_id": 10853612713,
+      "artifact_bytes": 36506,
+      "artifact_sha256": "0cc1a307f3a76ccdba28d9cac0efdbf7f918e74aeba1123079c7516d23bd5384"
+    },
+    "avalonia": {
+      "run_id": 36111369556,
+      "job_id": 107995347410,
+      "result": "SUCCESS",
+      "full_h2": "1286/1286",
+      "all_agent_mb_office_transport_steps": "PASS",
+      "windows_x64_publish": "PASS",
+      "packaged_helper_ipc": "PASS"
+    },
+    "exact_sha_workflows": {
+      "count": 22,
+      "success": 22,
+      "failed": 0,
+      "pull_request_count": 11,
+      "pull_request_success": 11
+    }
+  },
+  "build": {
+    "artifact_id": 10853806963,
+    "name": "H2Notes-Avalonia-Portable-win-x64",
+    "bytes": 110312844,
+    "sha256": "d9d0612c75200d7a0dcc7b273721c955bc6c219f77b8a75ebd6af872e8b932c8",
+    "source_sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
+    "expires_at_utc": "2026-12-24T08:09:10Z",
+    "independently_downloaded": false
+  },
+  "not_claimed": {
+    "native_excel_e3": "NOT PASSED. Real user-machine Office previously failed with native_object_unavailable/live_resource_required. Exact-window ROT/COM repair 9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd is E2/CI validated and requires real Word/Excel retest before E3 can pass.",
+    "h2_ui_model_e4": "NOT_REQUIRED_TO_CLOSE_AR-021_E3; no new claim",
+    "physical_two_pc_e5": "AR-083 DEFERRED_BY_USER",
+    "full_workbook_support": "NOT_CLAIMED from bounded range implementation",
+    "native_word_e3": "NOT PASSED. The same exact-window ROT/COM fallback is covered by controlled E2 Word regressions only; real Word/unsaved-document acceptance is still required."
+  },
+  "historical_failures": [
+    {
+      "sha": "a5e9b76c8e5518de170eed6615165f639f8ab1dc",
+      "run_id": 35985389076,
+      "result": "FAILURE",
+      "repair": "1fca3a506a8b40d1955c910fa2135a49797332b3"
+    },
+    {
+      "sha": "1fca3a506a8b40d1955c910fa2135a49797332b3",
+      "run_id": 35986730031,
+      "result": "FAILURE",
+      "repair": "e7dba71f76e36fc73aee7509e8f39416b8f7296a"
+    },
+    {
+      "sha": "d0dacf5f9d4001c9c7b568b38de82fc7e777b4bc",
+      "result": "FAILURE",
+      "repair": "c00a38790158cbf7cab49a182a0c8597835d8fac",
+      "reason": "First-capture targeted scan retry violated AR-020 enumeration/no-guess invariants; final repair limits targeted scan retry to already-bound sessions."
+    },
+    {
+      "sha": "466fddb93d7fe9b52c30d9662b7f52479199ffa7",
+      "result": "FAILURE",
+      "repair": "6a6287a6cf06cacd6d7bc19d987069e147d17610",
+      "reason": "New ROT regression fixture shadowed System.IO.Path with a string property, causing CS1061 in test code."
+    },
+    {
+      "sha": "6a6287a6cf06cacd6d7bc19d987069e147d17610",
+      "result": "FAILURE",
+      "repair": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
+      "reason": "Full H2 was 1284/1286 because private fake dynamic Word/Excel fixture types were inaccessible from the OfficeHost assembly path; production ROT code compiled. Test fixture accessibility was repaired without weakening assertions."
+    }
+  ],
+  "native_failure_history": {
+    "status": "NATIVE_FAILURE_OBSERVED_REPAIRED_AWAITING_RETEST",
+    "observed_from": "user-supplied H2 Notes screenshots in current conversation; screenshots not copied into repository",
+    "symptom_codes": [
+      "native_object_unavailable",
+      "live_resource_required"
+    ],
+    "interpretation": "Real Office was open but live binding failed before useful work; exact Office build/log correlation was not available from screenshots alone.",
+    "repair_sha": "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd",
+    "retest_required": true,
+    "repair_chain": [
+      "1c4e244669a3b3355836906b7a3af056966ceec2: bounded transient COM Open/revalidation retry",
+      "c00a38790158cbf7cab49a182a0c8597835d8fac: targeted transient scan retry only for already-bound session; first capture/discovery remain one-shot",
+      "9d8624c0e1c2491a52b2abed5caaeeb3d5a89ecd: exact-window ROT/COM fallback for Word/Excel when NativeOM is unavailable, with HWND/PID/start/session match and no filename/order/ActiveDocument guessing"
+    ]
+  }
+}

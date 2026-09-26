@@ -203,6 +203,14 @@ public sealed class CompactionManager
             ValidateCheckpointId(checkpoint.PreviousCheckpointId);
     }
 
+    public string Fingerprint(string id)
+    {
+        // Load validates bounded schema and summary. The full fingerprint is pinned by the
+        // Agent journal so even a self-rehashed checkpoint cannot replace an admitted source.
+        var checkpoint = Load(id);
+        return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(checkpoint))).ToLowerInvariant();
+    }
+
     private static string NormalizeSummary(string? summary)
     {
         if (string.IsNullOrWhiteSpace(summary)) return "";

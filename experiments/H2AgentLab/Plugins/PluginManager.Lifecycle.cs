@@ -1,0 +1,387 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using H2AgentLab.Tools;
+
+namespace H2AgentLab.Plugins;
+
+public sealed partial class PluginManager
+{
+    private sealed record AdmissionReceipt(int SchemaVersion, string ManifestHash, string PayloadHash);
+    private readonly Dictionary<string, long> _generations = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _versionCalls = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _versionPins = new(StringComparer.Ordinal);
+
+    public sealed record InstalledVersionState(
+        string PluginId,
+        string Version,
+        string Publisher,
+        bool Enabled,
+        bool Quarantined,
+        bool IntegrityValid,
+        IReadOnlyList<string> Tools,
+        IReadOnlyList<string> Skills,
+        IReadOnlyList<string> Providers,
+        string? ProblemCode);
+
+    public sealed record RestoreResult(
+        string PluginId,
+        string Version,
+        bool Restored,
+        string? ProblemCode);
+
+    public IReadOnlyList<InstalledVersionState> InstalledVersions()
+    {
+        lock (_sync)
+        {
+            var result = new List<InstalledVersionState>();
+            foreach (var pluginRoot in Directory.EnumerateDirectories(_root).OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var pluginId = Path.GetFileName(pluginRoot);
+                PluginActivationRecord? activation;
+                try { activation = ReadActivation(pluginRoot); }
+                catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+                {
+                    result.Add(new(pluginId, "unknown", "", false, false, false, [], [], [], "activation_" + ex.GetType().Name));
+                    continue;
+                }
+
+                foreach (var versionRoot in Directory.EnumerateDirectories(pluginRoot).OrderBy(x => x, StringComparer.Ordinal))
+                {
+                    var version = Path.GetFileName(versionRoot);
+                    if (!Version.TryParse(version, out var parsed) || parsed.ToString() != version)
+                        continue;
+                    var quarantined = File.Exists(Path.Combine(versionRoot, "quarantine.json"));
+                    try
+                    {
+                        var manifest = quarantined ? ReadManifest(versionRoot) : VerifyVersion(pluginId, version);
+                        result.Add(new(
+                            pluginId,
+                            version,
+                            manifest.Publisher,
+                            activation?.Enabled == true && activation.ActiveVersion == version && !quarantined,
+                            quarantined,
+                            !quarantined,
+                            manifest.Capabilities.ToArray(),
+                            manifest.Skills.ToArray(),
+                            manifest.Providers.ToArray(),
+                            quarantined ? "quarantined" : null));
+                    }
+                    catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException
+                        or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
+                    {
+                        result.Add(new(pluginId, version, "", false, quarantined, false, [], [], [],
+                            "integrity_" + ex.GetType().Name));
+                    }
+                }
+            }
+            return result.ToArray();
+        }
+    }
+
+    public IReadOnlyList<RestoreResult> RestoreActivePlugins()
+    {
+        lock (_sync)
+        {
+            var result = new List<RestoreResult>();
+            foreach (var pluginRoot in Directory.EnumerateDirectories(_root).OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var pluginId = Path.GetFileName(pluginRoot);
+                PluginActivationRecord? activation = null;
+                try
+                {
+                    activation = ReadActivation(pluginRoot);
+                    if (activation is null || !activation.Enabled)
+                        continue;
+                    var manifest = VerifyVersion(pluginId, activation.ActiveVersion);
+                    var versionRoot = VersionRoot(pluginId, activation.ActiveVersion);
+                    _ = ActivateIntoRegistry(manifest, versionRoot, static () => { });
+                    result.Add(new(pluginId, manifest.Version, true, null));
+                }
+                catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException
+                    or InvalidOperationException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    _registry.UnregisterWhere(x => x.Provenance?.ProviderId == "plugin." + pluginId);
+                    result.Add(new(pluginId, activation?.ActiveVersion ?? "unknown", false,
+                        "restore_" + ex.GetType().Name));
+                }
+            }
+            return result.ToArray();
+        }
+    }
+
+    public PluginInstallResult InstallFromArchive(string archivePath, PluginCatalogEntry entry,
+        PluginInstallPolicy policy, bool userApproved)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_sync)
+        {
+            EnsurePluginBoundary(entry.Id);
+            _ = VersionRoot(entry.Id, entry.Version);
+            return InstallFromArchiveCore(archivePath, entry, policy, userApproved);
+        }
+    }
+
+    public H2PluginManifest Rollback(string pluginId)
+    { lock (_sync) { EnsurePluginBoundary(pluginId); return RollbackCore(pluginId); } }
+
+    public void Quarantine(string pluginId, string version, string reason)
+    { lock (_sync) { EnsurePluginBoundary(pluginId, ignorePins: true); QuarantineCore(pluginId, version, reason); } }
+
+    public IReadOnlyList<(H2PluginManifest Manifest, string VersionRoot)> ActivePlugins()
+    { lock (_sync) return ActivePluginsCore(); }
+
+    public (H2PluginManifest Manifest, string VersionRoot)? GetActive(string pluginId)
+    { lock (_sync) return GetActiveCore(pluginId); }
+
+    public void Disable(string pluginId)
+    { lock (_sync) { EnsurePluginBoundary(pluginId, ignorePins: true); DisableCore(pluginId); } }
+
+    private void DisableCore(string pluginId)
+    {
+        var root = PluginRoot(pluginId);
+        var active = ReadActivation(root);
+        if (active is null) return;
+        _registry.ReplaceWhere(x => x.Provenance?.ProviderId == "plugin." + pluginId,
+            Array.Empty<ToolDescriptor>(), () =>
+            {
+                WriteActivation(root, active with { Enabled = false });
+                _generations[pluginId] = _generations.GetValueOrDefault(pluginId) + 1;
+            });
+    }
+
+    /// <summary>Re-enable only an already admitted, intact version. No trust is inferred from disk files.</summary>
+    public H2PluginManifest Enable(string pluginId, string version)
+    {
+        lock (_sync)
+        {
+            EnsurePluginBoundary(pluginId);
+            var manifest = VerifyVersion(pluginId, version);
+            RunDeclarativeSelfTest(manifest, VersionRoot(pluginId, version));
+            var old = ReadActivation(PluginRoot(pluginId));
+            var previous = old?.ActiveVersion == version ? old.PreviousVersion : old?.ActiveVersion;
+            ActivateIntoRegistry(manifest, VersionRoot(pluginId, version), () => WriteActivation(
+                PluginRoot(pluginId), new(version, previous, DateTime.UtcNow)));
+            return manifest;
+        }
+    }
+
+    public H2PluginManifest SelfTest(string pluginId, string version)
+    {
+        lock (_sync)
+        {
+            var manifest = VerifyVersion(pluginId, version);
+            RunDeclarativeSelfTest(manifest, VersionRoot(pluginId, version));
+            ValidateToolDefinitions(manifest, VersionRoot(pluginId, version));
+            return manifest;
+        }
+    }
+
+    public void Uninstall(string pluginId, string version)
+    {
+        lock (_sync)
+        {
+            EnsurePluginBoundary(pluginId);
+            var root = VersionRoot(pluginId, version);
+            if (!Directory.Exists(root)) return;
+            if (ReadActivation(PluginRoot(pluginId))?.ActiveVersion == version) DisableCore(pluginId);
+            _ = EnumeratePayload(root);
+            // Package bytes only. The Agent's historical artifacts/journal are not under this root.
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>Host task lifetime pin. An update waits at the affected plugin boundary only.
+    /// Revocation may still disable/quarantine a pinned version; it never permits later calls.</summary>
+    public IDisposable PinVersion(string pluginId, string version)
+    {
+        lock (_sync)
+        {
+            var active = GetActiveCore(pluginId);
+            if (active?.Manifest.Version != version) throw new InvalidOperationException("Plugin version is not active.");
+            _versionPins[pluginId] = _versionPins.GetValueOrDefault(pluginId) + 1;
+            return new VersionScope(this, pluginId, pin: true);
+        }
+    }
+
+    private void EnsurePluginBoundary(string pluginId, bool ignorePins = false)
+    {
+        _ = PluginRoot(pluginId);
+        EnsureActivationBoundary();
+        if (_versionCalls.GetValueOrDefault(pluginId) != 0 || (!ignorePins && _versionPins.GetValueOrDefault(pluginId) != 0))
+            throw new InvalidOperationException("Plugin version is pinned or a tool call is in flight.");
+    }
+
+    private string VersionRoot(string pluginId, string version)
+    {
+        if (!Version.TryParse(version, out var parsed) || parsed.ToString() != version)
+            throw new ArgumentException("Plugin version path is invalid.");
+        var path = Path.Combine(PluginRoot(pluginId), version);
+        RejectLinks(path);
+        return path;
+    }
+
+    private static void RejectLinks(string path)
+    {
+        for (var current = new DirectoryInfo(Path.GetFullPath(path)); current is not null; current = current.Parent)
+            if (current.LinkTarget is not null || (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0))
+                throw new IOException("Plugin storage cannot traverse symbolic links or reparse points.");
+    }
+
+    private static string HashFile(string path)
+    {
+        RejectLinks(path);
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
+    private H2PluginManifest VerifyVersion(string pluginId, string version)
+    {
+        var root = VersionRoot(pluginId, version);
+        if (File.Exists(Path.Combine(root, "quarantine.json")))
+            throw new InvalidOperationException("Plugin version is quarantined.");
+        var admissionPath = Path.Combine(root, "admission.json");
+        RejectLinks(admissionPath);
+        if (!File.Exists(admissionPath) || new FileInfo(admissionPath).Length > 4096)
+            throw new InvalidDataException("Plugin has no bounded admission receipt; reinstall with approval.");
+        var admission = JsonSerializer.Deserialize<AdmissionReceipt>(File.ReadAllBytes(admissionPath))
+            ?? throw new InvalidDataException("Plugin admission receipt is invalid.");
+        var manifestPath = Path.Combine(root, "manifest.json");
+        if (admission.SchemaVersion != 1 || new FileInfo(manifestPath).Length > 128000
+            || HashFile(manifestPath) != admission.ManifestHash)
+            throw new InvalidDataException("Plugin manifest differs from its admitted version.");
+        var manifest = ReadManifest(root);
+        if (manifest.Id != pluginId || manifest.Version != version || !string.Equals(manifest.PackageHash[7..], admission.PayloadHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Plugin admitted identity differs from its directory.");
+        var files = EnumeratePayload(root);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        long totalBytes = 0;
+        foreach (var file in files.OrderBy(x => x.Relative, StringComparer.Ordinal))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(file.Relative)); hash.AppendData([0]);
+            using var input = File.OpenRead(file.Path); var buffer = new byte[16384]; int count;
+            while ((count = input.Read(buffer)) > 0)
+            {
+                totalBytes += count;
+                if (totalBytes > 64L * 1024 * 1024) throw new InvalidDataException("Plugin expanded bytes exceed limit.");
+                hash.AppendData(buffer.AsSpan(0, count));
+            }
+            hash.AppendData([0]);
+        }
+        if (Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant() != admission.PayloadHash)
+            throw new InvalidDataException("Plugin payload differs from its admitted version.");
+        return manifest;
+    }
+
+    private static List<(string Path, string Relative)> EnumeratePayload(string root)
+    {
+        var files = new List<(string Path, string Relative)>();
+        var pending = new Stack<string>(); pending.Push(root);
+        int entries = 0;
+        long bytes = 0;
+        while (pending.Count > 0)
+        {
+            var directory = pending.Pop(); RejectLinks(directory);
+            foreach (var path in Directory.EnumerateFileSystemEntries(directory))
+            {
+                if (++entries > 4096) throw new InvalidDataException("Plugin entry count exceeds limit.");
+                RejectLinks(path);
+                if (Directory.Exists(path)) { pending.Push(path); continue; }
+                var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
+                if (relative is "manifest.json" or "admission.json" or "quarantine.json") continue;
+                bytes += new FileInfo(path).Length;
+                if (bytes > 64L * 1024 * 1024) throw new InvalidDataException("Plugin expanded bytes exceed limit.");
+                files.Add((path, relative));
+            }
+        }
+        return files;
+    }
+
+    private ToolReadiness VersionReadiness(string id, string version, long generation)
+    {
+        lock (_sync)
+        {
+            // Readiness is cheap host state. Integrity is rechecked at the execution boundary.
+            return new(_generations.GetValueOrDefault(id) == generation
+                ? ToolReadinessState.Ready : ToolReadinessState.Unavailable);
+        }
+    }
+
+    private IAgentToolExecutor WrapVersionExecutor(H2PluginManifest manifest, string toolName,
+        long generation, IAgentToolExecutor inner)
+        => inner is IAgentToolOutcomeExecutor typed
+            ? new VersionOutcomeExecutor(this, manifest, toolName, generation, typed)
+            : new VersionExecutor(this, manifest, toolName, generation, inner);
+
+    private IDisposable EnterVersionCall(H2PluginManifest manifest, string toolName,
+        long generation, ToolCall call, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            if (!string.Equals(call.Name, toolName, StringComparison.Ordinal)
+                || _generations.GetValueOrDefault(manifest.Id) != generation)
+                throw new ToolPreflightException("provider_unavailable");
+            string? activeVersion;
+            try { activeVersion = GetActiveCore(manifest.Id)?.Manifest.Version; }
+            catch (Exception ex) when (ex is InvalidDataException or JsonException
+                or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+            {
+                // Integrity/activation checks are before the resolver and before a call lease.
+                // A corrupt package is a refused dispatch, not evidence that a new write occurred.
+                // Do not forward paths or exception bodies as provider instructions/diagnostics.
+                throw new ToolPreflightException("provider_unavailable");
+            }
+            if (activeVersion != manifest.Version)
+                throw new ToolPreflightException("provider_unavailable");
+            _versionCalls[manifest.Id] = _versionCalls.GetValueOrDefault(manifest.Id) + 1;
+        }
+        return new VersionScope(this, manifest.Id, pin: false);
+    }
+
+    private sealed class VersionExecutor(PluginManager owner, H2PluginManifest manifest,
+        string toolName, long generation, IAgentToolExecutor inner) : IAgentToolExecutor
+    {
+        public string ExecutorId => inner.ExecutorId;
+        public async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken cancellationToken)
+        {
+            using var lease = owner.EnterVersionCall(manifest, toolName, generation, call, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return await inner.ExecuteAsync(call, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // Preserve AR-011 out-of-band effect, job, pagination and evidence metadata. A version
+    // lease is not permission to turn Running/OutcomeUnknown into a successful string result.
+    // Ordinary callers retain exact domain bytes; the runtime still performs outcome validation.
+    private sealed class VersionOutcomeExecutor(PluginManager owner, H2PluginManifest manifest,
+        string toolName, long generation, IAgentToolOutcomeExecutor inner) : IAgentToolOutcomeExecutor
+    {
+        public string ExecutorId => inner.ExecutorId;
+        public async ValueTask<ToolExecutionOutput> ExecuteOutcomeAsync(ToolCall call, CancellationToken cancellationToken)
+        {
+            using var lease = owner.EnterVersionCall(manifest, toolName, generation, call, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return await inner.ExecuteOutcomeAsync(call, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async ValueTask<string> ExecuteAsync(ToolCall call, CancellationToken cancellationToken)
+            => (await ExecuteOutcomeAsync(call, cancellationToken).ConfigureAwait(false)).DomainPayload;
+    }
+
+    private sealed class VersionScope(PluginManager owner, string id, bool pin) : IDisposable
+    {
+        private PluginManager? _owner = owner;
+        public void Dispose()
+        {
+            var value = Interlocked.Exchange(ref _owner, null);
+            if (value is null) return;
+            lock (value._sync)
+            {
+                var counts = pin ? value._versionPins : value._versionCalls;
+                var count = counts[id] - 1;
+                if (count == 0) counts.Remove(id); else counts[id] = count;
+            }
+        }
+    }
+}

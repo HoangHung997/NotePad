@@ -17,6 +17,8 @@ public static class AiModelCapabilities
                     or "gpt-5-mini-2025-08-07" or "gpt-5-nano-2025-08-07" => ["minimal", "low", "medium", "high"],
                 "gpt-5.1" or "gpt-5.1-2025-11-13" => ["none", "low", "medium", "high"],
                 "gpt-5.2" or "gpt-5.2-2025-12-11" or "gpt-5.4" => ["none", "low", "medium", "high", "xhigh"],
+                // Verified 2026-09-23: https://developers.openai.com/api/docs/models/gpt-5.6-luna
+                "gpt-5.6-luna" => ["none", "low", "medium", "high", "xhigh", "max"],
                 "gpt-6-astra" => ["low", "medium", "high", "xhigh", "max"],
                 _ => []
             };

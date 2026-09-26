@@ -1,0 +1,60 @@
+name: AR-012 scoped binding validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar012-validation.yml'
+      - 'src/**'
+      - 'experiments/**'
+      - 'tests/**'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar012-readonly-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  bindings:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Record exact source and compile
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force artifacts/ar012 | Out-Null
+          if (git status --porcelain) { throw 'Dirty test checkout' }
+          @{code_sha=(git rev-parse HEAD);working_tree='CLEAN';os=[Environment]::OSVersion.VersionString;level='E1/E2 controlled fixtures only, native Office/model/H2 UI/E5 NOT_RUN'} | ConvertTo-Json | Set-Content artifacts/ar012/identity.json
+          dotnet restore H2Notes.Avalonia.slnx
+          if ($LASTEXITCODE) { throw 'Restore failed' }
+          dotnet build H2Notes.Avalonia.slnx -c Release --no-restore 2>&1 | Tee-Object artifacts/ar012/build.log
+          if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Repeat binding corpus and retain previous regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $failures=@()
+          foreach ($name in 'AR-012-1','AR-012-2','AR-012-3','AR-011','AR-010','AR-001') {
+            $task=$name.Substring(0,6);$log="artifacts/ar012/$name.log"
+            dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $task 2>&1 | Tee-Object $log
+            $exit=$LASTEXITCODE
+            if ($exit -ne 0 -or (Get-Content $log -Raw) -notmatch 'RESULT: [1-9][0-9]* passed, 0 failed') { $failures += $name }
+          }
+          if ($failures.Count) { throw ('Failed corpora: '+($failures -join ', ')) }
+      - name: Independent required Agent suites with aggregate failure
+        shell: pwsh
+        run: tools/agent-reliability/run_agent_suites.ps1 -OutputDirectory artifacts/ar012/all-agent-suites
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR012-E1-E2-Evidence
+          path: artifacts/ar012/
+          if-no-files-found: error
+          retention-days: 14

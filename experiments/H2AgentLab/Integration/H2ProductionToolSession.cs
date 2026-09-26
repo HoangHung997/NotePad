@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
+using H2AgentLab.DesktopProtocol;
 using H2AgentLab.Runtime;
 using H2AgentLab.Tools;
 using H2Notes.Core;
@@ -16,24 +18,186 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     private readonly SemaphoreSlim _approvalGate = new(1, 1);
     private readonly AsyncLocal<bool> _executingAuthorizedCall = new();
     private readonly HashSet<string> _declined = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, byte> _runtimeApprovedInvocations = new();
     private readonly List<IDisposable> _owned = [];
     private readonly H2AgentTaskContext? _context;
     private readonly IH2ProjectToolHost? _projects;
     private readonly Guid _taskId;
+    private readonly H2HistoryRuntimeTools? _history;
+    private readonly Func<string>? _jobRevision;
+    private readonly CancellationToken _ownerCancellation;
+    private readonly Action<ToolCall, H2AgentProcessJobInfo>? _jobObserved;
+    private H2LocalCommandTool? _commands;
+    internal IReadOnlyList<AgentRuntimeJobObservation> ObserveJobResults() => _commands?.ObserveJobResults() ?? [];
+    private SafeWorkspace? _fileTargets;
+    private readonly H2AgentTargetBindingPolicy? _targetPolicy;
+    private readonly Action<H2AgentTargetResolution>? _targetObserved;
+    private readonly Func<Office.IOfficeSessionClient>? _officeClientFactory;
+    private readonly Func<Cad.IAutoCadNativeBridge?>? _autoCadLiveBridgeFactory;
+    private readonly Func<H2ActiveWorkContext, bool>? _captureValidator;
+    private readonly object _launchedOfficeGate = new();
+    private readonly Dictionary<H2ApplicationKind, TaskLaunchedOfficeWindow> _launchedOfficeWindows = [];
+    private readonly Dictionary<string, H2AgentResourceBinding> _launchedOfficeSessions = new(StringComparer.Ordinal);
 
     public H2ProductionToolSession(Guid taskId, Guid? projectId, bool readOnly,
         H2AgentTaskContext? context, IH2ProjectToolHost? projects,
-        Func<string, string, CancellationToken, Task<bool>> approve)
+        Func<string, string, CancellationToken, Task<bool>> approve,
+        H2AgentTargetBindingPolicy? targetPolicy = null,
+        Action<H2AgentTargetResolution>? targetObserved = null,
+        Func<Office.IOfficeSessionClient>? officeClientFactory = null,
+        Func<Cad.IAutoCadNativeBridge?>? autoCadLiveBridgeFactory = null,
+        Func<H2ActiveWorkContext, bool>? captureValidator = null, H2HistoryRuntimeTools? history = null,
+        Func<string>? jobRevision = null, CancellationToken ownerCancellation = default,
+        Action<ToolCall, H2AgentProcessJobInfo>? jobObserved = null, string? userGoal = null,
+        Func<string, string, CancellationToken, Task<SourceApprovalReply>>? approveSource = null,
+        Func<string>? sourceAuthorityStamp = null, Action<H2AgentSourceDecision>? sourceDecisionObserved = null)
     {
-        _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
+        _liveRequirement = H2AgentLiveResourceRequirement.FromUserRequest(userGoal, context?.ActiveWorkContext, context?.TargetIntent);
+        _approveSource = approveSource; _sourceAuthorityStamp = sourceAuthorityStamp; _sourceDecisionObserved = sourceDecisionObserved;
+        _jobRevision = jobRevision; _ownerCancellation = ownerCancellation; _jobObserved = jobObserved;
+        _history = history; _taskId = taskId; _projectId = projectId; _readOnly = readOnly;
         _context = context; _scope = context?.PermissionScope; _projects = projects; _approve = approve;
+        _targetPolicy = targetPolicy; _targetObserved = targetObserved;
+        _officeClientFactory = officeClientFactory; _autoCadLiveBridgeFactory = autoCadLiveBridgeFactory; _captureValidator = captureValidator;
     }
 
     public bool IsExecutingAuthorizedCall => _executingAuthorizedCall.Value;
 
+    internal void ObserveLaunchedApplicationWindow(DesktopApplicationLaunchResult launched)
+    {
+        ArgumentNullException.ThrowIfNull(launched);
+        var kind = LaunchedOfficeKind(launched.ApplicationId, launched.ProcessName, launched.Window.ProcessName);
+        // Only a distinct newly-created Office HWND becomes a new task-local live source.
+        // Re-activating a pre-existing app is useful UI behavior but is not a new source grant.
+        if (kind == H2ApplicationKind.Unknown || !launched.NewWindowObserved || launched.ReusedExistingWindow) return;
+        if (launched.Window.Handle <= 0
+            || launched.Window.ProcessId <= 0
+            || launched.Window.ProcessStartedUtcTicks <= 0
+            || !string.Equals(launched.ProcessName, launched.Window.ProcessName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Verified app launch returned an incomplete Office window identity.");
+
+        var authority = new TaskLaunchedOfficeWindow(
+            kind,
+            launched.Window.ProcessId,
+            launched.Window.ProcessStartedUtcTicks,
+            $"win32:{launched.Window.Handle:x}:{launched.Window.ProcessId}:{launched.Window.ProcessStartedUtcTicks}",
+            DateTime.UtcNow);
+
+        lock (_launchedOfficeGate)
+        {
+            _launchedOfficeWindows[kind] = authority;
+            foreach (var key in _launchedOfficeSessions
+                .Where(pair => pair.Value.ApplicationKind == kind)
+                .Select(pair => pair.Key)
+                .ToArray())
+                _launchedOfficeSessions.Remove(key);
+        }
+    }
+
+    internal bool IsTaskLaunchedOfficeCandidate(H2AgentResourceBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        if (!AllowsTaskLaunchedOfficeHandoff()) return false;
+        lock (_launchedOfficeGate)
+            return _launchedOfficeWindows.TryGetValue(binding.ApplicationKind, out var authority)
+                && MatchesLaunchedAuthority(binding, authority);
+    }
+
+    internal bool HasTaskLaunchedOfficeAuthority(H2ApplicationKind application)
+    {
+        if (application is not (H2ApplicationKind.Excel or H2ApplicationKind.Word)
+            || !AllowsTaskLaunchedOfficeHandoff())
+            return false;
+        lock (_launchedOfficeGate) return _launchedOfficeWindows.ContainsKey(application);
+    }
+
+    internal void PinTaskLaunchedOfficeBinding(H2AgentResourceBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        if (!AllowsTaskLaunchedOfficeHandoff())
+            throw new InvalidOperationException("Current permission scope does not allow task-launched Office handoff.");
+        if (string.IsNullOrWhiteSpace(binding.DocumentSessionId))
+            throw new InvalidOperationException("Task-launched Office binding has no document session.");
+        lock (_launchedOfficeGate)
+        {
+            if (!_launchedOfficeWindows.TryGetValue(binding.ApplicationKind, out var authority)
+                || !MatchesLaunchedAuthority(binding, authority))
+                throw new InvalidOperationException("Office binding does not match the exact task-launched window.");
+            _launchedOfficeSessions[OfficeSessionKey(binding.ApplicationKind, binding.DocumentSessionId)] = binding;
+        }
+    }
+
+    private bool AllowsTaskLaunchedOfficeHandoff()
+    {
+        if (_scope?.HasFullAccessAt(DateTime.UtcNow) == true) return true;
+        return _scope is
+            {
+                Mode: H2AgentPermissionMode.AskBeforeChanges,
+                ScopeKind: H2AgentResourceScopeKind.Workspace
+            }
+            or
+            {
+                Mode: H2AgentPermissionMode.UseProjectPolicy,
+                ScopeKind: H2AgentResourceScopeKind.Project
+            };
+    }
+
+    private bool IsTaskLaunchedOfficeSession(string toolNamespace, string? sessionId)
+    {
+        if (!AllowsTaskLaunchedOfficeHandoff() || string.IsNullOrWhiteSpace(sessionId)) return false;
+        var kind = toolNamespace switch
+        {
+            "excel" => H2ApplicationKind.Excel,
+            "word" => H2ApplicationKind.Word,
+            _ => H2ApplicationKind.Unknown
+        };
+        if (kind == H2ApplicationKind.Unknown) return false;
+        lock (_launchedOfficeGate)
+        {
+            return _launchedOfficeSessions.TryGetValue(OfficeSessionKey(kind, sessionId), out var binding)
+                && _launchedOfficeWindows.TryGetValue(kind, out var authority)
+                && MatchesLaunchedAuthority(binding, authority);
+        }
+    }
+
+    private static H2ApplicationKind LaunchedOfficeKind(string applicationId, string resultProcess, string windowProcess)
+    {
+        if (!string.Equals(resultProcess, windowProcess, StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Unknown;
+        if (applicationId.Equals("excel", StringComparison.OrdinalIgnoreCase)
+            && resultProcess.Equals("EXCEL", StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Excel;
+        if ((applicationId.Equals("winword", StringComparison.OrdinalIgnoreCase)
+                || applicationId.Equals("word", StringComparison.OrdinalIgnoreCase))
+            && resultProcess.Equals("WINWORD", StringComparison.OrdinalIgnoreCase))
+            return H2ApplicationKind.Word;
+        return H2ApplicationKind.Unknown;
+    }
+
+    private static bool MatchesLaunchedAuthority(H2AgentResourceBinding binding, TaskLaunchedOfficeWindow authority)
+        => binding.Kind == H2AgentResourceKind.LiveDocument
+            && binding.ApplicationKind == authority.ApplicationKind
+            && binding.ProcessId == authority.ProcessId
+            && binding.ProcessStartUtcTicks == authority.ProcessStartUtcTicks
+            && string.Equals(binding.WindowIdentity, authority.WindowIdentity, StringComparison.Ordinal)
+            && binding.ObservedUtc.Kind == DateTimeKind.Utc
+            && binding.ObservedUtc >= authority.ObservedUtc
+            && DateTime.UtcNow - authority.ObservedUtc <= H2AgentTargetBindingPolicy.MaxCaptureAge;
+
+    private static string OfficeSessionKey(H2ApplicationKind kind, string sessionId)
+        => kind + ":" + sessionId;
+
+    private sealed record TaskLaunchedOfficeWindow(
+        H2ApplicationKind ApplicationKind,
+        int ProcessId,
+        long ProcessStartUtcTicks,
+        string WindowIdentity,
+        DateTime ObservedUtc);
+
     public ToolRegistry Configure(AgentTools tools, ToolRegistry registry,
         List<IAgentRuntimeDomainVerifier> verifiers)
     {
+        _fileTargets = tools.Workspace;
         if (_projects is not null && _projectId is { } projectId && _context?.IncludeProjectContent != false)
         {
             var projectTools = new H2ProjectRuntimeTools(_projects, projectId, _taskId,
@@ -42,75 +206,173 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
             verifiers.Add(projectTools);
         }
         H2AttachmentRuntimeTools.Register(registry, _context);
+        _history?.Register(registry);
         ConfigureDomains(tools, registry, verifiers);
+        RegisterSourceSelection(registry);
+        if (tools.Desktop is null && _desktopBindingFailure is not null)
+            registry.RegisterCapabilityNotice(new("desktop.bound_window", "Desktop actions require a current host-captured target; Full Access does not choose one.",
+                new(ToolReadinessState.Unavailable, _desktopBindingFailure)));
         if (!_readOnly && _scope?.Mode == H2AgentPermissionMode.FullAccess)
         {
             var commands = new H2LocalCommandTool();
             commands.Register(registry, tools.Workspace); verifiers.Add(commands);
+            _commands = commands; _owned.Add(commands);
+            if (_jobRevision is not null && _jobObserved is not null)
+                commands.RegisterJobs(registry, tools.Workspace, tools.StateRoot, _taskId,
+                    _jobRevision, _ownerCancellation, _scope.ExpiresUtc, _jobObserved);
         }
         var wrapped = new ToolRegistry();
+        foreach (var notice in registry.CapabilityNotices) wrapped.RegisterCapabilityNotice(notice);
         foreach (var descriptor in registry.Tools)
         {
             if (descriptor.Namespace.Name == "desktop" && tools.Desktop is null) continue;
             if (descriptor.Name == "open_file" && _scope?.ScopeKind == H2AgentResourceScopeKind.Workspace) continue;
-            var executor = new DelegatingToolExecutor("h2-authorized-tool", async (call, ct) =>
+            var executor = new DelegatingOutcomeToolExecutor("h2-authorized-tool", async (call, ct) =>
             {
                 var permission = Check(descriptor, call);
-                if (!permission.Allowed) return Denied(permission);
+                if (!permission.Allowed) return Rejected(call, descriptor, permission);
                 var key = permission.ResourceKey ?? descriptor.Name;
                 if (descriptor.IsMutating)
                 {
-                    await _approvalGate.WaitAsync(ct).ConfigureAwait(false);
-                    try
+                    var runtimePrepared = call.Invocation is { } invocation
+                        && _runtimeApprovedInvocations.TryRemove(invocation.InvocationId, out _);
+                    if (!runtimePrepared)
                     {
-                        if (_declined.Contains(key)) return Denied(permission with { Allowed = false, Code = "denied", Message = "This resource was declined for this task." });
-                        if (!MayAutoApprove(descriptor, call)
-                            && !await _approve("Cho phép " + descriptor.Name + "?",
-                                "Phạm vi: " + key + "\nThay đổi đề xuất:\n" + call.Arguments.GetRawText(), ct).ConfigureAwait(false))
-                        {
-                            _declined.Add(key);
-                            return Denied(permission with { Allowed = false, Code = "denied", Message = "Người dùng đã từ chối thay đổi." });
-                        }
-                        permission = Check(descriptor, call);
-                        if (!permission.Allowed) return Denied(permission);
+                        // Direct/legacy executor calls still use the historical approval path.
+                        // Normal AgentRuntime calls prepare approval in AuthorizeAsync BEFORE
+                        // entering the shared resource gate, so no resource lock is held while
+                        // waiting for user input.
+                        permission = await PrepareMutationAuthorizationAsync(
+                            descriptor, call, permission, rememberRuntimeInvocation: false, ct).ConfigureAwait(false);
+                        if (!permission.Allowed) return Rejected(call, descriptor, permission);
                     }
-                    finally { _approvalGate.Release(); }
+                    // This check is deliberately AFTER the shared mutation gate was acquired.
+                    // A permission can expire/be revoked while another task owns the resource.
+                    permission = Check(descriptor, call);
+                    if (!permission.Allowed) return Rejected(call, descriptor, permission);
                 }
                 ct.ThrowIfCancellationRequested();
-                _executingAuthorizedCall.Value = true;
-                try { return await descriptor.Executor.ExecuteAsync(call, ct).ConfigureAwait(false); }
-                catch (Exception ex) when (ex is IOException or HttpRequestException or FormatException
-                    or ArgumentException or InvalidOperationException or TimeoutException or KeyNotFoundException)
+                if (_targetPolicy is not null && _fileTargets is not null && descriptor.Namespace.Name is "files" or "autocad")
                 {
-                    return JsonSerializer.Serialize(new { ok = false,
-                          error = ex is H2AgentLab.Office.OfficeHostClientException officeError ? officeError.Code
-                              : ex is ArgumentException or FormatException ? "invalid_arguments" : "tool_failed",
-                        message = ex.Message.Length <= 1500 ? ex.Message : ex.Message[..1500],
-                        next = "Inspect the error and current resource state, correct the arguments, then retry the discovered tool. Do not claim success." });
+                    var path = Arg(call, "path") ?? Arg(call, "destination");
+                    if (path is not null && H2AgentTargetScope.TryNormalize(path, out var canonical, _fileTargets.Root))
+                    {
+                        // No content hash was read here; do not label this path binding ContentVerified.
+                        var id = "path-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                            System.Text.Encoding.UTF8.GetBytes(OperatingSystem.IsWindows() ? canonical.ToUpperInvariant() : canonical))).ToLowerInvariant();
+                        _targetObserved?.Invoke(new(new(id, H2AgentResourceKind.DiskFile, H2ApplicationKind.Unknown,
+                            "filesystem", null, null, null, canonical, null, null, null, null, null, null, null, DateTime.UtcNow),
+                            "resolved", _targetPolicy.IsExternal(canonical), "host-file-target"));
+                    }
+                }
+                _executingAuthorizedCall.Value = true;
+                try
+                {
+                    // Common metadata stays out-of-band; the domain verifier sees exact old bytes.
+                    // Typed executors preserve their effect/job/completeness across this wrapper.
+                    var output = descriptor.Executor is IAgentToolOutcomeExecutor typed
+                        ? await typed.ExecuteOutcomeAsync(call, ct).ConfigureAwait(false)
+                        : ToolOutcomeBridge.FromLegacy(call, descriptor,
+                            await descriptor.Executor.ExecuteAsync(call, ct).ConfigureAwait(false));
+                    output = ToolOutcomeBridge.Validate(output, call, descriptor);
+                    ObserveSourceResult(descriptor, call, output);
+                    return output;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) when (ex is IOException or HttpRequestException or FormatException
+                    or ArgumentException or InvalidOperationException or TimeoutException or KeyNotFoundException
+                    or UnauthorizedAccessException or NotSupportedException)
+                {
+                    if (ex is H2AgentLab.Office.OfficeHostClientException { NoEffect: true } rejected)
+                        return ToolOutcomeBridge.Failure(call, descriptor, rejected.Code, ToolErrorPhase.Preflight, ToolMutationEffect.None);
+                    var failure = ToolOutcomeBridge.FromException(call, descriptor, ex,
+                        ex is H2AgentLab.Office.OfficeHostClientException office ? office.Code : null);
+                    ObserveSourceResult(descriptor, call, failure);
+                    return failure;
                 }
                 finally { _executingAuthorizedCall.Value = false; }
             });
             wrapped.Register(new ToolDescriptor(descriptor.Name, descriptor.Namespace, descriptor.Description,
                 descriptor.Risk, descriptor.Access, descriptor.SupportsParallel, descriptor.SchemaVersion,
                 descriptor.CallableSchema, executor, descriptor.Provenance, descriptor.ResourceScope,
-                descriptor.SerializationKey, descriptor.CanProvideVerificationEvidence, descriptor.Preference));
+                descriptor.SerializationKey, descriptor.CanProvideVerificationEvidence, descriptor.Preference,
+                descriptor.Readiness, descriptor.Limits, descriptor.Dependencies, descriptor.SupportedOperations, descriptor.ResultFormat,
+                descriptor.Preflight, descriptor.ReadinessSnapshot));
         }
         return wrapped;
     }
 
-    public ValueTask<AgentRuntimePermissionDecision> AuthorizeAsync(AgentRuntimePermissionRequest request, CancellationToken cancellationToken)
+    public async ValueTask<AgentRuntimePermissionDecision> AuthorizeAsync(
+        AgentRuntimePermissionRequest request,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var permission = Check(request.Descriptor, request.Call);
+        if (!permission.Allowed || !request.Descriptor.IsMutating) return permission;
+        return await PrepareMutationAuthorizationAsync(
+            request.Descriptor, request.Call, permission, rememberRuntimeInvocation: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public ValueTask<AgentRuntimePermissionDecision> RevalidateBeforeDispatchAsync(
+        AgentRuntimePermissionRequest request,
+        AgentRuntimePermissionDecision priorDecision,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!priorDecision.Allowed || !request.Descriptor.IsMutating)
+            return ValueTask.FromResult(priorDecision);
         return ValueTask.FromResult(Check(request.Descriptor, request.Call));
     }
 
-    public void ObserveResult(AgentRuntimePermissionRequest request, string output) { }
+    public void ObserveResult(AgentRuntimePermissionRequest request, string output)
+    {
+        if (request.Call.Invocation is { } invocation)
+            _runtimeApprovedInvocations.TryRemove(invocation.InvocationId, out _);
+    }
+
+    private async ValueTask<AgentRuntimePermissionDecision> PrepareMutationAuthorizationAsync(
+        ToolDescriptor descriptor,
+        ToolCall call,
+        AgentRuntimePermissionDecision permission,
+        bool rememberRuntimeInvocation,
+        CancellationToken cancellationToken)
+    {
+        var key = permission.ResourceKey ?? descriptor.Name;
+        await _approvalGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_declined.Contains(key))
+                return AgentRuntimePermissionDecision.Deny(
+                    "denied", "This resource was declined for this task.", key);
+            if (!MayAutoApprove(descriptor, call)
+                && !await _approve("Cho phép " + descriptor.Name + "?",
+                    "Phạm vi: " + key + "\nThay đổi đề xuất:\n" + call.Arguments.GetRawText(),
+                    cancellationToken).ConfigureAwait(false))
+            {
+                _declined.Add(key);
+                return AgentRuntimePermissionDecision.Deny(
+                    "denied", "Người dùng đã từ chối thay đổi.", key);
+            }
+
+            permission = Check(descriptor, call);
+            if (!permission.Allowed) return permission;
+            if (rememberRuntimeInvocation && call.Invocation is { } invocation)
+                _runtimeApprovedInvocations[invocation.InvocationId] = 0;
+            return permission;
+        }
+        finally { _approvalGate.Release(); }
+    }
 
     private AgentRuntimePermissionDecision Check(ToolDescriptor descriptor, ToolCall call)
     {
         var key = ResourceKey(descriptor, call);
         if (_scope?.Mode == H2AgentPermissionMode.FullAccess && !_scope.HasFullAccessAt(DateTime.UtcNow))
             return AgentRuntimePermissionDecision.Deny("expired_permission", "Quyền toàn máy đã hết hạn; chọn lại quyền và gửi yêu cầu mới.", key);
+        var semantics = CheckResourceSemantics(descriptor, call, key);
+        if (semantics is not null) return semantics;
+        var grounding = CheckFileGrounding(descriptor, call, key);
+        if (grounding is not null) return grounding;
         if (!descriptor.IsMutating) return AgentRuntimePermissionDecision.Allow(key);
         if (_readOnly) return AgentRuntimePermissionDecision.Deny("permission_required", "Chế độ Chỉ đọc không cho phép thay đổi.", key);
         if (_scope is null) return AgentRuntimePermissionDecision.Allow(key); // exact call still needs approval
@@ -122,12 +384,78 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
     }
 
 
+    // Only ordinary filesystem arguments are resolved here. Artifact-relative paths and source
+    // code are not file grants; their existing domain executors keep their own validation.
+    private AgentRuntimePermissionDecision? CheckFileGrounding(ToolDescriptor descriptor, ToolCall call, string key)
+    {
+        if (_fileTargets is null) return null;
+        var targets = new List<(string Path, bool Directory)>();
+        if (descriptor.Namespace.Name is "files" or "autocad")
+        {
+            if (Arg(call, "path") is { } path) targets.Add((path, call.Name is "list_files" or "find_files"));
+            if (Arg(call, "destination") is { } destination) targets.Add((destination, false));
+        }
+        else if (call.Name == "publish_artifact" && Arg(call, "destination") is { } publishDestination)
+            targets.Add((publishDestination, false));
+        else if (call.Name == "run_python" && Arg(call, "inputs") is { } inputs)
+            targets.AddRange(inputs.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(path => (path.Trim(), false)));
+        try
+        {
+            foreach (var target in targets) _ = _fileTargets.Resolve(target.Path, target.Directory);
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return AgentRuntimePermissionDecision.Deny("target_not_grounded",
+                "Chỉ chọn workspace hoặc đúng tệp được chỉ định. Quyền Full Access không tự chọn đích ngoài phạm vi.", key);
+        }
+    }
+
     private bool MatchesScope(ToolDescriptor descriptor, ToolCall call)
     {
         if (_scope is null) return true;
         if (_scope.HasFullAccessAt(DateTime.UtcNow)) return true;
         if (descriptor.Namespace.Name is "files" or "python" && H2AgentTargetScope.Contains(_context?.TargetPaths,
             Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) return true;
+        // App launch/activation is machine-visible. AskBeforeChanges may admit the exact
+        // app/session because the wrapper still requires a separate resource-specific approval
+        // for every mutating call. AllowScopedChanges never expands a document/session grant into
+        // process launch. ProjectPolicy must still match the exact current project. FullAccess was
+        // handled by the early HasFullAccessAt return above.
+        if (descriptor.Namespace.Name == "app")
+        {
+            var scopeAllowsApp = _scope switch
+            {
+                { Mode: H2AgentPermissionMode.AskBeforeChanges } => true,
+                { Mode: H2AgentPermissionMode.UseProjectPolicy,
+                  ScopeKind: H2AgentResourceScopeKind.Project } when _projectId is { } project
+                    && (_scope.ResourceKey == "h2-project:" + project.ToString("N")
+                        || _scope.ResourceKey == "project:" + project.ToString("N")) => true,
+                _ => false
+            };
+            if (!scopeAllowsApp) return false;
+            return call.Name switch
+            {
+                "launch_app" => !string.IsNullOrWhiteSpace(Arg(call, "application")),
+                "activate_app" => !string.IsNullOrWhiteSpace(Arg(call, "session_id")),
+                _ => true
+            };
+        }
+        if (descriptor.Namespace.Name == "browser")
+        {
+            // Browser interaction can change external state. A document/project grant never
+            // expands into browser authority. AskBeforeChanges permits the exact tab operation
+            // only after its per-call approval; FullAccess was handled above.
+            return _scope.Mode == H2AgentPermissionMode.AskBeforeChanges
+                && !string.IsNullOrWhiteSpace(Arg(call, "tab_id"));
+        }
+        if (descriptor.Namespace.Name is "excel" or "word"
+            && IsTaskLaunchedOfficeSession(descriptor.Namespace.Name, Arg(call, "session_id")))
+        {
+            return _scope.Mode is H2AgentPermissionMode.AskBeforeChanges
+                or H2AgentPermissionMode.UseProjectPolicy;
+        }
         if (_scope.ScopeKind == H2AgentResourceScopeKind.Workspace)
         {
             // This grant selects a filesystem root, never an Office session or desktop window.
@@ -166,13 +494,32 @@ internal sealed partial class H2ProductionToolSession : IAgentRuntimePermissionP
                 && H2AgentTargetScope.Contains([t], Arg(call, "path") ?? Arg(call, "destination") ?? Arg(call, "target"))) == true)
             && (_scope.HasFullAccessAt(DateTime.UtcNow) || call.Name != "replace_project_note");
 
-    private static string ResourceKey(ToolDescriptor descriptor, ToolCall call)
-        => descriptor.Namespace.Name == "h2" ? "h2-project:" + Arg(call, "project_id")
-            : (Arg(call, "session_id") ?? Arg(call, "document_session_id") ?? Arg(call, "destination")
-                ?? Arg(call, "path") ?? descriptor.ResourceScope?.ScopeId ?? descriptor.Name);
+    private string ResourceKey(ToolDescriptor descriptor, ToolCall call)
+    {
+        if (call.Name is "write_command_stdin" or "cancel_command_job")
+            return call.Name + ":" + _taskId.ToString("N") + ":" + (Arg(call, "job_id") ?? "unbound");
+        if (descriptor.Namespace.Name == "h2") return "h2-project:" + Arg(call, "project_id");
+        if (descriptor.Namespace.Name == "desktop") return _selectedWindowIdentity ?? "unbound-window";
+        if (descriptor.Namespace.Name == "app")
+            return call.Name == "activate_app"
+                ? "app-window:" + (Arg(call, "session_id") ?? "unbound")
+                : "app:" + (Arg(call, "application") ?? "inventory").Trim().ToLowerInvariant();
+        if (descriptor.Namespace.Name == "browser")
+            return "browser:tab:" + (Arg(call, "tab_id") ?? "unbound");
+        if ((Arg(call, "session_id") ?? Arg(call, "document_session_id")) is { } session)
+            return descriptor.Namespace.Name + ":session:" + session;
+        var path = Arg(call, "destination") ?? Arg(call, "path");
+        if (path is not null && _fileTargets is not null && H2AgentTargetScope.TryNormalize(path, out var canonical, _fileTargets.Root))
+            return "file:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(OperatingSystem.IsWindows() ? canonical.ToUpperInvariant() : canonical))).ToLowerInvariant();
+        return descriptor.ResourceScope?.ScopeId ?? descriptor.Name;
+    }
 
     internal static string? Arg(ToolCall call, string name)
         => call.Arguments.TryGetProperty(name, out var node) && node.ValueKind == JsonValueKind.String ? node.GetString() : null;
+    private static ToolExecutionOutput Rejected(ToolCall call, ToolDescriptor descriptor, AgentRuntimePermissionDecision decision)
+        => ToolOutcomeBridge.Failure(call, descriptor, decision.Code, ToolErrorPhase.Preflight,
+            ToolMutationEffect.None, Denied(decision));
     private static string Denied(AgentRuntimePermissionDecision decision)
         => JsonSerializer.Serialize(new { ok = false, error = decision.Code, message = decision.Message, scope = decision.ResourceKey });
 

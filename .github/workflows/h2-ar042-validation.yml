@@ -1,0 +1,47 @@
+name: AR-042 steering and concurrency validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar042-validation.yml'
+      - 'experiments/H2AgentLab/Tools/HostResourceMutationCoordinator.cs'
+      - 'experiments/H2AgentLab/Tools/ToolExecutionScheduler.cs'
+      - 'experiments/H2AgentLab/Runtime/AgentRuntime.cs'
+      - 'experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs'
+      - 'experiments/H2AgentLab/Runtime/AgentRuntimePermission.cs'
+      - 'experiments/H2AgentLab/Integration/H2ProductionToolSession.cs'
+      - 'experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs'
+      - 'experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs'
+      - 'experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Chat.cs'
+      - 'tests/H2Notes.Tests/H2AgentSteeringConcurrencyTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'tools/agent-reliability/validate_ar042.ps1'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar042-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  steering-concurrency:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-042 E1-E2 and retained regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar042.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR042-E1-E2-Evidence
+          path: artifacts/ar042/
+          if-no-files-found: error
+          retention-days: 14

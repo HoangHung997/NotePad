@@ -23,6 +23,28 @@ public sealed record DesktopWindowInfo(
     uint Dpi,
     bool Foreground);
 
+public sealed record DesktopApplicationLaunchRequest(
+    string Application,
+    bool PermissionGranted,
+    int WaitMilliseconds = 20000,
+    bool RequireNewWindow = false);
+
+public sealed record DesktopApplicationWaitRequest(
+    string Application,
+    int WaitMilliseconds = 10000);
+
+public sealed record DesktopApplicationActivateRequest(
+    string SessionId,
+    bool PermissionGranted);
+
+public sealed record DesktopApplicationLaunchResult(
+    string RequestedApplication,
+    string ApplicationId,
+    string ProcessName,
+    bool NewWindowObserved,
+    bool ReusedExistingWindow,
+    DesktopWindowInfo Window);
+
 public sealed record DesktopElementInfo(
     string Token,
     string Name,
@@ -98,9 +120,10 @@ public sealed record DesktopPingResult(
 
 public static class DesktopProtocolConstants
 {
-    public const string Version = "1.0";
+    public const string Version = "1.2";
     public const int MaxMessageBytes = 8 * 1024 * 1024;
     public const int MaxScreenshotBytes = 4 * 1024 * 1024;
     public const int MaxElements = 200;
     public const int ElementTokenLifetimeSeconds = 60;
+    public const int MaxApplicationWaitMilliseconds = 30_000;
 }

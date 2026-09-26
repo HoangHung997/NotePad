@@ -1,0 +1,864 @@
+{
+  "task": "AR-010",
+  "spec_version": "H2-AR-SPEC-1.0",
+  "status": "DONE",
+  "evidence_level": "E2",
+  "branch": "feature/h2-agent-reliability-ar-000",
+  "pr": 3,
+  "main_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "tested_code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+  "read_only_workflow_head": "d9c3831e65f2616dabbd9a69643bbfd4e2cf265a",
+  "captured_at_utc": "2026-09-22T07:27:50.094989+00:00",
+  "working_tree_at_test": "CLEAN",
+  "full_ci": {
+    "id": 35698496546,
+    "head_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-09-22T07:13:02Z",
+    "updated_at": "2026-09-22T07:19:37Z",
+    "job_id": 106650670642,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-22T07:13:07Z",
+        "completed_at": "2026-09-22T07:13:09Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-22T07:13:09Z",
+        "completed_at": "2026-09-22T07:13:17Z"
+      },
+      {
+        "name": "Setup .NET 10",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-22T07:13:17Z",
+        "completed_at": "2026-09-22T07:14:02Z"
+      },
+      {
+        "name": "Restore Avalonia solution",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-22T07:14:02Z",
+        "completed_at": "2026-09-22T07:14:39Z"
+      },
+      {
+        "name": "Build Avalonia solution",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-22T07:14:39Z",
+        "completed_at": "2026-09-22T07:14:59Z"
+      },
+      {
+        "name": "Run H2 Notes tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-22T07:14:59Z",
+        "completed_at": "2026-09-22T07:16:58Z"
+      },
+      {
+        "name": "Run H2 NAS acceptance harness self-test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-22T07:16:58Z",
+        "completed_at": "2026-09-22T07:17:03Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab DesktopHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-22T07:17:03Z",
+        "completed_at": "2026-09-22T07:17:04Z"
+      },
+      {
+        "name": "Build H2 Agent Lab DesktopHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-22T07:17:04Z",
+        "completed_at": "2026-09-22T07:17:05Z"
+      },
+      {
+        "name": "Run H2 Agent Lab DesktopHost safety self-tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-22T07:17:05Z",
+        "completed_at": "2026-09-22T07:17:06Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab OfficeHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-22T07:17:06Z",
+        "completed_at": "2026-09-22T07:17:07Z"
+      },
+      {
+        "name": "Build H2 Agent Lab OfficeHost",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-22T07:17:07Z",
+        "completed_at": "2026-09-22T07:17:08Z"
+      },
+      {
+        "name": "Restore H2 Agent Lab",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-22T07:17:08Z",
+        "completed_at": "2026-09-22T07:17:09Z"
+      },
+      {
+        "name": "Build H2 Agent Lab",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-09-22T07:17:09Z",
+        "completed_at": "2026-09-22T07:17:11Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v1 self-test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-09-22T07:17:11Z",
+        "completed_at": "2026-09-22T07:17:12Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 architecture guard",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-09-22T07:17:12Z",
+        "completed_at": "2026-09-22T07:17:14Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 metrics tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-09-22T07:17:14Z",
+        "completed_at": "2026-09-22T07:17:15Z"
+      },
+      {
+        "name": "Run H2 Agent Lab initial A B baseline",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-09-22T07:17:15Z",
+        "completed_at": "2026-09-22T07:17:16Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 session context tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-09-22T07:17:16Z",
+        "completed_at": "2026-09-22T07:17:17Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 artifact store tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-22T07:17:17Z",
+        "completed_at": "2026-09-22T07:17:18Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 compaction tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-09-22T07:17:18Z",
+        "completed_at": "2026-09-22T07:17:20Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 context cache acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-09-22T07:17:20Z",
+        "completed_at": "2026-09-22T07:17:21Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 orchestrator tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-09-22T07:17:21Z",
+        "completed_at": "2026-09-22T07:17:22Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 tool registry tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-09-22T07:17:22Z",
+        "completed_at": "2026-09-22T07:17:23Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 verification gate tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-09-22T07:17:23Z",
+        "completed_at": "2026-09-22T07:17:24Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 closed file acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 26,
+        "started_at": "2026-09-22T07:17:24Z",
+        "completed_at": "2026-09-22T07:17:25Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Phase 10 acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 27,
+        "started_at": "2026-09-22T07:17:25Z",
+        "completed_at": "2026-09-22T07:17:27Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Phase 11 acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28,
+        "started_at": "2026-09-22T07:17:27Z",
+        "completed_at": "2026-09-22T07:17:28Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 extensibility refinement tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29,
+        "started_at": "2026-09-22T07:17:28Z",
+        "completed_at": "2026-09-22T07:17:29Z"
+      },
+      {
+        "name": "Run H2 Agent MB-10 runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30,
+        "started_at": "2026-09-22T07:17:29Z",
+        "completed_at": "2026-09-22T07:17:30Z"
+      },
+      {
+        "name": "Run H2 Agent MB-11 orchestrator runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31,
+        "started_at": "2026-09-22T07:17:30Z",
+        "completed_at": "2026-09-22T07:17:31Z"
+      },
+      {
+        "name": "Run H2 Agent MB-12 provider runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 32,
+        "started_at": "2026-09-22T07:17:31Z",
+        "completed_at": "2026-09-22T07:17:32Z"
+      },
+      {
+        "name": "Run H2 Agent MB-20 bounded context tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 33,
+        "started_at": "2026-09-22T07:17:32Z",
+        "completed_at": "2026-09-22T07:17:34Z"
+      },
+      {
+        "name": "Run H2 Agent MB-21 runtime compaction tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 34,
+        "started_at": "2026-09-22T07:17:34Z",
+        "completed_at": "2026-09-22T07:17:35Z"
+      },
+      {
+        "name": "Run H2 Agent MB-22 prompt cache runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 35,
+        "started_at": "2026-09-22T07:17:35Z",
+        "completed_at": "2026-09-22T07:17:36Z"
+      },
+      {
+        "name": "Run H2 Agent MB-30 initial tool exposure tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 36,
+        "started_at": "2026-09-22T07:17:36Z",
+        "completed_at": "2026-09-22T07:17:37Z"
+      },
+      {
+        "name": "Run H2 Agent MB-31 ToolRegistry execution tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 37,
+        "started_at": "2026-09-22T07:17:37Z",
+        "completed_at": "2026-09-22T07:17:38Z"
+      },
+      {
+        "name": "Run H2 Agent MB-32 deferred tool loading tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 38,
+        "started_at": "2026-09-22T07:17:38Z",
+        "completed_at": "2026-09-22T07:17:39Z"
+      },
+      {
+        "name": "Run H2 Agent MB-33 scheduler runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 39,
+        "started_at": "2026-09-22T07:17:39Z",
+        "completed_at": "2026-09-22T07:17:41Z"
+      },
+      {
+        "name": "Run H2 Agent MB-40 permission runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 40,
+        "started_at": "2026-09-22T07:17:41Z",
+        "completed_at": "2026-09-22T07:17:42Z"
+      },
+      {
+        "name": "Run H2 Agent MB-41 evidence runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 41,
+        "started_at": "2026-09-22T07:17:42Z",
+        "completed_at": "2026-09-22T07:17:43Z"
+      },
+      {
+        "name": "Run H2 Agent MB-42 verification runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 42,
+        "started_at": "2026-09-22T07:17:43Z",
+        "completed_at": "2026-09-22T07:17:44Z"
+      },
+      {
+        "name": "Run H2 Agent MB-43 bounded repair runtime tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 43,
+        "started_at": "2026-09-22T07:17:44Z",
+        "completed_at": "2026-09-22T07:17:45Z"
+      },
+      {
+        "name": "Run H2 Agent MB-44 host completion gate tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 44,
+        "started_at": "2026-09-22T07:17:45Z",
+        "completed_at": "2026-09-22T07:17:46Z"
+      },
+      {
+        "name": "Run H2 Agent MB-50 canonical SkillCatalog tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 45,
+        "started_at": "2026-09-22T07:17:46Z",
+        "completed_at": "2026-09-22T07:17:47Z"
+      },
+      {
+        "name": "Run H2 Agent MB-51 Codex-style skill discovery tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 46,
+        "started_at": "2026-09-22T07:17:47Z",
+        "completed_at": "2026-09-22T07:17:48Z"
+      },
+      {
+        "name": "Run H2 Agent MB-52 progressive skill loading tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 47,
+        "started_at": "2026-09-22T07:17:48Z",
+        "completed_at": "2026-09-22T07:17:49Z"
+      },
+      {
+        "name": "Run H2 Agent MB-60 extension registration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 48,
+        "started_at": "2026-09-22T07:17:49Z",
+        "completed_at": "2026-09-22T07:17:51Z"
+      },
+      {
+        "name": "Run H2 Agent MB-61 generic tool preference tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 49,
+        "started_at": "2026-09-22T07:17:51Z",
+        "completed_at": "2026-09-22T07:17:52Z"
+      },
+      {
+        "name": "Run H2 Agent MB-62 computer provider registration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 50,
+        "started_at": "2026-09-22T07:17:52Z",
+        "completed_at": "2026-09-22T07:17:53Z"
+      },
+      {
+        "name": "Run H2 Agent MB-63 first-party extension card tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 51,
+        "started_at": "2026-09-22T07:17:53Z",
+        "completed_at": "2026-09-22T07:17:54Z"
+      },
+      {
+        "name": "Run H2 Agent MB-70 domain-neutral capability search tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 52,
+        "started_at": "2026-09-22T07:17:54Z",
+        "completed_at": "2026-09-22T07:17:55Z"
+      },
+      {
+        "name": "Run H2 Agent MB-71 installed capability projection tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 53,
+        "started_at": "2026-09-22T07:17:55Z",
+        "completed_at": "2026-09-22T07:17:56Z"
+      },
+      {
+        "name": "Run H2 Agent MB-72 available capability search tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 54,
+        "started_at": "2026-09-22T07:17:56Z",
+        "completed_at": "2026-09-22T07:17:57Z"
+      },
+      {
+        "name": "Run H2 Agent MB-73 thin CapabilityResolver tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 55,
+        "started_at": "2026-09-22T07:17:57Z",
+        "completed_at": "2026-09-22T07:17:58Z"
+      },
+      {
+        "name": "Run H2 Agent MB-74 runtime capability install tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 56,
+        "started_at": "2026-09-22T07:17:58Z",
+        "completed_at": "2026-09-22T07:18:00Z"
+      },
+      {
+        "name": "Run H2 Agent MB-75 task capability pinning tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 57,
+        "started_at": "2026-09-22T07:18:00Z",
+        "completed_at": "2026-09-22T07:18:01Z"
+      },
+      {
+        "name": "Run H2 Agent MB-80 minimal catalog source tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 58,
+        "started_at": "2026-09-22T07:18:01Z",
+        "completed_at": "2026-09-22T07:18:02Z"
+      },
+      {
+        "name": "Run H2 Agent MB-81 package retriever boundary tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 59,
+        "started_at": "2026-09-22T07:18:02Z",
+        "completed_at": "2026-09-22T07:18:03Z"
+      },
+      {
+        "name": "Run H2 Agent MB-82 end-to-end install-and-continue test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 60,
+        "started_at": "2026-09-22T07:18:03Z",
+        "completed_at": "2026-09-22T07:18:04Z"
+      },
+      {
+        "name": "Run H2 Agent MB-90 retire AgentRunner tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 61,
+        "started_at": "2026-09-22T07:18:04Z",
+        "completed_at": "2026-09-22T07:18:05Z"
+      },
+      {
+        "name": "Run H2 Agent MB-91 retire AgentTools giant switch tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 62,
+        "started_at": "2026-09-22T07:18:05Z",
+        "completed_at": "2026-09-22T07:18:06Z"
+      },
+      {
+        "name": "Run H2 Agent MB-92 retire V1 ToolRegistry adapter tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 63,
+        "started_at": "2026-09-22T07:18:06Z",
+        "completed_at": "2026-09-22T07:18:07Z"
+      },
+      {
+        "name": "Run H2 Agent MB-93 retire duplicate SkillCatalog tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 64,
+        "started_at": "2026-09-22T07:18:07Z",
+        "completed_at": "2026-09-22T07:18:08Z"
+      },
+      {
+        "name": "Run H2 Agent MB-94 retire ComputerTools tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 65,
+        "started_at": "2026-09-22T07:18:08Z",
+        "completed_at": "2026-09-22T07:18:10Z"
+      },
+      {
+        "name": "Run H2 Agent MB-95 trace journal boundary tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 66,
+        "started_at": "2026-09-22T07:18:10Z",
+        "completed_at": "2026-09-22T07:18:11Z"
+      },
+      {
+        "name": "Run H2 Agent MB-100 Minimum Bootable Agent acceptance corpus",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 67,
+        "started_at": "2026-09-22T07:18:11Z",
+        "completed_at": "2026-09-22T07:18:12Z"
+      },
+      {
+        "name": "Run H2 Agent MB-101 fully V2 normal UI path acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 68,
+        "started_at": "2026-09-22T07:18:12Z",
+        "completed_at": "2026-09-22T07:18:13Z"
+      },
+      {
+        "name": "Run H2 Agent MB-102 context boundedness gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 69,
+        "started_at": "2026-09-22T07:18:13Z",
+        "completed_at": "2026-09-22T07:18:15Z"
+      },
+      {
+        "name": "Run H2 Agent MB-103 extension bus gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 70,
+        "started_at": "2026-09-22T07:18:15Z",
+        "completed_at": "2026-09-22T07:18:16Z"
+      },
+      {
+        "name": "Run H2 Agent MB-104 permission and scope gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 71,
+        "started_at": "2026-09-22T07:18:16Z",
+        "completed_at": "2026-09-22T07:18:21Z"
+      },
+      {
+        "name": "Run H2 Agent MB-105 core correctness gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 72,
+        "started_at": "2026-09-22T07:18:21Z",
+        "completed_at": "2026-09-22T07:18:23Z"
+      },
+      {
+        "name": "Run H2 Agent MB-110 Office acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 73,
+        "started_at": "2026-09-22T07:18:23Z",
+        "completed_at": "2026-09-22T07:18:25Z"
+      },
+      {
+        "name": "Run H2 Agent MB-111 Web freshness legal acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 74,
+        "started_at": "2026-09-22T07:18:25Z",
+        "completed_at": "2026-09-22T07:18:26Z"
+      },
+      {
+        "name": "Run H2 Agent MB-112 Desktop computer-use acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 75,
+        "started_at": "2026-09-22T07:18:26Z",
+        "completed_at": "2026-09-22T07:18:28Z"
+      },
+      {
+        "name": "Run H2 Agent MB-113 AutoCAD extension acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 76,
+        "started_at": "2026-09-22T07:18:28Z",
+        "completed_at": "2026-09-22T07:18:29Z"
+      },
+      {
+        "name": "Run H2 Agent MB-114 MCP acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 77,
+        "started_at": "2026-09-22T07:18:29Z",
+        "completed_at": "2026-09-22T07:18:30Z"
+      },
+      {
+        "name": "Run H2 Agent MB-115 plugin package lifecycle acceptance gate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 78,
+        "started_at": "2026-09-22T07:18:30Z",
+        "completed_at": "2026-09-22T07:18:31Z"
+      },
+      {
+        "name": "Run H2 Agent MB-120 final architecture report acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 79,
+        "started_at": "2026-09-22T07:18:31Z",
+        "completed_at": "2026-09-22T07:18:32Z"
+      },
+      {
+        "name": "Run H2 Agent MB-121 public integration boundary acceptance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 80,
+        "started_at": "2026-09-22T07:18:32Z",
+        "completed_at": "2026-09-22T07:18:34Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 DesktopHost acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 81,
+        "started_at": "2026-09-22T07:18:34Z",
+        "completed_at": "2026-09-22T07:18:36Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OfficeHost acceptance tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 82,
+        "started_at": "2026-09-22T07:18:36Z",
+        "completed_at": "2026-09-22T07:18:40Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 transport contract tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 83,
+        "started_at": "2026-09-22T07:18:40Z",
+        "completed_at": "2026-09-22T07:18:41Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Ollama transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 84,
+        "started_at": "2026-09-22T07:18:41Z",
+        "completed_at": "2026-09-22T07:18:42Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 Chat Completions transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 85,
+        "started_at": "2026-09-22T07:18:42Z",
+        "completed_at": "2026-09-22T07:18:43Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OpenAI Responses HTTP transport tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 86,
+        "started_at": "2026-09-22T07:18:43Z",
+        "completed_at": "2026-09-22T07:18:45Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 OpenAI Responses WebSocket tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 87,
+        "started_at": "2026-09-22T07:18:45Z",
+        "completed_at": "2026-09-22T07:18:46Z"
+      },
+      {
+        "name": "Run H2 Agent Lab v2 provider transport resilience matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 88,
+        "started_at": "2026-09-22T07:18:46Z",
+        "completed_at": "2026-09-22T07:18:47Z"
+      },
+      {
+        "name": "Publish self-contained Windows x64",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 89,
+        "started_at": "2026-09-22T07:18:47Z",
+        "completed_at": "2026-09-22T07:19:16Z"
+      },
+      {
+        "name": "Verify packaged Agent helpers start and answer IPC",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 90,
+        "started_at": "2026-09-22T07:19:16Z",
+        "completed_at": "2026-09-22T07:19:17Z"
+      },
+      {
+        "name": "Publish H2 NAS acceptance probe Windows x64",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 91,
+        "started_at": "2026-09-22T07:19:17Z",
+        "completed_at": "2026-09-22T07:19:20Z"
+      },
+      {
+        "name": "Upload H2 NAS acceptance probe",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 92,
+        "started_at": "2026-09-22T07:19:20Z",
+        "completed_at": "2026-09-22T07:19:23Z"
+      },
+      {
+        "name": "Upload Avalonia portable build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 93,
+        "started_at": "2026-09-22T07:19:23Z",
+        "completed_at": "2026-09-22T07:19:32Z"
+      },
+      {
+        "name": "Post Setup .NET 10",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 185,
+        "started_at": "2026-09-22T07:19:32Z",
+        "completed_at": "2026-09-22T07:19:32Z"
+      },
+      {
+        "name": "Post Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 186,
+        "started_at": "2026-09-22T07:19:32Z",
+        "completed_at": "2026-09-22T07:19:34Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 187,
+        "started_at": "2026-09-22T07:19:34Z",
+        "completed_at": "2026-09-22T07:19:34Z"
+      }
+    ],
+    "h2_tests": {
+      "passed": 614,
+      "failed": 0
+    },
+    "log_sha256": "30e15a63a20644868c2def0e3fa1b40591136bb2f24052e1689858b2846bc8f6"
+  },
+  "focused_evidence": [
+    {
+      "run_id": 35698479792,
+      "trigger_head": "d9ea0e0d0f276f7a01170c353e79348139664e43",
+      "tested_code_sha": "14767f0fdaf3ead109867c41caf34111adb8c02a",
+      "artifact_id": 10680529565,
+      "artifact_sha256": "34928dd7e2a8466bcbb08e6f83df6ce39869731db9d3c05ec2502fb1b33e0afe",
+      "AR010": "11/11 in each of 3 iterations",
+      "AR001_regression": "13/13",
+      "required_Agent_suites": "74/74",
+      "verification": "Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization."
+    },
+    {
+      "run_id": 35698742558,
+      "trigger_head": "d9c3831e65f2616dabbd9a69643bbfd4e2cf265a",
+      "tested_code_sha": "d9c3831e65f2616dabbd9a69643bbfd4e2cf265a",
+      "artifact_id": 10681393961,
+      "artifact_sha256": "60b785cb60cee3ce34283b0dc66b2e57c3ef368ac3b3e3eaa67a1098e866e883",
+      "AR010": "11/11 in each of 3 iterations",
+      "AR001_regression": "13/13",
+      "required_Agent_suites": "74/74",
+      "verification": "Assistant downloaded archive, checked SHA256 and ZIP CRC, and read identity.json, suite-results.json and per-iteration tests/traces before finalization."
+    }
+  ],
+  "rc01": {
+    "goal": "Read marker.txt and report the observed marker.",
+    "paths": [
+      "Global concrete production adapter",
+      "Project concrete production adapter",
+      "Lab AgentOrchestratedRun"
+    ],
+    "observed": "10 ordered actual hook events per path, 3 actual provider sends each, deferred read_file executes against distinct temporary files, no identity crossing; same concrete hook implementation."
+  },
+  "review_repair": "Throwing/null hook factories now reject before allocating registry/provider/transport resources; two new negative tests pass on the final code.",
+  "package": {
+    "artifact_id": 10680959654,
+    "size_in_bytes": 109950921,
+    "sha256": "1acf562abd12eb53c691d485fd5b83380a2ad52ede2c39ac8910512a33167485",
+    "zip_entries": 482,
+    "verification": "Assistant downloaded exact archive, checked SHA256 and all entry CRCs; app and Office/Desktop helper DLLs nonempty. Packaged helper startup/IPC was executed successfully by full CI."
+  },
+  "commands": [
+    "dotnet restore H2Notes.Avalonia.slnx",
+    "dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
+    "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build",
+    "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-010",
+    "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001",
+    "tools/agent-reliability/run_agent_suites.ps1",
+    "All existing .github/workflows/avalonia-ci.yml required suites/publish/helper commands"
+  ],
+  "limitations": [
+    "E1/E2 concrete runtime and scripted transport only; no new model credential/endpoint or personal document.",
+    "E3 native Office/provider/model and E4 H2 UI+model+real tools remain NOT_RUN / AWAITING_ENVIRONMENT.",
+    "AR-083 remains DEFERRED_BY_USER; NAS package and local harness are not physical E5.",
+    "Checkpoint hooks are in-memory boundaries except a referenced existing Lab CompactionManager durable checkpoint. AR-031/041/050/051 and B04-B10 are not implemented or closed by AR-010.",
+    "MB-124-127, H2M-133 and historical native acceptance debts are not re-awarded."
+  ],
+  "next_task": "AR-011 NOT_STARTED",
+  "next_exact_action": "On feature/h2-agent-reliability-ar-000 and PR #3, reconcile current main, checkpoint, working tree and checks. Start only AR-011: read SPEC section 6 and task acceptance; extend existing ToolDescriptor/registry and production wrappers with status/effect/verification/completeness and bounded error/readiness metadata, preserve existing domain payloads and permission gates, and add concrete executor-to-runtime-to-UI tests. Retain AR-010 and AR-001 corpora. Do not create a second engine/store, change NAS protocol, or call E3/E4/E5 complete.",
+  "documentation_attempts": [
+    {
+      "run": 35699526800,
+      "result": "FAILED_BEFORE_WRITES",
+      "cause": "gh refused raw job logs containing ANSI controls; no runtime/test change or acceptance downgrade.",
+      "repair": "Capture bytes through Python PIPE with documented flag; never print raw controls."
+    }
+  ]
+}

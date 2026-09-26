@@ -1,0 +1,390 @@
+{
+  "schema_version": 1,
+  "task": "AR-050",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "E2_PASS",
+  "done": true,
+  "code_sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
+  "initial_source_sha": "1eee17a73aae0ff857b6ab831a65be68b32cf738",
+  "settings_fix_sha": "023b08989e9f1d59ade6b62112c9355fe2bcb0ca",
+  "focused": {
+    "run_id": 35821961122,
+    "job_id": 107055530604,
+    "artifact": {
+      "id": 10733529300,
+      "name": "AR050-Serialized-Budget-Evidence",
+      "size": 3147114,
+      "sha256": "d0becccfd43e71e1691d41fae346417eebe3ddd49737d9f0d2795da238207da1",
+      "entries": 712
+    },
+    "identity": {
+      "code_sha": "04a733417bc5e4d4502ea9fe58cddf60780cc3a4",
+      "E5": "AR-083 DEFERRED_BY_USER",
+      "network": "No model calls; deterministic handlers",
+      "E1": "Budget settings and policy",
+      "E2": "Actual serialized HTTP/socket frames intercepted by fixture; real production write/archive and headless settings save",
+      "working_tree": "CLEAN",
+      "E3": "NOT_RUN",
+      "E4": "NOT_RUN"
+    },
+    "corpora": {
+      "results": [
+        {
+          "result": "RESULT: 50 passed, 0 failed",
+          "name": "AR-050-1",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 50 passed, 0 failed",
+          "name": "AR-050-2",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 50 passed, 0 failed",
+          "name": "AR-050-3",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 57 passed, 0 failed",
+          "name": "AR-040",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 42 passed, 0 failed",
+          "name": "AR-033",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 19 passed, 0 failed",
+          "name": "AR-032",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 39 passed, 0 failed",
+          "name": "AR-031",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 39 passed, 0 failed",
+          "name": "AR-030",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 36 passed, 0 failed",
+          "name": "AR-020",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 44 passed, 0 failed",
+          "name": "AR-012",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 25 passed, 0 failed",
+          "name": "AR-011",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 11 passed, 0 failed",
+          "name": "AR-010",
+          "exit_code": 0
+        },
+        {
+          "result": "RESULT: 13 passed, 0 failed",
+          "name": "AR-001",
+          "exit_code": 0
+        }
+      ],
+      "failed": []
+    },
+    "agent_suites": 74,
+    "settings_control": {
+      "prior_class_commit": "33fc0a09346dd8816860d48e9ec01369c60d6dc9",
+      "result": "EXPECTED_0_PASS_1_FAILURE",
+      "primary_error": "Settings draft dropped the configured budget.",
+      "restored_checkout_bytes_sha256": "6db44296bbd3e41b7766a4b8784398c731cd52665f91a2ac8c5c30fdb57f4ccb",
+      "restored_clean": true
+    }
+  },
+  "full": {
+    "run_id": 35821963881,
+    "job_id": 107055538746,
+    "actual_checkout_sha": "e40011dd4f02d8a900f658368678934c4a5d52e3",
+    "source_matches_focused": true,
+    "h2_passed": 965,
+    "h2_failed": 0,
+    "all_steps_successful": true,
+    "compiler_warnings": 38,
+    "raw_log_sha256": "445868b628572868ab71a1202e74ade3df05d96319a99715a5a8fa7f84c170af",
+    "portable": {
+      "id": 10733948475,
+      "name": "H2Notes-Avalonia-Portable-win-x64",
+      "size": 110159882,
+      "sha256": "2dc2266623645734db70ac7c587ff9e074a568be27c078189e2f2b64dfe9f998",
+      "entries": 482
+    }
+  },
+  "source": {
+    "files": 778,
+    "bytes": 8738367,
+    "receipts_verified": true
+  },
+  "serialized_corpora": [
+    {
+      "rep": 1,
+      "mode": "ollama",
+      "serialized_sends": 205,
+      "first_bytes": 8619,
+      "last_bytes": 101241,
+      "last_estimated_input": 101241,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 1,
+      "mode": "chat",
+      "serialized_sends": 205,
+      "first_bytes": 8588,
+      "last_bytes": 94982,
+      "last_estimated_input": 94982,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 1,
+      "mode": "responses",
+      "serialized_sends": 205,
+      "first_bytes": 8271,
+      "last_bytes": 85967,
+      "last_estimated_input": 85967,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 1,
+      "mode": "stored",
+      "serialized_sends": 205,
+      "first_bytes": 8228,
+      "last_bytes": 11535,
+      "last_estimated_input": 2040648,
+      "last_retained_estimate": 2029113,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 1,
+      "mode": "ws",
+      "serialized_sends": 205,
+      "first_bytes": 8240,
+      "last_bytes": 11547,
+      "last_estimated_input": 2043108,
+      "last_retained_estimate": 2031561,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 2,
+      "mode": "ollama",
+      "serialized_sends": 205,
+      "first_bytes": 8619,
+      "last_bytes": 101241,
+      "last_estimated_input": 101241,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 2,
+      "mode": "chat",
+      "serialized_sends": 205,
+      "first_bytes": 8588,
+      "last_bytes": 94982,
+      "last_estimated_input": 94982,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 2,
+      "mode": "responses",
+      "serialized_sends": 205,
+      "first_bytes": 8271,
+      "last_bytes": 85967,
+      "last_estimated_input": 85967,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 2,
+      "mode": "stored",
+      "serialized_sends": 205,
+      "first_bytes": 8228,
+      "last_bytes": 11535,
+      "last_estimated_input": 2040648,
+      "last_retained_estimate": 2029113,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 2,
+      "mode": "ws",
+      "serialized_sends": 205,
+      "first_bytes": 8240,
+      "last_bytes": 11547,
+      "last_estimated_input": 2043108,
+      "last_retained_estimate": 2031561,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 3,
+      "mode": "ollama",
+      "serialized_sends": 205,
+      "first_bytes": 8619,
+      "last_bytes": 101241,
+      "last_estimated_input": 101241,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 3,
+      "mode": "chat",
+      "serialized_sends": 205,
+      "first_bytes": 8588,
+      "last_bytes": 94982,
+      "last_estimated_input": 94982,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 3,
+      "mode": "responses",
+      "serialized_sends": 205,
+      "first_bytes": 8271,
+      "last_bytes": 85967,
+      "last_estimated_input": 85967,
+      "last_retained_estimate": 0,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 3,
+      "mode": "stored",
+      "serialized_sends": 205,
+      "first_bytes": 8228,
+      "last_bytes": 11535,
+      "last_estimated_input": 2040648,
+      "last_retained_estimate": 2029113,
+      "next_oversize_send_blocked": true
+    },
+    {
+      "rep": 3,
+      "mode": "ws",
+      "serialized_sends": 205,
+      "first_bytes": 8240,
+      "last_bytes": 11547,
+      "last_estimated_input": 2043108,
+      "last_retained_estimate": 2031561,
+      "next_oversize_send_blocked": true
+    }
+  ],
+  "post_effect_production": [
+    {
+      "rep": 1,
+      "scope": "global",
+      "task_id": "adad1e6d-41d6-471e-a171-e415e1245764",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    },
+    {
+      "rep": 1,
+      "scope": "project",
+      "task_id": "29289565-3341-401f-959d-1a376fdd2d6c",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    },
+    {
+      "rep": 2,
+      "scope": "global",
+      "task_id": "489575c5-3292-4587-b792-adcb77a772fa",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    },
+    {
+      "rep": 2,
+      "scope": "project",
+      "task_id": "b5af3c74-fa9d-46d5-888e-3e8687aac788",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    },
+    {
+      "rep": 3,
+      "scope": "global",
+      "task_id": "5d149498-5c13-453c-9d35-4a86ac2ce5bd",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    },
+    {
+      "rep": 3,
+      "scope": "project",
+      "task_id": "28256e2d-d7f6-45c6-9dac-b1e76ecd912c",
+      "sends": 2,
+      "mutation_count": 1,
+      "evidence_count": 3,
+      "status": "Blocked"
+    }
+  ],
+  "evidence_levels": {
+    "E1": "Settings, accounting policy, source identity and pre-send gate",
+    "E2": "Concrete serializers intercepted by deterministic handlers/sockets; actual Global/Project file write, journal reload and headless settings save",
+    "E3": "NOT_RUN",
+    "E4": "NOT_RUN",
+    "E5": "AR-083 DEFERRED_BY_USER"
+  },
+  "limits": [
+    "Exact bytes/hash refer to the serialized request body, not provider tokens or HTTP headers.",
+    "Input tokens are conservative estimates: serialized UTF-8 bytes plus explicit media and retained context charges. They can block earlier than a tokenizer.",
+    "Context and media settings are user/deployment configuration with source labels, not validated model capabilities. Unknown provider context uses labelled local policy; native image/PDF expansion is not certified by wire tests.",
+    "205 sends per mode are intercepted fixture requests, not live model calls or semantic compaction acceptance.",
+    "AR-051 semantic compaction and AR-052 model switch/rebase remain separate; this change safely blocks rather than silently trimming source.",
+    "Standalone legacy AiClient is not the shared Agent execution path and is unchanged. No real endpoints, credentials or personal documents were used."
+  ],
+  "historical_failures": [
+    {
+      "run_id": 35819745122,
+      "sha": "97b7d6d16e20bb083dd4f5445c00aa4219de81c5",
+      "status": "FAILURE",
+      "stage": "source delivery",
+      "reason": "Malformed compressed carrier; zlib invalid block type; no application source committed by that attempt."
+    },
+    {
+      "run_id": 35821300963,
+      "sha": "b19c86556589c811fa4dfab7dd665d1f9cd4da2c",
+      "status": "FAILURE",
+      "stage": "settings control harness",
+      "reason": "Ambiguous TextBox selector failed before budget assertion; positive corpus/suites skipped.",
+      "artifact_id": 10733896669,
+      "artifact_sha256": "04bac089bcdd2cff02f4343571580e57854060d51751653d4d7e2d871027ff81"
+    },
+    {
+      "run_id": 35821305458,
+      "sha": "b19c86556589c811fa4dfab7dd665d1f9cd4da2c",
+      "status": "FAILURE",
+      "h2_passed": 964,
+      "h2_failed": 1,
+      "reason": "Same UI selector failure; post-effect cases passed; later mandatory stages and publish skipped."
+    }
+  ],
+  "earlier_positive": {
+    "run_id": 35820429024,
+    "sha": "33fc0a09346dd8816860d48e9ec01369c60d6dc9",
+    "ar050": "47/47 x3",
+    "agent_suites": "74/74",
+    "artifact_id": 10733082642,
+    "artifact_sha256": "da76de58935d756afa3ee907d553ad25d36763689350386f6f0d5dea7185de6f"
+  },
+  "saved_at_utc": "2026-09-23T05:31:59.538755+00:00"
+}

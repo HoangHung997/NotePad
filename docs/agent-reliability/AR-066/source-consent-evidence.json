@@ -1,0 +1,863 @@
+{
+  "task": "AR-066",
+  "scope": "Exact-bound live input plus separately approved disk reference/output/replacement/reselection; not a general multi-live resolver",
+  "implementation": "SOURCE_CONSENT_CORE_IMPLEMENTED",
+  "acceptance": "E1/E2_PASS; NATIVE_E3_AND_REAL_H2_E4_AWAITING_ENVIRONMENT; NOT_DONE",
+  "code_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+  "runtime_sha": "4c6a96ee39116c431dcd7d69a620c6c4f5bb94e2",
+  "branch": "feature/h2-agent-reliability-ar-000",
+  "pr": 3,
+  "focused_run": 35908748336,
+  "focused_job": 107342940138,
+  "full_run": 35908755287,
+  "full_job": 107342963072,
+  "attempt": 1,
+  "full_checkout_sha": "fe95c7d011c0901aa0d8e95ef4efab3b6e1a8cac",
+  "full_tree_equals_focused": true,
+  "full_log_sha256": "f62eb2b09503b17338f0ce4c58d2ee1ede367aaaf10656efc79bbcd818c3f493",
+  "artifact": {
+    "id": 10773205051,
+    "bytes": 3750221,
+    "sha256": "ffe288ad7ce7ddd3a4c93bfc8bf42e3c1fbbe1b5cae89d84e1b71a8754b2c305",
+    "crc_verified": true
+  },
+  "source": {
+    "files": 825,
+    "bytes": 9597936,
+    "all_git_blobs_verified": true
+  },
+  "focused_each": {
+    "passed": 134,
+    "failed": 0,
+    "repetitions": 3
+  },
+  "new_source_consent_cases": 58,
+  "full_h2": {
+    "passed": 1266,
+    "failed": 0
+  },
+  "retained": {
+    "AR-012": 44,
+    "AR-020": 36,
+    "AR-065": 55
+  },
+  "independent_agent_suites": 74,
+  "build_warnings": 38,
+  "build_errors": 0,
+  "consent_receipts": 232,
+  "all_AR066_receipts": 432,
+  "injected": "scripted model/native client/capture; actual host approval API/file IO/archive",
+  "old_source_control": "NOT_RUN_TOOL_SAFETY_BLOCKED: old-source control upload was refused; no replay attempted",
+  "historical_failure": {
+    "sha": "6ac81cb8cd18b6d8124bdd97fc3b9bc541e7b78a",
+    "focused_run": 35903219588,
+    "full_run": 35903224947,
+    "focused_each": {
+      "passed": 132,
+      "failed": 2,
+      "repetitions": 3
+    },
+    "full": {
+      "passed": 1264,
+      "failed": 2
+    },
+    "artifact_id": 10770393061,
+    "artifact_sha256": "982ae4ce14870e21691050f9ef89e9f30b4d7938cff231fac9185161373c6241",
+    "cause": "Two new fixtures demanded unchanged error text after unknown effect; existing archive projects ReconcileRequired. Test-only repair retains and strengthens exact receipt/no-replay checks. Historical run remains FAILURE."
+  },
+  "peer_failure_history": {
+    "sha": "2f2dda5f6207f948ed56e30ca5cd2c50cb811948",
+    "focused_run": 35904844689,
+    "focused_result": "134/134 x3; full1266; Agent74 PASS",
+    "full_run": 35904851797,
+    "full_result": "SUCCESS",
+    "focused_artifact": {
+      "id": 10771238823,
+      "bytes": 3744736,
+      "sha256": "850edd77e59935d3474484a1ec9b043ac9d54fb8df116b0b047ff71c0a30deaa"
+    },
+    "failed_peer_runs": [
+      {
+        "id": 35904844588,
+        "artifact_id": 10770523381,
+        "artifact_sha256": "2dd9f9ce3e7a4add426adf76cd9bfad0ed89a1c0767e27f49ee908ce882f5d00",
+        "reason": "Historical AR033 control pinned an obsolete current-assessment hash and stopped before source substitution. All current AR03342 x3 and Agent74 passed. Original executed control artifact10725382259 was independently CRC/hash checked and preserved read-only; identical six contradiction regression sources still run in every current42 corpus. No new negative-control execution claimed."
+      },
+      {
+        "id": 35904844594,
+        "artifact_id": 10770753527,
+        "artifact_sha256": "895c42e286a39ec0faa460252abe23735e2e3e4c44ab8c444a066855fd553318",
+        "reason": "Resilience cancellation assumed a dispatch before a prearmed40ms timer; actual count was not logged. Replaced timing assumption with a bounded observed-dispatch handshake and four separate precancel-zero-send tests; exact one-send/no-fallback assertions retained. Runtime transport unchanged."
+      }
+    ],
+    "failed_checkpoint": {
+      "id": 35906863619,
+      "sha": "9e1dddd1cf9f957b6a29e90a974bbd112a0e984c",
+      "result": "FAILURE_BEFORE_DOCUMENT_WRITE_OR_COMMIT_OR_PUSH",
+      "reason": "Refused to checkpoint while exact-SHA peer workflows were red."
+    },
+    "repair_commit": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+    "classification": "AR066 regression maintenance only; all historical failures remain failures"
+  },
+  "repaired_peer_evidence": [
+    {
+      "run": 35908748180,
+      "path": ".github/workflows/h2-ar033-consistency.yml",
+      "attempt": 1,
+      "artifact_id": 10772810132,
+      "name": "AR033-Consistency-Evidence",
+      "bytes": 3178648,
+      "sha256": "cf53d5a1ddf2978047519d497ad811bcb0a9f7595b38864a37b7616b5bda9128",
+      "retained_historical_control": {
+        "classification": "HISTORICAL_EXECUTED_CONTROL_READ_ONLY; NOT_A_NEW_NEGATIVE_CONTROL_RUN",
+        "historical_run": 35799370449,
+        "historical_code_sha": "f5ede2d0e24896be3bd329ea8cce34e20d7f5ee1",
+        "historical_artifact": {
+          "id": 10725382259,
+          "bytes": 2896326,
+          "sha256": "2f9f36c51b61eb383bbd3100d239152f6131712edc67212a85c66896996a6574"
+        },
+        "historical_expected_failures": [
+          "AR-033 concrete completion remains blocked for FailedSummary",
+          "AR-033 concrete completion remains blocked for PendingSummary",
+          "AR-033 verdict consistency rejects Failed with successful detail mutation=False",
+          "AR-033 verdict consistency rejects Failed with successful detail mutation=True",
+          "AR-033 verdict consistency rejects NotVerified with successful detail mutation=False",
+          "AR-033 verdict consistency rejects NotVerified with successful detail mutation=True"
+        ],
+        "historical_prior_log_sha256": "2013ea49991e9793d6c0241af540e75ef2c8b126a24205c97a7520b88b9e10b2",
+        "current_sha": "17af5676bcfb397441a4a8aae264c6088a5701e1",
+        "unchanged_test_blob": "f50eb5424d9da3116bc09e702fef8333eb19eea6",
+        "source_substitution_performed": false,
+        "new_negative_control_executed": false,
+        "evidence_refusal_checks": 8,
+        "current_repeated_regression": [
+          {
+            "log": "AR-033-1.log",
+            "sha256": "981d445a84b0da25e4d09d0a5e65d77e670eacc1789b6f1fc84707382f9d903b",
+            "passed": 42,
+            "failed": 0
+          },
+          {
+            "log": "AR-033-2.log",
+            "sha256": "f2d2d7d6b7693f562b33c936daee40c5efe481be14b7e4f2548256972900f03c",
+            "passed": 42,
+            "failed": 0
+          },
+          {
+            "log": "AR-033-3.log",
+            "sha256": "bcdcf38f8a384ea3f4e8c6fc9f864a210465163acac0dccb175e50ced6dfb37d",
+            "passed": 42,
+            "failed": 0
+          }
+        ],
+        "current_status": "CURRENT42_PASS_X3"
+      }
+    },
+    {
+      "run": 35908748229,
+      "path": ".github/workflows/h2-ar040-validation.yml",
+      "attempt": 1,
+      "artifact_id": 10772647395,
+      "name": "AR040-Process-Regression-Evidence",
+      "bytes": 3498584,
+      "sha256": "8cf912255635a7233e357073dc93aa23066d8ec05b21abf2b0d3b7fe9dafee7f"
+    }
+  ],
+  "resilience_cases": [
+    "Capability matrix makes continuation behavior explicit",
+    "Chat Completions cancellation is terminal and sends only one request",
+    "Chat Completions malformed provider JSON is rejected before completion",
+    "Chat Completions pre-cancelled request has zero sends",
+    "Chat Completions premature disconnect is not reported complete or retried",
+    "Ollama cancellation is terminal and sends only one request",
+    "Ollama malformed provider JSON is rejected before completion",
+    "Ollama pre-cancelled request has zero sends",
+    "Ollama premature disconnect is not reported complete or retried",
+    "Responses HTTP cancellation is terminal and sends only one request",
+    "Responses HTTP malformed provider JSON is rejected before completion",
+    "Responses HTTP pre-cancelled request has zero sends",
+    "Responses HTTP premature disconnect is not reported complete or retried",
+    "Responses WebSocket cancellation stops one written request without fallback replay",
+    "Responses WebSocket malformed message is rejected without fallback replay",
+    "Responses WebSocket pre-cancelled request has zero writes and no fallback",
+    "Responses WebSocket premature end is ambiguous and never auto-replayed"
+  ],
+  "full_artifacts": [
+    {
+      "id": 10772688004,
+      "name": "H2Notes-NasAcceptance-win-x64",
+      "bytes": 39410369,
+      "digest": "sha256:f1b265df9155fc0cd65c64f7794e274c601350b37175df6971e8688e8f169da8",
+      "binary_download_verified": false
+    },
+    {
+      "id": 10772478588,
+      "name": "H2Notes-Avalonia-Portable-win-x64",
+      "bytes": 110223283,
+      "digest": "sha256:c9ee9d0d44926688da23fb27aefbfb2e058079218bfbcd17b02693bf0258986e",
+      "binary_download_verified": false
+    }
+  ],
+  "all_peer_CI_success": true,
+  "ci_inventory": [
+    {
+      "id": 35908755414,
+      "name": "AR-000 baseline capture (not product acceptance)",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755234,
+      "name": "AR-032 scoped history validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755196,
+      "name": "AR-012 scoped binding validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755107,
+      "name": "AR-020 native discovery implementation validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755229,
+      "name": "AR-011 outcome contract validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755121,
+      "name": "AR-031 journal and cancellation regression",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755851,
+      "name": "AR-030 outcome and revision validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755641,
+      "name": "AR-010 shared runtime validation",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755198,
+      "name": "AR-001 isolated implementation workspace",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908755287,
+      "name": "Avalonia CI",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748180,
+      "name": "AR-033 verdict consistency validation",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748321,
+      "name": "AR-050 actual serialized request budget validation",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748571,
+      "name": "AR-030 outcome and revision validation",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748229,
+      "name": "AR-040 process and owned-job regression",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748189,
+      "name": "AR-051 source-backed work compaction validation",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748337,
+      "name": "AR-064 plugin provider lifecycle validation",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748379,
+      "name": "AR-065 exact-source validation (17af5676bcfb397441a4a8aae264c6088a5701e1)",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    },
+    {
+      "id": 35908748336,
+      "name": "AR-066 exact source-consent validation (17af5676bcfb397441a4a8aae264c6088a5701e1)",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1
+    }
+  ],
+  "case_inventory": [
+    "AR-066 CONTROL production read Global",
+    "AR-066 CONTROL production read Project",
+    "AR-066 CONTROL production write Global",
+    "AR-066 CONTROL production write Project",
+    "AR-066 CONTROL same native object reacquired after modal_blocked",
+    "AR-066 CONTROL same native object reacquired after native_object_unavailable",
+    "AR-066 CONTROL same native object reacquired after provider_busy",
+    "AR-066 completion source discovery-only project=False",
+    "AR-066 completion source discovery-only project=True",
+    "AR-066 completion source excel-read project=False",
+    "AR-066 completion source excel-read project=True",
+    "AR-066 completion source incomplete-after-read project=False",
+    "AR-066 completion source incomplete-after-read project=True",
+    "AR-066 completion source no-tools project=False",
+    "AR-066 completion source no-tools project=True",
+    "AR-066 completion source word-read project=False",
+    "AR-066 completion source word-read project=True",
+    "AR-066 completion source wrong-kind project=False",
+    "AR-066 completion source wrong-kind project=True",
+    "AR-066 completion source wrong-session project=False",
+    "AR-066 completion source wrong-session project=True",
+    "AR-066 disk Office source check_word live=False project=False",
+    "AR-066 disk Office source check_word live=False project=True",
+    "AR-066 disk Office source check_word live=True project=False",
+    "AR-066 disk Office source check_word live=True project=True",
+    "AR-066 disk Office source word_paragraphs live=False project=False",
+    "AR-066 disk Office source word_paragraphs live=False project=True",
+    "AR-066 disk Office source word_paragraphs live=True project=False",
+    "AR-066 disk Office source word_paragraphs live=True project=True",
+    "AR-066 exact captured live path is protected even without Office extension",
+    "AR-066 host selected live intent cannot be downgraded by goal wording",
+    "AR-066 incomplete enumeration retains comparison identity without returning cached live view",
+    "AR-066 live source requirement Inspect current drawing",
+    "AR-066 live source requirement Read current tab",
+    "AR-066 live source requirement Read the currently open Word document",
+    "AR-066 live source requirement Sua file Word dang mo",
+    "AR-066 live source requirement Sửa bản vẽ đang chọn",
+    "AR-066 live source requirement Sửa file Word đang mở",
+    "AR-066 live source requirement Đọc Excel đang active",
+    "AR-066 live source requirement Đọc trang web đang mở",
+    "AR-066 live source requirement Đọc ô đang chọn",
+    "AR-066 observed stale native identity is retired rather than treated as transient",
+    "AR-066 ordinary disk or creation request remains available Hello",
+    "AR-066 ordinary disk or creation request remains available Read the saved disk file A.docx",
+    "AR-066 ordinary disk or creation request remains available Tạo file Excel mới trong workspace",
+    "AR-066 ordinary disk or creation request remains available Đọc bản đã lưu trên đĩa",
+    "AR-066 production browser-notice Global",
+    "AR-066 production browser-notice Project",
+    "AR-066 production cad-notice Global",
+    "AR-066 production cad-notice Project",
+    "AR-066 production command Global",
+    "AR-066 production command Project",
+    "AR-066 production disk-only Global",
+    "AR-066 production disk-only Project",
+    "AR-066 production python Global",
+    "AR-066 production python Project",
+    "AR-066 production reference Global",
+    "AR-066 production reference Project",
+    "AR-066 semantic rejection preserves typed preflight no-effect code",
+    "AR-066 source consent approve-read project=False",
+    "AR-066 source consent approve-read project=True",
+    "AR-066 source consent approved-no-read project=False",
+    "AR-066 source consent approved-no-read project=True",
+    "AR-066 source consent cancel project=False",
+    "AR-066 source consent cancel project=True",
+    "AR-066 source consent capture-stale project=False",
+    "AR-066 source consent capture-stale project=True",
+    "AR-066 source consent deny project=False",
+    "AR-066 source consent deny project=True",
+    "AR-066 source consent duplicate project=False",
+    "AR-066 source consent duplicate project=True",
+    "AR-066 source consent expired-pending project=False",
+    "AR-066 source consent expired-pending project=True",
+    "AR-066 source consent file-changed project=False",
+    "AR-066 source consent file-changed project=True",
+    "AR-066 source consent metadata-only project=False",
+    "AR-066 source consent metadata-only project=True",
+    "AR-066 source consent output-create project=False",
+    "AR-066 source consent output-create project=True",
+    "AR-066 source consent output-existing project=False",
+    "AR-066 source consent output-existing project=True",
+    "AR-066 source consent output-no-live project=False",
+    "AR-066 source consent output-no-live project=True",
+    "AR-066 source consent output-overwrite project=False",
+    "AR-066 source consent output-overwrite project=True",
+    "AR-066 source consent partial-read project=False",
+    "AR-066 source consent partial-read project=True",
+    "AR-066 source consent post-read-change project=False",
+    "AR-066 source consent post-read-change project=True",
+    "AR-066 source consent readonly-write project=False",
+    "AR-066 source consent readonly-write project=True",
+    "AR-066 source consent reference-read-only project=False",
+    "AR-066 source consent reference-read-only project=True",
+    "AR-066 source consent reference-with-live project=False",
+    "AR-066 source consent reference-with-live project=True",
+    "AR-066 source consent reference-write project=False",
+    "AR-066 source consent reference-write project=True",
+    "AR-066 source consent return-live project=False",
+    "AR-066 source consent return-live project=True",
+    "AR-066 source consent return-live-no-read project=False",
+    "AR-066 source consent return-live-no-read project=True",
+    "AR-066 source consent revision-after-read project=False",
+    "AR-066 source consent revision-after-read project=True",
+    "AR-066 source consent revision-pending project=False",
+    "AR-066 source consent revision-pending project=True",
+    "AR-066 source consent secret project=False",
+    "AR-066 source consent secret project=True",
+    "AR-066 source consent two-references project=False",
+    "AR-066 source consent two-references project=True",
+    "AR-066 source consent ungrounded project=False",
+    "AR-066 source consent ungrounded project=True",
+    "AR-066 source consent unknown-binding project=False",
+    "AR-066 source consent unknown-binding project=True",
+    "AR-066 source consent unknown-effect project=False",
+    "AR-066 source consent unknown-effect project=True",
+    "AR-066 source consent wrong-source project=False",
+    "AR-066 source consent wrong-source project=True",
+    "AR-066 transient loss never binds a replacement confirmed-close",
+    "AR-066 transient loss never binds a replacement document",
+    "AR-066 transient loss never binds a replacement path",
+    "AR-066 transient loss never binds a replacement process",
+    "AR-066 transient loss never binds a replacement view",
+    "AR-066 trusted source revision ordinary-supplement project=False",
+    "AR-066 trusted source revision ordinary-supplement project=True",
+    "AR-066 trusted source revision retain-live project=False",
+    "AR-066 trusted source revision retain-live project=True",
+    "AR-066 trusted source revision tool-data project=False",
+    "AR-066 trusted source revision tool-data project=True",
+    "AR-066 trusted source revision upgrade-batch project=False",
+    "AR-066 trusted source revision upgrade-batch project=True",
+    "AR-066 trusted source revision upgrade-final project=False",
+    "AR-066 trusted source revision upgrade-final project=True",
+    "AR-066 trusted source revision upgrade-read project=False",
+    "AR-066 trusted source revision upgrade-read project=True"
+  ],
+  "agent_suite_logs": [
+    {
+      "flag": "--self-test",
+      "exit": 0,
+      "log_sha256": "b83e4c5267dab71aa2445c09f31a9a9acdec1b8706ad77a13c1a24fa9caeb72e"
+    },
+    {
+      "flag": "--v2-guard-test",
+      "exit": 0,
+      "log_sha256": "6860b75fe6f9d8ad5860583d0bff307d91214d3358e4e219c91ad634f579be15"
+    },
+    {
+      "flag": "--v2-metrics-test",
+      "exit": 0,
+      "log_sha256": "407190ea574a9bbcbc1dcf64f3335d7e88f037af5b9f34cf34aac3239b442580"
+    },
+    {
+      "flag": "--v2-baseline-test",
+      "exit": 0,
+      "log_sha256": "82d6aea3e49c17095f83bed09744179089f6d209d76c7a59dffe1207b9baaca6"
+    },
+    {
+      "flag": "--v2-session-context-test",
+      "exit": 0,
+      "log_sha256": "3f40e1c68566dc471170f34b032aeacfe4e701bb8baaef6745f5f7bf9568f3de"
+    },
+    {
+      "flag": "--v2-artifact-store-test",
+      "exit": 0,
+      "log_sha256": "9ef3349ebefba8985099649897b7d0213c5fac2b0ebea524158c78e2bb131478"
+    },
+    {
+      "flag": "--v2-compaction-test",
+      "exit": 0,
+      "log_sha256": "4b26acee0dba9fbcfaa9c40ffc44a0a479f0dce54327d60762243517ff17a18f"
+    },
+    {
+      "flag": "--v2-context-cache-test",
+      "exit": 0,
+      "log_sha256": "bb0376046ec036576aee702c1018606d759f6cb3961aa5e32eb87d5486919b46"
+    },
+    {
+      "flag": "--v2-orchestrator-test",
+      "exit": 0,
+      "log_sha256": "f8e1533812553b4aeb43c43a5b3fa3db68bdf3fc404d074f8f13355390f746b6"
+    },
+    {
+      "flag": "--v2-tool-registry-test",
+      "exit": 0,
+      "log_sha256": "7e27fcf617158296ca4b207925a9aaf0eee6a321a8c1ddd10aa7ae3b54108c9e"
+    },
+    {
+      "flag": "--v2-verification-test",
+      "exit": 0,
+      "log_sha256": "5fa77073efee4aff1db280cbc6dac278eb804dccf6d5f866750206b337e6a7d3"
+    },
+    {
+      "flag": "--v2-closed-file-test",
+      "exit": 0,
+      "log_sha256": "6af679671ffcab31624e94861f718133edefd9d9086047a832e04df68acdd6b5"
+    },
+    {
+      "flag": "--v2-phase10-test",
+      "exit": 0,
+      "log_sha256": "9e55d3ced58258421f6fb667aab87097924a26b00e10edfef2d0e2425c360b74"
+    },
+    {
+      "flag": "--v2-phase11-test",
+      "exit": 0,
+      "log_sha256": "2de4ec0049ba42164bd07df2c6e88d90f5080c522eb8ae326574a21d4c54f984"
+    },
+    {
+      "flag": "--v2-extensibility-refinement-test",
+      "exit": 0,
+      "log_sha256": "8ee585880aaa5f5104ce17c9864958e50b2f4bedfb1b29c90f78f7f9c485737e"
+    },
+    {
+      "flag": "--mb-runtime-test",
+      "exit": 0,
+      "log_sha256": "2e9ef34b8b87ed77d23711c712fcc2e69263693add527020d85945ee622695a0"
+    },
+    {
+      "flag": "--mb-orchestrator-runtime-test",
+      "exit": 0,
+      "log_sha256": "01956e5ad20de84b0deac0ac6defa56ba464bb12647e453fe54b6c5fd6de77dd"
+    },
+    {
+      "flag": "--mb-provider-runtime-test",
+      "exit": 0,
+      "log_sha256": "c5f629486aceca3f6ea3312bf998e539fc91576fd972f25728c031368ca6a19f"
+    },
+    {
+      "flag": "--mb-context-runtime-test",
+      "exit": 0,
+      "log_sha256": "ad41a56a8447fe0d0d59ca640cd96bd072a4f4d622a102fe8a549ecf0583d018"
+    },
+    {
+      "flag": "--mb-compaction-runtime-test",
+      "exit": 0,
+      "log_sha256": "e0fdf827bb667ea5b65000ee797c34d3f218ec1eb877e1a940aa730e435da7fb"
+    },
+    {
+      "flag": "--mb-prompt-cache-runtime-test",
+      "exit": 0,
+      "log_sha256": "2e8473bc33bb1b34aa9d06ad6b192416c2693805eb47ed4e7464effe115beb02"
+    },
+    {
+      "flag": "--mb-initial-tool-exposure-test",
+      "exit": 0,
+      "log_sha256": "bfd9c9e16898e883946d45ecdea0ef70596557c6736314a1aa626b294887a367"
+    },
+    {
+      "flag": "--mb-tool-registry-execution-test",
+      "exit": 0,
+      "log_sha256": "88c65c95172b208378d6883cf2ddc88bcc53230aec922bf71569886c6157103a"
+    },
+    {
+      "flag": "--mb-deferred-tool-loading-test",
+      "exit": 0,
+      "log_sha256": "d8b76d41e1ba3ba2cb9a072cee687d7279958c73f059a126775e701b6078f9d9"
+    },
+    {
+      "flag": "--mb-scheduler-runtime-test",
+      "exit": 0,
+      "log_sha256": "f5d921a9a9d8064530c05fb8609c0de272028edefd645eb83823148e81bc46ee"
+    },
+    {
+      "flag": "--mb-permission-runtime-test",
+      "exit": 0,
+      "log_sha256": "fea3d223ca05b71cb5c18154484cf47a53477beebfb475c69010d4ec7da20cd2"
+    },
+    {
+      "flag": "--mb-evidence-runtime-test",
+      "exit": 0,
+      "log_sha256": "2b5c01f5368fda49d618afdf595fe015bc2734d58474bc4447daf2b5e3f8a8a2"
+    },
+    {
+      "flag": "--mb-verification-runtime-test",
+      "exit": 0,
+      "log_sha256": "b627d4d89238bfb0f9b185edbf9655a720be7e09c438c676651f4fd8c16e7426"
+    },
+    {
+      "flag": "--mb-repair-runtime-test",
+      "exit": 0,
+      "log_sha256": "b8aaa1b6626e15372514bd41034f033ef3246754b56ddfedf54dfe3908194de4"
+    },
+    {
+      "flag": "--mb-completion-gate-test",
+      "exit": 0,
+      "log_sha256": "53cb9645eed7b5620e28879a7c256c573cbc9ad5eb47a9cc8cba64b0de615e92"
+    },
+    {
+      "flag": "--mb-skill-catalog-test",
+      "exit": 0,
+      "log_sha256": "0ef53604071ee8a25d4799d9622f69172d87a59f07830d2568d75615965f0dba"
+    },
+    {
+      "flag": "--mb-skill-discovery-test",
+      "exit": 0,
+      "log_sha256": "11a8d68ffbe8a76dd5c7a5d6d88067d0bd3cd0a8b843397054946d3748d891bf"
+    },
+    {
+      "flag": "--mb-progressive-skill-loading-test",
+      "exit": 0,
+      "log_sha256": "3f98b45e0c971659ca768624b392b6e870f25d4c39c3bd6ce38a241c4db7d0aa"
+    },
+    {
+      "flag": "--mb-extension-registration-test",
+      "exit": 0,
+      "log_sha256": "009c4e0310c1b55072fe0d94bfdfa817e5407a89c870b7b82b2b607d84a42a60"
+    },
+    {
+      "flag": "--mb-generic-tool-preference-test",
+      "exit": 0,
+      "log_sha256": "b6def11b3b42406c33fe0b4cb0ce308e2ae1e50b4946a9919ce3bc0a84087ec5"
+    },
+    {
+      "flag": "--mb-computer-extension-registration-test",
+      "exit": 0,
+      "log_sha256": "abc3e7d6594cfea69bc5da598ee23a82bcadc4e7212292e803a02f9618577168"
+    },
+    {
+      "flag": "--mb-first-party-extension-cards-test",
+      "exit": 0,
+      "log_sha256": "19c723245eab72681933ed644279cbbca1a2cb850595cbe1a531b0249c98ed7d"
+    },
+    {
+      "flag": "--mb-domain-neutral-capability-search-test",
+      "exit": 0,
+      "log_sha256": "3439e6b97b94c3fb6ab0647dbd730e5a4a07b77aa8aa17e9832078fce3afb565"
+    },
+    {
+      "flag": "--mb-installed-capability-projection-test",
+      "exit": 0,
+      "log_sha256": "1683ff65e9283f6cbb3b9033720e1b9976bc7cdba791335f3f6239d089f38b03"
+    },
+    {
+      "flag": "--mb-available-capability-search-test",
+      "exit": 0,
+      "log_sha256": "dc51c3b0dabc5b15e3e947c6cdb6f077d6b4914eacdc379635419b1d170754c0"
+    },
+    {
+      "flag": "--mb-thin-capability-resolver-test",
+      "exit": 0,
+      "log_sha256": "d910ef162c9c9f25b1015581393cb6fa4df442e2278f1e7c84a34650392e6c4f"
+    },
+    {
+      "flag": "--mb-runtime-capability-install-test",
+      "exit": 0,
+      "log_sha256": "3d5d909cd90528b315511ffebd18a680a91870106803245a7902ce961436320c"
+    },
+    {
+      "flag": "--mb-task-capability-pinning-test",
+      "exit": 0,
+      "log_sha256": "2b5ab9d91178cdd484acedf978d8ff153cbe1f48f4445d5129af34594883c3c3"
+    },
+    {
+      "flag": "--mb-minimal-catalog-source-test",
+      "exit": 0,
+      "log_sha256": "b3b076e49392d766bc81a6e8379071175105ea38887e6a5b56c071cdb78d3c59"
+    },
+    {
+      "flag": "--mb-package-retriever-boundary-test",
+      "exit": 0,
+      "log_sha256": "fd96884ee1027b31c7b72a70d08cf5d3d7fc11ef9b51bb56603175f5d273b4e6"
+    },
+    {
+      "flag": "--mb-end-to-end-install-continue-test",
+      "exit": 0,
+      "log_sha256": "9e046a2d6616bb9c3847a16858e745c7f640301af6e4eaa5db7a395ee8ce5c09"
+    },
+    {
+      "flag": "--mb-retire-agent-runner-test",
+      "exit": 0,
+      "log_sha256": "ef1a24e2b63f60d03ff2e80f398027817df70286b3f9516c919173bf4d3a10a0"
+    },
+    {
+      "flag": "--mb-retire-agent-tools-switch-test",
+      "exit": 0,
+      "log_sha256": "6ae44bf8040454314c15dd93e2532f413a2f532b8831d14ba48caee7d98e443e"
+    },
+    {
+      "flag": "--mb-retire-v1-tool-registry-adapter-test",
+      "exit": 0,
+      "log_sha256": "09fc9a77af543c423f10aa5548e840f3673c0076e03be8caf66e9a78d963ebe7"
+    },
+    {
+      "flag": "--mb-retire-duplicate-skill-catalog-test",
+      "exit": 0,
+      "log_sha256": "67ee967cfbadbb1efc445a409ad3f25170b52f66989a86cbe72daad58b9e8dba"
+    },
+    {
+      "flag": "--mb-retire-computer-tools-test",
+      "exit": 0,
+      "log_sha256": "b4f5bb62dc6b42449470faa69b10db24b9a3465463e0d579957cadc8cfa507c4"
+    },
+    {
+      "flag": "--mb-trace-journal-boundary-test",
+      "exit": 0,
+      "log_sha256": "2ef2217a37d1df472858be19f224f813b077ebacddc3ca8cb94fd4b27c6d87e2"
+    },
+    {
+      "flag": "--mb-minimum-bootable-agent-acceptance-test",
+      "exit": 0,
+      "log_sha256": "2593e4cef2fb4ba9dc046c441cdf0a28b6a3140644be1ac486dfb8f053b9bdee"
+    },
+    {
+      "flag": "--mb-normal-ui-v2-path-test",
+      "exit": 0,
+      "log_sha256": "ed4501e4b13cf98089fcfb35c86d41af6502a653fee83f88dca50f65928239fd"
+    },
+    {
+      "flag": "--mb-context-boundedness-gate-test",
+      "exit": 0,
+      "log_sha256": "2a65423306ff5e8f0ec956c353eb3d10ba2b96574ce9230153890e92ff3f961b"
+    },
+    {
+      "flag": "--mb-extension-bus-gate-test",
+      "exit": 0,
+      "log_sha256": "96130c841472a6ca2a8f750f37b423315eefcb255249a8d8ae4ab321edb1a430"
+    },
+    {
+      "flag": "--mb-permission-scope-gate-test",
+      "exit": 0,
+      "log_sha256": "cd3ad185e9591f96b585de186ee77964522105d3a0c56f4ce8fbc84fcb13c7f6"
+    },
+    {
+      "flag": "--mb-core-correctness-gate-test",
+      "exit": 0,
+      "log_sha256": "a96863d2dab46bce9de2f14f77379b1955c51591dab499d026f14719bb152ffd"
+    },
+    {
+      "flag": "--mb-office-acceptance-test",
+      "exit": 0,
+      "log_sha256": "b3d34d5d013060ee6b29928c77ec96d16e15f670fdc4ef5e7153a822c1e2c8a7"
+    },
+    {
+      "flag": "--mb-web-freshness-legal-acceptance-test",
+      "exit": 0,
+      "log_sha256": "fd2371ca5cc8b18609eccd55b57057ecb9ead0f73b142f8dd2c71c9c1c946575"
+    },
+    {
+      "flag": "--mb-desktop-computer-use-acceptance-test",
+      "exit": 0,
+      "log_sha256": "738c18cdcabe16ecba18f108e335f7f358834ee2ea199556e8d42d5d615ce126"
+    },
+    {
+      "flag": "--mb-autocad-acceptance-test",
+      "exit": 0,
+      "log_sha256": "07f98177addb24792b552a92107e63d53ab8f7f7878d4440d90b2dca8c7846d3"
+    },
+    {
+      "flag": "--mb-mcp-acceptance-test",
+      "exit": 0,
+      "log_sha256": "820c553b4de231dbcebd45468eb9a652cccc7572d030976931fe627652bda3f5"
+    },
+    {
+      "flag": "--mb-plugin-package-lifecycle-acceptance-test",
+      "exit": 0,
+      "log_sha256": "9abbfcb13c32ebf5483231ae84c43d169701a651a47c64411e92d7d47006e8f8"
+    },
+    {
+      "flag": "--mb-final-architecture-report-test",
+      "exit": 0,
+      "log_sha256": "1731f028612b5f45a640e9796ba957879068aac15f8afc38f0a8772b5e3e50a2"
+    },
+    {
+      "flag": "--mb-agent-public-integration-boundary-test",
+      "exit": 0,
+      "log_sha256": "c61fcda2556fb356fc9c2e03e5f0b0bd72cd5aa5985cd5247872642687f8634b"
+    },
+    {
+      "flag": "--v2-desktop-host-test",
+      "exit": 0,
+      "log_sha256": "619b3f25e37ab9a6d6f90ef9d39511a7be9721e5627a3755ecb1e87cf570792b"
+    },
+    {
+      "flag": "--v2-office-host-test",
+      "exit": 0,
+      "log_sha256": "3644fe52fa5d0c37294a1e8d6accb8b1d9b19922a564776e214ce487d0d5fb36"
+    },
+    {
+      "flag": "--v2-transport-contract-test",
+      "exit": 0,
+      "log_sha256": "fddad9a09dfc0a7fa10c05ebe9015ba6c4c43a01774c344f2a9805aa3d773acd"
+    },
+    {
+      "flag": "--v2-ollama-transport-test",
+      "exit": 0,
+      "log_sha256": "5599a0f794eec047d3e3c88a5717901a91826c1a5b0eca2e66df54663c3182b9"
+    },
+    {
+      "flag": "--v2-chat-transport-test",
+      "exit": 0,
+      "log_sha256": "8e7423fcca897e156748497659afe3e57bfef4d442a69dec96b46e83c8eb5315"
+    },
+    {
+      "flag": "--v2-responses-transport-test",
+      "exit": 0,
+      "log_sha256": "79ad4cc1bf84cef0d468ed9ecb191236ca6ff4958833094debbd037d52591a07"
+    },
+    {
+      "flag": "--v2-responses-websocket-test",
+      "exit": 0,
+      "log_sha256": "40f954193d97be58267f4771e0dd293929a332c9fbc953333f5faff735a4e09e"
+    },
+    {
+      "flag": "--v2-provider-resilience-test",
+      "exit": 0,
+      "log_sha256": "07e18a68bad9eaecc03a715dcf94fb7e940f24682f7a436b22270ba2f5675532"
+    }
+  ],
+  "limits": [
+    "No real native Office/H2/model acceptance; no new provider, credentials or personal-document test.",
+    "Source consent changes meaning only, not file grounding, mutation permission, goal verification or unknown-effect fences.",
+    "Unknown/ambiguous original live resources remain blocked; source approvals are exact-file, task-local, revision-bound and never restored as grants.",
+    "AR064 PARTIAL, AR020/033 E3, AR051/065 E4, MB124-127 and AR083 DEFERRED_BY_USER remain unchanged."
+  ]
+}

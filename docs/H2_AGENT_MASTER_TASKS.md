@@ -1372,3 +1372,8 @@ Track long process sessions and side effects by stable IDs; restore/reconcile af
 Exercise repeated compaction, early-fact recall, changed requirements, exact file versions, pending/failed actions, smaller-context provider switching and restart recovery through real H2 flows. Run each boundary case at least three times and retain raw evidence. Compare request usage and task correctness; neither smaller prompts nor fixture-only passes close this gate. Record untested model/provider/platform combinations explicitly.
 
 Read-only audit note: `RuntimeCompactionCoordinator.BuildSummary` currently summarizes covered history using counts of user/assistant/tool events plus source references. `AgentContextBudget` currently uses character limits. These are useful foundations, but this review does not establish faithful semantic recall. No implementation or new runtime test execution accompanies these requirement additions.
+
+
+## Agent reliability implementation — AR checkpoint (2026-09-22)
+
+The approved [AR specification](H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. [AR-000 baseline](agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.

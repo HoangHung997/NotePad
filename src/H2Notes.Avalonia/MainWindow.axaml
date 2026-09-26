@@ -50,8 +50,13 @@
             </Grid>
             <Border x:Name="CommandCenterAttentionSection" Grid.Row="2" IsVisible="False" Background="#FFF6F0" BorderBrush="#E5C7B7" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,12">
               <StackPanel Spacing="7">
-                <TextBlock x:Name="CommandCenterAttentionHeader" Text="Cần bạn xử lý" FontSize="12" FontWeight="SemiBold" Foreground="#A4573D"/>
-                <ListBox x:Name="CommandCenterAttentionList" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
+                <Button x:Name="CommandCenterAttentionToggle" Classes="quiet" Padding="0" HorizontalContentAlignment="Stretch" AutomationProperties.Name="Bung hoặc gập danh sách cần xử lý">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="CommandCenterAttentionHeader" Text="Cần bạn xử lý" FontSize="12" FontWeight="SemiBold" Foreground="#A4573D" VerticalAlignment="Center"/>
+                    <local:AppIcon x:Name="CommandCenterAttentionChevron" Grid.Column="1" Kind="ChevronDown" Width="16" Height="16" Foreground="#A4573D" Margin="12,0,0,0"/>
+                  </Grid>
+                </Button>
+                <ListBox x:Name="CommandCenterAttentionList" IsVisible="False" Background="Transparent" BorderThickness="0" Padding="0" SelectionMode="Single">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:CompileBindings="False">
                       <Border Background="#FFFDFC" BorderBrush="#EAD8CC" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,5">
@@ -64,6 +69,7 @@
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
+                <Button x:Name="CommandCenterAttentionShowAllButton" Classes="quiet" Content="Xem tất cả" IsVisible="False" HorizontalAlignment="Left" AutomationProperties.Name="Xem tất cả mục cần xử lý"/>
               </StackPanel>
             </Border>
             <Grid Grid.Row="3">

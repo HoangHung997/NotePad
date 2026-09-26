@@ -17,12 +17,36 @@ public interface IOfficeBackend
     OfficeSaveCopyResult SaveWordCopy(OfficeSaveCopyRequest request);
 }
 
+public interface IOfficeCaptureBackend
+{
+    OfficeCaptureResult Capture(OfficeCaptureRequest request);
+}
+
+/// <summary>Additive bounded Excel range reader. Keeping this separate from IOfficeBackend
+/// preserves compatibility with older injected fixtures while production COM/fixture backends
+/// opt into the AR-021 paged read contract.</summary>
+public interface IExcelRangeReadBackend
+{
+    ExcelRangeReadPage ReadExcelRange(ExcelReadRangeRequest request);
+}
+
 public sealed class OfficeHostFaultException : Exception
 {
-    public OfficeHostFaultException(string code, string message) : base(message)
+    public OfficeHostFaultException(string code, string message, bool noEffect = false) : base(message)
     {
-        Code = code;
+        Code = code; NoEffect = noEffect;
     }
 
     public string Code { get; }
+    public bool NoEffect { get; }
+}
+
+
+/// <summary>Additive bounded Word page reader. Production and fixture backends opt in without
+/// expanding the base Office mutation interface.</summary>
+public interface IWordPagedReadBackend
+{
+    WordParagraphReadPage ReadWordParagraphs(WordParagraphReadRequest request);
+    WordRangeReadPage ReadWordRange(WordRangeReadRequest request);
+    WordTableReadPage ReadWordTables(WordTableReadRequest request);
 }

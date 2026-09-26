@@ -44,3 +44,8 @@ Giải nén toàn bộ gói trước khi chạy. Cấu hình AI và API key thu�
 - [Hợp nhất và dọn các bản cũ](docs/H2_MAIN_CONSOLIDATION_2026-09-22.md).
 
 `src/Nodepad.Desktop/`, `Nodepad.slnx` và `_ver2/` giữ mã WPF/WinForms lịch sử để đối chiếu. Đây không phải bản ứng dụng hiện tại; không xóa dữ liệu hoặc sửa ảnh baseline gốc khi dọn bản build.
+
+
+## Agent reliability implementation — AR checkpoint (2026-09-22)
+
+The approved [AR specification](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. [AR-000 baseline](docs/agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.

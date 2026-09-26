@@ -1,0 +1,142 @@
+{
+  "task": "AR-001",
+  "status": "AR-001_ACCEPTED_AFTER_REPAIR",
+  "recorded_at_utc": "2026-09-22T06:02:45.755014+00:00",
+  "attempts": [
+    {
+      "run_id": 35691748431,
+      "code_sha": "88cc6241d9488e26e0652751a7c14c26df4aecb3",
+      "kind": "focused",
+      "passed": 9,
+      "failed": 4,
+      "artifact_id": 10679446309,
+      "artifact_sha256": "a96c330edf9746d1a36f9f3cd662f973c058ba2a7dc1ac263c05e307d1ffa2bd",
+      "issues": [
+        "UI-context-dependent executor/provider disposal",
+        "Test parsed evidence footer as raw JSON"
+      ]
+    },
+    {
+      "run_id": 35692162013,
+      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
+      "kind": "focused",
+      "repetitions": [
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        }
+      ],
+      "artifact_id": 10679422208,
+      "artifact_sha256": "b26040954154ed315355978edcad3e09e8267c85be2855a7cb863f8735cf79f8"
+    },
+    {
+      "run_id": 35692347728,
+      "job_id": 106631823690,
+      "code_sha": "c26b3521ce4b7d60e69f3942dda123c23fd53cf3",
+      "kind": "full",
+      "conclusion": "failure",
+      "h2_tests": {
+        "passed": 603,
+        "failed": 0
+      },
+      "architecture": {
+        "passed": 35,
+        "failed": 0
+      },
+      "phase11": {
+        "passed": 14,
+        "failed": 1
+      },
+      "failure": "1108 exact WebResearchHost tool set omitted existing web.read_feed",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35692802913,
+      "code_sha": "82af106655358fa4f27d60f3da2a53e35341f1cb",
+      "kind": "focused-build",
+      "conclusion": "failure",
+      "error": "CS8852 at V2Phase11Tests.cs:251: FeedObserved is init-only; test assigned it after construction",
+      "tests": "NOT_RUN",
+      "artifact_id": 10678948191,
+      "artifact_sha256": "e5264e73d4f255e9afa06e3e04b0e5e88d24ba7e862b22b827ad785ec07c7b74"
+    },
+    {
+      "run_id": 35693115516,
+      "code_sha": "f023b611b0d03d55c11c257babcfa5529893f5bb",
+      "kind": "full",
+      "conclusion": "failure",
+      "failure": "MB-33 serialized mutation fixture lacked verifier; 3 passed / 1 failed",
+      "h2_tests": "603/603",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35693829220,
+      "code_sha": "efe274cf8aaea1af870aea18c81b8c180f01f4c0",
+      "kind": "full",
+      "conclusion": "failure",
+      "failure": "MB-74 mutation fixture lacked verifier",
+      "earlier_required_steps": "PASS through MB-73",
+      "later_suites_and_publish": "NOT_RUN"
+    },
+    {
+      "run_id": 35693929260,
+      "code_sha": "74418bee6c3b12c2be6fffa68a121a4ce36aa294",
+      "kind": "all-agent-diagnostic",
+      "suites": 74,
+      "passed_suites": 66,
+      "failed_suites": 8,
+      "actual_fixture_failures": [
+        "MB-74 missing verifier",
+        "MBA-04 unrelated unknown operation stayed unresolved"
+      ],
+      "harness_invocation_errors": 6,
+      "artifact_id": 10679995582,
+      "artifact_sha256": "9a83822aab1f870d2bafd25842787abc76ea79ce00ac6dc0022318b90859cce7"
+    },
+    {
+      "run_id": 35694729061,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "kind": "focused-plus-all-Agent",
+      "repetitions": [
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        },
+        {
+          "passed": 13,
+          "failed": 0
+        }
+      ],
+      "passed_suites": 74,
+      "failed_suites": 0,
+      "artifact_id": 10680096876,
+      "conclusion": "success"
+    },
+    {
+      "run_id": 35694774117,
+      "code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+      "kind": "full-including-publish-helper-smoke",
+      "conclusion": "success",
+      "artifact_ids": [
+        10680490207,
+        10679742893
+      ]
+    }
+  ],
+  "evidence_level": "E1/E2 fixtures and disposable process only; E3/E4 Office-model NOT_RUN; AR-083 DEFERRED_BY_USER",
+  "next_action": "Validate the init-only test correction with repeated focused corpus and all mandatory full CI/publish smoke on its actual new code SHA.",
+  "final_accepted_code_sha": "f3ebc4d336b8d6752436412840675fb2e7204e1d",
+  "final_acceptance": "acceptance.json"
+}

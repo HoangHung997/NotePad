@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace H2Notes.Core;
 
 public enum H2WorkspaceSyncState
@@ -41,7 +43,8 @@ public sealed record NeedsAttentionProjection(
     string Kind,
     string Code,
     string Title,
-    DateTime? AtUtc);
+    DateTime? AtUtc,
+    string? SourceRevision = null);
 
 public sealed record ProjectActivityProjection(
     Guid ProjectId,
@@ -73,7 +76,7 @@ public sealed class H2ProductProjectionService
                 H2WorkspaceSyncState.RecoveryRequired,
                 diagnostic?.Code ?? "recovery-fallback",
                 diagnostic?.Message ?? "Workspace is using a write-blocked last-known-good generation.",
-                DateTime.UtcNow,
+                diagnostic?.ObservedUtc ?? DateTime.UtcNow,
                 hasPending,
                 IsRecoveryFallback: true);
 
@@ -84,7 +87,7 @@ public sealed class H2ProductProjectionService
                     hasPending ? H2WorkspaceSyncState.PendingLocal : H2WorkspaceSyncState.Healthy,
                     diagnostic.Code,
                     diagnostic.Message,
-                    DateTime.UtcNow,
+                    diagnostic.ObservedUtc,
                     hasPending,
                     IsRecoveryFallback: false);
 
@@ -93,7 +96,7 @@ public sealed class H2ProductProjectionService
                     H2WorkspaceSyncState.RecoveryRequired,
                     diagnostic.Code,
                     diagnostic.Message,
-                    DateTime.UtcNow,
+                    diagnostic.ObservedUtc,
                     hasPending,
                     IsRecoveryFallback: false);
 
@@ -102,7 +105,7 @@ public sealed class H2ProductProjectionService
                     H2WorkspaceSyncState.Offline,
                     diagnostic.Code,
                     diagnostic.Message,
-                    DateTime.UtcNow,
+                    diagnostic.ObservedUtc,
                     hasPending,
                     IsRecoveryFallback: false);
 
@@ -110,7 +113,7 @@ public sealed class H2ProductProjectionService
                 H2WorkspaceSyncState.Warning,
                 diagnostic.Code,
                 diagnostic.Message,
-                DateTime.UtcNow,
+                diagnostic.ObservedUtc,
                 hasPending,
                 IsRecoveryFallback: false);
         }
@@ -176,7 +179,8 @@ public sealed class H2ProductProjectionService
                 Title: string.IsNullOrWhiteSpace(health.Message)
                     ? WorkspaceAttentionTitle(health.State)
                     : health.Message!,
-                AtUtc: health.ObservedUtc));
+                AtUtc: health.ObservedUtc,
+                SourceRevision: WorkspaceAttentionRevision(health)));
         }
 
         return items
@@ -320,7 +324,10 @@ public sealed class H2ProductProjectionService
                 "agent",
                 code,
                 Bound(title, 300),
-                task.UpdatedUtc));
+                task.UpdatedUtc,
+                task.Status == H2AgentTaskStatus.WaitingForApproval && task.PendingApproval is { } approval
+                    ? approval.ApprovalId.ToString("N")
+                    : task.UpdatedUtc.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)));
         }
 
         if (health is { State: not H2WorkspaceSyncState.Healthy })
@@ -333,10 +340,21 @@ public sealed class H2ProductProjectionService
                 string.IsNullOrWhiteSpace(health.Message)
                     ? WorkspaceAttentionTitle(health.State)
                     : health.Message!,
-                health.ObservedUtc));
+                health.ObservedUtc,
+                WorkspaceAttentionRevision(health)));
         }
 
         return items;
+    }
+
+    private static string WorkspaceAttentionRevision(H2WorkspaceHealthSnapshot health)
+    {
+        var code = health.Code ?? health.State.ToString().ToLowerInvariant();
+        if (code is "saving" or "pending-local")
+            return "condition:" + code;
+        return health.ObservedUtc is { } observed
+            ? observed.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)
+            : "condition:" + code;
     }
 
     private static DateTime? LatestVerifiedActivity(

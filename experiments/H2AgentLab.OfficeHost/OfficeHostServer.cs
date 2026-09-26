@@ -128,7 +128,7 @@ public sealed class OfficeHostServer
         }
         catch (OfficeHostFaultException ex)
         {
-            response = Error(request.Id, ex.Code, ex.Message);
+            response = Error(request.Id, ex.Code, ex.Message) with { Error = new OfficeRpcError(ex.Code, ex.Message) { NoEffect = ex.NoEffect } };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -160,14 +160,28 @@ public sealed class OfficeHostServer
                 _fixtureMode,
                 Thread.CurrentThread.GetApartmentState() == ApartmentState.STA),
 
+            "office.capture" => _backend is IOfficeCaptureBackend capture ? capture.Capture(Parameters<OfficeCaptureRequest>(request))
+                : new OfficeCaptureResult("Unavailable","unsupported_operation",null,null,null,null,0),
             "excel.discover" => _backend.DiscoverExcel(),
             "excel.snapshot" => _backend.SnapshotExcel(Parameters<ExcelSnapshotRequest>(request).SessionId),
-            "excel.patch" => _backend.PatchExcel(Parameters<ExcelPatchRequest>(request)),
+            "excel.readRange" => _backend is IExcelRangeReadBackend rangeReader
+                ? rangeReader.ReadExcelRange(Parameters<ExcelReadRangeRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Excel range reads.", true),
+            "excel.patch" => PatchExcel(Parameters<ExcelPatchRequest>(request)),
             "excel.recalculate" => _backend.RecalculateExcel(Parameters<ExcelRecalculateRequest>(request)),
             "excel.saveCopy" => _backend.SaveExcelCopy(Parameters<OfficeSaveCopyRequest>(request)),
 
             "word.discover" => _backend.DiscoverWord(),
             "word.snapshot" => _backend.SnapshotWord(Parameters<WordSnapshotRequest>(request).SessionId),
+            "word.readParagraphs" => _backend is IWordPagedReadBackend wordPages
+                ? wordPages.ReadWordParagraphs(Parameters<WordParagraphReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word paragraph reads.", true),
+            "word.readRange" => _backend is IWordPagedReadBackend wordRanges
+                ? wordRanges.ReadWordRange(Parameters<WordRangeReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word range reads.", true),
+            "word.readTables" => _backend is IWordPagedReadBackend wordTables
+                ? wordTables.ReadWordTables(Parameters<WordTableReadRequest>(request))
+                : throw new OfficeHostFaultException("unsupported_operation", "This Office backend does not support bounded Word table reads.", true),
             "word.patch" => _backend.PatchWord(Parameters<WordPatchRequest>(request)),
             "word.languageEvidence" => _backend.InspectWordLanguage(Parameters<WordLanguageEvidenceRequest>(request)),
             "word.saveCopy" => _backend.SaveWordCopy(Parameters<OfficeSaveCopyRequest>(request)),
@@ -176,6 +190,14 @@ public sealed class OfficeHostServer
             "fixture.crash" when _fixtureMode => CrashFixture(),
             _ => throw new OfficeHostFaultException("unknown_method", $"OfficeHost method '{request.Method}' is not supported.")
         };
+    }
+
+    private ExcelPatchResult PatchExcel(ExcelPatchRequest request)
+    {
+        OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem, true);
+        return _backend.PatchExcel(request);
     }
 
     private static object FixtureDelay(

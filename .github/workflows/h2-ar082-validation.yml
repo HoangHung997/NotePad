@@ -1,0 +1,56 @@
+name: AR-082 clean portable validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar082-validation.yml'
+      - '.github/workflows/avalonia-ci.yml'
+      - 'src/H2Notes.Avalonia/PortablePackageDiagnostics.cs'
+      - 'src/H2Notes.Avalonia/Program.cs'
+      - 'src/H2Notes.Avalonia/H2Notes.Avalonia.csproj'
+      - 'src/H2Notes.Avalonia/PORTABLE-README.txt'
+      - 'src/H2Notes.Avalonia/VERIFY-PORTABLE.ps1'
+      - 'experiments/H2AgentLab/Integration/H2PortableDependencyProbe.cs'
+      - 'tests/H2Notes.Tests/H2PortablePreflightTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'experiments/H2AgentLab/Setup-Runtime.ps1'
+      - 'experiments/H2AgentLab/agent-python-requirements.txt'
+      - 'tools/agent-reliability/build_portable_manifest.ps1'
+      - 'tools/agent-reliability/prepare_agent_python.ps1'
+      - 'tools/agent-reliability/validate_ar082.ps1'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar082-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  clean-portable:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Setup Python 3.12 for Agent portable runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+          cache: 'pip'
+          cache-dependency-path: 'experiments/H2AgentLab/agent-python-requirements.txt'
+      - name: Validate AR-082 clean-profile portable gate
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar082.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR082-E1-E3-Evidence
+          path: artifacts/ar082/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,75 @@
+{
+  "task": "AR-022",
+  "source_sha": "df0ae549d4146fd667fc3e3445eb5a06cc096d0b",
+  "implementation_commits": [
+    "090519c480882011fde9093e14c4f5f2fa9748f7",
+    "a0b442c4cd669744c7fc6927feeedc341cfb8404",
+    "df0ae549d4146fd667fc3e3445eb5a06cc096d0b"
+  ],
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER",
+    "E4": "NOT_RUN",
+    "E5": "DEFERRED_BY_USER",
+    "native_pass_claim": false
+  },
+  "tests": {
+    "focused": "8/8",
+    "office_host": "18/18",
+    "retained": {
+      "AR-021": "14/14",
+      "AR-020": "36/36",
+      "AR-012": "44/44",
+      "AR-001": "13/13"
+    },
+    "full_h2": "1300/1300",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "14/14 SUCCESS"
+  },
+  "runs": {
+    "ar022": {
+      "run_id": 36213894993,
+      "job_id": 108326259949,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36213894968,
+      "job_id": 108325894609,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10896739058,
+      "bytes": 431651,
+      "sha256": "8a50a7bb4c615c1a2c7e119ff5a312f496a6c89504dda24832367dcad3038c93",
+      "expires_at_utc": "2026-10-10T03:30:02Z"
+    },
+    "portable": {
+      "id": 10896344953,
+      "bytes": 110373923,
+      "sha256": "205fc4851d1c0c4037e772bb01fa872db41a6f7143e632c6807edf4efe7c8f47",
+      "expires_at_utc": "2026-12-25T03:08:52Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "repaired_regressions": [
+    "Invalid-count native preflight message/effect contract diverged from fixture/server on a0b442c4.",
+    "Legacy AR-012 state-token-only Excel writes were blocked before execution on a0b442c4.",
+    "Both were repaired on df0ae549 without removing ContentToken or partial/unknown classification."
+  ],
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "two_pc_nas_certified": false
+  }
+}

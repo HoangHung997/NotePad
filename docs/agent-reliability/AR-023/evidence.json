@@ -1,0 +1,72 @@
+{
+  "task": "AR-023",
+  "source_sha": "c87778aa972d10a83a34b046ebf06fd5e5e34eed",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER",
+    "E4": "NOT_RUN",
+    "E5": "DEFERRED_BY_USER",
+    "native_pass_claim": false,
+    "layout_pass_claim": false
+  },
+  "tests": {
+    "focused": "9/9",
+    "office_host": "19/19",
+    "retained": {
+      "AR-022": "8/8",
+      "AR-021": "14/14",
+      "AR-020": "36/36",
+      "AR-012": "44/44",
+      "AR-001": "13/13"
+    },
+    "full_h2": "1309/1309",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "15/15 SUCCESS"
+  },
+  "runs": {
+    "ar023": {
+      "run_id": 36216588886,
+      "job_id": 108334058305,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36216588899,
+      "job_id": 108333645131,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10897703518,
+      "bytes": 432774,
+      "sha256": "d063b3c42d27d0edba9335e4e85672350e599033b1e64a52007073ee90271f3f",
+      "zip_entries": 651,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10897572845,
+      "bytes": 110398173,
+      "sha256": "4bc576c2b7e76705e3f8ec7cea26b8c9ff1866069e9c87d1a2504d44ac9a7e9c",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "repaired_regressions": [
+    "explicit C# record typing for dynamic page returns",
+    "lengthened disposable range corpus; runtime bounds unchanged"
+  ],
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "layout_certified": false,
+    "two_pc_nas_certified": false
+  }
+}

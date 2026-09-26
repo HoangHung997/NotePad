@@ -1,3 +1,5 @@
+using H2AgentLab.DesktopProtocol;
+
 namespace H2AgentLab.DesktopHost;
 
 public static class DesktopHostSelfTests
@@ -33,6 +35,198 @@ public static class DesktopHostSelfTests
             {
                 if (DesktopSafetyPolicy.IsWindowAllowed(process, "Normal"))
                     throw new InvalidOperationException("Blocked process was allowed: " + process);
+            }
+        });
+
+        Test("Launcher blocks shell credential and developer processes", () =>
+        {
+            foreach (var process in new[]
+            {
+                "cmd", "powershell", "pwsh", "regedit",
+                "rundll32", "regsvr32", "mshta", "wscript", "cscript", "msiexec",
+                "runas", "wmic", "diskpart", "bcdedit", "schtasks", "taskkill",
+                "certutil", "bitsadmin", "wevtutil", "takeown", "icacls", "fodhelper",
+                "CredentialUIBroker", "1Password", "Bitwarden",
+                "ChatGPT", "Codex", "Code", "devenv"
+            })
+            {
+                if (DesktopSafetyPolicy.IsProcessAllowedForLaunch(process))
+                    throw new InvalidOperationException("Blocked process was launchable: " + process);
+            }
+
+            if (!DesktopSafetyPolicy.IsProcessAllowedForLaunch("notepad"))
+                throw new InvalidOperationException("Ordinary safe application was blocked from launch.");
+        });
+
+        Test("Launcher strips credential environment without losing ordinary app settings", () =>
+        {
+            const string secretName = "H2_AR061_TEST_API_KEY";
+            const string safeName = "H2_AR061_SAFE_SETTING";
+            var oldSecret = Environment.GetEnvironmentVariable(secretName);
+            var oldSafe = Environment.GetEnvironmentVariable(safeName);
+            try
+            {
+                Environment.SetEnvironmentVariable(secretName, "DO_NOT_INHERIT");
+                Environment.SetEnvironmentVariable(safeName, "keep-me");
+                var info = Win32DesktopBackend.CreateLaunchStartInfo(
+                    new ResolvedDesktopApplication(
+                        "notepad",
+                        Path.Combine(Environment.SystemDirectory, "notepad.exe"),
+                        "notepad"),
+                    requireNewWindow: false);
+
+                if (info.UseShellExecute)
+                    throw new InvalidOperationException("Application launcher unexpectedly routes through ShellExecute.");
+                if (info.Environment.ContainsKey(secretName))
+                    throw new InvalidOperationException("Credential-like environment variable leaked into launched app.");
+                if (!info.Environment.TryGetValue(safeName, out var safe) || safe != "keep-me")
+                    throw new InvalidOperationException("Ordinary application environment was stripped unnecessarily.");
+                if (!Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("GITHUB_TOKEN")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("AZURE_CLIENT_SECRET")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS")
+                    || !Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("SSH_AUTH_SOCK")
+                    || Win32DesktopBackend.IsSensitiveLaunchEnvironmentVariable("TEMP"))
+                    throw new InvalidOperationException("Launcher credential-environment classification is incorrect.");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(secretName, oldSecret);
+                Environment.SetEnvironmentVariable(safeName, oldSafe);
+            }
+        });
+
+        Test("App Paths executable identity cannot redirect to another process", () =>
+        {
+            if (!DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "winword.exe",
+                    @"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"))
+                throw new InvalidOperationException("Matching App Paths executable identity was rejected.");
+
+            if (DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "winword.exe",
+                    @"C:\Windows\System32\cmd.exe"))
+                throw new InvalidOperationException("App Paths executable identity redirected Word to cmd.exe.");
+
+            if (DesktopApplicationResolver.RegisteredExecutableIdentityMatches(
+                    "notepad.exe",
+                    @"C:\Tools\powershell.exe"))
+                throw new InvalidOperationException("App Paths executable identity accepted another executable stem.");
+        });
+
+        Test("Office launch recognition ignores splash and dialog windows", () =>
+        {
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("WINWORD", "OpusApp"))
+                throw new InvalidOperationException("Word main window class was rejected.");
+            if (Win32DesktopBackend.IsApplicationLaunchWindowClass("WINWORD", "NUIDialog"))
+                throw new InvalidOperationException("Word dialog/splash class was accepted as launch completion.");
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("EXCEL", "XLMAIN"))
+                throw new InvalidOperationException("Excel main window class was rejected.");
+            if (Win32DesktopBackend.IsApplicationLaunchWindowClass("EXCEL", "bosa_sdm_XL9"))
+                throw new InvalidOperationException("Excel dialog class was accepted as launch completion.");
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", "CabinetWClass")
+                || !Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", "ExploreWClass"))
+                throw new InvalidOperationException("File Explorer main window class was rejected.");
+            foreach (var shellClass in new[] { "Shell_TrayWnd", "Progman", "WorkerW" })
+                if (Win32DesktopBackend.IsApplicationLaunchWindowClass("explorer", shellClass))
+                    throw new InvalidOperationException("Explorer shell surface was accepted as an app window: " + shellClass);
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowClass("notepad", "Notepad"))
+                throw new InvalidOperationException("Ordinary application launch window was rejected.");
+            if (Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: false))
+                throw new InvalidOperationException("Global app inventory exposed an offscreen/minimized window.");
+            if (!Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: true))
+                throw new InvalidOperationException("Exact activation could not re-resolve a minimized window.");
+        });
+
+        Test("Pre-launch identity keeps minimized windows private but stable", () =>
+        {
+            if (Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: false))
+                throw new InvalidOperationException("Global app inventory exposed a minimized/offscreen window.");
+            if (!Win32DesktopBackend.ShouldIncludeWindow(isOffscreen: true, includeOffscreen: true))
+                throw new InvalidOperationException("Private pre-launch identity could not include a minimized/offscreen window.");
+
+            var before = new HashSet<string>(StringComparer.Ordinal) { "minimized-existing" };
+            var restoredOld = new DesktopWindowInfo(
+                "minimized-existing", 101, 11, 1011, "WINWORD", "Document1",
+                new H2AgentLab.DesktopProtocol.DesktopBounds(0, 0, 640, 480), 96, true);
+            var genuinelyNew = restoredOld with { SessionId = "new-word", Handle = 102 };
+            var selected = Win32DesktopBackend.SelectUniqueCreatedWindow([restoredOld, genuinelyNew], before);
+            if (selected?.SessionId != "new-word")
+                throw new InvalidOperationException("A restored pre-existing window was mistaken for the new launch target.");
+        });
+
+        Test("AutoCAD launch completion requires the process main frame", () =>
+        {
+            const long main = 0x12345;
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acad",
+                    main,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD main frame was rejected.");
+
+            if (Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acad",
+                    0x22345,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD non-main/splash window was accepted.");
+
+            if (!Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acadlt",
+                    main,
+                    main,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD LT main frame was rejected.");
+
+            if (Win32DesktopBackend.IsApplicationLaunchWindowCandidate(
+                    "acadlt",
+                    main,
+                    0,
+                    "Afx:00400000"))
+                throw new InvalidOperationException("AutoCAD LT window was accepted without a process main-frame identity.");
+        });
+
+        Test("Office new-window mode uses only host-owned safe switches", () =>
+        {
+            if (DesktopApplicationResolver.NewWindowArgumentsForProcess("WINWORD") != "/w")
+                throw new InvalidOperationException("Word new-window launch lost the documented /w switch.");
+            if (DesktopApplicationResolver.NewWindowArgumentsForProcess("EXCEL") != "/x")
+                throw new InvalidOperationException("Excel new-window launch lost the documented /x switch.");
+            foreach (var process in new[] { "explorer", "acad", "notepad", "chrome" })
+                if (DesktopApplicationResolver.NewWindowArgumentsForProcess(process).Length != 0)
+                    throw new InvalidOperationException("Unexpected command-line switch for ordinary application: " + process);
+        });
+
+        Test("Friendly app identity preserves meaningful punctuation", () =>
+        {
+            if (!DesktopApplicationResolver.FriendlyNameMatches("Microsoft Word", " microsoft   word "))
+                throw new InvalidOperationException("Whitespace/case normalization rejected an exact friendly name.");
+            if (!DesktopApplicationResolver.FriendlyNameMatches("AutoCAD 2026", "autocad 2026"))
+                throw new InvalidOperationException("Exact AutoCAD friendly name was rejected.");
+            if (DesktopApplicationResolver.FriendlyNameMatches("Notepad++", "Notepad"))
+                throw new InvalidOperationException("Friendly-name normalization collapsed Notepad++ into Notepad.");
+            if (DesktopApplicationResolver.FriendlyNameMatches("App-X", "App X"))
+                throw new InvalidOperationException("Friendly-name normalization discarded meaningful punctuation.");
+        });
+
+        Test("Launch never guesses among multiple newly observed windows", () =>
+        {
+            var before = new HashSet<string>(StringComparer.Ordinal) { "before-1" };
+            var one = new DesktopWindowInfo(
+                "new-1", 101, 11, 1011, "fixture", "One",
+                new H2AgentLab.DesktopProtocol.DesktopBounds(0, 0, 640, 480), 96, true);
+            var selected = Win32DesktopBackend.SelectUniqueCreatedWindow([one], before);
+            if (selected?.SessionId != "new-1")
+                throw new InvalidOperationException("Unique new application window was not selected.");
+
+            var two = one with { SessionId = "new-2", Handle = 102 };
+            try
+            {
+                _ = Win32DesktopBackend.SelectUniqueCreatedWindow([one, two], before);
+                throw new InvalidOperationException("Multiple new windows were silently reduced to one target.");
+            }
+            catch (DesktopHostFaultException ex) when (ex.Code == "launch_ambiguous")
+            {
             }
         });
 

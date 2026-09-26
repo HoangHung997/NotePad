@@ -41,7 +41,7 @@ public sealed class AgentTransportFactory : IAgentTransportFactory
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(telemetry);
 
-        return profile.Protocol switch
+        IAgentTransport transport = profile.Protocol switch
         {
             AiProtocol.Ollama => new OllamaTransport(profile),
             AiProtocol.OpenAiResponses
@@ -57,5 +57,9 @@ public sealed class AgentTransportFactory : IAgentTransportFactory
             _ => throw new NotSupportedException(
                 "Giao thức model chưa được H2 AgentRuntime hỗ trợ.")
         };
+        if (transport is IAgentRequestBudgetSource budgeted)
+            budgeted.RequestBudgetEvaluated += receipt => telemetry.Trace.Mark(
+                AgentTraceKind.RuntimeHook, "outgoing-request-budget", System.Text.Json.JsonSerializer.Serialize(receipt));
+        return transport;
     }
 }

@@ -1452,3 +1452,8 @@ then add more cards/plugins/skills
 ```
 
 Do not build the marketplace before the Agent itself is running through the final V2 runtime.
+
+
+## Agent reliability implementation — AR checkpoint (2026-09-22)
+
+The approved [AR specification](H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md) and [AR tracker / SESSION HANDOFF](H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md) govern this reliability pass. [AR-000 baseline](agent-reliability/AR-000/baseline.md) records current code and CI, not renewed acceptance of historical tasks. MB-124–127 retain their evidence gates. AR-083 is DEFERRED_BY_USER; one-PC Office/model gates are not waived.

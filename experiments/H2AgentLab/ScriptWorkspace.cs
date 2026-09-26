@@ -21,7 +21,7 @@ public sealed record ScriptRunEvidence(
     int ExitCode,
     IReadOnlyList<ScriptArtifact> Artifacts,
     DateTime CompletedUtc);
-public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, Func<Approval, CancellationToken, Task<bool>> approve)
+public sealed partial class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, Func<Approval, CancellationToken, Task<bool>> approve)
 {
     private bool _authorized, _denied;
     private string RunsRoot => Path.Combine(stateRoot, "runs");
@@ -137,7 +137,9 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
     public async Task<object> Publish(string id, string artifact, string target, string expectedHash, CancellationToken ct)
     {
         var run = Load(id); if (run.ExitCode != 0) throw new IOException("Cannot publish from a failed script. Fix and verify it first.");
-        var data = Read(id, artifact); var ext = Path.GetExtension(target).ToLowerInvariant();
+        var data = Read(id, artifact);
+        var verification = LoadVerification(id, artifact);
+        var ext = Path.GetExtension(target).ToLowerInvariant();
         if (!SafeWorkspace.TextExtensions.Contains(ext) && ext is not (".docx" or ".xlsx" or ".pdf" or ".png" or ".jpg")) throw new IOException("Unsupported publication format.");
         if (ext != Path.GetExtension(artifact).ToLowerInvariant()) throw new IOException("Output and destination extensions must match.");
         var destination = workspace.Resolve(target);
@@ -151,7 +153,10 @@ public sealed class ScriptWorkspace(SafeWorkspace workspace, string stateRoot, F
             sourceRun = id,
             sourceEvidence = run.EvidenceId,
             sourceArtifactId = run.Artifacts.Single(x => x.Path == artifact).ArtifactId,
-            sourceArtifactEvidence = run.Artifacts.Single(x => x.Path == artifact).EvidenceId
+            sourceArtifactEvidence = run.Artifacts.Single(x => x.Path == artifact).EvidenceId,
+            artifactVerification = verification,
+            verificationEvidence = verification.EvidenceId,
+            requiresFurtherVerification = verification.RequiresFurtherVerification
         };
     }
 

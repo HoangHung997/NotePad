@@ -17,21 +17,101 @@ public sealed class FixtureDesktopBackend : IDesktopBackend
     private long _mutationSequence;
     private string? _pendingMutationId;
     private string? _lastObservedStateId;
+    private readonly List<DesktopWindowInfo> _launched = [];
+    private string _foregroundSessionId = SessionId;
+    private int _applicationSequence;
 
     public IReadOnlyList<DesktopWindowInfo> ListWindows()
-        =>
-        [
-            new DesktopWindowInfo(
-                SessionId,
-                424242,
-                Environment.ProcessId,
-                1,
-                "H2DesktopFixture",
-                "H2 Desktop Fixture Window",
-                _bounds,
-                96,
-                true)
-        ];
+    {
+        var baseWindow = new DesktopWindowInfo(
+            SessionId,
+            424242,
+            Environment.ProcessId,
+            1,
+            "H2DesktopFixture",
+            "H2 Desktop Fixture Window",
+            _bounds,
+            96,
+            _foregroundSessionId == SessionId);
+        return new[] { baseWindow }
+            .Concat(_launched.Select(x => x with { Foreground = x.SessionId == _foregroundSessionId }))
+            .ToArray();
+    }
+
+    public DesktopApplicationLaunchResult LaunchApplication(DesktopApplicationLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        var process = FixtureProcessName(request.Application);
+        DesktopSafetyPolicy.RequireLaunchProcessAllowed(process);
+
+        var existing = ListWindows()
+            .Where(x => string.Equals(x.ProcessName, process, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (!request.RequireNewWindow && existing.Length == 1)
+        {
+            _foregroundSessionId = existing[0].SessionId;
+            return new(
+                request.Application,
+                process.ToLowerInvariant(),
+                process,
+                false,
+                true,
+                existing[0] with { Foreground = true });
+        }
+        if (!request.RequireNewWindow && existing.Length > 1)
+            throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one fixture application window is already running; no new fixture window was created.");
+
+        _applicationSequence++;
+        var window = new DesktopWindowInfo(
+            "desktop-fixture-app-" + _applicationSequence,
+            500000 + _applicationSequence,
+            6000 + _applicationSequence,
+            100 + _applicationSequence,
+            process,
+            "Fixture " + process,
+            new DesktopBounds(140 + _applicationSequence * 10, 140, 640, 480),
+            96,
+            true);
+        _launched.Add(window);
+        _foregroundSessionId = window.SessionId;
+        return new(
+            request.Application,
+            process.ToLowerInvariant(),
+            process,
+            true,
+            false,
+            window);
+    }
+
+    public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var process = FixtureProcessName(request.Application);
+        var found = ListWindows()
+            .Where(x => string.Equals(x.ProcessName, process, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (found.Length == 1) return found[0];
+        if (found.Length > 1)
+            throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one fixture application window is running.");
+        throw new DesktopHostFaultException(
+            "app_not_found",
+            "Fixture application window is not running.");
+    }
+
+    public DesktopWindowInfo ActivateWindow(DesktopApplicationActivateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        var found = ListWindows().SingleOrDefault(x => x.SessionId == request.SessionId)
+            ?? throw new DesktopHostFaultException("session_not_found", "Desktop fixture window session is not available.");
+        _foregroundSessionId = found.SessionId;
+        return found with { Foreground = true };
+    }
 
     public DesktopObservation Observe(string sessionId)
     {
@@ -247,6 +327,28 @@ public sealed class FixtureDesktopBackend : IDesktopBackend
         if (bytes.Length > DesktopProtocolConstants.MaxScreenshotBytes)
             throw new DesktopHostFaultException("screenshot_too_large", "Fixture screenshot exceeds protocol limit.");
         return bytes;
+    }
+
+    private static string FixtureProcessName(string application)
+    {
+        application = (application ?? "").Trim();
+        if (application.Length is < 1 or > 128 || application.Any(char.IsControl)
+            || application.IndexOfAny(['\\','/',':','"','\'',';','|','&','>','<']) >= 0
+            || application.Contains("..", StringComparison.Ordinal))
+            throw new DesktopHostFaultException("invalid_application", "Use a friendly application name.");
+        return application.ToLowerInvariant() switch
+        {
+            "explorer" or "file explorer" or "windows explorer" => "explorer",
+            "word" or "microsoft word" or "winword" => "WINWORD",
+            "excel" or "microsoft excel" => "EXCEL",
+            "autocad" or "acad" => "acad",
+            "notepad" => "notepad",
+            _ when application.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                => Path.GetFileNameWithoutExtension(application),
+            _ when application.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-')
+                => application,
+            _ => throw new DesktopHostFaultException("app_not_found", "Fixture application alias is not registered.")
+        };
     }
 
     private void RequireSession(string sessionId)

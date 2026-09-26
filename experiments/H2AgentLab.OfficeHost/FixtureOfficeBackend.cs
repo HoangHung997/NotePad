@@ -3,17 +3,80 @@ using H2AgentLab.OfficeProtocol;
 
 namespace H2AgentLab.OfficeHost;
 
-public sealed class FixtureOfficeBackend : IOfficeBackend
+public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBackend, IWordPagedReadBackend
 {
     private readonly ExcelFixture _excel = new();
     private readonly WordFixture _word = new();
+    private long _excelRevision = 1;
+    private long _wordRevision = 1;
+    private readonly int _excelPatchFaultAfterWrites; private readonly bool _excelPatchReadbackFailsAfterFault; private readonly bool _excelSheetProtected;
+
+    public FixtureOfficeBackend(int extraExcelRows=0,int sparseExcelLastRow=0,int excelPatchFaultAfterWrites=-1,
+        bool excelPatchReadbackFailsAfterFault=false,bool excelSheetProtected=false,int extraWordParagraphs=0)
+    {
+        if (extraExcelRows is < 0 or > 20_000) throw new ArgumentOutOfRangeException(nameof(extraExcelRows));
+        if (extraWordParagraphs is < 0 or > 20_000) throw new ArgumentOutOfRangeException(nameof(extraWordParagraphs));
+        if(excelPatchFaultAfterWrites < -1 || excelPatchFaultAfterWrites > ExcelPatchLimits.MaxCells)throw new ArgumentOutOfRangeException(nameof(excelPatchFaultAfterWrites));
+        _excelPatchFaultAfterWrites=excelPatchFaultAfterWrites;_excelPatchReadbackFailsAfterFault=excelPatchReadbackFailsAfterFault;_excelSheetProtected=excelSheetProtected;
+        if (sparseExcelLastRow is < 0 or > ExcelRangeReadRules.MaxExcelRows) throw new ArgumentOutOfRangeException(nameof(sparseExcelLastRow));
+        for (var row = 3; row < 3 + extraExcelRows; row++)
+        {
+            var address = "A" + row;
+            _excel.Cells.Add(address, new ExcelCellFixture(address, "UNCHANGED-" + row, "", false, false, null, "General"));
+        }
+        if (sparseExcelLastRow > 0)
+        {
+            var address = "Z" + sparseExcelLastRow;
+            _excel.Cells[address] = new ExcelCellFixture(address, "SPARSE-END", "", false, false, null, "General");
+        }
+        for(var i=0;i<extraWordParagraphs;i++)
+            _word.Paragraphs.Add(new WordParagraphFixture($"WORD-LONG-{i + 3:D5}", false, false, false));
+    }
 
     public ExcelDiscovery DiscoverExcel()
     {
-        var snapshot = ExcelSnapshot();
-        return new ExcelDiscovery(
-            [Info(snapshot)],
-            snapshot.SessionId);
+        var info = new ExcelWorkbookInfo(
+            _excel.SessionId,
+            _excel.Name,
+            _excel.FullName,
+            _excel.Saved,
+            _excel.SheetName,
+            _excel.SelectionAddress,
+            "");
+        return new ExcelDiscovery([info], _excel.SessionId);
+    }
+
+    public void MoveExcelSelectionForFixture(string address)
+    {
+        var bounds = ExcelRangeReadRules.ParseRange(address);
+        if (bounds.CellCount != 1)
+            throw new ArgumentException("Fixture selection must be one cell.", nameof(address));
+        _excel.SelectionAddress = bounds.Address;
+    }
+
+    public void RenameExcelSheetForFixture(string sheetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sheetName);
+        _excel.SheetName = sheetName.Trim();
+        _excel.Saved = false;
+        _excelRevision++;
+    }
+
+    public void SetExcelValueForFixture(string address, string value, string formula = "")
+    {
+        var bounds = ExcelRangeReadRules.ParseRange(address);
+        if (bounds.CellCount != 1)
+            throw new ArgumentException("Fixture edit must target one cell.", nameof(address));
+        var normalized = bounds.Address;
+        if (!_excel.Cells.TryGetValue(normalized, out var cell))
+        {
+            cell = new ExcelCellFixture(normalized, "", "", false, false, null, "General");
+            _excel.Cells[normalized] = cell;
+        }
+        cell.Value = value ?? "";
+        cell.Formula = formula ?? "";
+        _excel.Saved = false;
+        _excelRevision++;
     }
 
     public ExcelLiveSnapshot SnapshotExcel(string sessionId)
@@ -22,63 +85,151 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         return ExcelSnapshot();
     }
 
-    public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
+    public ExcelRangeReadPage ReadExcelRange(ExcelReadRangeRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var before = SnapshotExcel(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-
+        RequireSession(request.SessionId, _excel.SessionId, "Excel workbook");
         if (!string.Equals(request.SheetName, _excel.SheetName, StringComparison.Ordinal))
-            throw new OfficeHostFaultException("sheet_not_found", "Fixture Excel sheet not found.");
-        if (request.Cells.Count is < 1 or > 128)
-            throw new OfficeHostFaultException("invalid_request", "Excel patch must contain 1..128 cells.");
-
-        var changed = new List<string>();
-        foreach (var patch in request.Cells)
         {
-            var address = NormalizeCellAddress(patch.Address);
-            if (!_excel.Cells.TryGetValue(address, out var cell))
-                throw new OfficeHostFaultException("cell_not_found", $"Excel cell '{address}' is outside the fixture scope.");
-
-            if (patch.ClearValue)
-            {
-                cell.Value = "";
-                cell.Formula = "";
-            }
-            if (patch.Value is not null)
-            {
-                cell.Value = patch.Value;
-                cell.Formula = "";
-            }
-            if (patch.Formula is not null)
-                cell.Formula = patch.Formula;
-            if (patch.Bold is bool bold) cell.Bold = bold;
-            if (patch.Italic is bool italic) cell.Italic = italic;
-            if (patch.FillColor is long fill) cell.FillColor = fill;
-            if (patch.NumberFormat is not null) cell.NumberFormat = patch.NumberFormat;
-            changed.Add(address);
+            if (!string.IsNullOrWhiteSpace(request.Cursor) || !string.IsNullOrWhiteSpace(request.ContentVersion))
+                throw new OfficeHostFaultException(
+                    "stale_content",
+                    "Fixture Excel sheet changed or is no longer available; restart the range read.",
+                    true);
+            throw new OfficeHostFaultException("sheet_not_found", "Fixture Excel sheet not found.", true);
         }
 
-        _excel.Saved = false;
-        var after = ExcelSnapshot();
-        return new ExcelPatchResult(before, after, changed.Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray());
+        ExcelRangeBounds requested;
+        IReadOnlyList<string> fields;
+        int pageSize;
+        try
+        {
+            requested = ExcelRangeReadRules.ParseRange(request.Range);
+            fields = ExcelRangeReadFields.Normalize(request.Fields);
+            pageSize = ExcelRangeReadLimits.NormalizePageSize(request.PageSize);
+        }
+        catch (Exception ex) when (ex is ArgumentException)
+        {
+            throw new OfficeHostFaultException("invalid_request", ex.Message, true);
+        }
+
+        ExcelRangePagePlan plan;
+        try { plan = ExcelRangeReadRules.PlanPage(requested, pageSize, request.Cursor); }
+        catch (Exception ex) when (ex is ArgumentException)
+        { throw new OfficeHostFaultException("invalid_cursor", ex.Message, true); }
+
+        var structuralPaging = !plan.Complete
+            && fields.Any(field => field is ExcelRangeReadFields.Format or ExcelRangeReadFields.Merge or ExcelRangeReadFields.Hidden);
+        if (structuralPaging)
+            throw new OfficeHostFaultException(
+                "content_tracking_unavailable",
+                "Paged Excel format/merge/hidden reads are not safe because native Excel change events do not provide a reliable structural-edit revision. Request a bounded structural range that completes in one page.",
+                true);
+
+        var extent = ExcelExtent();
+        var contentVersion = OfficeHostSafety.StableToken(new
+        {
+            _excel.SessionId,
+            _excel.Name,
+            _excel.FullName,
+            _excel.Saved,
+            _excel.SheetName,
+            extent.Address,
+            _excelRevision,
+            requestedRange = requested.Address,
+            fields = fields.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            pageSize
+        });
+        if (!string.IsNullOrWhiteSpace(request.Cursor) && string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request", "A continuation cursor requires content_version.", true);
+        if (!string.IsNullOrWhiteSpace(request.ContentVersion)
+            && !string.Equals(request.ContentVersion, contentVersion, StringComparison.Ordinal))
+            throw new OfficeHostFaultException("stale_content", "Excel content changed after the previous page; restart the range read.", true);
+
+        var started = Environment.TickCount64;
+        var cells = new List<ExcelRangeCellState>(plan.CellCount);
+        var wantValue = fields.Contains(ExcelRangeReadFields.Value, StringComparer.Ordinal);
+        var wantFormula = fields.Contains(ExcelRangeReadFields.Formula, StringComparer.Ordinal);
+        var wantFormat = fields.Contains(ExcelRangeReadFields.Format, StringComparer.Ordinal);
+        for (var row = plan.Bounds.StartRow; row <= plan.Bounds.EndRow; row++)
+        for (var column = plan.Bounds.StartColumn; column <= plan.Bounds.EndColumn; column++)
+        {
+            var address = ExcelRangeReadRules.CellAddress(row, column);
+            _excel.Cells.TryGetValue(address, out var cell);
+            cells.Add(new ExcelRangeCellState(
+                address,
+                wantValue ? cell?.Value ?? "" : null,
+                wantFormula ? cell?.Formula ?? "" : null,
+                wantFormat ? cell?.Bold ?? false : null,
+                wantFormat ? cell?.Italic ?? false : null,
+                wantFormat ? cell?.FillColor : null,
+                wantFormat ? cell?.NumberFormat ?? "General" : null,
+                wantFormat ? "General" : null,
+                wantFormat ? "General" : null));
+        }
+
+        var merges = fields.Contains(ExcelRangeReadFields.Merge, StringComparer.Ordinal)
+            && ExcelRangeReadRules.Intersects(plan.Bounds, ExcelRangeReadRules.ParseRange("A1:B1"))
+            ? new[] { "A1:B1" }
+            : [];
+        var hiddenRows = fields.Contains(ExcelRangeReadFields.Hidden, StringComparer.Ordinal)
+            && plan.Bounds.StartRow <= 3 && plan.Bounds.EndRow >= 3 ? new[] { 3 } : [];
+        var hiddenColumns = fields.Contains(ExcelRangeReadFields.Hidden, StringComparer.Ordinal)
+            && plan.Bounds.StartColumn <= 3 && plan.Bounds.EndColumn >= 3 ? new[] { 3 } : [];
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(new { cells, merges, hiddenRows, hiddenColumns }).Length;
+        return new ExcelRangeReadPage(
+            _excel.SessionId,
+            _excel.Name,
+            _excel.FullName,
+            _excel.Saved,
+            _excel.SheetName,
+            requested.Address,
+            plan.Bounds.Address,
+            fields,
+            cells,
+            merges,
+            hiddenRows,
+            hiddenColumns,
+            extent,
+            contentVersion,
+            plan.NextCursor,
+            plan.Complete,
+            "FixtureLiveDocument",
+            new(plan.CellCount, payloadBytes, Math.Max(0, Environment.TickCount64 - started)));
+    }
+
+    public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        var countError=ExcelPatchLimits.ValidationError(request.Cells?.Count??-1);
+        if(request.Cells is null||countError is not null)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode,countError??"Excel patch cells are required.",true);
+        IReadOnlyList<ExcelCellPatch> cells;try{cells=ExcelPatchMutationRules.ValidateAndNormalize(request.Cells);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}
+        var before=SnapshotExcel(request.SessionId);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);
+        if(request.SheetName!=_excel.SheetName)throw new OfficeHostFaultException("sheet_not_found","Fixture Excel sheet not found.",true);
+        if(_excelSheetProtected)throw new OfficeHostFaultException("protected_cell","The fixture worksheet is protected; no cells were written.",true);
+        foreach(var patch in cells){if(!_excel.Cells.ContainsKey(patch.Address))throw new OfficeHostFaultException("cell_not_found",$"Excel cell '{patch.Address}' is outside the fixture scope.",true);
+            if(IsMergedNonAnchor(patch.Address,"A1:B1"))throw new OfficeHostFaultException("merged_cell_non_anchor",$"Excel cell '{patch.Address}' is not the top-left cell of its merged range.",true);}
+        var applied=0;Exception? failure=null;
+        foreach(var patch in cells){if(_excelPatchFaultAfterWrites>=0&&applied>=_excelPatchFaultAfterWrites){failure=new IOException("Injected Excel write failure.");break;}
+            try{Apply(_excel.Cells[patch.Address],patch);applied++;}catch(Exception ex){failure=ex;break;}}
+        if(applied>0){_excel.Saved=false;_excelRevision++;}
+        if(failure is not null&&_excelPatchReadbackFailsAfterFault)return ExcelPatchMutationRules.Classify(request,before,null,cells,"outcome_unknown","Fixture readback was intentionally unavailable after a possible write.");
+        return ExcelPatchMutationRules.Classify(request,before,ExcelSnapshot(),cells,failure is null?null:"injected_write_failure",
+            failure is null?null:"Excel stopped before the whole fixture batch completed.");
     }
 
     public ExcelLiveSnapshot RecalculateExcel(ExcelRecalculateRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        OfficeHostSafety.RequirePermission(request.PermissionGranted);
-        var before = SnapshotExcel(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
-
-        if (_excel.Cells.TryGetValue("B1", out var b1)
-            && string.Equals(b1.Formula, "=A1", StringComparison.OrdinalIgnoreCase)
-            && _excel.Cells.TryGetValue("A1", out var a1))
-            b1.Value = a1.Value;
-
-        _excel.Saved = false;
-        return ExcelSnapshot();
+        ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        var before=SnapshotExcel(request.SessionId);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);
+        if(!string.IsNullOrWhiteSpace(request.SheetName)&&request.SheetName!=_excel.SheetName)throw new OfficeHostFaultException("sheet_not_found","Fixture Excel sheet not found.",true);
+        if(!string.IsNullOrWhiteSpace(request.Range)&&string.IsNullOrWhiteSpace(request.SheetName))throw new OfficeHostFaultException("invalid_request","Scoped Excel recalculation requires sheet name.",true);
+        var includesB1=true;if(!string.IsNullOrWhiteSpace(request.Range)){ExcelRangeBounds scope;try{scope=ExcelRangeReadRules.ParseRange(request.Range);}
+            catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}includesB1=ExcelRangeReadRules.Intersects(scope,ExcelRangeReadRules.ParseRange("B1"));}
+        if(includesB1&&_excel.Cells.TryGetValue("B1",out var b1)&&b1.Formula.Equals("=A1",StringComparison.OrdinalIgnoreCase)&&_excel.Cells.TryGetValue("A1",out var a1))b1.Value=a1.Value;
+        _excel.Saved=false;_excelRevision++;return ExcelSnapshot();
     }
 
     public OfficeSaveCopyResult SaveExcelCopy(OfficeSaveCopyRequest request)
@@ -107,12 +258,106 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         return WordSnapshot();
     }
 
+    public void MoveWordSelectionForFixture(int start,int end)
+    {
+        if(start<0||end<start)throw new ArgumentOutOfRangeException(nameof(start));
+        _word.SelectionStart=start;_word.SelectionEnd=end;
+    }
+
+    public void SetWordParagraphForFixture(int index,string text)
+    {
+        if(index<0||index>=_word.Paragraphs.Count)throw new ArgumentOutOfRangeException(nameof(index));
+        _word.Paragraphs[index].Text=text??"";_word.Saved=false;_wordRevision++;
+    }
+
+    public WordParagraphReadPage ReadWordParagraphs(WordParagraphReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var total=_word.Paragraphs.Count;if(total==0)throw new OfficeHostFaultException("resource_not_found","Fixture Word document has no paragraphs.",true);
+        var pageSize=WordPagedReadLimits.ParagraphPageSize(request.PageSize);
+        int start;try{start=WordPagedReadRules.Start(request.Cursor,"p",request.StartParagraph,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var end=Math.Min(total,start+pageSize);var items=new List<WordParagraphPageItem>();var chars=0;
+        for(var i=start;i<end;i++)
+        {
+            var p=_word.Paragraphs[i];var text=p.Text;chars+=text.Length;
+            var style="Normal";
+            var include=string.IsNullOrWhiteSpace(request.Query)||text.Contains(request.Query,StringComparison.OrdinalIgnoreCase);
+            if(request.OutlineOnly)include=include&&style.StartsWith("Heading",StringComparison.OrdinalIgnoreCase);
+            if(!include)continue;
+            IReadOnlyList<WordRunState> runs=request.IncludeFormatting
+                ? [new WordRunState(0,text,"DefaultParagraphFont",p.Bold,p.Italic,p.Underline)] : [];
+            items.Add(new(i,text,style,runs,[]));
+        }
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading the page.",true);
+        var complete=end>=total;var payload=JsonSerializer.SerializeToUtf8Bytes(items).Length;
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,total,items,version,
+            complete?null:WordPagedReadRules.Cursor("p",end),complete,"FixtureLiveDocument",
+            new(items.Count,end-start,chars,payload,0));
+    }
+
+    public WordRangeReadPage ReadWordRange(WordRangeReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var all=string.Join("\r",_word.Paragraphs.Select(p=>p.Text));
+        if(request.Start<0||request.Length<1||request.Length>WordPagedReadLimits.MaxRequestedRangeCharacters
+            || request.Start>all.Length||request.Start+request.Length>all.Length)
+            throw new OfficeHostFaultException("invalid_request","Word range is outside the document or exceeds the bounded request limit.",true);
+        var requestedEnd=request.Start+request.Length;int current;
+        try{current=WordPagedReadRules.Start(request.Cursor,"r",request.Start,request.Start,requestedEnd);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var size=WordPagedReadLimits.RangePageSize(request.PageSize);var end=Math.Min(requestedEnd,current+size);
+        var text=all[current..end];IReadOnlyList<WordRunState> runs=request.IncludeFormatting
+            ? [new WordRunState(0,text,"DefaultParagraphFont",false,false,false)] : [];
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading the range.",true);
+        var complete=end>=requestedEnd;var payload=JsonSerializer.SerializeToUtf8Bytes(text).Length;
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,request.Start,request.Length,current,end-current,text,runs,[],true,
+            version,complete?null:WordPagedReadRules.Cursor("r",end),complete,"FixtureLiveDocument",
+            new(1,1,text.Length,payload,0));
+    }
+
+    public WordTableReadPage ReadWordTables(WordTableReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);RequireSession(request.SessionId,_word.SessionId,"Word document");
+        var version=WordContentVersion();
+        if(!string.IsNullOrWhiteSpace(request.Cursor)&&string.IsNullOrWhiteSpace(request.ContentVersion))
+            throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
+        RequireWordPageVersion(request.ContentVersion,version);
+        var all=FixtureWordTables();var total=all.Count;if(total==0)
+            return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,0,[],version,null,true,"FixtureLiveDocument",new(0,0,0,2,0));
+        int start;try{start=WordPagedReadRules.Start(request.Cursor,"t",request.StartTable,0,total);}
+        catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
+        var size=WordPagedReadLimits.TablePageSize(request.PageSize);var end=Math.Min(total,start+size);var page=all.Skip(start).Take(end-start).ToArray();
+        var after=WordContentVersion();if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading tables.",true);
+        var complete=end>=total;var chars=page.SelectMany(t=>t.Rows).SelectMany(r=>r).Sum(x=>x.Length);
+        return new(_word.SessionId,_word.Name,_word.FullName,_word.Saved,total,page,version,
+            complete?null:WordPagedReadRules.Cursor("t",end),complete,"FixtureLiveDocument",
+            new(page.Length,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(page).Length,0));
+    }
+
     public WordPatchResult PatchWord(WordPatchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
         var before = SnapshotWord(request.SessionId);
-        OfficeHostSafety.RequireState(request.StateToken, before.StateToken);
+        if(!string.IsNullOrWhiteSpace(request.ContentVersion))
+        {
+            if(request.ContentVersion!=before.ContentVersion)
+                throw new OfficeHostFaultException("stale_content","Word content changed since the caller observed it.",true);
+        }
+        else
+        {
+            try{OfficeHostSafety.RequireState(request.StateToken,before.StateToken);}
+            catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}
+        }
 
         if (WordPatchRules.ValidationError(before, request.Paragraphs) is { } problem)
             throw new OfficeHostFaultException("word_patch_rejected", problem);
@@ -136,6 +381,7 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         }
 
         _word.Saved = false;
+        _wordRevision++;
         var after = WordSnapshot();
         return new WordPatchResult(before, after, changed.Distinct().OrderBy(x => x).ToArray());
     }
@@ -187,6 +433,34 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         return new OfficeSaveCopyResult(snapshot.SessionId, destination, snapshot.StateToken, OfficeHostSafety.Sha256(bytes));
     }
 
+    private ExcelSheetExtent ExcelExtent()
+    {
+        var bounds = _excel.Cells.Keys
+            .Select(ExcelRangeReadRules.ParseRange)
+            .ToArray();
+        var firstRow = bounds.Min(x => x.StartRow);
+        var firstColumn = bounds.Min(x => x.StartColumn);
+        var lastRow = bounds.Max(x => x.EndRow);
+        var lastColumn = bounds.Max(x => x.EndColumn);
+        var extent = new ExcelRangeBounds(firstRow, firstColumn, lastRow, lastColumn);
+        return new ExcelSheetExtent(
+            extent.Address,
+            firstRow,
+            firstColumn,
+            lastRow,
+            lastColumn,
+            extent.CellCount);
+    }
+
+    private static void Apply(ExcelCellFixture cell,ExcelCellPatch patch)
+    {if(patch.ClearValue){cell.Value="";cell.Formula="";}if(patch.Value is not null){cell.Value=patch.Value;cell.Formula="";}if(patch.Formula is not null)cell.Formula=patch.Formula;
+     if(patch.Bold is bool b)cell.Bold=b;if(patch.Italic is bool i)cell.Italic=i;if(patch.FillColor is long f)cell.FillColor=f;if(patch.NumberFormat is not null)cell.NumberFormat=patch.NumberFormat;}
+    private static bool IsMergedNonAnchor(string address,string mergedRange){var m=ExcelRangeReadRules.ParseRange(mergedRange);
+        return ExcelRangeReadRules.Intersects(ExcelRangeReadRules.ParseRange(address),m)&&address!=ExcelRangeReadRules.CellAddress(m.StartRow,m.StartColumn);}
+    private static void RequireExcelMutationPrecondition(string stateToken,string? contentToken,ExcelLiveSnapshot current)
+    {if(!string.IsNullOrWhiteSpace(contentToken)){if(contentToken!=ExcelPatchMutationRules.ContentToken(current))throw new OfficeHostFaultException("stale_content","Excel content changed since the caller observed it.",true);return;}
+     try{OfficeHostSafety.RequireState(stateToken,current.StateToken);}catch(OfficeHostFaultException ex){throw new OfficeHostFaultException(ex.Code,ex.Message,true);}}
+
     private ExcelLiveSnapshot ExcelSnapshot()
     {
         var cells = _excel.Cells.Values
@@ -219,15 +493,9 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
             _excel.SelectionAddress,
             Sheet = sheet
         };
-        return new ExcelLiveSnapshot(
-            _excel.SessionId,
-            _excel.Name,
-            _excel.FullName,
-            _excel.Saved,
-            _excel.SheetName,
-            _excel.SelectionAddress,
-            [sheet],
-            OfficeHostSafety.StableToken(basis));
+        var contentBasis=new{_excel.SessionId,_excel.Name,_excel.FullName,_excel.Saved,_excel.SheetName,Sheet=sheet,Revision=_excelRevision};
+        return new ExcelLiveSnapshot(_excel.SessionId,_excel.Name,_excel.FullName,_excel.Saved,_excel.SheetName,_excel.SelectionAddress,[sheet],
+            OfficeHostSafety.StableToken(basis)){ContentToken=OfficeHostSafety.StableToken(contentBasis)};
     }
 
     private WordLiveSnapshot WordSnapshot()
@@ -247,14 +515,7 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
                         x.Underline)
                 ]))
             .ToArray();
-        var tables = new[]
-        {
-            new WordTableState(
-                0,
-                [
-                    (IReadOnlyList<string>)new[] { "A", "B" }
-                ])
-        };
+        var tables = FixtureWordTables();
         var sections = new[]
         {
             new WordSectionState(0, 612, 792, 72, 72, 72, 72)
@@ -311,7 +572,8 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
             sections,
             headers,
             footers,
-            OfficeHostSafety.StableToken(basis));
+            OfficeHostSafety.StableToken(basis))
+        { ContentVersion = WordContentVersion() };
     }
 
     private static ExcelWorkbookInfo Info(ExcelLiveSnapshot snapshot)
@@ -355,8 +617,8 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         public string SessionId { get; } = "excel-fixture-1";
         public string Name { get; } = "UnsavedFixture.xlsx";
         public string FullName { get; } = Path.Combine(Path.GetTempPath(), "H2AgentLab", "UnsavedFixture.xlsx");
-        public string SheetName { get; } = "Data";
-        public string SelectionAddress { get; } = "A1";
+        public string SheetName { get; set; } = "Data";
+        public string SelectionAddress { get; set; } = "A1";
         public bool Saved { get; set; }
         public Dictionary<string, ExcelCellFixture> Cells { get; } = new(StringComparer.Ordinal)
         {
@@ -384,14 +646,30 @@ public sealed class FixtureOfficeBackend : IOfficeBackend
         public string NumberFormat { get; set; } = numberFormat;
     }
 
+    private IReadOnlyList<WordTableState> FixtureWordTables()
+        => [new WordTableState(0,[(IReadOnlyList<string>)new[]{"A","B"}])];
+
+    private string WordContentVersion()
+        => OfficeHostSafety.StableToken(new {
+            _word.SessionId,_word.Name,_word.FullName,_word.Saved,
+            Revision=_wordRevision,ParagraphCount=_word.Paragraphs.Count,
+            TableCount=1,SectionCount=1
+        });
+
+    private static void RequireWordPageVersion(string? supplied,string current)
+    {
+        if(!string.IsNullOrWhiteSpace(supplied)&&supplied!=current)
+            throw new OfficeHostFaultException("stale_content","Word content changed after the previous page; restart the read.",true);
+    }
+
     private sealed class WordFixture
     {
         public string SessionId { get; } = "word-fixture-1";
         public string Name { get; } = "UnsavedFixture.docx";
         public string FullName { get; } = Path.Combine(Path.GetTempPath(), "H2AgentLab", "UnsavedFixture.docx");
         public bool Saved { get; set; }
-        public int SelectionStart { get; } = 0;
-        public int SelectionEnd { get; } = 12;
+        public int SelectionStart { get; set; } = 0;
+        public int SelectionEnd { get; set; } = 12;
         public string SelectionText => Paragraphs[0].Text;
         public List<WordParagraphFixture> Paragraphs { get; } =
         [

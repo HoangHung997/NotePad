@@ -122,11 +122,8 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
     public void RemoveProviderTools(string providerId)
     {
         var normalized = Normalize(providerId);
-        _registry.UnregisterWhere(x =>
-            string.Equals(
-                x.Provenance?.ProviderId,
-                normalized,
-                StringComparison.Ordinal));
+        if (_providers.TryGetValue(normalized, out var provider)) _providerAdapter.Revoke(provider, permanent: false);
+        else _registry.UnregisterWhere(x => x.Provenance?.ProviderId == normalized);
     }
 
     public async Task<bool> UnregisterProviderAsync(
@@ -134,10 +131,10 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         var normalized = Normalize(providerId);
-        if (!_providers.Remove(normalized, out var provider))
-            return false;
-
-        RemoveProviderTools(normalized);
+        if (!_providers.TryGetValue(normalized, out var provider)) return false;
+        cancellationToken.ThrowIfCancellationRequested();
+        _providerAdapter.Revoke(provider, permanent: true);
+        _providers.Remove(normalized);
         try
         {
             if (provider.Health.Status != ProviderHealthStatus.Disconnected)
@@ -152,7 +149,7 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
         return true;
     }
 
-    private ICapabilityProvider Provider(string providerId)
+    internal ICapabilityProvider Provider(string providerId)
     {
         var normalized = Normalize(providerId);
         return _providers.TryGetValue(normalized, out var provider)
@@ -172,6 +169,7 @@ public sealed class CapabilityProviderManager : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        foreach (var provider in _providers.Values) _providerAdapter.Revoke(provider, permanent: true);
         foreach (var provider in _providers.Values)
             await provider.DisposeAsync().ConfigureAwait(false);
         _providers.Clear();

@@ -96,8 +96,15 @@ internal sealed class ClientResponsesWebSocketConnection : IResponsesWebSocketCo
 /// before a real request is written, the transport may safely fall back to HTTP/SSE. After a real
 /// request write succeeds, disconnects are ambiguous and are never auto-replayed through HTTP.
 /// </summary>
-public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
+public sealed partial class OpenAiResponsesWebSocketTransport : IAgentTransport, IAgentRequestBudgetSource, IAgentContextRebaseTransport
 {
+    private readonly AgentRequestBudgetGuard _requestBudget;
+    public AgentRequestBudgetReceipt? LastRequestBudget => (_fallback as IAgentRequestBudgetSource)?.LastRequestBudget ?? _requestBudget.LastReceipt;
+    public event Action<AgentRequestBudgetReceipt>? RequestBudgetEvaluated
+    {
+        add { _requestBudget.Evaluated += value; _fallbackBudgetObserver += value; }
+        remove { _requestBudget.Evaluated -= value; _fallbackBudgetObserver -= value; }
+    }
     private readonly AiProfile _profile;
     private readonly string _apiKey;
     private readonly Func<IResponsesWebSocketConnection> _connectionFactory;
@@ -139,6 +146,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             throw new ArgumentException("Chưa chọn model OpenAI Responses.", nameof(profile));
 
         _profile = profile.Copy();
+        _requestBudget = new AgentRequestBudgetGuard(_profile);
         _profile.Protocol = AiProtocol.OpenAiResponses;
         _apiKey = apiKey ?? "";
         _connectionFactory = connectionFactory;
@@ -168,7 +176,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         _turnId = request.TurnId;
         _allowParallelToolCalls = request.AllowParallelToolCalls;
         _promptCacheKey = NormalizeCacheKey(request.PromptCacheKey);
-        foreach (var tool in SnapshotTools(request.Tools)) _tools[tool.Name] = tool;
+        OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.Tools));
         foreach (var message in request.Messages) _initialInput.Add(ToResponsesMessage(message));
         if (_initialInput.Count == 0) throw new ArgumentException("Turn cần ít nhất một message.", nameof(request));
         _started = true;
@@ -233,7 +241,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         }
 
         if (request.NewlyLoadedTools is { Count: > 0 })
-            foreach (var tool in SnapshotTools(request.NewlyLoadedTools)) _tools[tool.Name] = tool;
+            OpenAiResponsesWireContract.Admit(_tools, SnapshotTools(request.NewlyLoadedTools));
 
         var input = new JsonArray();
         foreach (var call in _pendingCalls)
@@ -292,9 +300,15 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         if (_httpFallbackFactory is null)
             throw new IOException("Responses WebSocket không kết nối được và không có HTTP fallback.");
         _fallback = _httpFallbackFactory();
+        if (_fallback is IAgentRequestBudgetSource budgeted)
+            budgeted.RequestBudgetEvaluated += ForwardFallbackBudget;
         await foreach (var item in _fallback.StartAsync(request, cancellationToken).WithCancellation(cancellationToken))
             yield return item;
     }
+
+    private void ForwardFallbackBudget(AgentRequestBudgetReceipt receipt)
+        => _fallbackBudgetObserver?.Invoke(receipt);
+    private event Action<AgentRequestBudgetReceipt>? _fallbackBudgetObserver;
 
     private async Task EnsureConnected(CancellationToken cancellationToken)
     {
@@ -320,7 +334,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         {
             var payload = BuildPayload(_initialInput, previousResponseId: null);
             payload["generate"] = false;
-            await _connection.SendTextAsync(payload.ToJsonString(), token);
+            var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token, prewarm: true);
+            await _connection.SendTextAsync(serialized, token);
 
             string? responseId = null;
             var completed = false;
@@ -353,6 +368,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             if (!completed || string.IsNullOrWhiteSpace(responseId))
                 throw new IOException("Responses prewarm đóng trước completion hoặc thiếu response id.");
 
+            _requestBudget.ObserveCompleted(null, responseId, prewarm: true);
             _trace?.Mark(AgentTraceKind.PrewarmFinish, "responses-websocket", "success");
             return responseId;
         }
@@ -380,7 +396,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 
         // From this point onward a network failure is ambiguous: the provider may have accepted
         // the request. Do not auto-fallback/retry, which could duplicate tool execution or output.
-        await _connection.SendTextAsync(payload.ToJsonString(), token);
+        var serialized = _requestBudget.Prepare(payload, _taskId, _turnId, "ResponsesWebSocket", token);
+        await _connection.SendTextAsync(serialized, token);
 
         var startedEmitted = false;
         var completed = false;
@@ -402,12 +419,12 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             var type = String(root, "type") ?? "";
 
             if (type == "error")
-                throw new IOException("OpenAI Responses WebSocket báo lỗi. Không tự phát lại request.");
+                throw OpenAiResponsesDiagnostics.Error(root, _previousResponseId is null ? "initial" : "tool_continuation");
             if (type == "response.failed")
-                throw new IOException("OpenAI Responses WebSocket kết thúc ở trạng thái failed.");
+                throw OpenAiResponsesDiagnostics.Error(root, _previousResponseId is null ? "initial" : "tool_continuation");
             if (type == "response.incomplete")
             {
-                var reason = ReadIncompleteReason(root);
+                var reason = ReadIncompleteReason(root) is "max_output_tokens" ? "max_output_tokens" : "not_exposed";
                 throw new IOException("OpenAI Responses WebSocket kết thúc chưa hoàn tất" + (reason.Length > 0 ? ": " + reason : "."));
             }
 
@@ -453,8 +470,11 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
                     throw new InvalidDataException("response.completed thiếu response object.");
                 responseId = String(responseObject, "id") ?? responseId;
                 usage = ReadUsage(responseObject);
-                if (outputItems.Count == 0 && responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
+                if (responseObject.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array && output.GetArrayLength() > 0)
+                {
+                    outputItems.Clear();
                     outputItems.AddRange(output.EnumerateArray().Select(x => x.GetRawText()));
+                }
                 completed = true;
                 break;
             }
@@ -473,12 +493,17 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
 
         _previousResponseId = responseId;
         _pendingCalls = calls;
+        _requestBudget.ObserveCompleted(usage, responseId);
         if (usage is not null) yield return AgentTransportEvent.Meter(usage);
         foreach (var call in calls) yield return AgentTransportEvent.Tool(call);
         yield return AgentTransportEvent.Complete(responseId, calls.Count > 0 ? "tool_calls" : "stop");
     }
 
     private JsonObject BuildPayload(JsonArray input, string? previousResponseId)
+        => BuildContextPayload(input, previousResponseId, _tools.Values.ToArray(), _allowParallelToolCalls, _promptCacheKey);
+
+    private JsonObject BuildContextPayload(JsonArray input, string? previousResponseId,
+        IReadOnlyList<AgentToolDefinition> tools, bool allowParallel, string? cacheKey)
     {
         var payload = new JsonObject
         {
@@ -488,12 +513,12 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             ["store"] = false
         };
         if (!string.IsNullOrWhiteSpace(previousResponseId)) payload["previous_response_id"] = previousResponseId;
-        if (_tools.Count > 0)
+        if (tools.Count > 0)
         {
-            payload["tools"] = BuildTools();
-            payload["parallel_tool_calls"] = _allowParallelToolCalls;
+            payload["tools"] = BuildTools(tools);
+            payload["parallel_tool_calls"] = allowParallel;
         }
-        if (_promptCacheKey is { Length: > 0 }) payload["prompt_cache_key"] = _promptCacheKey;
+        if (cacheKey is { Length: > 0 }) payload["prompt_cache_key"] = cacheKey;
 
         var reasoning = new JsonObject();
         if (_profile.RequestReasoningSummary) reasoning["summary"] = "auto";
@@ -527,19 +552,8 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         return new JsonObject { ["role"] = role, ["content"] = parts };
     }
 
-    private JsonArray BuildTools()
-    {
-        var result = new JsonArray();
-        foreach (var tool in _tools.Values)
-            result.Add(new JsonObject
-            {
-                ["type"] = "function",
-                ["name"] = tool.Name,
-                ["description"] = tool.Description,
-                ["parameters"] = JsonNode.Parse(tool.Parameters.GetRawText())
-            });
-        return result;
-    }
+    private JsonArray BuildTools(IEnumerable<AgentToolDefinition>? candidates = null)
+        => OpenAiResponsesWireContract.Tools(candidates ?? _tools.Values);
 
     private static IReadOnlyList<AgentToolDefinition> SnapshotTools(IEnumerable<AgentToolDefinition> tools)
     {
@@ -554,7 +568,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
         return result;
     }
 
-    private static List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
+    private List<AgentTransportToolCall> ResolveFunctionCalls(IEnumerable<string> outputItems)
     {
         var result = new List<AgentTransportToolCall>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -571,7 +585,7 @@ public sealed class OpenAiResponsesWebSocketTransport : IAgentTransport
             using var args = JsonDocument.Parse(arguments);
             if (args.RootElement.ValueKind != JsonValueKind.Object)
                 throw new InvalidDataException("Responses function_call arguments phải là JSON object.");
-            result.Add(new AgentTransportToolCall(id, name, arguments));
+            result.Add(new AgentTransportToolCall(id, OpenAiResponsesWireContract.InternalName(name, _tools.Values), arguments));
         }
         return result;
     }

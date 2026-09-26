@@ -82,14 +82,17 @@ public sealed class SafeWorkspace
     public string Root { get; }
     private readonly Func<bool>? _fullAccessAuthorized;
     private readonly Func<string, bool>? _additionalTarget;
+    private readonly Func<string, bool>? _groundedTarget;
     public static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     { ".txt", ".md", ".csv", ".json", ".cs", ".csproj", ".slnx", ".xaml", ".axaml", ".py", ".js", ".ts", ".tsx", ".html", ".css", ".xml", ".yml", ".yaml" };
     private static readonly HashSet<string> Excluded = new(StringComparer.OrdinalIgnoreCase)
     { ".git", ".ssh", ".codex", ".aws", ".azure", "node_modules", "bin", "obj", ".vs", ".env", "credentials", "secrets.json", "appsettings.production.json" };
-    public SafeWorkspace(string root, Func<bool>? fullAccessAuthorized = null, Func<string, bool>? additionalTarget = null)
+    public SafeWorkspace(string root, Func<bool>? fullAccessAuthorized = null, Func<string, bool>? additionalTarget = null,
+        Func<string, bool>? groundedTarget = null)
     {
         _fullAccessAuthorized = fullAccessAuthorized;
         _additionalTarget = additionalTarget;
+        _groundedTarget = groundedTarget;
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         if (!Directory.Exists(Root) || Root == Path.GetPathRoot(Root)) throw new IOException("Chọn một thư mục dự án cụ thể, không chọn cả ổ đĩa.");
         CheckLinks(Root);
@@ -102,6 +105,24 @@ public sealed class SafeWorkspace
     }
     public string Resolve(string relative, bool directory = false)
     {
+        if (_groundedTarget is not null)
+        {
+            if (_fullAccessAuthorized is not null && !_fullAccessAuthorized())
+                throw new AgentFaultException("expired_permission", "Quyền toàn máy đã hết hạn hoặc bị thu hồi.", false);
+            // AR-012: grounding is checked even under FullAccess. Normalization is NOT native
+            // identity verification; unknown links/aliases fail closed rather than expanding scope.
+            if (!H2Notes.Core.H2AgentTargetScope.TryNormalize(relative, out var candidate, Root)
+                || !H2Notes.Core.H2AgentTargetScope.HasNoReparsePoints(candidate)
+                || !_groundedTarget(candidate))
+                throw new AgentFaultException("boundary", "Đích không thuộc workspace hoặc tài nguyên được người dùng chỉ định rõ.", false);
+            var components = candidate.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (components.Any(p => Excluded.Contains(p) || p.StartsWith(".env", StringComparison.OrdinalIgnoreCase)
+                || p.EndsWith(".pem", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".key", StringComparison.OrdinalIgnoreCase)))
+                throw new AgentFaultException("boundary", "Không đọc/ghi tệp bí mật hoặc thư mục được bảo vệ.", false);
+            if (!directory && H2Notes.Core.H2AgentTargetScope.PathComparer.Equals(candidate, Root))
+                throw new AgentFaultException("boundary", "Thao tác này cần một tệp cụ thể.", false);
+            return candidate;
+        }
         if (_fullAccessAuthorized is null && _additionalTarget is not null && relative.IndexOfAny(['\0', '*', '?']) < 0)
         {
             var candidate = Path.GetFullPath(relative, Root);

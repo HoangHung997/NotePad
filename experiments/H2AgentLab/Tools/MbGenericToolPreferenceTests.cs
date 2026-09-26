@@ -120,6 +120,51 @@ public static class MbGenericToolPreferenceTests
             return Task.CompletedTask;
         });
 
+        await Test("MB-61 provider request terms can prioritize a different capability family", () =>
+        {
+            var highLexical = Tool(
+                "content.open",
+                "Open an existing content file.",
+                ToolInteractionFidelity.Structured,
+                family: "content-active");
+            var lifecycle = new ToolDescriptor(
+                "lifecycle.launch",
+                new ToolNamespace("lifecycle", "Generic lifecycle actions."),
+                "Start a registered target application.",
+                AgentToolRisk.Low,
+                AgentToolAccess.ReadOnly,
+                supportsParallel: true,
+                schemaVersion: "v1",
+                callableSchema: JsonSerializer.SerializeToElement(new
+                {
+                    type = "function",
+                    function = new
+                    {
+                        name = "lifecycle.launch",
+                        description = "Start a registered target application.",
+                        parameters = new { type = "object", properties = new { }, additionalProperties = false }
+                    }
+                }),
+                executor: new DelegatingToolExecutor("mb61-lifecycle", (call, ct) => ValueTask.FromResult("{}")),
+                preference: new ToolPreferenceMetadata(
+                    "lifecycle",
+                    ToolInteractionFidelity.Accessibility,
+                    explicitRequestTerms: ["start application"]));
+
+            var ranked = DocumentToolPreference.Apply(
+                "start application",
+                [
+                    Result(highLexical, 100),
+                    Result(lifecycle, 1)
+                ],
+                10);
+
+            Check(ranked.Count == 2
+                && ranked[0].Descriptor.Name == "lifecycle.launch",
+                "Provider-declared request terms did not prioritize the matching capability family.");
+            return Task.CompletedTask;
+        });
+
         await Test("MB-61 interaction adapter chooser is application-neutral and honors explicit adapter request", () =>
         {
             var adapters = new[]

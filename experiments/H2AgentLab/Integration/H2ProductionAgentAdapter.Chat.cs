@@ -1,5 +1,6 @@
 using System.Text.Json;
 using H2Notes.Core;
+using H2AgentLab.Tasking;
 
 namespace H2AgentLab.Integration;
 
@@ -7,7 +8,6 @@ public sealed partial class H2ProductionAgentAdapter
 {
     private readonly object _chatGate = new();
     private readonly Dictionary<Guid, H2AgentThread> _threads = [];
-    private string ChatRoot => Path.Combine(_stateRoot, "integration", "threads");
 
     private async Task ExecuteWhenReadyAsync(LiveTask live)
     {
@@ -30,8 +30,15 @@ public sealed partial class H2ProductionAgentAdapter
         catch (OperationCanceledException) { SetStatus(live, H2AgentTaskStatus.Cancelled, "cancelled", "Đã hủy lượt xếp hàng."); }
         catch (Exception ex)
         {
-            lock (live.Gate) live.Error = ex.Message;
-            SetStatus(live, H2AgentTaskStatus.Failed, "failed", ex.Message);
+            // A persistence fault must not publish a successful terminal state or recurse
+            // through the failing persistence path. The durable prefix remains authoritative.
+            lock (live.Gate)
+            {
+                live.Status = _archive.Status.CanWrite ? H2AgentTaskStatus.Failed : H2AgentTaskStatus.Blocked;
+                live.Error = _archive.Status.CanWrite ? ex.Message : "Agent archive cần phục hồi; kết quả chưa được xác nhận bền vững.";
+                live.PendingApproval = null;
+            }
+            if (_archive.Status.CanWrite) _archive.Upsert(live.Snapshot());
         }
         finally { live.Finished.TrySetResult(); }
     }
@@ -42,16 +49,36 @@ public sealed partial class H2ProductionAgentAdapter
         text = BoundRequired(text, nameof(text), 8_000, true);
         lock (live.Gate)
         {
-            if (live.SupplementalIds.Contains(inputId)) return true;
+            if (live.SupplementalIds.TryGetValue(inputId, out var previous)) return previous == text;
+            if (_archive.TryMatchSteeringInput(taskId, inputId, text, out var durableMatch))
+            {
+                if (durableMatch) live.SupplementalIds[inputId] = text;
+                return durableMatch; // Restart/reconnect ACK only; never enqueue the same correction twice.
+            }
             if (!live.AcceptingInput || IsTerminal(live.Status) || live.Cancellation.IsCancellationRequested
                 || live.SupplementalIds.Count >= 24) return false;
-            live.SupplementalIds.Add(inputId); live.SupplementalInput.Enqueue(text);
-            AddProgressLocked(live, "user", "supplement-received", text);
+            try
+            {
+                if (!_archive.RecordSteeringInput(taskId, inputId, text)) return false;
+                // Do not expose the input to AgentRuntime until both the idempotency receipt
+                // and the public acknowledgement are durable. A journal fault therefore
+                // cannot produce an acknowledged-but-lost steering revision.
+                AddProgressLocked(live, "user", "supplement-received", text);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                live.Status = H2AgentTaskStatus.Blocked;
+                live.PendingApproval = null;
+                live.Error = "Agent archive cần phục hồi; steering chưa được xác nhận bền vững.";
+                throw;
+            }
+            live.SupplementalIds.Add(inputId, text);
+            live.SupplementalInput.Enqueue(new(inputId, text));
             return true;
         }
     }
 
-    private IReadOnlyList<string> TakeSupplementalInput(LiveTask live, bool closing)
+    private IReadOnlyList<AgentGoalInput> TakeSupplementalInput(LiveTask live, bool closing)
     {
         lock (live.Gate)
         {
@@ -64,23 +91,14 @@ public sealed partial class H2ProductionAgentAdapter
 
     private void InitializeChatArchive()
     {
-        Directory.CreateDirectory(ChatRoot);
-        foreach (var path in Directory.EnumerateFiles(ChatRoot, "*.json"))
-        {
-            // A broken thread is preserved for recovery; never reinterpret it as another conversation.
-            try
-            {
-                var item = JsonSerializer.Deserialize<H2AgentThread>(File.ReadAllText(path));
-                if (item is { ThreadId: var id } && id != Guid.Empty) _threads[id] = item;
-            }
-            catch (Exception ex) when (ex is IOException or JsonException) { }
-        }
+        foreach (var item in _archive.Threads()) _threads[item.ThreadId] = item;
         foreach (var task in _archive.Recent(null, 500))
         {
             var id = task.ThreadId ?? task.TaskId;
             if (_threads.TryGetValue(id, out var existing) && existing.TaskIds?.Contains(task.TaskId) == true) continue;
             var thread = existing ?? new H2AgentThread(id, task.ProjectId, Bound(task.Goal, 120), task.CreatedUtc, task.UpdatedUtc);
-            SaveThread(thread with { TaskIds = (thread.TaskIds ?? []).Append(task.TaskId).Distinct().ToArray() });
+            var rebuilt = thread with { TaskIds = (thread.TaskIds ?? []).Append(task.TaskId).Distinct().ToArray() };
+            if (_archive.Status.CanWrite) SaveThread(rebuilt); else _threads[id] = rebuilt;
         }
     }
 
@@ -103,7 +121,7 @@ public sealed partial class H2ProductionAgentAdapter
             // Draft saves must not drop tasks that the runtime registered concurrently.
             var ids = (_threads.GetValueOrDefault(thread.ThreadId)?.TaskIds ?? []).Concat(thread.TaskIds ?? []).Distinct().ToArray();
             var next = thread with { TaskIds = ids, Title = Bound(thread.Title, 120) };
-            ProjectWorkspaceStore.AtomicWrite(Path.Combine(ChatRoot, thread.ThreadId.ToString("N") + ".json"), JsonSerializer.SerializeToUtf8Bytes(next));
+            _archive.SaveThread(next);
             _threads[thread.ThreadId] = next;
         }
     }
@@ -118,67 +136,6 @@ public sealed partial class H2ProductionAgentAdapter
             Draft = "", UpdatedUtc = task.UpdatedUtc, TaskIds = (thread.TaskIds ?? []).Append(task.TaskId).Distinct().ToArray() });
     }
 
-    private string ProgressPath(Guid taskId) => Path.Combine(_stateRoot, "integration", "task-records", taskId.ToString("N") + ".jsonl");
-
-    private void PersistProgress(Guid taskId, H2AgentProgress progress)
-    {
-        var path = ProgressPath(taskId);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.AppendAllText(path, JsonSerializer.Serialize(progress) + "\n");
-    }
-
-    private IReadOnlyList<H2AgentProgress> ReadProgress(Guid taskId, long afterSequence)
-    {
-        var path = ProgressPath(taskId);
-        if (!File.Exists(path)) return [];
-        var events = new SortedDictionary<long, H2AgentProgress>();
-        foreach (var line in File.ReadLines(path))
-        {
-            try
-            {
-                var item = JsonSerializer.Deserialize<H2AgentProgress>(line);
-                if (item is not null && item.Sequence > afterSequence) events[item.Sequence] = item;
-            }
-            catch (JsonException) { /* A crash may leave one partial append. Preserve all complete events. */ }
-        }
-        return events.Values.ToArray();
-    }
-}
-
-internal sealed partial class AgentIntegrationTaskArchive
-{
-    private string TaskPath(Guid id) => Path.Combine(Path.GetDirectoryName(_path)!, "task-records", id.ToString("N") + ".json");
-
-    private void SaveDurableTask(H2AgentTaskSummary summary)
-    {
-        var path = TaskPath(summary.TaskId);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        ProjectWorkspaceStore.AtomicWrite(path, JsonSerializer.SerializeToUtf8Bytes(summary));
-    }
-
-    private H2AgentTaskSummary? LoadDurableTask(Guid id)
-    {
-        var path = TaskPath(id);
-        if (!File.Exists(path)) return null;
-        var task = JsonSerializer.Deserialize<H2AgentTaskSummary>(File.ReadAllText(path));
-        return task is null || IsTerminal(task.Status) ? task : task with {
-            Status = H2AgentTaskStatus.Failed, PendingApproval = null,
-            Error = "Tác vụ bị gián đoạn khi ứng dụng đóng. Quyền cũ không được khôi phục; gửi tiếp để tiếp tục." };
-    }
-
-    private H2AgentEvidence? FindDurableEvidence(string evidenceId)
-    {
-        var root = Path.GetDirectoryName(TaskPath(Guid.Empty))!;
-        if (!Directory.Exists(root)) return null;
-        foreach (var path in Directory.EnumerateFiles(root, "*.json"))
-        {
-            try
-            {
-                var task = JsonSerializer.Deserialize<H2AgentTaskSummary>(File.ReadAllText(path));
-                if (task?.Evidence.FirstOrDefault(e => e.EvidenceId == evidenceId) is { } evidence) return evidence;
-            }
-            catch (Exception ex) when (ex is IOException or JsonException) { }
-        }
-        return null;
-    }
+    private void PersistProgress(Guid taskId, H2AgentProgress progress) => _archive.AppendProgress(taskId, progress);
+    private IReadOnlyList<H2AgentProgress> ReadProgress(Guid taskId, long afterSequence) => _archive.ReadProgress(taskId, afterSequence);
 }

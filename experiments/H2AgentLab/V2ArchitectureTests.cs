@@ -755,23 +755,28 @@ public static class V2ArchitectureTests
 
             var expectedNames = new[]
             {
+                "activate_app",
                 "check_word",
                 "click_control",
                 "find_files",
                 "inspect_artifact",
                 "inspect_window",
+                "launch_app",
                 "list_files",
+                "list_running_apps",
                 "list_skills",
                 "open_file",
                 "publish_artifact",
                 "read_file",
                 "read_run",
                 "read_skill",
+                "read_tool_output",
                 "run_python",
                 "search_files",
                 "type_control",
                 "update_plan",
                 "view_artifact",
+                "wait_for_app_window",
                 "word_paragraphs",
                 "write_text"
             };
@@ -798,6 +803,12 @@ public static class V2ArchitectureTests
                 || click.Risk != AgentToolRisk.High
                 || !click.IsMutating)
                 throw new InvalidOperationException("desktop mutation metadata is incorrect.");
+            if (!registry.TryGet("launch_app", out var launch)
+                || launch.Namespace.Name != "app"
+                || launch.Risk != AgentToolRisk.High
+                || !launch.IsMutating
+                || launch.Preference?.InteractionFidelity != ToolInteractionFidelity.Accessibility)
+                throw new InvalidOperationException("application launch metadata is incorrect.");
         });
 
         Test("ToolSearchIndex ranks lexically and caches by registry version", () =>

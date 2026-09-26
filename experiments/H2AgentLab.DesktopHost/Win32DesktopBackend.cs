@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Automation;
 using H2AgentLab.DesktopProtocol;
 using System.Windows.Forms;
@@ -16,6 +17,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
     private long _mutationSequence;
 
     public IReadOnlyList<DesktopWindowInfo> ListWindows()
+        => EnumerateWindows(includeOffscreen: false);
+
+    private IReadOnlyList<DesktopWindowInfo> EnumerateWindows(
+        bool includeOffscreen,
+        string? requiredProcessName = null,
+        string? requiredSessionId = null)
     {
         var result = new List<DesktopWindowInfo>();
         foreach (AutomationElement element in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
@@ -25,16 +32,27 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                 var current = element.Current;
                 if (current.NativeWindowHandle == 0
                     || current.ProcessId <= 0
-                    || current.IsOffscreen
+                    || !ShouldIncludeWindow(current.IsOffscreen, includeOffscreen)
                     || string.IsNullOrWhiteSpace(current.Name))
                     continue;
 
                 using var process = Process.GetProcessById(current.ProcessId);
                 var processName = process.ProcessName;
+                if (requiredProcessName is { Length: > 0 }
+                    && !string.Equals(processName, requiredProcessName, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 if (!DesktopSafetyPolicy.IsWindowAllowed(processName, current.Name))
                     continue;
 
                 var handle = new IntPtr(current.NativeWindowHandle);
+                var className = WindowClass(handle);
+                var mainWindowHandle = process.MainWindowHandle.ToInt64();
+                if (!IsApplicationLaunchWindowCandidate(
+                        processName,
+                        current.NativeWindowHandle,
+                        mainWindowHandle,
+                        className))
+                    continue;
                 var bounds = ReadBounds(handle);
                 if (bounds.Width <= 0 || bounds.Height <= 0)
                     continue;
@@ -44,6 +62,9 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     current.ProcessId.ToString(CultureInfo.InvariantCulture),
                     started.ToString(CultureInfo.InvariantCulture),
                     current.NativeWindowHandle.ToString(CultureInfo.InvariantCulture));
+                if (requiredSessionId is { Length: > 0 }
+                    && !string.Equals(sessionId, requiredSessionId, StringComparison.Ordinal))
+                    continue;
 
                 result.Add(new DesktopWindowInfo(
                     sessionId,
@@ -56,7 +77,7 @@ public sealed class Win32DesktopBackend : IDesktopBackend
                     GetDpiForWindow(handle),
                     GetForegroundWindow() == handle));
 
-                if (result.Count >= 80) break;
+                if (requiredSessionId is { Length: > 0 } || result.Count >= 80) break;
             }
             catch (Exception ex) when (
                 ex is ElementNotAvailableException
@@ -72,6 +93,300 @@ public sealed class Win32DesktopBackend : IDesktopBackend
             .ThenBy(x => x.ProcessName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    public DesktopApplicationLaunchResult LaunchApplication(DesktopApplicationLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        var resolved = DesktopApplicationResolver.ResolveForLaunch(request.Application);
+
+        // Pre-launch identity must include safe minimized/offscreen windows. Otherwise a minimized
+        // existing Word/Excel window could be mistaken for a newly-created window after the OS
+        // restores it, or reuse_or_launch could create an unnecessary duplicate. Global inventory
+        // still hides offscreen windows; this broader snapshot is private to exact launch identity.
+        var before = EnumerateWindows(
+                includeOffscreen: true,
+                requiredProcessName: resolved.ProcessName)
+            .Where(x => IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
+            .ToArray();
+        var beforeSessions = before.Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
+        var beforeForeground = before.Where(x => x.Foreground).Select(x => x.SessionId).ToHashSet(StringComparer.Ordinal);
+
+        // If exactly one safe target is already running, "open/start app" is satisfied by
+        // activating that exact observed window even when it is currently minimized/offscreen.
+        // Do not start the executable again and risk creating an extra blank document/window.
+        if (!request.RequireNewWindow && before.Length == 1)
+        {
+            var reused = ActivateWindow(new DesktopApplicationActivateRequest(
+                before[0].SessionId,
+                PermissionGranted: true));
+            return new(
+                request.Application,
+                resolved.ApplicationId,
+                resolved.ProcessName,
+                NewWindowObserved: false,
+                ReusedExistingWindow: true,
+                reused);
+        }
+        if (!request.RequireNewWindow && before.Length > 1)
+            throw new DesktopHostFaultException(
+                "ambiguous_target",
+                "More than one safe application window is already running; enumerate and activate an exact session_id. No new process was started.");
+
+        try
+        {
+            var startInfo = CreateLaunchStartInfo(resolved, request.RequireNewWindow);
+            using var started = Process.Start(startInfo);
+            if (started is null)
+                throw new DesktopHostFaultException("provider_unavailable", "Windows did not start the requested application.");
+        }
+        catch (DesktopHostFaultException) { throw; }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            throw new DesktopHostFaultException("app_not_found", "Windows could not start the requested registered application.");
+        }
+
+        var wait = Math.Clamp(
+            request.WaitMilliseconds,
+            250,
+            DesktopProtocolConstants.MaxApplicationWaitMilliseconds);
+        var startedUtc = DateTime.UtcNow;
+        var deadline = startedUtc.AddMilliseconds(wait);
+        do
+        {
+            var current = EnumerateWindows(
+                    includeOffscreen: false,
+                    requiredProcessName: resolved.ProcessName)
+                .Where(x => IsApplicationLaunchWindow(resolved.ProcessName, x.Handle))
+                .ToArray();
+            var created = SelectUniqueCreatedWindow(current, beforeSessions);
+            if (created is not null)
+                return new(request.Application, resolved.ApplicationId, resolved.ProcessName, true, false, created);
+
+            if (!request.RequireNewWindow)
+            {
+                var promoted = current.FirstOrDefault(x => x.Foreground && !beforeForeground.Contains(x.SessionId));
+                if (promoted is not null)
+                    return new(request.Application, resolved.ApplicationId, resolved.ProcessName, false, true, promoted);
+            }
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        throw new DesktopHostFaultException(
+            "launch_unverified",
+            request.RequireNewWindow
+                ? "A distinct new application window was requested, but no new safe HWND/session was observed."
+                : "The application launch was requested, but no exact new, activated or single reusable safe window was observed.");
+    }
+
+    internal static ProcessStartInfo CreateLaunchStartInfo(
+        ResolvedDesktopApplication resolved,
+        bool requireNewWindow)
+    {
+        ArgumentNullException.ThrowIfNull(resolved);
+        var startInfo = new ProcessStartInfo(resolved.ExecutablePath)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = false,
+            WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath) ?? AppContext.BaseDirectory
+        };
+
+        if (requireNewWindow
+            && DesktopApplicationResolver.NewWindowArgumentsForProcess(resolved.ProcessName) is { Length: > 0 } fixedArgument)
+            startInfo.ArgumentList.Add(fixedArgument);
+
+        foreach (var name in startInfo.Environment.Keys
+            .Where(IsSensitiveLaunchEnvironmentVariable)
+            .ToArray())
+            startInfo.Environment.Remove(name);
+
+        return startInfo;
+    }
+
+    internal static bool IsSensitiveLaunchEnvironmentVariable(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var normalized = name.Trim().ToUpperInvariant();
+        return normalized.Contains("TOKEN", StringComparison.Ordinal)
+            || normalized.Contains("PASSWORD", StringComparison.Ordinal)
+            || normalized.Contains("SECRET", StringComparison.Ordinal)
+            || normalized.Contains("CREDENTIAL", StringComparison.Ordinal)
+            || normalized.Contains("PRIVATE_KEY", StringComparison.Ordinal)
+            || normalized.EndsWith("_API_KEY", StringComparison.Ordinal)
+            || normalized.EndsWith("APIKEY", StringComparison.Ordinal)
+            || normalized is "SSH_AUTH_SOCK" or "GPG_AGENT_INFO";
+    }
+
+    internal static DesktopWindowInfo? SelectUniqueCreatedWindow(
+        IReadOnlyList<DesktopWindowInfo> current,
+        IReadOnlySet<string> beforeSessions)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(beforeSessions);
+        var created = current
+            .Where(x => !beforeSessions.Contains(x.SessionId))
+            .ToArray();
+        return created.Length switch
+        {
+            0 => null,
+            1 => created[0],
+            _ => throw new DesktopHostFaultException(
+                "launch_ambiguous",
+                "The application launch produced multiple new safe windows. The app may be open, but no exact target can be selected without new observation.")
+        };
+    }
+
+    public DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var processName = DesktopApplicationResolver.ProcessNameFor(request.Application);
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Clamp(request.WaitMilliseconds, 0, DesktopProtocolConstants.MaxApplicationWaitMilliseconds));
+        do
+        {
+            var found = EnumerateWindows(
+                    includeOffscreen: false,
+                    requiredProcessName: processName)
+                .Where(x => IsApplicationLaunchWindow(processName, x.Handle))
+                .ToArray();
+            if (found.Length == 1) return found[0];
+            if (found.Length > 1)
+                throw new DesktopHostFaultException(
+                    "ambiguous_target",
+                    "More than one safe visible window exists for this application; enumerate and use an exact session_id.");
+            if (DateTime.UtcNow >= deadline) break;
+            Thread.Sleep(100);
+        }
+        while (true);
+
+        throw new DesktopHostFaultException(
+            "app_not_found",
+            "No safe visible window for the requested application was observed.");
+    }
+
+    private static bool IsApplicationLaunchWindow(string processName, long handle)
+    {
+        var className = WindowClass(new IntPtr(handle));
+        return IsApplicationLaunchWindowClass(processName, className);
+    }
+
+    internal static bool ShouldIncludeWindow(bool isOffscreen, bool includeOffscreen)
+        => includeOffscreen || !isOffscreen;
+
+    internal static bool IsApplicationLaunchWindowCandidate(
+        string processName,
+        long handle,
+        long processMainWindowHandle,
+        string className)
+    {
+        if (processName.Equals("acad", StringComparison.OrdinalIgnoreCase)
+            || processName.Equals("acadlt", StringComparison.OrdinalIgnoreCase))
+            return handle > 0
+                && processMainWindowHandle > 0
+                && handle == processMainWindowHandle;
+
+        return IsApplicationLaunchWindowClass(processName, className);
+    }
+
+    internal static bool IsApplicationLaunchWindowClass(string processName, string className)
+        => processName switch
+        {
+            var name when name.Equals("WINWORD", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("OpusApp", StringComparison.Ordinal),
+            var name when name.Equals("EXCEL", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("XLMAIN", StringComparison.Ordinal),
+            var name when name.Equals("explorer", StringComparison.OrdinalIgnoreCase)
+                => className.Equals("CabinetWClass", StringComparison.Ordinal)
+                    || className.Equals("ExploreWClass", StringComparison.Ordinal),
+            _ => true
+        };
+
+    private static string WindowClass(IntPtr handle)
+    {
+        var buffer = new StringBuilder(256);
+        return GetClassName(handle, buffer, buffer.Capacity) > 0
+            ? buffer.ToString()
+            : "";
+    }
+
+    public DesktopWindowInfo ActivateWindow(DesktopApplicationActivateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DesktopSafetyPolicy.RequirePermission(request.PermissionGranted);
+        // The exact session may have become minimized/offscreen after it was observed.
+        // Resolve the same HWND/PID/start identity without broadening inventory visibility,
+        // restore/focus it, then require a normal visible re-resolution below.
+        var window = ResolveWindow(request.SessionId, includeOffscreen: true);
+        var handle = new IntPtr(window.Handle);
+        TryActivateExactWindow(handle);
+
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (GetForegroundWindow() == handle)
+            {
+                try { return ResolveWindow(request.SessionId); }
+                catch (DesktopHostFaultException ex) when (ex.Code == "session_not_found")
+                {
+                    // Win32 focus can precede UI Automation's visible/offscreen refresh.
+                    // Keep the same exact session identity and retry briefly; never pick another HWND.
+                }
+            }
+            Thread.Sleep(50);
+        }
+
+        // One bounded retry after the OS had time to process restore/focus messages.
+        TryActivateExactWindow(handle);
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            if (GetForegroundWindow() == handle)
+            {
+                try { return ResolveWindow(request.SessionId); }
+                catch (DesktopHostFaultException ex) when (ex.Code == "session_not_found")
+                {
+                }
+            }
+            Thread.Sleep(50);
+        }
+
+        throw new DesktopHostFaultException(
+            "foreground_failed",
+            "Windows did not confirm the exact observed application window as foreground.");
+    }
+
+    private static void TryActivateExactWindow(IntPtr handle)
+    {
+        if (IsIconic(handle)) _ = ShowWindowAsync(handle, 9); // SW_RESTORE
+
+        var currentThread = GetCurrentThreadId();
+        var targetThread = GetWindowThreadProcessId(handle, out _);
+        var foreground = GetForegroundWindow();
+        var foregroundThread = foreground == IntPtr.Zero
+            ? 0u
+            : GetWindowThreadProcessId(foreground, out _);
+
+        var attachedForeground = false;
+        var attachedTarget = false;
+        try
+        {
+            if (foregroundThread != 0 && foregroundThread != currentThread)
+                attachedForeground = AttachThreadInput(currentThread, foregroundThread, true);
+            if (targetThread != 0
+                && targetThread != currentThread
+                && targetThread != foregroundThread)
+                attachedTarget = AttachThreadInput(currentThread, targetThread, true);
+
+            _ = BringWindowToTop(handle);
+            _ = SetForegroundWindow(handle);
+        }
+        finally
+        {
+            if (attachedTarget)
+                _ = AttachThreadInput(currentThread, targetThread, false);
+            if (attachedForeground)
+                _ = AttachThreadInput(currentThread, foregroundThread, false);
+        }
     }
 
     public DesktopObservation Observe(string sessionId)
@@ -311,9 +626,12 @@ public sealed class Win32DesktopBackend : IDesktopBackend
         };
     }
 
-    private DesktopWindowInfo ResolveWindow(string sessionId)
+    private DesktopWindowInfo ResolveWindow(string sessionId, bool includeOffscreen = false)
     {
-        var window = ListWindows().SingleOrDefault(x => x.SessionId == sessionId);
+        var window = EnumerateWindows(
+                includeOffscreen,
+                requiredSessionId: sessionId)
+            .SingleOrDefault();
         return window
             ?? throw new DesktopHostFaultException("session_not_found", "Desktop window session is unavailable or blocked by policy.");
     }
@@ -619,6 +937,27 @@ public sealed class Win32DesktopBackend : IDesktopBackend
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);

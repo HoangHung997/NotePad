@@ -1,0 +1,31 @@
+# AR-050 — budget the actual outgoing Agent request
+
+Status: **IMPLEMENTED / E2_PASS / DONE** for AR-050. The project is not complete. AR-020/033 E3 and E4 remain open; AR-083 is DEFERRED_BY_USER.
+
+## Source and executed evidence
+
+Source began at `f939cc510c29e655775f973bfb5030758d49ba44` on the existing branch/PR #3. Implementation `1eee17a73aae0ff857b6ab831a65be68b32cf738`, settings preservation and post-effect tests `023b08989e9f1d59ade6b62112c9355fe2bcb0ca`, exact tested source `04a733417bc5e4d4502ea9fe58cddf60780cc3a4`. Focused run 35821961122: **50/50 AR-050 in each of three repetitions**, retained AR suites and **74/74 independent Agent suites** pass. Full run 35821963881: **965 H2 tests / 0 failures**, all mandatory steps, Windows publish and packaged helper IPC pass. Actual full checkout `e40011dd4f02d8a900f658368678934c4a5d52e3` is a PR test merge, not a merge into main; runtime/test/tools/full-workflow source matches the focused code. Build retains 38 warnings. [Structured evidence](acceptance.json) records actual identities, hashes and prior failed attempts.
+
+## Production integration
+
+`AgentRequestBudgetGuard` sits immediately before final serialization/send in Ollama, Chat Completions, Responses HTTP (stateless/stored) and Responses WebSocket. It measures the exact string actually sent, including instructions/messages, tool schemas, roles/call-result pairs, escaped Unicode and native image/file bytes. Start, continuation, repair, steering, prewarm and concrete HTTP fallback have the same policy. Stored Responses and WebSocket add a conservative server-held context estimate; cached tokens do not remove context. Summarizer/rebase payloads sent through these transports are charged as ordinary requests, not free overhead. AR-051 semantic compaction is not implemented here.
+
+Output reserve is sent as `num_predict`, `max_tokens`/`max_completion_tokens` or `max_output_tokens` as appropriate. Responses truncation is disabled. An explicit Ollama context setting may set `num_ctx`; the fallback does not silently allocate a larger local context. Missing/invalid source configuration and known over-limit requests fail before dispatch. Overflow reports Blocked through the existing production adapter/archive; no silently dropped user correction, duplicate mutation or provider/endpoint switch. Factory metrics use existing telemetry. Immutable settings survive profile copying and actual connection editing/saving. No parallel engine, database, transcript or ProjectRecord Agent state was added.
+
+## Exact versus estimated; configuration
+
+**Only serialized body bytes/hash are exact.** The token cost is an intentionally conservative estimate of one token per serialized UTF-8 byte, plus media estimates and retained-context/usage corrections. It is not a provider tokenizer, invoice or proof of model capacity. It can reject requests earlier than a tokenizer, especially escaped text/base64 and repeated native schema/context charges. Native PDF/image expansion is not bounded solely by compressed byte size; configured estimates must be calibrated for the selected provider/corpus before native acceptance claims.
+
+Settings are in the existing local `AiProfile.RequestBudget`: `ContextLimitTokens`, `ContextLimitSource`, `ReservedOutputTokens`, `SafetyMarginTokens`, `MaxSerializedBytes`, media estimates/source and optional Chat output-field override. Context source is a non-secret identifier for the user/deployment configuration, not an automatic verification of the claimed capability. Unknown context uses the labelled local policy **131072** tokens with **4096** output reserve, **2048** safety margin and **16 MiB** body cap; this is not an advertised limit for any model. Image/file default estimates are **8192/32768** plus serialized bytes, also labelled estimates. There is no new budget editor or auto-discovery of model capacities in this slice. Existing legacy standalone `AiClient` is not the shared Agent path and is unchanged.
+
+## Concrete tests and failures retained
+
+Five modes each execute **205 intercepted real serializer requests**, including 32 initial schemas, ten later schema additions, 204 paired tool results and user steering. The next oversized tool-output request is blocked before send 206. In three repetitions this is **3075 accepted fixture sends** in the long corpus, not 3075 live model calls. Wire-byte/hash assertions compare the actual body captured by HTTP handlers/socket fixtures with the pre-send receipt; token labels remain estimated. Additional cases cover image/file wire forms, source settings, smaller limits, cache/retained context, invalid usage, cancellation, failed observers, prewarm and HTTP fallback.
+
+The Global/Project post-effect cases use the real production adapter, registry, disposable file and Agent journal. A synthetic provider usage correction occurs before a real write. The file is written exactly once, the next model request is blocked, unrelated file bytes remain unchanged, one mutation and its evidence survive archive reopening, and no third HTTP send or replay occurs. Native model/Office/UI acceptance is not inferred from these E2 cases.
+
+The initial source-delivery attempt 35819745122 failed on a malformed compressed carrier before any application source was committed. The initial 47-case corpus passed. A later settings test/control failed because two UI TextBoxes shared the same visible text; the selector now binds the form field next to its exact label. The old UI class then reproduces **0 pass / 1 expected budget-loss failure**; exact current bytes are restored and rebuilt before positive runs. All budget-preservation assertions remain. The failed harness run 35821300963 and full run 35821305458 (964 pass / 1 selector failure, later stages skipped) remain historical failures.
+
+## Next checkpoint
+
+Continue only **AR-051** from the canonical SESSION HANDOFF: source-backed semantic compaction, validated mandatory anchors and atomic checkpoints in existing runtime/journal. The E4 subset needs an actually configured/authorized model environment; deterministic fixture passes do not waive it. AR-041 restart/uncertain mutation and AR-052 model switching remain separate. No automatic compaction, new endpoint/credential, private document access, main merge or two-PC certification was performed here.

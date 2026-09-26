@@ -82,6 +82,14 @@ public interface ICapabilityProvider : IAsyncDisposable
         CancellationToken cancellationToken);
 }
 
+/// <summary>Optional identity-aware execution; legacy backends keep their wire format and
+/// are not advertised as supporting durable idempotency merely because host IDs exist.</summary>
+public interface IInvocationAwareCapabilityProvider : ICapabilityProvider
+{
+    ValueTask<string> ExecuteToolAsync(string toolName, JsonElement arguments,
+        ToolInvocation invocation, CancellationToken cancellationToken);
+}
+
 public sealed record CapabilityProviderPolicy(
     IReadOnlySet<string> AllowedReadScopes,
     IReadOnlySet<string> AllowedMutationScopes,

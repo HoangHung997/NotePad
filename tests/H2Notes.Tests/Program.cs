@@ -17,6 +17,12 @@ using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
 using NeraSpreadSheet.Scrolling;
 
+if (args.Length == 4 && args[0] == "--ar040-job-probe")
+    return H2AgentLongJobTests.Probe(args[1], args[2], args[3]);
+if (args.Length == 4 && args[0] == "--ar040-process-probe")
+    return H2AgentProcessDrainTests.Probe(args[1], args[2], args[3]);
+if (args.Length == 3 && args[0] == "--ar031-crash-probe")
+    return H2AgentArchiveJournalTests.Probe(args[1], args[2]);
 if (args.Length >= 2 && args[0] == "--desktop-session-probe")
     return DesktopSessionProbe.Run(args[1], args.Contains("--startup"));
 if (args.Length >= 2 && args[0] == "--live-ai-probe" && args.Contains("--allow-live-ai"))
@@ -684,14 +690,44 @@ H2ResponsiveProductTests.Run(Test);
 H2ProductArchitectureGuardTests.Run(Test);
 H2ProductionAgentBridgeTests.Run(Test);
 H2AgentChatSurfaceTests.Run(Test);
+H2AgentUiReliabilityTests.Run(Test);
 H2DocumentsDesignTests.Run(Test);
 H2AgentSteeringWireTests.Run(Test);
 H2ProductionRepairTests.Run(Test);
 H2WordCvRepairTests.Run(Test);
 H2AgentCapabilityRepairTests.Run(Test);
+H2AgentReliabilityContractTests.Run(Test);
+H2AgentRuntimeHookTests.Run(Test);
+H2AgentToolOutcomeTests.Run(Test);
+H2AgentResourceBindingTests.Run(Test);
+H2AgentLiveBindingTests.Run(Test);
+H2OfficeDiscoveryTests.Run(Test);
+H2AgentDesktopLaunchTests.Run(Test);
+H2ExcelRangeReadTests.Run(Test);
+H2ExcelBatchWriteTests.Run(Test);
+H2WordPagedReadTests.Run(Test);
+H2AgentGoalRevisionTests.Run(Test);
+H2AgentArchiveJournalTests.Run(Test);
+H2AgentRestartReconcileTests.Run(Test);
+H2AgentResumeRebaseTests.Run(Test);
+H2AgentSteeringConcurrencyTests.Run(Test);
+H2WebBackendTests.Run(Test);
+H2ArtifactPublicationTests.Run(Test);
+H2AgentHistoryRetrievalTests.Run(Test);
+H2AgentCompletionTests.Run(Test);
+H2AgentProcessDrainTests.Run(Test);
+H2AgentLongJobTests.Run(Test);
+H2AgentJobProductionTests.Run(Test);
+H2AgentJobObservationTests.Run(Test);
+H2AgentRequestBudgetTests.Run(Test);
+H2AgentWorkCompactionTests.Run(Test);
+H2AgentLongWorkProductionCorpusTests.Run(Test);
+H2AgentPluginLifecycleTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
+H2AutoCadLiveBridgeTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);
 H2FinalPerformanceTests.Run(Test);
+H2PortablePreflightTests.Run(Test);
 AiTests.Run(Test);
 Test("Responsive shell keeps rich draft, selection and undo across narrow and wide sizes", () =>
 {

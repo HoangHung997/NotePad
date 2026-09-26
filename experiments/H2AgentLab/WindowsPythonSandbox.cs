@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 
@@ -133,10 +134,20 @@ public static class WindowsPythonSandbox
     }
     private static async Task<FileStream> AcquireRuntimeLease(CancellationToken ct)
     {
+        // The portable runtime tree is immutable package content. The cross-process lease protects
+        // ACL read-modify-write, but must never create .execution.lock beside packaged Python.
+        // Key the user-temp lease by the exact normalized runtime root so independent runtimes do
+        // not serialize each other while all H2 processes using the same runtime still coordinate.
+        var normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(RuntimeRoot));
+        if (OperatingSystem.IsWindows()) normalized = normalized.ToUpperInvariant();
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
+        var lockRoot = Path.Combine(Path.GetTempPath(), "H2AgentLab", "runtime-locks");
+        Directory.CreateDirectory(lockRoot);
+        var lockPath = Path.Combine(lockRoot, key + ".lock");
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            try { return new FileStream(Path.Combine(RuntimeRoot, ".execution.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+            try { return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
             catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33) { await Task.Delay(100, ct); }
         }
     }

@@ -314,3 +314,8 @@ MB-120 final architecture report
 ```
 
 Do not bypass MB-121/122 by wiring H2 Notes directly to internal transport, ToolRegistry, verifier, provider or plugin implementation details.
+
+
+## AR-001 current-surface correction (2026-09-22)
+
+The 19-callable/six-executor measurements above are the historical MB-120 snapshot, not the current registry inventory. The already-shipped `read_tool_output` adds one read-only evidence tool and one evidence executor: current inventory is 20 callable descriptors / seven executors. Initial exposure remains `tool_search` plus `update_plan` (two schemas); no additional tool is eagerly exposed. AR-001 updates exact-set guards and tests chunk/foreign-handle behavior; it does not re-award any old MB acceptance.

@@ -5,6 +5,9 @@ namespace H2AgentLab.DesktopHost;
 public interface IDesktopBackend
 {
     IReadOnlyList<DesktopWindowInfo> ListWindows();
+    DesktopApplicationLaunchResult LaunchApplication(DesktopApplicationLaunchRequest request);
+    DesktopWindowInfo WaitForApplicationWindow(DesktopApplicationWaitRequest request);
+    DesktopWindowInfo ActivateWindow(DesktopApplicationActivateRequest request);
     DesktopObservation Observe(string sessionId);
     DesktopActionResult Act(DesktopActionRequest request);
 }

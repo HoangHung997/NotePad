@@ -1,0 +1,80 @@
+{
+  "task": "AR-024",
+  "source_sha": "4e6b4a07f4103edd654b680ca9af7f485f8b04d8",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "NOT_REQUIRED",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "e4_pass_claim": false
+  },
+  "production_slices": [
+    "Global Work Assistant -> H2ProductionAgentAdapter -> runtime/tool session -> H2OfficeRuntimeTools -> OfficeHost process -> Excel fixture",
+    "Project Agent -> H2ProductionAgentAdapter -> runtime/tool session -> H2OfficeRuntimeTools -> OfficeHost process -> Word fixture"
+  ],
+  "tests": {
+    "focused": "2/2",
+    "office_host": "19/19",
+    "retained": {
+      "AR-023": "9/9",
+      "AR-022": "8/8",
+      "AR-021": "14/14",
+      "AR-020": "36/36",
+      "AR-012": "44/44",
+      "AR-001": "13/13"
+    },
+    "full_h2": "1311/1311",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "16/16 SUCCESS"
+  },
+  "runs": {
+    "ar024": {
+      "run_id": 36221310522,
+      "job_id": 108346988677,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36221310599,
+      "job_id": 108346979174,
+      "result": "SUCCESS"
+    },
+    "ar023_rerun": {
+      "run_id": 36221310620,
+      "result": "SUCCESS",
+      "purpose": "same-SHA confirmation of one-off retained AR-021 probe flake"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10899865137,
+      "bytes": 433144,
+      "sha256": "04570ba108eac3703d88dfbfef402281be7bef4466eb8abda0fd8f472858e543",
+      "expires_at_utc": "2026-10-10T05:51:51Z",
+      "zip_entries": 652,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10899446974,
+      "bytes": 110398090,
+      "sha256": "d6fbcdf729092a967b1d2a010736c69420ec4619aa0e48bdf60f5bc0f2417866",
+      "expires_at_utc": "2026-12-25T05:36:41Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "workflow_note": "16/16 workflow identities completed SUCCESS on the exact code SHA. The first AR-023 attempt hit one transient retained AR-021 probe flake (Sequence contains no elements); the same test passed elsewhere on the same SHA, and the same-SHA AR-023 rerun completed SUCCESS. No runtime change was made for the non-reproduced flake.",
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "real_native_office_e4_certified": false,
+    "two_pc_nas_certified": false
+  }
+}
