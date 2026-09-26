@@ -20,6 +20,8 @@ $publish=Join-Path $env:RUNNER_TEMP 'ar082-publish-source'
 Remove-Item -LiteralPath $publish -Recurse -Force -ErrorAction SilentlyContinue
 dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o $publish 2>&1|Tee-Object artifacts/ar082/publish.log
 if($LASTEXITCODE){throw 'AR-082 publish failed'}
+& .\tools\agent-reliability\prepare_agent_python.ps1 -Destination (Join-Path $publish 'python')
+if($LASTEXITCODE){throw 'AR-082 Agent Python packaging failed'}
 & .\tools\agent-reliability\build_portable_manifest.ps1 -Root $publish -SourceSha $sha -SourceBranch $branch -RuntimeIdentifier win-x64
 
 $portable=Join-Path $env:RUNNER_TEMP 'AR082 Gói sạch Việt Nam\Ứng dụng 测试'
