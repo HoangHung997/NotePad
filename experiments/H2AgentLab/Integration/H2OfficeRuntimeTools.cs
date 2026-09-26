@@ -317,7 +317,7 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                         var full=classified.MutationStatus==ExcelPatchMutationStatus.Applied&&classified.AppliedCells.Count==cells.Count;
                         Record(call,full&&preserved.Passed,"office-state:"+after.StateToken);
                     }
-                    catch(Exception ex) when(ex is IOException or TimeoutException or InvalidOperationException)
+                    catch(Exception readbackFailure) when(readbackFailure is IOException or TimeoutException or InvalidOperationException)
                     {
                         classified=ExcelPatchMutationRules.Classify(request,patch.Before,null,cells,"outcome_unknown",
                             "Independent Excel readback/revalidation was unavailable after dispatch.");
@@ -425,8 +425,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         catch(JsonException)
         {
             try{using var doc=JsonDocument.Parse(payload);var root=doc.RootElement;if(root.TryGetProperty("ok",out var ok)&&ok.ValueKind==JsonValueKind.False){
-                var code=root.TryGetProperty("error",out var e)&&e.ValueKind==JsonValueKind.String?e.GetString()??"invalid_arguments":"invalid_arguments";
-                return ToolOutcomeBridge.Failure(call,null,code,ToolErrorPhase.Preflight,ToolMutationEffect.None,payload);}}catch(JsonException){}
+                var preflightCode=root.TryGetProperty("error",out var e)&&e.ValueKind==JsonValueKind.String?e.GetString()??"invalid_arguments":"invalid_arguments";
+                return ToolOutcomeBridge.Failure(call,null,preflightCode,ToolErrorPhase.Preflight,ToolMutationEffect.None,payload);}}catch(JsonException){}
             return ToolOutcomeBridge.Failure(call,null,"invalid_result",ToolErrorPhase.Execution,ToolMutationEffect.Unknown,payload);
         }
         if(!string.IsNullOrWhiteSpace(result.LogicalOperationId)&&result.LogicalOperationId!=call.Invocation!.LogicalOperationId)
@@ -435,8 +435,8 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
         if(result.MutationStatus==ExcelPatchMutationStatus.Applied)return new(payload,new ToolOutcome(call.Invocation!,ToolOutcomeStatus.Succeeded,ToolMutationEffect.Applied,
             new ToolCompleteness(true),new ToolOutcomeVerification(ToolVerificationStatus.NotRun,[]),Resource:resource));
         var effect=result.MutationEffect switch{ExcelPatchMutationEffect.PartiallyApplied=>ToolMutationEffect.PartiallyApplied,ExcelPatchMutationEffect.Unknown=>ToolMutationEffect.Unknown,_=>ToolMutationEffect.None};
-        var code=result.MutationStatus switch{ExcelPatchMutationStatus.PartiallyApplied=>"partially_applied",ExcelPatchMutationStatus.OutcomeUnknown=>"outcome_unknown",_=>result.ErrorCode??"tool_failed"};
-        var failed=ToolOutcomeBridge.Failure(call,null,code,ToolErrorPhase.Execution,effect,payload);return failed with{Outcome=failed.Outcome with{Resource=resource}};
+        var outcomeCode=result.MutationStatus switch{ExcelPatchMutationStatus.PartiallyApplied=>"partially_applied",ExcelPatchMutationStatus.OutcomeUnknown=>"outcome_unknown",_=>result.ErrorCode??"tool_failed"};
+        var failed=ToolOutcomeBridge.Failure(call,null,outcomeCode,ToolErrorPhase.Execution,effect,payload);return failed with{Outcome=failed.Outcome with{Resource=resource}};
     }
 
     private sealed record DiscoveryObservation(object Discovery, IReadOnlyList<H2AgentResourceBinding> Resources);
