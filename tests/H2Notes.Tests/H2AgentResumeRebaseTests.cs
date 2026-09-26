@@ -347,15 +347,15 @@ internal static class H2AgentResumeRebaseTests
         }
         private static HttpResponseMessage Ndjson(params object[] lines)
         {
-            var body=string.Join("\n",lines.Select(JsonSerializer.Serialize))+"\n";
-            var content=new StringContent(body,Encoding.UTF8);
+            var body=string.Join("\n",lines.Select(item=>JsonSerializer.Serialize(item)))+"\n";
+            var content=new StringContent(body);
             content.Headers.ContentType=new MediaTypeHeaderValue("application/x-ndjson");
             return new(HttpStatusCode.OK){Content=content};
         }
         private static HttpResponseMessage Sse(params string[] events)
         {
             var body=string.Join("\n\n",events.Select(x=>"data: "+x))+"\n\ndata: [DONE]\n\n";
-            var content=new StringContent(body,Encoding.UTF8);
+            var content=new StringContent(body);
             content.Headers.ContentType=new MediaTypeHeaderValue("text/event-stream");
             return new(HttpStatusCode.OK){Content=content};
         }
