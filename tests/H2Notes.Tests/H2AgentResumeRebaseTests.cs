@@ -185,7 +185,7 @@ internal static class H2AgentResumeRebaseTests
         }));
     }
 
-    private static Seed Seed(string root,Guid task,bool withUnknown)
+    private static SeedFixture Seed(string root,Guid task,bool withUnknown)
     {
         var workspace=Path.Combine(root,"workspace");Directory.CreateDirectory(workspace);
         var scope="workspace:"+workspace;
@@ -220,7 +220,7 @@ internal static class H2AgentResumeRebaseTests
                 ReconciledUtc=withUnknown?null:now
             });
         }
-        return new(summary,workspace,scope,thread,evidenceId,marker,resource);
+        return new SeedFixture(summary,workspace,scope,thread,evidenceId,marker,resource);
     }
 
     private static H2AgentOperationRecord Operation(Guid task,Guid turn,string revision,string resource)
@@ -240,7 +240,7 @@ internal static class H2AgentResumeRebaseTests
             ReservedOutputTokens=256,SafetyMarginTokens=128}
     };
 
-    private sealed record Seed(H2AgentTaskSummary Summary,string Workspace,string Scope,Guid ThreadId,
+    private sealed record SeedFixture(H2AgentTaskSummary Summary,string Workspace,string Scope,Guid ThreadId,
         string EvidenceId,string OldTranscriptMarker,string ResourceKey);
 
     private sealed class RealProtocolFactory(AiProtocol protocol):IAgentTransportFactory
