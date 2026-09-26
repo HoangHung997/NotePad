@@ -15,7 +15,7 @@ permissions:
   contents: read
 concurrency:
   group: h2-ar024-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   production-office-slice:
     if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
