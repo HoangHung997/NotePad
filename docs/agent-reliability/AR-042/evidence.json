@@ -1,0 +1,87 @@
+{
+  "task": "AR-042",
+  "source_sha": "51c74339c05602efc13180dcffbb41a9aed6277b",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E4": "NOT_RUN",
+    "E5": "DEFERRED_BY_USER",
+    "distributed_lock_claim": false
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-041": "6/6",
+      "AR-040": "57/57",
+      "AR-031": "39/39",
+      "AR-030": "39/39",
+      "AR-024": "2/2"
+    },
+    "full_h2": "1323/1323",
+    "required_agent_suites": "PASS",
+    "exact_sha_workflows": "18/18 SUCCESS"
+  },
+  "invariants": {
+    "same_resource_serialized": true,
+    "distinct_resources_parallel": true,
+    "shared_uncertainty_fence": true,
+    "post_wait_permission_recheck": true,
+    "durable_dispatch_after_recheck_only": true,
+    "dispatch_revision_immutable": true,
+    "turn_id_idempotent": true,
+    "steering_receipt_hash_only": true,
+    "queued_cancel_owner_isolated": true,
+    "distributed_lock_claim": false
+  },
+  "runs": {
+    "ar042": {
+      "run_id": 36231762267,
+      "job_id": 108376125152,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36231762357,
+      "job_id": 108376125362,
+      "result": "SUCCESS"
+    },
+    "ar021_same_sha_rerun": {
+      "run_id": 36231762334,
+      "job_id": 108380167072,
+      "result": "SUCCESS",
+      "reason": "one-off Sequence contains no elements probe flake"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10903400379,
+      "bytes": 430518,
+      "sha256": "667677b04da94291a3a26daf9e7147e6c9b0910663615d74667e421424dba6f8",
+      "expires_at_utc": "2026-10-10T09:22:02Z",
+      "zip_entries": 647,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10903620313,
+      "bytes": 110412220,
+      "sha256": "27f61daa9b8ab9e5312f71d80d8ae53d72d5b910a9b6c1d3e854a84efaf08283",
+      "expires_at_utc": "2026-12-25T09:06:18Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "raw_steering_text_in_receipt": false,
+    "foreign_task_cancel": false,
+    "coordinator_or_nas_certified": false
+  }
+}
