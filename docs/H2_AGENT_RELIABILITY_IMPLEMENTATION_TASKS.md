@@ -94,7 +94,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-050 | Budget mọi request thực | 010/032 | E2 + actual payload | DONE / E2_PASS |
 | AR-051 | Compaction theo work state có nguồn | 031/032/050 | E2/E4 | IMPLEMENTED / AWAITING_ENVIRONMENT (E2_PASS) |
 | AR-052 | Rebase model và resume context | 041/051 | E2/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no E4/native-provider PASS claim |
-| AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | ACTIVE — configurable Brave search / guarded fetch / configured local-CDP browser; E3-E4 live acceptance pending |
+| AR-060 | Search/fetch/browser backend thật | 011/012/040 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3-E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no live-search/browser PASS claim |
 | AR-061 | Desktop identity/capture/act recovery | 012/011 | E3/E4 | IMPLEMENTED / E2_PASS / E3-E4_DEFERRED_BY_USER — final full build ready for user test; NO E3/E4 PASS claim |
 | AR-062 | Tạo/xuất tài liệu end-to-end | 011/033 | E3/E4 | NOT_STARTED |
 | AR-063 | CAD đóng/live đúng phạm vi | 012/033 | E3/E4 cho phần live công bố | NOT_STARTED |
@@ -422,7 +422,7 @@ Full Avalonia CI `36237795173` / job `108392643192` **SUCCESS**, including full 
 
 **User decision — 2026-09-26:** real E4 with the user's configured live model/provider combinations is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until the user downloads/tests the final full build. This does not convert E4 to PASS and does not make AR-052 fully DONE.
 
-### [ ] AR-060 — Search/fetch/browser thật và trạng thái riêng
+### [~] AR-060 — Search/fetch/browser thật và trạng thái riêng
 
 **Sửa/reuse:** WebResearchHost, production registration, provider config và browser adapter; không ép thêm Web daemon riêng.
 
@@ -431,6 +431,16 @@ Full Avalonia CI `36237795173` / job `108392643192` **SUCCESS**, including full 
 **Test E3/E4:** RC-25/26; URL known vs search query; backend off/rate limit/redirect/timeout; sample website có interaction; không gửi form tới bên thứ ba để test. Test prompt injection, private endpoint policies, feed source metadata preservation.
 
 **Acceptance:** không return URL rồi claim đã browser-act; không giả current web facts; schema readiness đúng. Dịch vụ đăng nhập/tài khoản ngoài chưa được cho phép ghi NotTested, không làm giả.
+
+**AR-060 implementation checkpoint — 2026-09-26:** exact validated code SHA `b550855946e2378767917e0c5611f20497a9f791`. Production composition now exposes an explicit configurable Brave Search backend (`H2_BRAVE_SEARCH_API_KEY`), an HTTP fetch/download/extract path with bounded redirects/body size and public-network validation, and an optional browser CDP provider configured only through an explicit loopback DevTools endpoint (`H2_BROWSER_CDP_ENDPOINT`). Search or browser missing configuration is projected as `NeedsConfiguration`; explicit-URL fetch remains separately available. The legacy URL-only browser fallback is explicitly marked unsupported as browser-control capability.
+
+Web URLs reject embedded credentials and unsupported schemes. Fetch validates each redirect target before requesting it, blocks private/loopback destinations in the production public-fetch path, bounds response size before context ingestion, and preserves source/provenance metadata. Browser state keeps exact tab identity and separates read operations (list/inspect/query) from side-effecting navigation/click/type. CDP endpoint configuration itself is loopback-only; browser navigation follows its own public/explicit-loopback policy. Web content remains untrusted data and prompt-injection text does not gain host authority.
+
+Dedicated AR-060 run `36245687613` / job `108414334901` **SUCCESS**: focused AR-060 **6/6**, retained AR-052 **8/8**, AR-042 **6/6**, AR-041 **6/6**, AR-024 **2/2**, full H2 **1337/1337**, and all **75/75** required Agent suites PASS. Evidence artifact `10907149185`, 427,671 bytes, SHA256 `e37d6b7783c16059b5a38649ae0af0d9e1a5519a0a8505adce0184921ddcefdf`, was independently downloaded; ZIP integrity passed across **646** entries and `validation.json` reports E1=PASS, E2=PASS, E3/E4=DEFERRED_BY_USER_AWAITING_ENVIRONMENT, clean_end=true, live_search_claim=false, live_browser_claim=false and external_form_submission_claim=false.
+
+Full Avalonia CI `36245687565` / job `108414335312` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged DesktopHost/OfficeHost startup+IPC. All **20/20** pull-request workflows on exact code SHA completed SUCCESS, 0 failed. Final portable artifact `10907333886` is 110,442,910 bytes, SHA256 `ad03e82be0a72b91a8d9b57ef5f03db79123b8dcbae4795f42182a0b23dd4ba6`; it was independently downloaded, ZIP integrity passed across **482** entries, and `H2Notes.Avalonia.exe`, `H2AgentLab.DesktopHost.exe`, and `H2AgentLab.OfficeHost.exe` are present.
+
+**User decision — 2026-09-26:** live E3/E4 with a real configured Brave credential, real public-network search/fetch and an authorized dedicated browser CDP session is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until final-build testing. No live search/browser/form-submission/login acceptance is claimed.
 
 ### [~] AR-061 — Desktop đúng target, capture và recovery
 
@@ -592,72 +602,63 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-060_WEB_BACKEND_IMPLEMENTATION_ACTIVE",
-  "active_task": "AR-060",
-  "parked_task": "AR-052",
-  "implementation_status": "AR-060_ACTIVE",
-  "acceptance_status": "NOT_RUN",
+  "phase": "AR-060_IMPLEMENTED_E1_E2_PASS_E3_E4_DEFERRED_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-060",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E3_E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "E4 real configured model/provider resume combinations deferred until user tests final full build",
+  "required_evidence_level": "E3/E4 real configured search/fetch/browser through H2 UI/model deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "a2263e47a804d2f9f386296b1330b8a1c4231e2b",
+  "validated_code_sha": "b550855946e2378767917e0c5611f20497a9f791",
   "implementation_commits": [
-    "ccc86f5c82e600c9a8b246e3a92b716f66261a28 feat(AR-052): resume canonical task state on fresh model turn",
-    "e9bd288a06464c49a67ce0dd22f79d852107a678 fix(AR-052): disambiguate resume fixture type",
-    "0f6d8fb7b220df5d23871f6a01206037b798ad64 fix(AR-052): compile transport response fixtures",
-    "46cdf3d5a25bed3c247f90a5d51795261eb9bf2e test(AR-052): expose stuck resume lifecycle state",
-    "a2263e47a804d2f9f386296b1330b8a1c4231e2b test(AR-052): avoid fixture sync-context deadlock"
+    "b550855946e2378767917e0c5611f20497a9f791 feat(AR-060): add real web search and browser backends"
   ],
-  "last_validation_result": "AR052 8/8; retained AR041 6/6, AR042 6/6, AR051 37/37, AR031 39/39, AR050 50/50; full H2 1331/1331; 75/75 required Agent suites PASS. Dedicated run 36237795203 SUCCESS; Avalonia CI 36237795173 SUCCESS; all 19/19 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at a2263e47; AR052 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-26T11:21:59Z",
-  "user_decision": "User requires the complete build before personal testing. AR-052 real configured-model/provider E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
+  "last_validation_result": "AR060 6/6; retained AR052 8/8, AR042 6/6, AR041 6/6, AR024 2/2; full H2 1337/1337; 75/75 required Agent suites PASS. AR060 run 36245687613 SUCCESS; Avalonia CI 36245687565 SUCCESS; all 20/20 exact-SHA workflows SUCCESS; Windows x64 publish and packaged helper IPC PASS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at b5508559; AR060 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-26T13:57:16Z",
+  "user_decision": "User requires complete build before personal testing. AR-060 live search/browser E3/E4 is DEFERRED_BY_USER / AWAITING_ENVIRONMENT, not PASS.",
   "completed_this_session": [
-    "Rehydrated canonical AgentGoalState from durable goal/evidence snapshots without replaying old transcript or mutations.",
-    "Added same-TaskId ResumeTaskAsync with a fresh TurnId/provider request; old provider continuation/response identity is never reused.",
-    "Blocked resume before model/provider allocation while any AR-041 operation remains ReconcileRequired.",
-    "Required a fresh active mutation permission scope; expired/revoked grants never survive resume.",
-    "Explicit selected-provider failure does not auto-fallback; later provider/model change requires a new explicit fresh turn on the same TaskId.",
-    "Added scoped resume history locators so smaller-context models can retrieve exact durable facts without history becoming current authority.",
-    "Durable steering receipt ACKs reconnect without reapplying the same correction.",
-    "Validated Ollama/OpenAI Chat/OpenAI Responses fresh-start protocol matrix and exact SHA all-green CI."
+    "Reconciled concurrent worker state; AR-042 and AR-052 were already completed and were not overwritten.",
+    "Validated configurable Brave Search production backend with preserved source provenance and fail-closed missing configuration.",
+    "Validated guarded HTTP fetch with redirect/public-network/body-size policy before context ingestion.",
+    "Validated optional local-CDP browser with exact tab identity and read-vs-action separation; endpoint configuration is loopback-only.",
+    "Confirmed prompt-injection web text remains untrusted data and legacy URL-only browser fallback is not advertised as real browser control.",
+    "Validated exact SHA b5508559 with 20/20 workflows SUCCESS and independently verified portable/evidence ZIP artifacts."
   ],
   "remaining_in_parked_task": [
-    "Run E4 later with user-approved real configured model/provider combinations, including smaller-context switch and model change after a provider failure.",
-    "Confirm the resumed model still knows current requirements, verified outcomes, pending/reconciled operations and can retrieve exact earlier facts through scoped history.",
-    "Confirm native provider continuation IDs are never transferred across incompatible backends and no historical mutation is replayed.",
-    "For a mutation resume, expire/revoke the prior grant and verify a fresh permission is required before any new effect.",
-    "Record untested provider/model/platform combinations explicitly."
+    "Run E3/E4 later with a user-authorized Brave Search API key and a dedicated authorized Chrome/Edge CDP session.",
+    "Exercise real current search, explicit URL fetch, 429/auth/timeout/redirect behavior, browser tab inspect/query/navigation/click/type on disposable sample pages.",
+    "Do not submit real forms, upload private data, use logged-in personal browser profiles or test paid/external side effects without separate permission.",
+    "Confirm live source citations/provenance and prompt-injection resistance through H2 UI with configured model."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-052/implementation.md",
-    "docs/agent-reliability/AR-052/evidence.json",
-    "docs/agent-reliability/AR-052/native-acceptance.md",
-    "GitHub artifact 10905007711 AR052-E1-E2-Evidence",
-    "GitHub artifact 10905665137 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-060/implementation.md",
+    "docs/agent-reliability/AR-060/evidence.json",
+    "docs/agent-reliability/AR-060/native-acceptance.md",
+    "GitHub artifact 10907149185 AR060-E1-E2-Evidence",
+    "GitHub artifact 10907333886 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10905665137,
-    "bytes": 110421122,
-    "sha256": "513e11d60c1f3ce9528aed532255e67a00e6754cc4bd9861c957ee15f597e112",
-    "expires_at_utc": "2026-12-25T11:06:29Z",
-    "source_sha": "a2263e47a804d2f9f386296b1330b8a1c4231e2b",
+    "artifact_id": 10907333886,
+    "bytes": 110442910,
+    "sha256": "ad03e82be0a72b91a8d9b57ef5f03db79123b8dcbae4795f42182a0b23dd4ba6",
+    "expires_at_utc": "2026-12-25T13:35:40Z",
+    "source_sha": "b550855946e2378767917e0c5611f20497a9f791",
     "local_verification": "Downloaded through GitHub connector; SHA256 matched; ZIP test PASS for 482 entries; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present."
   },
   "safety_claims": {
-    "old_provider_continuation_reused": false,
-    "auto_provider_fallback": false,
-    "mutation_replay": false,
-    "fresh_turn_required": true,
-    "fresh_permission_for_mutation": true,
+    "live_search_claim": false,
+    "live_browser_claim": false,
+    "external_form_submission_claim": false,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-052 unless real E4 final-build testing reports a regression.",
-  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-052 turn."
+  "next_exact_action": "Next implementation turn: reconcile current branch/CI and select exactly one READY task from tracker dependency order. Do not reopen AR-060 unless live final-build testing reports a regression.",
+  "next_task_if_active_done": "Select one READY task at the start of the next turn; do not implement it in this AR-060 turn."
 }
 ```
 
