@@ -71,7 +71,7 @@ internal sealed partial class H2ProductionToolSession
         else
         {
             registry.RegisterCapabilityNotice(new("autocad.live_drawing",
-                "Live AutoCAD is unavailable. Start AutoCAD in the same Windows user session and select target entities. Closed-file Core Console is a separate capability and never substitutes for an unsaved live drawing.",
+                "Live AutoCAD is unavailable. Start AutoCAD in the same Windows user session and select target entities. Closed-file Core Console is a separate capability and never substitutes for an unsaved live drawing. A saved file, HTTP fetch, or unbound command is not an equivalent source.",
                 new(ToolReadinessState.Unavailable, liveCadReason)));
         }
 
@@ -82,7 +82,7 @@ internal sealed partial class H2ProductionToolSession
                 new(ToolReadinessState.NeedsConfiguration, "search_backend_not_configured")));
         if (!webConfig.BrowserConfigured)
             registry.RegisterCapabilityNotice(new("browser.live_tab",
-                "Interactive browser automation is not configured. Start a dedicated Chrome/Edge debugging session and set H2_BROWSER_CDP_ENDPOINT to its loopback endpoint.",
+                "Interactive browser automation is not configured. Start a dedicated Chrome/Edge debugging session and set H2_BROWSER_CDP_ENDPOINT to its loopback endpoint. A saved file, HTTP fetch, or unbound command is not an equivalent source.",
                 new(ToolReadinessState.NeedsConfiguration, "browser_backend_not_configured")));
         registry.RegisterCapabilityNotice(new("web.open_browser",
             "Legacy URL-only browser fallback is not a browser-control capability. Use browser.* only when a configured CDP session is ready.",
@@ -127,7 +127,7 @@ internal sealed partial class H2ProductionToolSession
             catch (ArgumentException)
             {
                 registry.RegisterCapabilityNotice(new("browser.live_tab",
-                    "Configured browser endpoint is invalid. H2_BROWSER_CDP_ENDPOINT must be an explicit loopback HTTP/HTTPS DevTools endpoint.",
+                    "Configured browser endpoint is invalid. H2_BROWSER_CDP_ENDPOINT must be an explicit loopback HTTP/HTTPS DevTools endpoint. A saved file, HTTP fetch, or unbound command is not an equivalent source.",
                     new(ToolReadinessState.NeedsConfiguration, "browser_endpoint_invalid")));
             }
         }
