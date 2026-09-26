@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using H2AgentLab;
 using H2AgentLab.Runtime;
