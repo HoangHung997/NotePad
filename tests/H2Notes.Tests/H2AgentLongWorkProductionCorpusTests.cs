@@ -188,7 +188,8 @@ internal static class H2AgentLongWorkProductionCorpusTests
             "Read-only resume modified one of the near-name documents.");
         Save("unsaved-"+iteration,new{
             iteration,status=done.Status.ToString(),seed.UnsavedSession,
-            request=factory.Budgets.Single(),docA=seed.DocAHash,docB=seed.DocBHash
+            requestCount=factory.Budgets.Count,requests=factory.Budgets.ToArray(),
+            docA=seed.DocAHash,docB=seed.DocBHash
         });
     }
 
