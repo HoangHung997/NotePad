@@ -150,7 +150,7 @@ internal static class H2AgentSteeringConcurrencyTests
                 using(var adapter=Adapter(state,factory))
                 {
                     var starts=Enumerable.Range(0,8)
-                        .Select(_=>Task.Run(()=>adapter.StartTaskAsync(null,"AR-042 reconnect",context)).Unwrap())
+                        .Select(_=>Task.Run(async()=>await adapter.StartTaskAsync(null,"AR-042 reconnect",context).ConfigureAwait(false)))
                         .ToArray();
                     Task.WaitAll(starts);
                     var ids=starts.Select(x=>x.Result).Distinct().ToArray();
