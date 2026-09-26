@@ -187,7 +187,7 @@ public sealed class OfficeHostServer
     {
         OfficeHostSafety.RequirePermission(request.PermissionGranted);
         if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
-            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem);
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode, problem, true);
         return _backend.PatchExcel(request);
     }
 

@@ -5,6 +5,7 @@ using H2AgentLab.Office;
 using H2AgentLab.OfficeHost;
 using H2AgentLab.OfficeProtocol;
 using H2AgentLab.Tools;
+using H2Notes.Core;
 
 internal static class H2ExcelBatchWriteTests
 {
@@ -77,7 +78,9 @@ internal static class H2ExcelBatchWriteTests
             var root=Path.Combine(Path.GetTempPath(),"h2-ar022-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
             try{
                 var client=new BatchClient();var type=typeof(H2ProductionAgentAdapter).Assembly.GetType("H2AgentLab.Integration.H2OfficeRuntimeTools",true)!;
-                using var office=(IDisposable)Activator.CreateInstance(type,[new Func<bool>(()=>true),root,null,null])!;
+                var observed=client.Backend.SnapshotExcel(client.SessionId);
+                IReadOnlyList<H2AgentTargetPath> targets=[new(observed.FullName,false,"user-path")];
+                using var office=(IDisposable)Activator.CreateInstance(type,[new Func<bool>(()=>true),root,null,targets])!;
                 type.GetField("_client",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(office,client);
                 var registry=new ToolRegistry();type.GetMethod("Register")!.Invoke(office,[registry]);Check(registry.TryGet("excel.write_range",out var descriptor),"write tool missing");
                 var p=descriptor.CallableSchema.GetProperty("function").GetProperty("parameters");var req=p.GetProperty("required").EnumerateArray().Select(x=>x.GetString()).ToArray();

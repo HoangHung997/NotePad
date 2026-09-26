@@ -197,6 +197,9 @@ public sealed class FixtureOfficeBackend : IOfficeBackend, IExcelRangeReadBacken
     public ExcelPatchResult PatchExcel(ExcelPatchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);OfficeHostSafety.RequirePermission(request.PermissionGranted);
+        var countError=ExcelPatchLimits.ValidationError(request.Cells?.Count??-1);
+        if(request.Cells is null||countError is not null)
+            throw new OfficeHostFaultException(ExcelPatchLimits.ErrorCode,countError??"Excel patch cells are required.",true);
         IReadOnlyList<ExcelCellPatch> cells;try{cells=ExcelPatchMutationRules.ValidateAndNormalize(request.Cells);}
         catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_request",ex.Message,true);}
         var before=SnapshotExcel(request.SessionId);RequireExcelMutationPrecondition(request.StateToken,request.ContentToken,before);

@@ -294,7 +294,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                     var beforeWrite=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
                     ValidateSnapshot(target,beforeWrite.SessionId,beforeWrite.FullName,beforeWrite.ActiveSheet+"!"+beforeWrite.SelectionAddress,false,
                         _intent==H2AgentTargetIntent.CapturedSelection,native:beforeWrite.NativeIdentity);
-                    if(ExcelPatchMutationRules.ContentToken(beforeWrite)!=contentToken)throw new ToolPreflightException("stale_resource");
+                    if(string.IsNullOrWhiteSpace(contentToken))
+                    {
+                        if(beforeWrite.StateToken!=token)throw new ToolPreflightException("stale_resource");
+                        contentToken=ExcelPatchMutationRules.ContentToken(beforeWrite);
+                    }
+                    else if(ExcelPatchMutationRules.ContentToken(beforeWrite)!=contentToken)throw new ToolPreflightException("stale_resource");
                     var invocation=ToolInvocation.Bind(call);
                     var request=new ExcelPatchRequest(session,beforeWrite.StateToken,true,sheetName,cells){
                         ContentToken=contentToken,LogicalOperationId=invocation.LogicalOperationId,
@@ -329,7 +334,12 @@ internal sealed class H2OfficeRuntimeTools : IAgentRuntimeDomainVerifier, IDispo
                 {
                     RequireAuthorization();var before=await Client.SnapshotExcelAsync(session,ct).ConfigureAwait(false);
                     ValidateSnapshot(target,before.SessionId,before.FullName,before.ActiveSheet+"!"+before.SelectionAddress,false,native:before.NativeIdentity);
-                    if(ExcelPatchMutationRules.ContentToken(before)!=contentToken)throw new ToolPreflightException("stale_resource");
+                    if(string.IsNullOrWhiteSpace(contentToken))
+                    {
+                        if(before.StateToken!=token)throw new ToolPreflightException("stale_resource");
+                        contentToken=ExcelPatchMutationRules.ContentToken(before);
+                    }
+                    else if(ExcelPatchMutationRules.ContentToken(before)!=contentToken)throw new ToolPreflightException("stale_resource");
                     var req=new ExcelRecalculateRequest(session,before.StateToken,true){ContentToken=contentToken,
                         SheetName=H2ProductionToolSession.Arg(call,"sheet_name"),Range=H2ProductionToolSession.Arg(call,"range")};
                     var calculated=await Client.RecalculateExcelAsync(req,ct).ConfigureAwait(false);
