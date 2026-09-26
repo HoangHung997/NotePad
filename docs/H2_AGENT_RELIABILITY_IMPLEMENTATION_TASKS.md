@@ -107,7 +107,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
-| AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | NOT_STARTED |
+| AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | ACTIVE — three-repeat production-path E2 corpus; E4 native/model long-work pending |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | NOT_STARTED |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | NOT_STARTED |
 | AR-083 | Nghiệm thu hai PC/NAS thật | 082 + user sẵn sàng | E5 | DEFERRED_BY_USER |
@@ -624,11 +624,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-063_IMPLEMENTED_E1_E2_PASS_E3_E4_DEFERRED_FINAL_BUILD_READY",
-  "active_task": null,
+  "phase": "AR-080_LONG_WORK_CORPUS_IMPLEMENTATION_ACTIVE",
+  "active_task": "AR-080",
   "parked_task": "AR-063",
-  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+  "implementation_status": "AR-080_ACTIVE",
+  "acceptance_status": "E4_NOT_RUN",
   "completed_evidence_level": "E2",
   "required_evidence_level": "E3/E4 real installed AutoCAD live-selection and native-session acceptance deferred until user final-build test",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",

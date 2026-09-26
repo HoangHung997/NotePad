@@ -720,6 +720,7 @@ H2AgentJobProductionTests.Run(Test);
 H2AgentJobObservationTests.Run(Test);
 H2AgentRequestBudgetTests.Run(Test);
 H2AgentWorkCompactionTests.Run(Test);
+H2AgentLongWorkProductionCorpusTests.Run(Test);
 H2AgentPluginLifecycleTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2AutoCadLiveBridgeTests.Run(Test);
