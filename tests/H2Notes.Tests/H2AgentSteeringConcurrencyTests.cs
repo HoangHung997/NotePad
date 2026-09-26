@@ -222,7 +222,7 @@ internal static class H2AgentSteeringConcurrencyTests
             JsonSerializer.SerializeToElement(new{type="object",properties=new{}}),
             new DelegatingToolExecutor(executorId,execute),
             resourceScope:new("fixture:mutation","fixture:*"),
-            serializationKey:"fixture:mutation",
+            serializationKey:"fixture_mutation",
             resultFormat:ToolResultFormat.Json);
 
     private static string Success()
