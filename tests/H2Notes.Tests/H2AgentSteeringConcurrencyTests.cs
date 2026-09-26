@@ -118,7 +118,9 @@ internal static class H2AgentSteeringConcurrencyTests
             Check(rechecks==1&&queuedEffects==0&&queuedDispatches==0
                 && result.Outcome?.Error?.Code=="expired_permission"
                 && result.Outcome.Effect==ToolMutationEffect.None,
-                "Expired permission crossed the post-wait pre-dispatch boundary.");
+                "Expired permission crossed the post-wait pre-dispatch boundary. "
+                + $"rechecks={rechecks}; effects={queuedEffects}; dispatches={queuedDispatches}; "
+                + $"code={result.Outcome?.Error?.Code ?? "<null>"}; effect={result.Outcome?.Effect.ToString() ?? "<null>"}");
         });
 
         test("AR-042 E1 steering revision cannot rewrite the revision of an already dispatched mutation", () =>
