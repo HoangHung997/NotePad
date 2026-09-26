@@ -401,9 +401,9 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         }
         var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading this paragraph page.",true);
         _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=total;
-        return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+        return new WordParagraphReadPage(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
             total,result,version,complete?null:WordPagedReadRules.Cursor("p",end),complete,"LiveDocument",
-            new(result.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(result).Length,Math.Max(0,Environment.TickCount64-started)))
+            new WordReadMetrics(result.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(result).Length,Math.Max(0,Environment.TickCount64-started)))
         {NativeIdentity=bound.Identity};
     }
 
@@ -431,10 +431,10 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             var runs=request.IncludeFormatting?ReadWordRuns(document,range,ref runBudget):Array.Empty<WordRunState>();
             var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading this range page.",true);
             _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=requestedEnd;
-            return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+            return new WordRangeReadPage(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
                 request.Start,request.Length,current,end-current,text,runs,kinds,kinds.Count==0,version,
                 complete?null:WordPagedReadRules.Cursor("r",end),complete,"LiveDocument",
-                new(1,1,text.Length,JsonSerializer.SerializeToUtf8Bytes(new{text,runs,kinds}).Length,Math.Max(0,Environment.TickCount64-started)))
+                new WordReadMetrics(1,1,text.Length,JsonSerializer.SerializeToUtf8Bytes(new{text,runs,kinds}).Length,Math.Max(0,Environment.TickCount64-started)))
             {NativeIdentity=bound.Identity};
         }
         finally{Release(range);Release(content);}
@@ -450,8 +450,8 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
             throw new OfficeHostFaultException("invalid_request","Word continuation cursor requires content_version.",true);
         RequireWordPageVersion(request.ContentVersion,version);
         var total=Convert.ToInt32(document.Tables.Count,CultureInfo.InvariantCulture);
-        if(total==0)return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
-            0,[],version,null,true,"LiveDocument",new(0,0,0,2,0)){NativeIdentity=bound.Identity};
+        if(total==0)return new WordTableReadPage(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+            0,Array.Empty<WordTableState>(),version,null,true,"LiveDocument",new WordReadMetrics(0,0,0,2,0)){NativeIdentity=bound.Identity};
         int start;try{start=WordPagedReadRules.Start(request.Cursor,"t",request.StartTable,0,total);}
         catch(ArgumentException ex){throw new OfficeHostFaultException("invalid_cursor",ex.Message,true);}
         var size=WordPagedReadLimits.TablePageSize(request.PageSize);var end=Math.Min(total,start+size);var tables=new List<WordTableState>();
@@ -484,9 +484,9 @@ public sealed class ComOfficeBackend : IOfficeBackend, IOfficeCaptureBackend, IE
         }
         var after=WordContentVersion(bound,document);if(after!=version)throw new OfficeHostFaultException("stale_content","Word content changed while reading table page.",true);
         _catalog.ValidateCurrent(bound,noEffect:true);var complete=end>=total;var chars=tables.SelectMany(x=>x.Rows).SelectMany(x=>x).Sum(x=>x.Length);
-        return new(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
+        return new WordTableReadPage(bound.SessionId,SafeString(()=>document.Name,bound.Name),SafeString(()=>document.FullName,bound.FullName),SafeBool(()=>document.Saved),
             total,tables,version,complete?null:WordPagedReadRules.Cursor("t",end),complete,"LiveDocument",
-            new(tables.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(tables).Length,Math.Max(0,Environment.TickCount64-started)))
+            new WordReadMetrics(tables.Count,end-start,chars,JsonSerializer.SerializeToUtf8Bytes(tables).Length,Math.Max(0,Environment.TickCount64-started)))
         {NativeIdentity=bound.Identity};
     }
 
