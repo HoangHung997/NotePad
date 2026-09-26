@@ -652,7 +652,10 @@ internal static class H2ProductAcceptanceScenarioTests
                 {
                     var compact = OpenCompact(app);
                     compact.SelectedPermissionMode = H2AgentPermissionMode.AllowScopedChanges;
-                    compact.PromptText = "Trong drawing AutoCAD đang mở, đọc block đang chọn và đổi attribute KM thành 12+345; chỉ sửa đúng block đang chọn rồi xác minh.";
+                    // Keep this AR-063 slice to one user outcome. Exact-selection preservation
+                    // and readback are host assertions below; the generic domain verifier must not
+                    // invent semantic coverage for extra prose clauses.
+                    compact.PromptText = "Trong drawing AutoCAD đang mở, đổi attribute KM của block đang chọn thành 12+345.";
                     ClickSend(compact);
                     WaitUntil(() => app.CurrentWorkAssistantTaskId is not null);
                     var taskId = app.CurrentWorkAssistantTaskId!.Value;
