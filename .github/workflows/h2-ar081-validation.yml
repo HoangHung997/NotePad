@@ -1,0 +1,44 @@
+name: AR-081 UI reliability validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar081-validation.yml'
+      - 'src/H2Notes.Avalonia/Controls/AgentUiProjection.cs'
+      - 'src/H2Notes.Avalonia/Controls/AgentTurnView.cs'
+      - 'src/H2Notes.Avalonia/Controls/AgentChatSurface.cs'
+      - 'src/H2Notes.Avalonia/Controls/AgentApprovalPanel.cs'
+      - 'src/H2Notes.Avalonia/Controls/AgentArtifactView.cs'
+      - 'src/H2Notes.Avalonia/AgentTaskWindow.cs'
+      - 'tests/H2Notes.Tests/H2AgentUiReliabilityTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'tools/agent-reliability/validate_ar081.ps1'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar081-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  ui-reliability:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-081 E1-E2 and retained regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar081.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR081-E1-E2-Evidence
+          path: artifacts/ar081/
+          if-no-files-found: error
+          retention-days: 14

@@ -690,6 +690,7 @@ H2ResponsiveProductTests.Run(Test);
 H2ProductArchitectureGuardTests.Run(Test);
 H2ProductionAgentBridgeTests.Run(Test);
 H2AgentChatSurfaceTests.Run(Test);
+H2AgentUiReliabilityTests.Run(Test);
 H2DocumentsDesignTests.Run(Test);
 H2AgentSteeringWireTests.Run(Test);
 H2ProductionRepairTests.Run(Test);

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input.Platform;
@@ -16,11 +17,13 @@ public sealed class AgentArtifactView : TabControl
     protected override Type StyleKeyOverride => typeof(TabControl);
     public AgentArtifactView(H2AgentEvidence evidence, IH2AgentAdapter? adapter = null)
     {
+        AutomationProperties.SetName(this, "Bằng chứng Agent: " + (evidence.Summary ?? evidence.Kind));
         Styles.Add(new global::Avalonia.Styling.Style(x=>x.OfType<TabItem>()) { Setters={
             new global::Avalonia.Styling.Setter(FontSizeProperty,13d),
             new global::Avalonia.Styling.Setter(PaddingProperty,new Thickness(9,10)) } });
         var preview = new StackPanel { Spacing = 12 };
-        var status = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Text = evidence.Summary };
+        var status = new TextBlock { Name = "AgentArtifactStatus", FontSize = 12, TextWrapping = TextWrapping.Wrap, Text = evidence.Summary };
+        AutomationProperties.SetName(status, "Trạng thái bằng chứng: " + (evidence.Summary ?? evidence.Kind));
         preview.Children.Add(status);
         var metadata = new SelectableTextBlock { TextWrapping = TextWrapping.Wrap,
             Text = $"Mã: {evidence.EvidenceId}\nLoại: {evidence.Kind}\nNguồn: {evidence.Provenance}\nTệp: {evidence.LocalPath}\nURI: {evidence.SourceUri}\nSHA-256: {evidence.Sha256}" };
@@ -29,7 +32,8 @@ public sealed class AgentArtifactView : TabControl
         {
             var ext = Path.GetExtension(path).ToLowerInvariant();
             var allowed = AiDocuments.Extensions.Contains(ext) || ext is ".log" or ".diff";
-            var open = new Button { Content = ext switch { ".xlsx"=>"Mở bằng Excel", ".docx"=>"Mở bằng Word", _=>"Mở tệp gốc" }, IsEnabled = allowed, FontSize = 12 };
+            var open = new Button { Name = "AgentArtifactOpen", Content = ext switch { ".xlsx"=>"Mở bằng Excel", ".docx"=>"Mở bằng Word", _=>"Mở tệp gốc" }, IsEnabled = allowed, FontSize = 12 };
+            AutomationProperties.SetName(open, open.Content?.ToString() ?? "Mở tệp bằng chứng");
             open.Click += (_, _) => { try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch (Exception ex) { status.Text = ex.Message; } };
             preview.Children.Add(open);
             try
@@ -65,7 +69,7 @@ public sealed class AgentArtifactView : TabControl
             { status.Text = "Không đọc được bản xem trước: " + ex.Message; }
         }
         else if (path is not null) status.Text = "Tệp không còn ở vị trí đã lưu. Thông tin nguồn được giữ lại bên dưới.";
-        ItemsSource = new[] {
+        var tabs = new[] {
             new TabItem { Header = "Xem trước", Content = new ScrollViewer { Content = preview, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } },
             new TabItem { Header = "Thay đổi", Content = new ScrollViewer { Content = new SelectableTextBlock {
                 Text=path is not null && Path.GetExtension(path).Equals(".diff",StringComparison.OrdinalIgnoreCase) && File.Exists(path) && new FileInfo(path).Length<=1_000_000
@@ -75,12 +79,15 @@ public sealed class AgentArtifactView : TabControl
                 new SelectableTextBlock { Text=evidence.Summary,TextWrapping=TextWrapping.Wrap },
                 new TextBlock { Text="Nguồn: "+(evidence.Provenance??"Tệp được chọn"),TextWrapping=TextWrapping.Wrap },
                 new Expander { Header="Thông tin kỹ thuật",Content=metadata } } } } } };
+        foreach (var tab in tabs) AutomationProperties.SetName(tab, "Bằng chứng Agent · " + tab.Header);
+        ItemsSource = tabs;
     }
 
     private static Control Word(string path)
     {
         var root=new StackPanel { Spacing=8 };
         var zoom=new Slider { Minimum=.5,Maximum=2,Value=1,Width=120 };
+        AutomationProperties.SetName(zoom, "Thu phóng xem trước Word");
         var zoomText=new TextBlock { Text="Vừa khung",FontSize=12,VerticalAlignment=VerticalAlignment.Center };
         var page=new Viewbox { Child=WordDocumentPreview.Read(path),Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left };
         void Fit()
@@ -89,7 +96,7 @@ public sealed class AgentArtifactView : TabControl
             zoomText.Text=zoom.Value==1 ? "Vừa khung" : Math.Round(zoom.Value*100)+"% khung";
         }
         zoom.ValueChanged+=(_,_)=>Fit();root.SizeChanged+=(_,_)=>Fit();
-        var reset=new Button { Content="Vừa khung",FontSize=12 };reset.Click+=(_,_)=>zoom.Value=1;
+        var reset=new Button { Content="Vừa khung",FontSize=12 }; AutomationProperties.SetName(reset, "Đặt Word vừa khung");reset.Click+=(_,_)=>zoom.Value=1;
         root.Children.Add(new StackPanel { Orientation=Orientation.Horizontal,Spacing=8,Children={zoomText,zoom,reset} });
         root.Children.Add(new ScrollViewer { Content=page,MaxHeight=700,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto });
         return root;
@@ -99,8 +106,10 @@ public sealed class AgentArtifactView : TabControl
     {
         var root = new StackPanel { Spacing = 8 };
         var previous = new Button { Content = "‹" }; var next = new Button { Content = "›" };
+        AutomationProperties.SetName(previous, "Trang PDF trước"); AutomationProperties.SetName(next, "Trang PDF sau");
         var pageLabel = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var zoom = new Slider { Minimum = .5, Maximum = 2, Value = 1, Width = 100 };
+        AutomationProperties.SetName(zoom, "Thu phóng PDF");
         var picture = new Image { Stretch = Stretch.Uniform, Width = 600 };
         var text = new SelectableTextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
         CancellationTokenSource? cts = null; var page = 0; var pages = 1; Bitmap? bitmap = null;
@@ -137,10 +146,15 @@ public sealed class AgentArtifactView : TabControl
     {
         var root = new StackPanel { Spacing = 6 };
         var formulas = new CheckBox { Name="SpreadsheetFormulaMode", Content="Hiện công thức", FontSize=12 };
-        var sheets = new ComboBox { ItemsSource = AgentSpreadsheetPreview.SheetNames(path), SelectedIndex = 0 };
+        var sheets = new ComboBox { Name="SpreadsheetSheetPicker", ItemsSource = AgentSpreadsheetPreview.SheetNames(path), SelectedIndex = 0 };
+        AutomationProperties.SetName(formulas, "Hiện công thức bảng tính");
+        AutomationProperties.SetName(sheets, "Chọn sheet bảng tính");
         var selected = new SelectableTextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Text = "Chọn ô để xem địa chỉ, giá trị lưu và công thức." };
         var previous = new Button { Content = "‹" }; var next = new Button { Content = "›" };
         var copy = new Button { Content = "Sao chép trang", FontSize = 11 };
+        AutomationProperties.SetName(previous, "Trang bảng tính trước");
+        AutomationProperties.SetName(next, "Trang bảng tính sau");
+        AutomationProperties.SetName(copy, "Sao chép trang bảng tính");
         var pageText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontSize = 11 };
         var body = new ContentControl(); var page = 0; string copyText = "";
         void Render()
