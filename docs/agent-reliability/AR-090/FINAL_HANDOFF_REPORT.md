@@ -1,5 +1,7 @@
 # H2 Agent Reliability — Final Handoff
 
+> **STALE_AFTER_OPTIONAL_TASK_ACTIVATION — AR-072 ACTIVE.** This final handoff is retained as provenance only while the separately selected optional AR-072 comparison is in progress. Reissue AR-090 after AR-072 finishes; do not treat this stale report as the current final handoff. AR-083 E5 remains deferred.
+
 Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 post-AR-071 revalidation complete.
 
 This is the current implementation handoff for the validated code SHA below. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
