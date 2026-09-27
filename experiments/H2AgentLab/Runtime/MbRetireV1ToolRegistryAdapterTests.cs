@@ -6,6 +6,10 @@ public static class MbRetireV1ToolRegistryAdapterTests
 {
     private static readonly string[] ExpectedTools =
     [
+        "activate_app",
+        "launch_app",
+        "list_running_apps",
+        "wait_for_app_window",
         "click_control",
         "check_word",
         "find_files",
@@ -18,6 +22,7 @@ public static class MbRetireV1ToolRegistryAdapterTests
         "read_file",
         "read_run",
         "read_skill",
+        "read_tool_output",
         "run_python",
         "search_files",
         "type_control",

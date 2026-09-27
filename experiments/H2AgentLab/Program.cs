@@ -54,6 +54,7 @@ public static class Program
         if (args.Contains("--mb-evidence-runtime-test")) return MbEvidenceRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-verification-runtime-test")) return MbVerificationRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-repair-runtime-test")) return MbRepairRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
+        if (args.Contains("--ar070-recovery-policy-test")) return MbRecoveryPolicyRuntimeTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-completion-gate-test")) return MbCompletionGateTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-skill-catalog-test")) return H2AgentLab.Skills.MbSkillCatalogTests.Run(args[^1]).GetAwaiter().GetResult();
         if (args.Contains("--mb-skill-discovery-test")) return H2AgentLab.Skills.MbSkillDiscoveryTests.Run(args[^1]).GetAwaiter().GetResult();

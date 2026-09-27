@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -27,6 +28,9 @@ public sealed class AgentTaskWindow : Window
         Title = "Chi tiết tác vụ · H2 Notes"; Width = 640; Height = 560; MinWidth = 460; MinHeight = 400;
         Background = Brush.Parse("#FCFAF7"); ShowInTaskbar = false;
         var close = new Button { Content = "Đóng" }; close.Click += (_, _) => Close();
+        AutomationProperties.SetName(close, "Đóng chi tiết tác vụ Agent");
+        AutomationProperties.SetName(_cancel, "Dừng tác vụ Agent");
+        AutomationProperties.SetName(_state, "Trạng thái tác vụ Agent");
         _cancel.Click += (_, _) => { _adapter.CancelTask(_taskId); Refresh(); };
         var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"), Margin = new Thickness(20), RowSpacing = 12 };
         root.Children.Add(_state);
@@ -42,12 +46,15 @@ public sealed class AgentTaskWindow : Window
         try
         {
             var task = _adapter.GetTaskSummary(_taskId);
+            var observation = _adapter.ObserveTask(_taskId);
+            var projection = AgentUiProjector.Project(task, observation.Progress);
             var thread = _adapter.GetThread(task.ThreadId ?? task.TaskId);
             var tasks = (thread?.TaskIds ?? [_taskId]).Select(_adapter.GetTaskSummary).ToArray();
             _surface.PresentTasks(_adapter, tasks, (task.ThreadId ?? task.TaskId).ToString());
-            _state.Text = task.Status switch { H2AgentTaskStatus.WaitingForApproval => "Cần bạn xác nhận", H2AgentTaskStatus.Completed => "Đã hoàn tất",
-                H2AgentTaskStatus.Blocked => "Chưa thể hoàn tất", H2AgentTaskStatus.Failed => "Tác vụ gặp lỗi", H2AgentTaskStatus.Cancelled => "Đã dừng", _ => "Agent đang làm việc" };
-            _result.Text = task.Goal + "\n\n" + (task.Error ?? task.FinalText ?? "Đang chờ kết quả…");
+            _state.Text = projection.Label;
+            ToolTip.SetTip(_state, projection.Detail);
+            AutomationProperties.SetName(_state, projection.Label + ". " + projection.Detail);
+            _result.Text = task.Goal + "\n\n" + (task.FinalText ?? task.Error ?? "Đang chờ kết quả…");
             _approval.Present(_adapter, _taskId, task.PendingApproval);
             _evidence.Text = string.Join("\n\n", task.Evidence.Select(item =>
                 (item.VerificationPassed == true ? "Đã xác minh: " : item.VerificationPassed == false ? "Xác minh chưa đạt: " : "Bằng chứng: ")

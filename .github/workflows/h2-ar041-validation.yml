@@ -1,0 +1,44 @@
+name: AR-041 restart reconcile validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar041-validation.yml'
+      - 'src/H2Notes.Core/H2AgentAdapter.cs'
+      - 'src/H2Notes.Core/H2AgentArchiveStatus.cs'
+      - 'experiments/H2AgentLab/Integration/AgentIntegrationTaskArchive.cs'
+      - 'experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs'
+      - 'experiments/H2AgentLab/Runtime/**'
+      - 'experiments/H2AgentLab/Tools/**'
+      - 'tests/H2Notes.Tests/H2AgentRestartReconcileTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'tools/agent-reliability/validate_ar041.ps1'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar041-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  restart-reconcile:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-041 E1-E2 and retained regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar041.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR041-E1-E2-Evidence
+          path: artifacts/ar041/
+          if-no-files-found: error
+          retention-days: 14

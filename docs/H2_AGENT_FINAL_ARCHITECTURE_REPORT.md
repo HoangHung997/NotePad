@@ -1,5 +1,7 @@
 # H2 Agent — Final Architecture Report
 
+> **HISTORICAL MB-120 BASELINE — not current AR reliability status.** This 2026-09-19 snapshot is retained for evidence compatibility. For current implementation/acceptance/package state, use [`docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md`](agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md). Statements such as “No H2 Notes production integration yet” below describe that historical snapshot only.
+
 Status: **MB-120 integration-readiness architecture baseline**  
 Date: **2026-09-19**  
 Canonical architecture: `docs/H2_AGENT_MASTER_SPEC.md`  
@@ -314,3 +316,8 @@ MB-120 final architecture report
 ```
 
 Do not bypass MB-121/122 by wiring H2 Notes directly to internal transport, ToolRegistry, verifier, provider or plugin implementation details.
+
+
+## AR-001 current-surface correction (2026-09-22)
+
+The 19-callable/six-executor measurements above are the historical MB-120 snapshot, not the current registry inventory. The already-shipped `read_tool_output` adds one read-only evidence tool and one evidence executor: current inventory is 20 callable descriptors / seven executors. Initial exposure remains `tool_search` plus `update_plan` (two schemas); no additional tool is eagerly exposed. AR-001 updates exact-set guards and tests chunk/foreign-handle behavior; it does not re-award any old MB acceptance.

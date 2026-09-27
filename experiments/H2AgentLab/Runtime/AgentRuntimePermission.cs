@@ -31,6 +31,12 @@ public interface IAgentRuntimePermissionPolicy
         AgentRuntimePermissionRequest request,
         CancellationToken cancellationToken);
 
+    ValueTask<AgentRuntimePermissionDecision> RevalidateBeforeDispatchAsync(
+        AgentRuntimePermissionRequest request,
+        AgentRuntimePermissionDecision priorDecision,
+        CancellationToken cancellationToken)
+        => ValueTask.FromResult(priorDecision);
+
     void ObserveResult(
         AgentRuntimePermissionRequest request,
         string output);

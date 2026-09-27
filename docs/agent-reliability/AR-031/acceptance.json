@@ -1,0 +1,557 @@
+{
+  "task": "AR-031",
+  "implementation_status": "IMPLEMENTED",
+  "acceptance_status": "E2_PASS",
+  "done": true,
+  "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+  "actual_full_ci_checkout": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+  "main_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "branch": "feature/h2-agent-reliability-ar-000",
+  "pr": 3,
+  "corpora": {
+    "AR-031-1": {
+      "passed": 39,
+      "failed": 0,
+      "sha256": "5618e22f99525669a86f84896739a6b11230a7c184853fa1d45785b47630e274"
+    },
+    "AR-031-2": {
+      "passed": 39,
+      "failed": 0,
+      "sha256": "a7844df5942ada10d68d314e94b92864700ea1a48b9925d9465ae5cfad71d46a"
+    },
+    "AR-031-3": {
+      "passed": 39,
+      "failed": 0,
+      "sha256": "1916b9b87ec7574fc6ebb0925a20b17f325e3d90ffedac8a34d8cb8e923b54ec"
+    },
+    "AR-030": {
+      "passed": 39,
+      "failed": 0,
+      "sha256": "c136df9cea60bbe067d74c1c2b0e17915a8b5261ed1a59e45d1bd324a967c42c"
+    },
+    "AR-020": {
+      "passed": 36,
+      "failed": 0,
+      "sha256": "b3bdee284db16a19d17b1fb1dc5018c32bcf815f412e84a891c7ef34b6ad78da"
+    },
+    "AR-012": {
+      "passed": 44,
+      "failed": 0,
+      "sha256": "bdf71e499b8e025084b59dffab60b06273adcd8b86f0d77a9e56e5e5ba34152d"
+    },
+    "AR-011": {
+      "passed": 25,
+      "failed": 0,
+      "sha256": "a05ad9755db44a81987cc664b39710554311b4390c819b50ba0582145ea7b7e7"
+    },
+    "AR-010": {
+      "passed": 11,
+      "failed": 0,
+      "sha256": "70ab5e891f63bd35e1df383f9492e84a9bc03dad6bb170304df816270626c0f4"
+    },
+    "AR-001": {
+      "passed": 13,
+      "failed": 0,
+      "sha256": "8354ba23b696abde1b43f312793c52350616dc2799ff42f7ba5d899d8c54c6e1"
+    }
+  },
+  "cancellation": {
+    "passed": 4,
+    "repetitions": 3,
+    "old_adapter": "9576af4aa1507daf833ef358c26fa7597351ad09",
+    "negative_passed": 1,
+    "negative_failed": 3,
+    "negative_log_sha256": "be3abf9fc5a7fcbd41ca6a4312e88482331348f22c1bc664941ebe4e81c7db27"
+  },
+  "h2_tests": {
+    "passed": 797,
+    "failed": 0
+  },
+  "independent_agent_suites": 74,
+  "solution_warnings": 35,
+  "runs": [
+    {
+      "run_id": 35785572999,
+      "job_id": 106941639193,
+      "event": "push",
+      "trigger_sha": "2207a03066240cd41239998b04cbd6528cd65cbe",
+      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "result": "SUCCESS",
+      "steps": [
+        {
+          "name": "Set up job",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/setup-dotnet@v4",
+          "result": "success"
+        },
+        {
+          "name": "Record exact source and build",
+          "result": "success"
+        },
+        {
+          "name": "Reproduce cancellation defects with the actual prior adapter and unchanged new tests",
+          "result": "success"
+        },
+        {
+          "name": "Rebuild positive source and run all corpora even after a negative-control discrepancy",
+          "result": "success"
+        },
+        {
+          "name": "Run every mandatory independent Agent suite",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "result": "success"
+        },
+        {
+          "name": "Post Run actions/setup-dotnet@v4",
+          "result": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "result": "success"
+        },
+        {
+          "name": "Complete job",
+          "result": "success"
+        }
+      ]
+    },
+    {
+      "run_id": 35785633670,
+      "job_id": 106941632110,
+      "event": "workflow_dispatch",
+      "trigger_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "tested_code_sha": "268079a566f3f6f10f31d99852c31bb050d39ec4",
+      "result": "SUCCESS",
+      "steps": [
+        {
+          "name": "Set up job",
+          "result": "success"
+        },
+        {
+          "name": "Checkout",
+          "result": "success"
+        },
+        {
+          "name": "Setup .NET 10",
+          "result": "success"
+        },
+        {
+          "name": "Restore Avalonia solution",
+          "result": "success"
+        },
+        {
+          "name": "Build Avalonia solution",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Notes tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 NAS acceptance harness self-test",
+          "result": "success"
+        },
+        {
+          "name": "Restore H2 Agent Lab DesktopHost",
+          "result": "success"
+        },
+        {
+          "name": "Build H2 Agent Lab DesktopHost",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab DesktopHost safety self-tests",
+          "result": "success"
+        },
+        {
+          "name": "Restore H2 Agent Lab OfficeHost",
+          "result": "success"
+        },
+        {
+          "name": "Build H2 Agent Lab OfficeHost",
+          "result": "success"
+        },
+        {
+          "name": "Restore H2 Agent Lab",
+          "result": "success"
+        },
+        {
+          "name": "Build H2 Agent Lab",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v1 self-test",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 architecture guard",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 metrics tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab initial A B baseline",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 session context tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 artifact store tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 compaction tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 context cache acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 orchestrator tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 tool registry tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 verification gate tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 closed file acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 Phase 10 acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 Phase 11 acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 extensibility refinement tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-10 runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-11 orchestrator runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-12 provider runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-20 bounded context tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-21 runtime compaction tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-22 prompt cache runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-30 initial tool exposure tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-31 ToolRegistry execution tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-32 deferred tool loading tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-33 scheduler runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-40 permission runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-41 evidence runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-42 verification runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-43 bounded repair runtime tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-44 host completion gate tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-50 canonical SkillCatalog tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-51 Codex-style skill discovery tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-52 progressive skill loading tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-60 extension registration tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-61 generic tool preference tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-62 computer provider registration tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-63 first-party extension card tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-70 domain-neutral capability search tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-71 installed capability projection tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-72 available capability search tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-73 thin CapabilityResolver tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-74 runtime capability install tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-75 task capability pinning tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-80 minimal catalog source tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-81 package retriever boundary tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-82 end-to-end install-and-continue test",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-90 retire AgentRunner tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-91 retire AgentTools giant switch tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-92 retire V1 ToolRegistry adapter tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-93 retire duplicate SkillCatalog tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-94 retire ComputerTools tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-95 trace journal boundary tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-100 Minimum Bootable Agent acceptance corpus",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-101 fully V2 normal UI path acceptance",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-102 context boundedness gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-103 extension bus gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-104 permission and scope gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-105 core correctness gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-110 Office acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-111 Web freshness legal acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-112 Desktop computer-use acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-113 AutoCAD extension acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-114 MCP acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-115 plugin package lifecycle acceptance gate",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-120 final architecture report acceptance",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent MB-121 public integration boundary acceptance",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 DesktopHost acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 OfficeHost acceptance tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 transport contract tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 Ollama transport tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 Chat Completions transport tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 OpenAI Responses HTTP transport tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 OpenAI Responses WebSocket tests",
+          "result": "success"
+        },
+        {
+          "name": "Run H2 Agent Lab v2 provider transport resilience matrix",
+          "result": "success"
+        },
+        {
+          "name": "Publish self-contained Windows x64",
+          "result": "success"
+        },
+        {
+          "name": "Verify packaged Agent helpers start and answer IPC",
+          "result": "success"
+        },
+        {
+          "name": "Publish H2 NAS acceptance probe Windows x64",
+          "result": "success"
+        },
+        {
+          "name": "Upload H2 NAS acceptance probe",
+          "result": "success"
+        },
+        {
+          "name": "Upload Avalonia portable build",
+          "result": "success"
+        },
+        {
+          "name": "Post Setup .NET 10",
+          "result": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "result": "success"
+        },
+        {
+          "name": "Complete job",
+          "result": "success"
+        }
+      ]
+    }
+  ],
+  "focused_artifact": {
+    "id": 10720480739,
+    "bytes": 2710766,
+    "sha256": "570da1d6ba82f7d011545d8696b8bec3a6da054c336a5a5803d74c39a7188d42"
+  },
+  "source_files_checked": 692,
+  "full_log_sha256": "c51cdee1c747c152b01ce4f1e0bdcb85a0e800ab384b7abb8fab36db1fc6c01a",
+  "package": {
+    "id": 10720516427,
+    "bytes": 110064979,
+    "digest": "sha256:eac90118df70d4ea959e12efaa041e9af550538a9378b00a2193322a9f3c0213"
+  },
+  "E1": "Version/schema/hash/index/migration/retention fixtures",
+  "E2": "Existing local journal and production Global/Project file/cancellation paths with scripted transport; actual owned child-process crashes and same-machine exclusion",
+  "E3": "NOT_RUN",
+  "E4": "NOT_RUN",
+  "AR-020": "IMPLEMENTED / AWAITING_ENVIRONMENT",
+  "AR-083": "DEFERRED_BY_USER",
+  "limits": [
+    "No native Office/model/UI acceptance",
+    "No two-PC/NAS certification",
+    "No automatic uncertain-write resume (AR-041)",
+    "Startup replay is linear in bounded retained history",
+    "Legacy rollback restores only pre-migration bytes; no silent backport",
+    "Journal is not an OS sandbox or administrator-tamper protection"
+  ],
+  "checkpoint_attempts": [
+    {
+      "run_id": 35786837664,
+      "job_id": 106945591326,
+      "result": "FAILED_TO_PUSH",
+      "reason": "Actions token lacks workflows permission; no checkpoint reached the branch. This retry writes only three docs; workflow maintenance uses the separately authorized connector."
+    }
+  ],
+  "captured_at_utc": "2026-09-22T21:32:05.181324+00:00"
+}

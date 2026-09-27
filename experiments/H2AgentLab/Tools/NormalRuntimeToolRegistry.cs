@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Validation;
+using H2AgentLab.Desktop;
+using H2AgentLab.DesktopProtocol;
 using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace H2AgentLab.Tools;
@@ -75,7 +77,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "inspect_artifact",
             "python",
-            "Read a recorded script output as bounded text or extracted Word/Excel/PDF text. This is not visual verification.",
+            "Independently reopen a recorded output and persist an exact-byte verification receipt. DOCX/XLSX use host OpenXML readers; PDF/image receipt is signature-only unless separate content/layout evidence exists.",
             AgentToolRisk.Low,
             AgentToolAccess.ReadOnly,
             true,
@@ -101,7 +103,7 @@ public static class NormalRuntimeToolRegistry
         new(
             "publish_artifact",
             "python",
-            "Publish a verified script output to the approved workspace after confirmation. Existing destinations require the current hash.",
+            "Publish a staged output only after inspect_artifact created an exact-byte verification receipt. Existing destinations require the current hash; signature-only PDF/image publication remains explicitly unverified for content/layout.",
             AgentToolRisk.High,
             AgentToolAccess.Mutating,
             false,
@@ -164,6 +166,49 @@ public static class NormalRuntimeToolRegistry
             AgentToolAccess.Mutating,
             false,
             Args(("path", "Relative .docx/.xlsx/.pdf/.txt"))),
+
+        new(
+            "list_running_apps",
+            "app",
+            "List safe visible desktop applications and exact observed session identities without exposing window titles. Does not launch or activate anything.",
+            AgentToolRisk.Low,
+            AgentToolAccess.ReadOnly,
+            true,
+            Args(),
+            Evidence: true,
+            Preference: ApplicationLifecycle()),
+        new(
+            "launch_app",
+            "app",
+            "Open/start/launch an app by name, including File Explorer (also called File Explore/explore), Word, Excel or AutoCAD. mode=reuse_or_launch activates the single exact running app when safe or starts it; mode=new_window requires a distinct new HWND/session and MUST be used when the user explicitly asks for a new/blank Word, Excel, Explorer or other app window. Vietnamese intent: mở ứng dụng, mở app, mở Word/Excel trắng/mới. Arbitrary executable paths and shell commands are rejected.",
+            AgentToolRisk.High,
+            AgentToolAccess.Mutating,
+            false,
+            Args(
+                ("application", "Friendly app name such as File Explorer, Word, Excel, AutoCAD or a registered executable name"),
+                ("mode", "Exactly reuse_or_launch or new_window. Use new_window for explicit new/blank/trắng/mới window requests.")),
+            Evidence: true,
+            Preference: ApplicationLaunch()),
+        new(
+            "wait_for_app_window",
+            "app",
+            "Wait up to ten seconds for exactly one safe visible window of the explicitly named application; multiple matches fail closed.",
+            AgentToolRisk.Low,
+            AgentToolAccess.ReadOnly,
+            false,
+            Args(("application", "Friendly app name or registered executable name")),
+            Evidence: true,
+            Preference: ApplicationLifecycle()),
+        new(
+            "activate_app",
+            "app",
+            "Activate one exact previously observed safe application window by session_id; never chooses another matching window.",
+            AgentToolRisk.Medium,
+            AgentToolAccess.Mutating,
+            false,
+            Args(("session_id", "Exact session_id returned by list_running_apps, launch_app or wait_for_app_window")),
+            Evidence: true,
+            Preference: ApplicationLifecycle()),
 
         new(
             "word_paragraphs",
@@ -229,6 +274,7 @@ public static class NormalRuntimeToolRegistry
             ["python"] = new PythonExecutor(host),
             ["files"] = new FileExecutor(host),
             ["office"] = new WordExecutor(host),
+            ["app"] = new ApplicationExecutor(host),
             ["desktop"] = new DesktopExecutor(host)
         };
 
@@ -325,18 +371,27 @@ public static class NormalRuntimeToolRegistry
             serializationKey: mutationScope ?? card.Namespace,
             canProvideVerificationEvidence:
                 card.Evidence || card.Access == AgentToolAccess.Mutating,
-            preference: card.Preference));
+            preference: card.Preference,
+            limits: new(SupportsPagination: card.Name is "read_file" or "read_tool_output"),
+            resultFormat: ToolResultFormat.Json));
     }
 
     private static JsonElement Schema(Card card)
     {
         var properties = card.Arguments.ToDictionary(
             x => x.Name,
-            x => (object)new
-            {
-                type = "string",
-                description = x.Description
-            },
+            x => card.Name == "launch_app" && x.Name == "mode"
+                ? (object)new
+                {
+                    type = "string",
+                    description = x.Description,
+                    @enum = new[] { "reuse_or_launch", "new_window" }
+                }
+                : new
+                {
+                    type = "string",
+                    description = x.Description
+                },
             StringComparer.Ordinal);
         return JsonSerializer.SerializeToElement(new
         {
@@ -368,6 +423,7 @@ public static class NormalRuntimeToolRegistry
             "core" => "Small stable planning/status tools.",
             "files" => "Workspace file discovery, reading, writing and open-file operations.",
             "office" => "Structured closed-document inspection and validation.",
+            "app" => "Observed desktop application discovery, launch and activation.",
             "desktop" => "User-selected window inspection and UI actions.",
             "python" => "Sandboxed Python execution and generated artifact inspection/publication.",
             "skills" => "Progressive skill discovery and guidance loading.",
@@ -382,6 +438,8 @@ public static class NormalRuntimeToolRegistry
             "view_artifact" => "model.vision",
             "publish_artifact" or "write_text" => "workspace.write",
             "open_file" => "desktop.open",
+            "launch_app" => "desktop.app-launch",
+            "activate_app" => "desktop.app-activate",
             "click_control" or "type_control" => "desktop.selected-window",
             _ => "mutation." + name.Replace('_', '.')
         };
@@ -406,6 +464,47 @@ public static class NormalRuntimeToolRegistry
 
     private static ToolPreferenceMetadata Accessibility()
         => new("active-content", ToolInteractionFidelity.Accessibility);
+
+    private static ToolPreferenceMetadata ApplicationLifecycle()
+        => new("application-lifecycle", ToolInteractionFidelity.Accessibility);
+
+    private static ToolPreferenceMetadata ApplicationLaunch()
+        => new(
+            "application-lifecycle",
+            ToolInteractionFidelity.Accessibility,
+            explicitRequestTerms:
+            [
+                "open app",
+                "start app",
+                "launch app",
+                "open application",
+                "start application",
+                "launch application",
+                "mở app",
+                "mở ứng dụng",
+                "file explorer",
+                "file explore",
+                "open word",
+                "start word",
+                "launch word",
+                "mở word",
+                "blank word",
+                "new word window",
+                "word trắng",
+                "word mới",
+                "open excel",
+                "start excel",
+                "launch excel",
+                "mở excel",
+                "blank excel",
+                "new excel window",
+                "excel trắng",
+                "excel mới",
+                "open autocad",
+                "start autocad",
+                "launch autocad",
+                "mở autocad"
+            ]);
 
     private abstract class ExecutorBase : IAgentToolExecutor
     {
@@ -537,13 +636,20 @@ public static class NormalRuntimeToolRegistry
             var fault = global::H2AgentLab.RecoveryPolicy.Classify(
                 exception,
                 call.Name);
+            fault = fault with { Message = ToolOutcomeBridge.SafeMessage(fault.Code) };
             var result = new JsonObject
             {
-                ["error"] = exception.Message,
+                ["error"] = fault.Message,
                 ["success"] = false,
                 ["recovery"] =
                     global::H2AgentLab.RecoveryPolicy.ToJson(fault)
             };
+            // Only typed, documented preflight rejection establishes that no mutation ran.
+            // IOException text is not evidence that a file operation was atomic.
+            if (exception is global::H2AgentLab.AgentFaultException known
+                && known.Code is "stale_state" or "invalid_arguments" or "invalid_application" or "app_not_found"
+                    or "ambiguous_target" or "app_preflight_unavailable" or "denied" or "boundary" or "permission_required")
+                result["mutationApplied"] = false;
 
             if (fault.Code == "not_found"
                 && call.Arguments.TryGetProperty("path", out var missing)
@@ -693,26 +799,17 @@ public static class NormalRuntimeToolRegistry
                 case "inspect_artifact":
                 {
                     var path = Arg(call, "path");
-                    var data = Host.RuntimeScripts.Read(Arg(call, "run_id"), path);
-                    var ext = Path.GetExtension(path).ToLowerInvariant();
-                    if (ext is ".pdf" or ".png" or ".jpg" or ".jpeg" or ".webp")
-                        return new { path, hash = global::H2AgentLab.SafeWorkspace.Hash(data), bytes = data.Length,
-                            contentAvailable = false,
-                            next = ext == ".pdf" ? "Use run_python with pypdf to extract embedded text or render with pypdfium2. For scans attach the file through the configured OCR workflow. This hash can be used as expected_hash when publishing a verified edited PDF."
-                                : "Use view_artifact or the configured attachment OCR workflow to inspect the image; metadata is not image content." };
-                    var text = global::H2AgentLab.SafeWorkspace.TextExtensions.Contains(ext)
-                        ? Decode(data)
-                        : ext is ".docx" or ".xlsx" or ".pdf"
-                            ? H2Notes.Core.AiDocuments.Read(path, data).Text
-                            : "Binary output. Use run_python with previous_run to inspect, or view_artifact for images.";
+                    var inspection = Host.RuntimeScripts.VerifyArtifact(Arg(call, "run_id"), path);
                     return new
                     {
                         path,
-                        sha256 = global::H2AgentLab.SafeWorkspace.Hash(data),
-                        characters = text.Length,
-                        content = text[..Math.Min(16_000, text.Length)],
-                        truncated = text.Length > 16_000,
-                        visualReview = false
+                        sha256 = inspection.Verification.Sha256,
+                        characters = inspection.Characters,
+                        content = inspection.Content,
+                        truncated = inspection.Truncated,
+                        verification = inspection.Verification,
+                        visualReview = inspection.Verification.LayoutVerified,
+                        requiresFurtherVerification = inspection.Verification.RequiresFurtherVerification
                     };
                 }
 
@@ -1029,6 +1126,186 @@ public static class NormalRuntimeToolRegistry
             throw new InvalidOperationException(
                 "Unknown Word runtime tool.");
         }
+    }
+
+    private sealed class ApplicationExecutor : ExecutorBase
+    {
+        private static readonly IReadOnlySet<string> Supported =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "list_running_apps",
+                "launch_app",
+                "wait_for_app_window",
+                "activate_app"
+            };
+
+        public ApplicationExecutor(global::H2AgentLab.AgentTools host) : base(host) { }
+        public override string ExecutorId => "normal.app";
+        protected override IReadOnlySet<string> Names => Supported;
+
+        protected override async ValueTask<object?> ExecuteCoreAsync(
+            global::H2AgentLab.ToolCall call,
+            CancellationToken cancellationToken)
+        {
+            using var client = DesktopHostLocator.CreateClientForApplicationLifecycle();
+            try
+            {
+                if (call.Name == "list_running_apps")
+                {
+                    var windows = await client.ListWindowsAsync(cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        applications = windows
+                            .GroupBy(x => x.ProcessName, StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                            .Select(group => new
+                            {
+                                process = group.Key,
+                                windows = group.Select(WindowIdentityProjection).ToArray()
+                            })
+                            .ToArray(),
+                        windowCount = windows.Count,
+                        note = "Only safe visible DesktopHost windows are returned."
+                    };
+                }
+
+                if (call.Name == "wait_for_app_window")
+                {
+                    var observed = await client.WaitForApplicationWindowAsync(
+                        new DesktopApplicationWaitRequest(Arg(call, "application"), 10_000),
+                        cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        observed = WindowProjection(observed),
+                        verifiedByHostObservation = true
+                    };
+                }
+
+                if (Host.ReadOnly)
+                    throw new global::H2AgentLab.AgentFaultException(
+                        "permission_required",
+                        "Chế độ Chỉ đọc không cho phép mở hoặc kích hoạt ứng dụng.",
+                        false);
+
+                if (call.Name == "launch_app")
+                {
+                    var application = Arg(call, "application");
+                    var mode = Arg(call, "mode");
+                    var requireNewWindow = mode switch
+                    {
+                        "reuse_or_launch" => false,
+                        "new_window" => true,
+                        _ => throw new global::H2AgentLab.AgentFaultException(
+                            "invalid_arguments",
+                            "launch_app mode must be exactly reuse_or_launch or new_window.",
+                            false)
+                    };
+                    await PermitOutsideProductionAsync(
+                        "Mở ứng dụng",
+                        "Ứng dụng: " + application + "\nDesktopHost chỉ cho phép tên ứng dụng/App Paths đã đăng ký; không chạy command line hoặc đường dẫn executable tùy ý.",
+                        cancellationToken).ConfigureAwait(false);
+                    var launched = await client.LaunchApplicationAsync(
+                        new DesktopApplicationLaunchRequest(application, true, 20_000, requireNewWindow),
+                        cancellationToken).ConfigureAwait(false);
+                    var launchSemanticsVerified =
+                        string.Equals(launched.RequestedApplication?.Trim(), application.Trim(), StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(launched.ProcessName, launched.Window.ProcessName, StringComparison.OrdinalIgnoreCase)
+                        && (requireNewWindow
+                            ? launched.NewWindowObserved && !launched.ReusedExistingWindow
+                            : launched.NewWindowObserved || launched.ReusedExistingWindow);
+                    if (!launchSemanticsVerified)
+                        throw new global::H2AgentLab.AgentFaultException(
+                            "launch_unverified",
+                            "DesktopHost result did not prove the exact requested application launch mode.");
+                    Host.ProductionSession?.ObserveLaunchedApplicationWindow(launched);
+                    return new
+                    {
+                        requestedApplication = launched.RequestedApplication,
+                        requestedMode = mode,
+                        application = launched.ApplicationId,
+                        process = launched.ProcessName,
+                        newWindowObserved = launched.NewWindowObserved,
+                        reusedExistingWindow = launched.ReusedExistingWindow,
+                        window = WindowProjection(launched.Window),
+                        verifiedByHostObservation = true
+                    };
+                }
+
+                if (call.Name == "activate_app")
+                {
+                    var sessionId = Arg(call, "session_id");
+                    await PermitOutsideProductionAsync(
+                        "Kích hoạt cửa sổ ứng dụng",
+                        "session_id: " + sessionId + "\nChỉ đúng cửa sổ đã được DesktopHost quan sát mới được kích hoạt.",
+                        cancellationToken).ConfigureAwait(false);
+                    var activated = await client.ActivateWindowAsync(
+                        new DesktopApplicationActivateRequest(sessionId, true),
+                        cancellationToken).ConfigureAwait(false);
+                    return new
+                    {
+                        window = WindowProjection(activated),
+                        activated = activated.Foreground,
+                        verifiedByHostObservation = activated.Foreground
+                    };
+                }
+
+                throw new InvalidOperationException("Unknown application runtime tool.");
+            }
+            catch (DesktopHostClientException ex)
+            {
+                throw Map(ex);
+            }
+        }
+
+        private async Task PermitOutsideProductionAsync(
+            string title,
+            string details,
+            CancellationToken cancellationToken)
+        {
+            if (Host.ProductionSession is null)
+                await Host.RuntimePermitAsync(title, details, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static object WindowIdentityProjection(DesktopWindowInfo window)
+            => new
+            {
+                session_id = window.SessionId,
+                pid = window.ProcessId,
+                process_started_utc_ticks = window.ProcessStartedUtcTicks,
+                process = window.ProcessName,
+                foreground = window.Foreground
+            };
+
+        // App lifecycle evidence needs exact process/window identity, not human window titles.
+        // Titles can contain document names or other private UI text and are deliberately omitted.
+        private static object WindowProjection(DesktopWindowInfo window)
+            => new
+            {
+                session_id = window.SessionId,
+                hwnd = window.Handle,
+                pid = window.ProcessId,
+                process_started_utc_ticks = window.ProcessStartedUtcTicks,
+                process = window.ProcessName,
+                foreground = window.Foreground
+            };
+
+        private static Exception Map(DesktopHostClientException ex)
+            => ex.Code switch
+            {
+                "permission_denied" => new global::H2AgentLab.AgentFaultException("denied", ex.Message, false),
+                "session_not_found" => new global::H2AgentLab.AgentFaultException("stale_state", ex.Message),
+                "invalid_application" => new global::H2AgentLab.AgentFaultException("invalid_application", ex.Message, false),
+                "app_not_found" => new global::H2AgentLab.AgentFaultException("app_not_found", ex.Message),
+                "ambiguous_target" => new global::H2AgentLab.AgentFaultException("ambiguous_target", ex.Message, false),
+                "launch_ambiguous" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
+                "launch_unverified" => new global::H2AgentLab.AgentFaultException("launch_unverified", ex.Message),
+                "foreground_failed" => new global::H2AgentLab.AgentFaultException("foreground_failed", ex.Message),
+                "preflight_unavailable" or "protocol_mismatch" => new global::H2AgentLab.AgentFaultException(
+                    "app_preflight_unavailable",
+                    ex.Message,
+                    false),
+                _ => new global::H2AgentLab.AgentFaultException("provider_unavailable", ex.Message)
+            };
     }
 
     private sealed class DesktopExecutor : ExecutorBase

@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/H2Notes.Avalonia/H2Notes.Avalonia.csproj" />
     <ProjectReference Include="../../src/H2Notes.Coordinator/H2Notes.Coordinator.csproj" />
+    <ProjectReference Include="../../experiments/H2AgentLab.OfficeHost/H2AgentLab.OfficeHost.csproj" />
     <PackageReference Include="Avalonia.Headless" Version="12.1.2" />
   </ItemGroup>
 </Project>

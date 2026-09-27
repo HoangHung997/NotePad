@@ -1,0 +1,66 @@
+name: AR-061 fastlane Linux cross-build
+on:
+  push:
+    branches:
+      - feature/h2-agent-reliability-ar-000
+
+permissions:
+  contents: read
+
+concurrency:
+  group: h2-ar061-fastlane-linux
+  cancel-in-progress: true
+
+jobs:
+  cross-build:
+    if: github.repository == 'HoangHung997/NotePad'
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Windows-targeted solution
+        run: dotnet restore H2Notes.Avalonia.slnx -p:EnableWindowsTargeting=true
+
+      - name: Cross-build exact source
+        run: dotnet build H2Notes.Avalonia.slnx -c Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Cross-publish self-contained Windows x64
+        run: >
+          dotnet publish src/H2Notes.Avalonia/H2Notes.Avalonia.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:EnableWindowsTargeting=true
+          -o artifacts/H2Notes-Avalonia-Portable-crossbuild
+
+      - name: Record exact build identity
+        shell: bash
+        run: |
+          test -s artifacts/H2Notes-Avalonia-Portable-crossbuild/H2Notes.Avalonia.exe
+          cat > artifacts/H2Notes-Avalonia-Portable-crossbuild/SOURCE.txt <<EOF
+          Source branch: ${{ github.ref_name }}
+          Source commit: ${{ github.sha }}
+          Actions run: ${{ github.run_id }}
+          Task: AR-061
+          Runner: ubuntu-slim
+          Cross-build only: native Windows runtime/helper acceptance is NOT claimed here.
+          EOF
+
+      - name: Upload Windows x64 cross-build
+        uses: actions/upload-artifact@v4
+        with:
+          name: H2Notes-Avalonia-Portable-win-x64-AR061-LinuxCrossBuild
+          path: artifacts/H2Notes-Avalonia-Portable-crossbuild/
+          if-no-files-found: error
+          retention-days: 14

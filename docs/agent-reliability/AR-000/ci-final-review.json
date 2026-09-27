@@ -1,0 +1,31 @@
+{
+  "task": "AR-000",
+  "source": "Completed GitHub Actions run metadata and decoded job log reviewed by the implementation session",
+  "run_id": 35689629766,
+  "job_id": 106623650447,
+  "url": "https://github.com/HoangHung997/NotePad/actions/runs/35689629766",
+  "head_sha": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
+  "tested_checkout_sha": "c62851a76351028906d495ba3c00b4401e8f4831",
+  "checkout_kind": "GitHub PR test merge, not a merge into main",
+  "runtime_source_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "runtime_diff": "EMPTY_VERIFIED",
+  "conclusion": "FAILURE",
+  "build": {
+    "warnings": 31,
+    "errors": 0
+  },
+  "h2_tests": {
+    "passed": 589,
+    "failed": 1
+  },
+  "architecture_guard": "NOT_RUN_SKIPPED_AFTER_H2_FAILURE",
+  "downstream_suites_and_publish": "NOT_RUN",
+  "artifact_count": 0,
+  "finding": "B11: H2WorkAssistantRepairTests full-access local-command fixture fails in InWorkspace cleanup at line 285 with IOException (directory used by another process); 589 passed / 1 failed. Root cause is not confirmed; AR-001 must investigate without weakening assertions.",
+  "owner": "AR-001",
+  "evidence_level": "E2 concrete runtime / scripted model and disposable process fixture, not E3/E4 Office-model acceptance",
+  "historical_baseline_run_preserved": 35687637186,
+  "captured_at_utc": "2026-09-22T05:20:16.762364+00:00",
+  "finalization_checked_head": "4e06bcd6c54c1eea3ecc93c288c0cf2f452d74d6",
+  "new_finalization_commit_full_ci": "NOT_CLAIMED; this records the completed run above, not any newly triggered CI"
+}

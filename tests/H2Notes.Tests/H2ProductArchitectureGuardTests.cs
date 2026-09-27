@@ -24,6 +24,15 @@ internal static class H2ProductArchitectureGuardTests
             Check(service.Contains("BuildNeedsAttention(", StringComparison.Ordinal),
                 "NeedsAttention is no longer built through product projection service.");
             GuardNoPersistenceMarkers(service, "NeedsAttention projection service");
+
+            var local = typeof(H2Notes.Avalonia.LocalConfiguration)
+                .GetProperty(nameof(H2Notes.Avalonia.LocalConfiguration.CommandCenter));
+            Check(local?.PropertyType == typeof(H2Notes.Avalonia.CommandCenterLocalSettings),
+                "Command Center acknowledgement overlay is not machine-local configuration.");
+            var sharedProject = typeof(ProjectRecord).GetProperties().Select(property => property.Name).ToArray();
+            Check(!sharedProject.Any(name => name.Contains("Acknowledg", StringComparison.OrdinalIgnoreCase)
+                                             || name.Contains("AttentionCollapsed", StringComparison.OrdinalIgnoreCase)),
+                "Command Center acknowledgement/collapse leaked into shared ProjectRecord.");
         });
 
         test("H2M-102 research remains evidence view with no independent ResearchStore", () =>

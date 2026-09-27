@@ -443,6 +443,11 @@ public static class MbAgentRuntimeTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
+    private static VerificationReport BindFixture(AgentRuntimeVerificationContext context, VerificationReport report)
+        => report with { CallCoverage = context.Calls.Where(c => context.MutationCallIds.Contains(c.Id))
+            .SelectMany(call => report.Criteria.Select(c => new VerificationCallCoverage(call.Invocation!.InvocationId,
+                c.CriterionId, "fixture:resource-1", c.CriterionId, c.Status, c.EvidenceIds))).ToArray() };
+
     private sealed class RepairVerifier : IAgentRuntimeVerifier
     {
         public int WriteVerifications { get; private set; }
@@ -458,7 +463,7 @@ public static class MbAgentRuntimeTests
             WriteVerifications++;
             if (WriteVerifications == 1)
             {
-                return Task.FromResult<VerificationReport?>(new VerificationReport(
+                return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                     "fixture-verifier",
                     [
                         new VerificationCriterionResult(
@@ -469,17 +474,17 @@ public static class MbAgentRuntimeTests
                                 "fixture.correct",
                                 "Fixture value is still incorrect.",
                                 ["evidence:fixture:bad"]))
-                    ]));
+                    ])));
             }
 
-            return Task.FromResult<VerificationReport?>(new VerificationReport(
+            return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                 "fixture-verifier",
                 [
                     new VerificationCriterionResult(
                         "fixture.correct",
                         VerificationCriterionStatus.Passed,
                         ["evidence:fixture:good"])
-                ]));
+                ])));
         }
     }
 

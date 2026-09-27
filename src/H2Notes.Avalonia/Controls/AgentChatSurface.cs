@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -13,7 +14,7 @@ public sealed class AgentChatSurface : Grid
 {
     public StackPanel Timeline { get; } = new() { Spacing = 16, Margin = new Thickness(18, 12), MaxWidth = 900, HorizontalAlignment = HorizontalAlignment.Stretch };
     public ScrollViewer Scroll { get; } = new() { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-    private readonly Button _latest = new() { Content = "↓ Hoạt động mới", HorizontalAlignment = HorizontalAlignment.Center,
+    private readonly Button _latest = new() { Name = "AgentLatestActivity", Content = "↓ Hoạt động mới", HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 10), IsVisible = false };
     private readonly Dictionary<Guid, AgentTurnView> _turns = [];
     private bool _follow = true;
@@ -21,7 +22,7 @@ public sealed class AgentChatSurface : Grid
     private int _visibleTurns = 30;
     private IReadOnlyList<H2AgentTaskSummary> _tasks = [];
     private IH2AgentAdapter? _adapter;
-    private readonly Button _older = new() { Content = "Xem các lượt trước", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly Button _older = new() { Name = "AgentOlderTurns", Content = "Xem các lượt trước", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly Grid _timelineHost = new();
     private readonly Border _inspector = new() { IsVisible = false, Background = Brush.Parse("#FCFAF7"), Padding = new Thickness(12) };
     public event Action<H2AgentEvidence>? ExternalArtifactRequested;
@@ -38,6 +39,11 @@ public sealed class AgentChatSurface : Grid
     public AgentChatSurface()
     {
         Name = "AgentChatSurface";
+        AutomationProperties.SetName(this, "Hội thoại Agent");
+        Scroll.Name = "AgentConversationScroll";
+        AutomationProperties.SetName(Scroll, "Lịch sử hội thoại Agent");
+        AutomationProperties.SetName(_latest, "Đi tới hoạt động Agent mới nhất");
+        AutomationProperties.SetName(_older, "Xem các lượt Agent trước");
         ColumnDefinitions = new ColumnDefinitions("*,0");
         Scroll.Content = Timeline; _timelineHost.Children.Add(Scroll); _timelineHost.Children.Add(_latest);
         Children.Add(_timelineHost); Children.Add(_inspector);
@@ -70,6 +76,7 @@ public sealed class AgentChatSurface : Grid
     {
         if (ExternalArtifactRequested is not null) { ExternalArtifactRequested(evidence); return; }
         var close = new Button { Content = "← Hội thoại", FontSize = 12 };
+        AutomationProperties.SetName(close, "Quay lại hội thoại Agent");
         close.Click += (_, _) => { _inspector.IsVisible = false; _inspector.Child = null; ArrangeInspector(); };
         var root = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), RowSpacing = 8 };
         root.Children.Add(close);

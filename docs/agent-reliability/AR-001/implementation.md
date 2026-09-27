@@ -1,0 +1,44 @@
+# AR-001 — contract repair and CI restoration
+
+Source baseline: `e573394963ea44398217721ed5f200f899234d31`. Existing branch `feature/h2-agent-reliability-ar-000`, PR #3. Runtime baseline is unchanged from AR-000 main before this patch.
+
+B01: production prompt uses canonical skill name constants. B02: ExcelPatchLimits owns 1..128 for schema, adapter, IPC client/server and both backends; oversize batches are rejected before writing or native discovery, never truncated. The optional enlarged fixture tests 128 distinct cells and unrelated-cell preservation. B03: exact-set guards include the already-shipped read_tool_output; historical MB-120 measurements remain intact and current 20 descriptors/seven executors are explicitly distinguished.
+
+B11: the old fixture had a 10-second wait but a default 60-second command timeout. Synchronous disposal cancelled/disposed tokens without waiting for the execution's Finished barrier; Directory.Delete in finally could replace the primary exception. IAsyncDisposable now drains those existing execution tasks before releasing tokens; fixture owners await it before deletion, retain the primary error and preserve evidence on cleanup failure. The command-success case has an explicit 20-second tool/30-second harness budget. A forced 50ms timeout while an owned PowerShell process runs must remain TimeoutException, stop that process and allow deletion only after drain. Slow startup is a hypothesis for the historical masked failure, not a proven root cause. No new job/queue engine or full restart-recovery claim is introduced.
+
+## Acceptance pending
+
+Focused AR-001 CI runs `dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter AR-001` three times; the unchanged full Avalonia CI runs every existing suite and publish/helper smoke separately. The proposed main-workflow edits were not applied because the CI token cannot write workflow files. E1/E2 use scripted transport, fixture backend and disposable local command. Invalid native count preflight does not access COM. E3/E4 Office/model/UI are NOT_RUN. AR-083 remains DEFERRED_BY_USER. Record actual CI before claiming completion.
+
+
+## First actual CI repair — not yet accepted
+
+Focused run 35691748431 tested source 88cc6241d9488e26e0652751a7c14c26df4aecb3: build succeeds; 9 RC-02 cases pass and 4 fail. The two oversized production-runtime cases already reject correctly but their tests incorrectly parse the evidence-footer projection as raw JSON; the assertions now explicitly require the footer and parse the preceding JSON body. The forced-timeout and held-transport-disposal tests expose UI synchronization-context capture in ToolExecutionScheduler awaits and implicit await-using disposal. Engine continuations now use ConfigureAwait(false), preserving gate/cancellation semantics while no longer depending on the caller pumping UI during shutdown. Both deterministic regression cases remain mandatory; no pass is claimed until rerun. Original primary errors and failed-run evidence remain preserved. This does not prove the exact cause of the earlier AR-000 sporadic cleanup failure.
+
+
+## Full CI uncovered another pre-existing exact-inventory mismatch
+
+Source c26b3521ce4b7d60e69f3942dda123c23fd53cf3 passed the AR-001 corpus 13/13 in all three focused repetitions (run 35692162013; artifact digest b26040954154ed315355978edcad3e09e8267c85be2855a7cb863f8735cf79f8). Full run 35692347728 passed H2 603/603, architecture 35/35 and all preceding suites, then Phase-11 case 1108 failed: its exact WebResearchHost list omitted the already-implemented web.read_feed. Phase-11 was 14 passed / 1 failed; downstream MB suites and publish were NOT_RUN. The corrected test retains exact ordering and selected-only schema checks, adds read-only/scope assertions, and executes the existing feed backend/parser/observation path using a synthetic feed. No actual search/browser connection is installed or claimed. Native/fixture Excel null preflight is made explicit to remove the two new nullable warnings without changing its rejection contract. This repair remains AR-001 CI restoration; AR-060 live Web acceptance stays open.
+
+
+## Test-only compile correction
+
+Run 35692802913 on 82af106655358fa4f27d60f3da2a53e35341f1cb failed compilation (CS8852) because the added Phase-11 test assigned the init-only FeedObserved property after construction. The fixture now binds that callback in an object initializer, preserving the provider contract and all feed assertions. The failed build is not counted as a test pass. Detailed failed/passing attempts are retained in ci-attempts.json. Full CI still requires a clean run on the corrected source.
+
+
+## MB-33 completion-contract drift exposed by full CI
+
+Full run 35693115516 / job 106634126497 on f023b611b0d03d55c11c257babcfa5529893f5bb passed H2 603/603, architecture 35/35, Phase-11 15/15 and all suites through MB-32, then MB-33 was 3 passed / 1 failed: the serialized-mutation fixture had no verifier report. The completion gate correctly refused it. The fixture now writes both call IDs to its own temporary file, independently reads exact ordered effects, requires the readback verifier in the task contract, checks max concurrency stays one, and rejects missing/partial side effects. No runtime completion rule is weakened. An independent diagnostic runner reuses every Agent suite flag from the existing full workflow and aggregates failures without hiding later failures behind an early guard; its final exit is nonzero when any required suite fails. Full CI/publish still remain required. Latest focused AR-001 on f023 passed 13/13 in each of three repetitions (artifact 10679343679, SHA256 60abc903fd33a6354646770a2826f61adc63592d0e18a3edbd6e9a482f2a4407).
+
+
+## AR-001 accepted on f3ebc4d336b8d6752436412840675fb2e7204e1d
+
+Full Avalonia CI [35694774117](https://github.com/HoangHung997/NotePad/actions/runs/35694774117) passed **every required build/test/Agent/helper/publish step**. The independently executed **74/74 Agent suites** and **13/13 AR-001 cases repeated three times** passed on the same exact code in run 35694729061. Downloaded evidence archive SHA256: `5d08cd125ad6163e9bf491f36281794d0a14840284a8ff1cd8f9f8aa7fb7c66a`. Detailed machine-readable steps, artifact identities and limitations: [acceptance.json](acceptance.json).
+
+The full-CI follow-up repairs retain strict completion rules: MB-74 independently checks active version, exact installed bytes and registry/skill contributions, and rejects a tampered payload; MB-100 proves recovery only through a host-selected candidate and preserves the original completely invented tool as a fail-closed negative. Six independent-runner invocation failures were corrected by preserving the required DesktopHost/OfficeHost arguments; they were harness errors, not native Office certification.
+
+Portable Windows archive: 109,941,950 bytes, SHA256 `fac6f92f42fbdb4da55c1e8fb92ea40e57177e8350211ac72f356fc7dfcb640c`. It was downloaded, hash-verified and inspected for the nonempty application and both helpers plus runtime/dependency files. The full CI actually executed packaged-helper IPC smoke. NAS probe archive exists (39,380,124 bytes); this is only a package, not physical E5 acceptance.
+
+**AR-001 = IMPLEMENTED / E2_PASS / DONE.** Native Office/model and real H2 UI acceptance remain NOT_RUN / AWAITING_ENVIRONMENT; AR-083 remains DEFERRED_BY_USER. MB-124–127 and other historical task acceptance are not re-awarded. Remaining baseline B04–B10 are not declared fixed. The exact cause of the historical masked B11 failure is not invented.
+
+Next: **AR-010 NOT_STARTED on the same branch and PR**. The canonical SESSION HANDOFF contains the exact next action. This finalization is documentation-only relative to the tested source; any CI triggered by the documentation commit must be distinguished from the completed source run above.

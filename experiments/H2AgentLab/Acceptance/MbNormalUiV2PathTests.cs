@@ -502,6 +502,11 @@ public static class MbNormalUiV2PathTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
+    private static VerificationReport BindFixture(AgentRuntimeVerificationContext context, VerificationReport report)
+        => report with { CallCoverage = context.Calls.Where(c => context.MutationCallIds.Contains(c.Id))
+            .SelectMany(call => report.Criteria.Select(c => new VerificationCallCoverage(call.Invocation!.InvocationId,
+                c.CriterionId, "mb101.fixture", c.CriterionId, c.Status, c.EvidenceIds))).ToArray() };
+
     private sealed class UiRepairVerifier : IAgentRuntimeVerifier
     {
         public int VerificationCount { get; private set; }
@@ -517,7 +522,7 @@ public static class MbNormalUiV2PathTests
             VerificationCount++;
             if (VerificationCount == 1)
             {
-                return Task.FromResult<VerificationReport?>(new VerificationReport(
+                return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                     AgentRuntimeDomainVerifierRouter.VerifierId,
                     [
                         new VerificationCriterionResult(
@@ -528,17 +533,17 @@ public static class MbNormalUiV2PathTests
                                 AgentRuntimeDomainVerifierRouter.MutationCriterionId,
                                 "MB-101 fixture value is not correct yet.",
                                 ["evidence:mb101:bad"]))
-                    ]));
+                    ])));
             }
 
-            return Task.FromResult<VerificationReport?>(new VerificationReport(
+            return Task.FromResult<VerificationReport?>(BindFixture(context, new VerificationReport(
                 AgentRuntimeDomainVerifierRouter.VerifierId,
                 [
                     new VerificationCriterionResult(
                         AgentRuntimeDomainVerifierRouter.MutationCriterionId,
                         VerificationCriterionStatus.Passed,
                         ["evidence:mb101:good"])
-                ]));
+                ])));
         }
     }
 

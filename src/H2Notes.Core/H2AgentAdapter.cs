@@ -173,7 +173,9 @@ public sealed record H2AgentTaskContext(
     Guid? ThreadId = null,
     Guid? TurnId = null,
     Guid? AfterTaskId = null,
-    IReadOnlyList<H2AgentTargetPath>? TargetPaths = null);
+    IReadOnlyList<H2AgentTargetPath>? TargetPaths = null,
+    H2ActiveWorkContext? ActiveWorkContext = null,
+    H2AgentTargetIntent? TargetIntent = null);
 
 public sealed record H2AgentChatTurn(string SourceId, string Role, string Content);
 
@@ -182,7 +184,12 @@ public sealed record H2AgentProgress(
     DateTime AtUtc,
     string Kind,
     string Code,
-    string Message);
+    string Message)
+{
+    public H2AgentToolOutcome? ToolOutcome { get; init; }
+    public H2AgentTargetResolution? TargetBinding { get; init; }
+    public H2AgentSourceDecision? SourceDecision { get; init; }
+}
 
 public sealed record H2AgentApproval(
     Guid ApprovalId,
@@ -212,7 +219,20 @@ public sealed record H2AgentTaskSummary(
     DateTime CreatedUtc,
     DateTime UpdatedUtc,
     Guid? ThreadId = null,
-    Guid? TurnId = null);
+    Guid? TurnId = null)
+{
+    // Read-only Agent archive projection; never added to ProjectRecord or H2 TaskRecord.
+    public H2AgentGoalSnapshot? GoalState { get; init; }
+    public H2AgentRecoverySnapshot? Recovery { get; init; }
+    public H2AgentCompletionAssessment? Completion { get; init; }
+}
+
+public sealed record H2AgentOutcomeSnapshot(string Id, string Requirement, string SourceId,
+    string RevisionId, string TargetScope, string Status, string? ReplacedBy, IReadOnlyList<string> EvidenceIds);
+public sealed record H2AgentGoalRevisionSnapshot(string Id, string? ParentId, int Sequence,
+    string SourceId, string SourceText, IReadOnlyList<string> Added, IReadOnlyList<string> Retired);
+public sealed record H2AgentGoalSnapshot(string RevisionId, IReadOnlyList<H2AgentGoalRevisionSnapshot> Revisions,
+    IReadOnlyList<H2AgentOutcomeSnapshot> Outcomes, IReadOnlyList<string> MutationRevisions, string? Scope = null);
 
 public sealed record H2AgentTaskObservation(
     H2AgentTaskSummary Summary,
@@ -225,6 +245,7 @@ public static class H2AgentVerification
 {
     public static bool IsVerified(H2AgentTaskSummary task)
         => task.Status == H2AgentTaskStatus.Completed
+            && task.Recovery?.ReconcileRequired != true
             && task.Evidence.LastOrDefault(item => item.VerificationPassed.HasValue)?.VerificationPassed == true;
 }
 
@@ -252,6 +273,13 @@ public interface IH2AgentAdapter
         bool readOnly = true,
         CancellationToken cancellationToken = default);
 
+    Task<Guid> ResumeTaskAsync(
+        Guid taskId,
+        H2AgentTaskContext context,
+        bool readOnly = true,
+        CancellationToken cancellationToken = default)
+        => Task.FromException<Guid>(new NotSupportedException("Task resume/rebase is not supported by this Agent adapter."));
+
     H2AgentTaskObservation ObserveTask(
         Guid taskId,
         long afterSequence = -1);
@@ -270,6 +298,11 @@ public interface IH2AgentAdapter
         int limit = 50);
 
     H2AgentEvidence? GetEvidence(string evidenceId);
+
+    H2AgentReconcileResult ReconcileInterruptedTask(
+        Guid taskId,
+        IReadOnlyList<H2AgentReconcileObservation> observations)
+        => throw new NotSupportedException("Restart reconciliation is not supported by this Agent adapter.");
 
     bool AttachProject(
         Guid taskId,

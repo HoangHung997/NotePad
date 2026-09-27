@@ -29,15 +29,16 @@ public sealed class AgentRuntimeEvidenceProjector
         ToolDescriptor descriptor,
         string sourceId,
         long sequence,
-        string output)
+        string output,
+        bool forceEvidence = false)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceId);
         output ??= "";
 
-        var requiresEvidence = descriptor.IsMutating
+        var requiresEvidence = forceEvidence || descriptor.IsMutating
             || descriptor.CanProvideVerificationEvidence
-            || output.Length > MaxInlineToolOutputCharacters;
+            || output.Length > Math.Min(MaxInlineToolOutputCharacters, descriptor.Limits.MaxOutputCharacters);
         if (!requiresEvidence)
             return null;
 
@@ -56,7 +57,7 @@ public sealed class AgentRuntimeEvidenceProjector
             projection.Handle.Sha256,
             summary);
 
-        if (output.Length > MaxInlineToolOutputCharacters)
+        if (output.Length > Math.Min(MaxInlineToolOutputCharacters, descriptor.Limits.MaxOutputCharacters))
         {
             return new AgentRuntimeEvidenceProjection(
                 evidence,
@@ -70,6 +71,33 @@ public sealed class AgentRuntimeEvidenceProjector
             : output.TrimEnd() + Environment.NewLine + evidenceLine;
 
         return new AgentRuntimeEvidenceProjection(evidence, modelContent);
+    }
+
+    internal AgentEvidenceReference ObserveJobOutput(string id, string jobId)
+    {
+        var handle = _store.LoadHandle(id); // Validates the current content hash, not merely the manifest.
+        if (handle.Kind is not (AgentArtifactKind.Stdout or AgentArtifactKind.Stderr)
+            || handle.SourceId != "job:" + jobId + ":" + (handle.Kind == AgentArtifactKind.Stdout ? "stdout" : "stderr"))
+            throw new AgentVerificationRequiredException("Process output artifact is not bound to this job.");
+        return new(AgentEvidenceKind.ToolResult, handle.Id, handle.Sha256,
+            "Retained " + handle.Kind + " from " + jobId + "; process output, not independent postcondition verification.");
+    }
+
+    public void EnsureReachable(IEnumerable<AgentEvidenceReference> references)
+    {
+        foreach (var item in references.Distinct())
+        {
+            // Only this store's typed handles, never an arbitrary evidence URI or path.
+            if (!item.ReferenceId.StartsWith("h2a1_", StringComparison.Ordinal)) continue;
+            try
+            {
+                var actual = _store.LoadHandle(item.ReferenceId);
+                if (actual.Sha256 != item.Sha256)
+                    throw new IOException("Completion evidence identity changed.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { throw new AgentVerificationRequiredException("Completion evidence is no longer retrievable with its recorded hash.", ex); }
+        }
     }
 
     private static string BuildSummary(string toolName, string output)

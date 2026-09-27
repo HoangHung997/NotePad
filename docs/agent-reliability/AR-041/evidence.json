@@ -1,0 +1,73 @@
+{
+  "task": "AR-041",
+  "source_sha": "ca215bf616bca98f94fafa11f8ec0690bc99e961",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E4": "NOT_RUN",
+    "E5": "DEFERRED_BY_USER",
+    "replay_claim": false,
+    "exactly_once_claim": false,
+    "fresh_permission_required": true
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-031": "39/39",
+      "AR-040": "57/57",
+      "AR-024": "2/2",
+      "AR-033": "42/42",
+      "AR-022": "8/8"
+    },
+    "full_h2": "1317/1317",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "17/17 SUCCESS"
+  },
+  "runs": {
+    "ar041": {
+      "run_id": 36225962252,
+      "job_id": 108359938339,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36225962431,
+      "job_id": 108359938825,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10901281618,
+      "bytes": 430125,
+      "sha256": "21123b9eae6339366ae67a40f428de9956844f2ced4115458996844b0add4f79",
+      "expires_at_utc": "2026-10-10T07:24:13Z",
+      "zip_entries": 647,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10900553554,
+      "bytes": 110405384,
+      "sha256": "26b5bbab87e1fbcb92f1cb845f79b7429172d11bb8a36899e353908c550435ac",
+      "expires_at_utc": "2026-12-25T07:10:18Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "safety": {
+    "auto_resume": false,
+    "blind_replay": false,
+    "generic_exactly_once": false,
+    "old_permission_restored": false,
+    "stale_pid_adopted": false,
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none"
+  }
+}

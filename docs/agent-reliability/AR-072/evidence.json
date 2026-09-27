@@ -1,0 +1,123 @@
+{
+  "task": "AR-072",
+  "source_sha": "5582e376c43ce7b4329ecf0e87a2261d0fb948c6",
+  "status": {
+    "selection": "USER_SELECTED",
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "NOT_RUN",
+    "E4": "NOT_RUN",
+    "E5": "DEFERRED_BY_USER",
+    "recommendation": "KEEP_CURRENT",
+    "production_switch": false,
+    "concurrent_planner_control": false,
+    "external_engine_claim": false,
+    "model_quality_claim": false
+  },
+  "benchmark": {
+    "corpus_id": "ar072-direct-readonly-v1",
+    "iterations_per_engine": 20,
+    "permission": "read-only / no external side effects",
+    "measurement_scope": "Deterministic in-process control-plane overhead only; no real network, model-quality, native-app or external-engine claim.",
+    "current": {
+      "name": "H2 AgentRuntime / production adapter",
+      "p50_ms": 190.23,
+      "p95_ms": 207.617,
+      "completions": 20,
+      "samples": 20,
+      "errors": 0,
+      "missing_mandatory_mappings": 0,
+      "adapter_cost": "None"
+    },
+    "candidate": {
+      "name": "Frozen AgentRunner",
+      "p50_ms": 1.566,
+      "p95_ms": 2.69,
+      "completions": 20,
+      "samples": 20,
+      "errors": 0,
+      "missing_mandatory_mappings": 7,
+      "adapter_cost": "High"
+    },
+    "mandatory_mappings": [
+      "TaskId",
+      "TurnId",
+      "GoalRevision",
+      "Jobs",
+      "Approvals",
+      "Events",
+      "RestartResume"
+    ],
+    "external_candidate": {
+      "status": "NotTested",
+      "reason": "No user-authorized external engine package/endpoint was supplied for AR-072 E2.",
+      "dependencies": "NotEvaluated",
+      "license_review": "NotEvaluated"
+    },
+    "decision_basis": "Candidate misses 7 mandatory task/revision/job/approval/event mappings; latency cannot override compatibility."
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-071": "6/6",
+      "AR-090": "7/7",
+      "AR-082": "5/5",
+      "AR-080": "4/4",
+      "AR-042": "6/6",
+      "AR-041": "6/6"
+    },
+    "full_h2": "1382/1382",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "28/28 SUCCESS"
+  },
+  "runs": {
+    "ar072": {
+      "run_id": 36296856593,
+      "job_id": 108557354501,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36296856547,
+      "job_id": 108557192819,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "comparison_evidence": {
+      "id": 10924761397,
+      "bytes": 433293,
+      "sha256": "e6f6262f6c6b3d8f92d9f834201ab4733bc7b645a70f165013195bf3da191d9c",
+      "expires_at_utc": "2026-10-11T05:35:56Z",
+      "zip_entries": 651,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10924502338,
+      "bytes": 175503614,
+      "sha256": "8aa2475e5ee85b859857d446471fed1df11d64efeab4ef93d2adcb206c75a091",
+      "expires_at_utc": "2026-12-26T05:19:12Z",
+      "source_sha": "5582e376c43ce7b4329ecf0e87a2261d0fb948c6",
+      "zip_entries": 2970,
+      "zip_integrity": "PASS",
+      "manifest_files": 2969,
+      "manifest_total_bytes": 415263768,
+      "manifest_content_sha256": "d707beb4963eb58581d717d4e018cda667c1b708220db520c4003d4e1a4b4eb6",
+      "manifest_all_file_hashes_verified": true,
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "external_engine_contacted": false,
+    "production_switch": false,
+    "concurrent_planner_control": false,
+    "physical_two_pc_nas_certified": false
+  }
+}

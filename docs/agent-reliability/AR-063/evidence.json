@@ -1,0 +1,97 @@
+{
+  "task": "AR-063",
+  "source_sha": "da8b9daefa1bbb1e86b833a72c68ebd395e62cb0",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "live_native_claim": false,
+    "general_dynamic_block_claim": false,
+    "plot_claim": false,
+    "undo_transaction_claim": false
+  },
+  "tests": {
+    "focused": "5/5",
+    "mb113": "6/6",
+    "retained": {
+      "AR-062": "6/6",
+      "AR-060": "6/6",
+      "AR-024": "2/2",
+      "AR-033": "42/42",
+      "AR-012": "44/44"
+    },
+    "full_h2": "1348/1348",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "22/22 SUCCESS"
+  },
+  "runs": {
+    "ar063": {
+      "run_id": 36254640413,
+      "job_id": 108439028970,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36254640513,
+      "job_id": 108438987210,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10910655601,
+      "bytes": 432387,
+      "sha256": "2b966f174b87f7dc2cdd1dbacef82f90264711cbcd16b016f8123a634a4da86e",
+      "expires_at_utc": "2026-10-10T16:27:16Z",
+      "zip_entries": 650,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10910881244,
+      "bytes": 110469935,
+      "sha256": "24b342f1378525a521678a51a0986171595045de56d4c475bf257f37c103e29f",
+      "expires_at_utc": "2026-12-25T16:12:43Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "scope": {
+    "closed_file": [
+      "autocad.create_file",
+      "autocad.inspect_file",
+      "autocad.update_entities",
+      "autocad.export_dxf"
+    ],
+    "live_external_com": [
+      "autocad.list_documents",
+      "autocad.get_active_document",
+      "autocad.query_entities",
+      "autocad.read_attributes",
+      "autocad.read_layers",
+      "autocad.update_attribute",
+      "autocad.verify_entity"
+    ],
+    "live_not_advertised": [
+      "autocad.update_entity",
+      "autocad.plot",
+      "autocad.verify_plot",
+      "general dynamic-block mutation",
+      "arbitrary AutoCAD command/LISP/script"
+    ]
+  },
+  "safety": {
+    "saved_file_equivalent_to_live": false,
+    "transaction_atomicity_claim": false,
+    "undo_claim": false,
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none"
+  }
+}

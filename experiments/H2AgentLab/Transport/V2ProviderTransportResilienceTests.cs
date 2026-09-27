@@ -31,14 +31,30 @@ public static class V2ProviderTransportResilienceTests
             {
                 var handler = new BlockingHandler();
                 await using var transport = fixture.Create(handler);
-                using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(40));
+                using var cancel = new CancellationTokenSource();
+                var pending = Collect(transport.StartAsync(Start(), cancel.Token));
                 try
                 {
-                    _ = await Collect(transport.StartAsync(Start(), cancel.Token));
-                    throw new InvalidOperationException("Cancelled request completed unexpectedly.");
+                    // Test cancellation AFTER dispatch, not a race between a 40 ms timer and
+                    // serialization/JIT/runner load. The separately tested pre-cancel path sends zero.
+                    await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    Check(!pending.IsCompleted && handler.Requests == 1, "The controlled request did not block after one dispatch.");
+                    cancel.Cancel();
+                    await ExpectCancellation(pending);
+                    Check(handler.Requests == 1, $"Cancellation triggered an unexpected retry/replay: {handler.Requests} sends.");
                 }
-                catch (OperationCanceledException) { }
-                Check(handler.Requests == 1, "Cancellation triggered an unexpected retry/replay.");
+                finally { await CancelAndDrain(cancel, pending); }
+            });
+
+            await Test(fixture.Name + " pre-cancelled request has zero sends", async () =>
+            {
+                var handler = new BlockingHandler();
+                await using var transport = fixture.Create(handler);
+                using var cancel = new CancellationTokenSource();
+                cancel.Cancel();
+                await ExpectCancellation(Collect(transport.StartAsync(Start(), cancel.Token)));
+                Check(handler.Requests == 0 && !handler.Entered.Task.IsCompleted,
+                    $"Pre-cancelled request reached the handler: {handler.Requests} sends.");
             });
 
             await Test(fixture.Name + " malformed provider JSON is rejected before completion", async () =>
@@ -83,15 +99,30 @@ public static class V2ProviderTransportResilienceTests
             var socket = new BlockingSocket();
             var fallback = new CountingFallback();
             await using var transport = new OpenAiResponsesWebSocketTransport(ResponsesProfile(), "key", () => socket, () => fallback);
-            using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(40));
+            using var cancel = new CancellationTokenSource();
+            var pending = Collect(transport.StartAsync(Start(), cancel.Token));
             try
             {
-                _ = await Collect(transport.StartAsync(Start(), cancel.Token));
-                throw new InvalidOperationException("Cancelled WebSocket request completed unexpectedly.");
+                await socket.Receiving.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Check(socket.Sends == 1 && !pending.IsCompleted, "The controlled socket did not block after one write.");
+                cancel.Cancel();
+                await ExpectCancellation(pending);
+                Check(socket.Sends == 1, $"Expected one WebSocket write, observed {socket.Sends}.");
+                Check(fallback.Starts == 0, "Written WebSocket request was replayed through HTTP fallback.");
             }
-            catch (OperationCanceledException) { }
-            Check(socket.Sends == 1, "Expected exactly one WebSocket write before cancellation.");
-            Check(fallback.Starts == 0, "Written WebSocket request was replayed through HTTP fallback.");
+            finally { await CancelAndDrain(cancel, pending); }
+        });
+
+        await Test("Responses WebSocket pre-cancelled request has zero writes and no fallback", async () =>
+        {
+            var socket = new BlockingSocket();
+            var fallback = new CountingFallback();
+            await using var transport = new OpenAiResponsesWebSocketTransport(ResponsesProfile(), "key", () => socket, () => fallback);
+            using var cancel = new CancellationTokenSource();
+            cancel.Cancel();
+            await ExpectCancellation(Collect(transport.StartAsync(Start(), cancel.Token)));
+            Check(socket.Sends == 0 && !socket.Receiving.Task.IsCompleted && fallback.Starts == 0,
+                $"Pre-cancellation dispatched work: socket={socket.Sends}, fallback={fallback.Starts}.");
         });
 
         await Test("Responses WebSocket malformed message is rejected without fallback replay", async () =>
@@ -187,6 +218,21 @@ public static class V2ProviderTransportResilienceTests
         return result;
     }
 
+    private static async Task ExpectCancellation(Task pending)
+    {
+        try { await pending.WaitAsync(TimeSpan.FromSeconds(5)); }
+        catch (OperationCanceledException) { return; }
+        throw new InvalidOperationException("Cancelled request completed unexpectedly.");
+    }
+
+    private static async Task CancelAndDrain(CancellationTokenSource cancel, Task pending)
+    {
+        cancel.Cancel();
+        try { await pending.WaitAsync(TimeSpan.FromSeconds(5)); }
+        catch (OperationCanceledException) { }
+        // An uncooperative or faulted task fails the fixture; it is not silently abandoned.
+    }
+
     private sealed record HttpFixture(
         string Name,
         Func<HttpMessageHandler, IAgentTransport> Create,
@@ -196,10 +242,12 @@ public static class V2ProviderTransportResilienceTests
 
     private sealed class BlockingHandler : HttpMessageHandler
     {
+        public readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int Requests;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Requests++;
+            Interlocked.Increment(ref Requests);
+            Entered.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("unreachable");
         }
@@ -233,8 +281,10 @@ public static class V2ProviderTransportResilienceTests
 
     private sealed class BlockingSocket : FakeSocketBase
     {
+        public readonly TaskCompletionSource Receiving = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public override async IAsyncEnumerable<string> ReceiveTextAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            Receiving.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }

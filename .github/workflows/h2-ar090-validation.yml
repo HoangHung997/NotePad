@@ -1,0 +1,42 @@
+name: AR-090 final handoff audit
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar090-validation.yml'
+      - 'README.md'
+      - 'docs/H2_AGENT_FINAL_ARCHITECTURE_REPORT.md'
+      - 'docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+      - 'docs/agent-reliability/AR-090/**'
+      - 'tests/H2Notes.Tests/H2AgentFinalHandoffAuditTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'tools/agent-reliability/validate_ar090.ps1'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar090-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  final-handoff-audit:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-090 final audit and retained regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar090.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR090-Final-Handoff-Evidence
+          path: artifacts/ar090/
+          if-no-files-found: error
+          retention-days: 30

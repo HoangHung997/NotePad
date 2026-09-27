@@ -47,6 +47,45 @@ public sealed record AutoCadMutationResult(
     AutoCadEntityRef After,
     string EvidenceId);
 
+public enum AutoCadOperationMode
+{
+    ClosedFileCoreConsole = 0,
+    LiveExternalCom = 1
+}
+
+public sealed record AutoCadOperationMatrixEntry(
+    AutoCadOperationMode Mode,
+    string ToolName,
+    bool Implemented,
+    bool Mutating,
+    string Scope,
+    string Verification);
+
+public static class AutoCadOperationMatrix
+{
+    public static IReadOnlyList<AutoCadOperationMatrixEntry> Entries { get; } =
+    [
+        new(AutoCadOperationMode.ClosedFileCoreConsole, "autocad.create_file", true, true, "closed DWG", "CoreConsole reopen/readback"),
+        new(AutoCadOperationMode.ClosedFileCoreConsole, "autocad.inspect_file", true, false, "closed DWG", "CoreConsole entity read"),
+        new(AutoCadOperationMode.ClosedFileCoreConsole, "autocad.update_entities", true, true, "closed DWG", "CoreConsole reopen/preservation readback"),
+        new(AutoCadOperationMode.ClosedFileCoreConsole, "autocad.export_dxf", true, true, "closed DWG -> new DXF", "DXF structure/readback"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.list_documents", true, false, "live AutoCAD", "COM document identity/state"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.get_active_document", true, false, "live AutoCAD", "COM active document identity/state"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.query_entities", true, false, "current PickFirst selection only", "selected handle/entity state"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.read_attributes", true, false, "selected block reference", "COM attribute readback"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.read_layers", true, false, "live AutoCAD", "COM layer read"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.update_attribute", true, true, "selected attributed block only", "independent COM attribute readback"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.verify_entity", true, false, "selected attributed block only", "exact document/entity token + attribute expectation"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.update_entity", false, true, "unsupported in live COM provider", "not advertised"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.plot", false, true, "unsupported in live COM provider", "not advertised"),
+        new(AutoCadOperationMode.LiveExternalCom, "autocad.verify_plot", false, false, "unsupported in live COM provider", "not advertised")
+    ];
+
+    public static IReadOnlySet<string> LiveComImplementedTools { get; } =
+        Entries.Where(x => x.Mode == AutoCadOperationMode.LiveExternalCom && x.Implemented)
+            .Select(x => x.ToolName).ToHashSet(StringComparer.Ordinal);
+}
+
 public interface IAutoCadNativeBridge
 {
     Task<IReadOnlyList<AutoCadDocumentRef>> ListDocumentsAsync(
@@ -422,7 +461,11 @@ public static class AutoCadProviderPolicy
 
     public static IReadOnlyList<ToolDescriptor> BuildDescriptors(
         IAgentToolExecutor executor,
-        string providerVersion = "1.0.0")
+        string providerVersion = "1.0.0",
+        IReadOnlySet<string>? supportedNames = null,
+        string providerId = "autocad-native-plugin",
+        string serverId = "local-autocad-ipc",
+        string capabilityDescription = "Structured AutoCAD native-plugin bridge capability.")
     {
         ArgumentNullException.ThrowIfNull(executor);
 
@@ -525,7 +568,9 @@ public static class AutoCadProviderPolicy
                 ["document_session_id", "document_state_token", "expectation"])
         };
 
-        return definitions.Select(item =>
+        return definitions
+            .Where(item => supportedNames is null || supportedNames.Contains(item.Name))
+            .Select(item =>
         {
             var schema = JsonSerializer.SerializeToElement(new
             {
@@ -533,7 +578,7 @@ public static class AutoCadProviderPolicy
                 function = new
                 {
                     name = item.Name,
-                    description = "Structured AutoCAD native-plugin bridge capability.",
+                    description = capabilityDescription,
                     parameters = new
                     {
                         type = "object",
@@ -549,8 +594,8 @@ public static class AutoCadProviderPolicy
                 item.Name,
                 new ToolNamespace(
                     "autocad",
-                    "Structured AutoCAD native plugin capabilities."),
-                "Structured AutoCAD native-plugin bridge capability.",
+                    capabilityDescription),
+                capabilityDescription,
                 item.Risk,
                 item.Access,
                 supportsParallel: !mutating,
@@ -558,9 +603,9 @@ public static class AutoCadProviderPolicy
                 schema,
                 executor,
                 provenance: new ToolProvenance(
-                    "autocad-native-plugin",
+                    providerId,
                     providerVersion,
-                    "local-autocad-ipc",
+                    serverId,
                     providerVersion),
                 resourceScope: new ToolResourceScope(
                     "autocad:active-document",

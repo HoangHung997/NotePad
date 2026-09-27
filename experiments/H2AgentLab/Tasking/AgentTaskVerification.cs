@@ -44,6 +44,7 @@ public static class AgentTaskCompletionGate
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(outcome);
 
+        contract.Goals?.EnsureComplete();
         var policy = contract.VerificationPolicy;
         var requiresVerification =
             contract.IsMutating

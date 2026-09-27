@@ -31,17 +31,17 @@ public static class VerificationCompletionGate
         if (missing.Length > 0)
             return new AgentVerificationOutcome(
                 passed: false,
-                verifierIds: snapshot.Select(x => x.VerifierId));
+                verifierIds: snapshot.SelectMany(x => x.ContributingVerifierIds.Count == 0 ? [x.VerifierId] : x.ContributingVerifierIds));
 
         if (requiredCriteria.Any(id =>
             resultByCriterion[id].Status != VerificationCriterionStatus.Passed))
             return new AgentVerificationOutcome(
                 passed: false,
-                verifierIds: snapshot.Select(x => x.VerifierId));
+                verifierIds: snapshot.SelectMany(x => x.ContributingVerifierIds.Count == 0 ? [x.VerifierId] : x.ContributingVerifierIds));
 
         var allReportsPass = snapshot.Length > 0 && snapshot.All(x => x.Passed);
         return new AgentVerificationOutcome(
             passed: allReportsPass,
-            verifierIds: snapshot.Select(x => x.VerifierId));
+            verifierIds: snapshot.SelectMany(x => x.ContributingVerifierIds.Count == 0 ? [x.VerifierId] : x.ContributingVerifierIds));
     }
 }

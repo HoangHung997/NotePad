@@ -1,0 +1,39 @@
+name: AR-072 alternative engine comparison
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/h2-ar072-validation.yml'
+      - 'tests/H2Notes.Tests/H2AlternativeEngineComparisonTests.cs'
+      - 'tests/H2Notes.Tests/Program.cs'
+      - 'tools/agent-reliability/validate_ar072.ps1'
+      - 'docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md'
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar072-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  compare-engines:
+    if: github.repository == 'HoangHung997/NotePad' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/h2-agent-reliability-ar-000'
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate AR-072 deterministic comparison and retained regressions
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar072.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR072-E1-E2-Comparison-Evidence
+          path: artifacts/ar072/
+          if-no-files-found: error
+          retention-days: 14

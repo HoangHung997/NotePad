@@ -60,6 +60,7 @@ public sealed partial class AiSettingsWindow : Window
                 RequestReasoningSummary = reasoningSummary.IsVisible && reasoningSummary.IsChecked == true,
                 WaitForCompletion = waitForCompletion.IsChecked == true,
                 ReasoningEffort = selected.ReasoningEffort,
+                RequestBudget = selected.RequestBudget,
                 OllamaThinking = ollamaThinking.IsVisible ? ollamaThinking.SelectedIndex switch { 1 => true, 2 => false, _ => (bool?)null } : null };
             AiClient.Endpoint(result, "models");
             if (result.Name.Length == 0) throw new InvalidOperationException("Nhập tên kết nối.");

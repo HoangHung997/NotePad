@@ -719,7 +719,9 @@ public partial class App : Application
             Files: AiDocuments.NativeFiles(attachments),
             Attachments: attachments,
             ThreadId: _workAssistantThreadId,
-            TurnId: Guid.NewGuid());
+            TurnId: Guid.NewGuid(),
+            ActiveWorkContext: workspaceRoot is null && compact.SelectedContextScope != WorkAssistantContextScope.None
+                ? validatedContext : null);
 
         try
         {

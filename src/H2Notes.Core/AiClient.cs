@@ -29,6 +29,7 @@ public sealed class AiProfile
     public string ReasoningEffort { get; set; } = "";
     // Null preserves the model default; explicit booleans require a model that supports them.
     public bool? OllamaThinking { get; set; }
+    public AiRequestBudgetSettings RequestBudget { get; set; } = new();
     internal AiProfile Copy() => (AiProfile)MemberwiseClone();
     [System.Text.Json.Serialization.JsonIgnore] public bool IsOllamaCloud => Protocol == AiProtocol.Ollama &&
         (Model.EndsWith(":cloud", StringComparison.OrdinalIgnoreCase) || Model.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase)

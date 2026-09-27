@@ -12,10 +12,10 @@ internal static class H2AgentChatSurfaceTests
 {
     public static void Run(Action<string, Action> test)
     {
-        test("Agent chat retains distinct thread and turn identities, drafts and replay after restart", () => WithRoot(root =>
+        test("Agent chat retains distinct thread and turn identities, drafts and replay after restart", () => WithRoot(async root =>
         {
             var a = Guid.NewGuid(); var b = Guid.NewGuid(); var firstTurn = Guid.NewGuid(); Guid first;
-            using (var adapter = Adapter(root, new Script()))
+            await using (var adapter = Adapter(root, new Script()))
             {
                 first = adapter.StartTaskAsync(null, "Hello A", new(root, null, ThreadId: a, TurnId: firstTurn)).Result;
                 Wait(adapter, first);
@@ -23,7 +23,7 @@ internal static class H2AgentChatSurfaceTests
                 Wait(adapter, adapter.StartTaskAsync(null, "Hello B", new(root, null, ThreadId: b, TurnId: Guid.NewGuid())).Result);
                 adapter.SaveThread(adapter.GetThread(a)! with { Draft = "Bản nháp giữ lại" });
             }
-            using var restarted = Adapter(root, new Script());
+            await using var restarted = Adapter(root, new Script());
             Check(restarted.GetThreads().Count == 2, "Global conversations were merged");
             Check(restarted.GetThread(a)!.TaskIds!.Count == 2 && restarted.GetThread(b)!.TaskIds!.Count == 1, "Task ownership changed");
             Check(restarted.GetThread(a)!.Draft == "Bản nháp giữ lại", "Draft was lost");
@@ -32,10 +32,10 @@ internal static class H2AgentChatSurfaceTests
             Check(restarted.ObserveTask(first, replay.Progress.Last().Sequence).Progress.Count == 0, "Replay cursor repeats activity");
         }));
 
-        test("Agent chat applies busy follow-up exactly once inside the original runtime task", () => WithRoot(root =>
+        test("Agent chat applies busy follow-up exactly once inside the original runtime task", () => WithRoot(async root =>
         {
             var script = new Script { Hold = true };
-            using var adapter = Adapter(root, script);
+            await using var adapter = Adapter(root, script);
             var task = adapter.StartTaskAsync(null, "Hello", new(root, null, ThreadId: Guid.NewGuid())).Result;
             var input = Guid.NewGuid();
             Check(adapter.SupplementTask(task, input, "Include the word follow-up"), "Active task refused input");
@@ -59,9 +59,9 @@ internal static class H2AgentChatSurfaceTests
             Check(!activity.IsExpanded && view.Children.OfType<MarkdownMessageView>().Single().Markdown == "**Answer**", "Final answer collapsed into activity");
         });
 
-        test("Agent chat queues in order and cancelling a queued turn does not cancel the running task", () => WithRoot(root =>
+        test("Agent chat queues in order and cancelling a queued turn does not cancel the running task", () => WithRoot(async root =>
         {
-            var script = new Script { Hold = true }; using var adapter = Adapter(root, script);
+            var script = new Script { Hold = true }; await using var adapter = Adapter(root, script);
             var thread = Guid.NewGuid();
             var first = adapter.StartTaskAsync(null, "First", new(root, null, ThreadId: thread)).Result;
             var second = adapter.StartTaskAsync(null, "Second", new(root, null, ThreadId: thread, AfterTaskId: first)).Result;
@@ -175,6 +175,22 @@ internal static class H2AgentChatSurfaceTests
         { var task = adapter.GetTaskSummary(id); if (H2AgentActivity.IsTerminal(task.Status)) return task; Thread.Sleep(10); }
         throw new TimeoutException("Agent task did not finish");
     }
+    private static void WithRoot(Func<string, Task> action)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "h2-chat-surface-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        // These three fixtures exercise only the production adapter, not controls. Do not
+        // block Avalonia's synchronization context on an await-using continuation.
+        var execution = Task.Run(() => action(root));
+        try { execution.WaitAsync(TimeSpan.FromSeconds(30)).GetAwaiter().GetResult(); }
+        finally
+        {
+            // A timeout is not a quiescence barrier. Keep evidence rather than masking the
+            // primary timeout by deleting a directory whose writer may still be live.
+            if (execution.IsCompleted) Directory.Delete(root, true);
+        }
+    }
+
     private static void WithRoot(Action<string> action)
     {
         var root = Path.Combine(Path.GetTempPath(), "h2-chat-surface-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);

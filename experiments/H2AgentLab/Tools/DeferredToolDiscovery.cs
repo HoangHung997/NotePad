@@ -94,7 +94,7 @@ public sealed class DeferredToolDiscovery
         var newlyLoaded = new List<string>();
         foreach (var result in selected)
         {
-            if (!_loaded.Add(result.Descriptor.Name))
+            if (!result.Descriptor.CurrentReadiness.CanExecute || !_loaded.Add(result.Descriptor.Name))
                 continue;
             schemas.Add(result.Descriptor.CallableSchema.Clone());
             newlyLoaded.Add(result.Descriptor.Name);
@@ -146,7 +146,20 @@ public sealed class DeferredToolDiscovery
             registryVersion = batch.Trace.RegistryVersion,
             selected = batch.Trace.SelectedNames,
             newlyLoaded = batch.Trace.NewlyLoadedNames,
-            nextRequestSchemas = batch.CallableSchemas.Select(SchemaName).ToArray()
+            nextRequestSchemas = batch.CallableSchemas.Select(SchemaName).ToArray(),
+            capabilities = batch.Trace.SelectedNames.Select(name => {
+                _registry.TryGet(name, out var d);
+                return new { name, readiness = d.CurrentReadiness.State, reason = d.CurrentReadiness.SafeReason,
+                    executable = d.CurrentReadiness.CanExecute, outputSchemaVersion = d.OutputSchemaVersion,
+                    supportedOperations = d.SupportedOperations, dependencies = d.Dependencies, limits = d.Limits,
+                    effectClass = d.EffectClass, canProvideVerificationEvidence = d.CanProvideVerificationEvidence };
+            }).ToArray(),
+            unavailableCapabilities = _registry.CapabilityNotices.Where(n =>
+                queryNode.GetString()!.Split([' ', '.', '_'], StringSplitOptions.RemoveEmptyEntries)
+                    .Any(term => term.Length >= 2 && (n.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                        || n.Description.Contains(term, StringComparison.OrdinalIgnoreCase))))
+                .Take(8).Select(n => new { name = n.Name, description = n.Description,
+                    readiness = n.Readiness.State, reason = n.Readiness.SafeReason, executable = false }).ToArray()
         });
     }
 

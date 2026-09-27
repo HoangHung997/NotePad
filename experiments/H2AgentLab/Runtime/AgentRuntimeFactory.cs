@@ -25,11 +25,19 @@ public interface IAgentRuntimeFactory
 /// </summary>
 public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
 {
+    internal AgentCompactionOptions WorkCompactionOptions { get; init; } = new();
+    internal Func<string, string, AgentWorkSummary>? WorkSummarizer { get; init; }
     private readonly IAgentTransportFactory _transportFactory;
+    private readonly Func<AgentRunTelemetry, IAgentRuntimeHooks> _hooksFactory;
+    private readonly HostResourceMutationCoordinator _mutationCoordinator;
 
-    public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null)
+    public AgentRuntimeFactory(IAgentTransportFactory? transportFactory = null,
+        Func<AgentRunTelemetry, IAgentRuntimeHooks>? hooksFactory = null,
+        HostResourceMutationCoordinator? mutationCoordinator = null)
     {
         _transportFactory = transportFactory ?? new AgentTransportFactory();
+        _hooksFactory = hooksFactory ?? (telemetry => new AgentRuntimeHooks(telemetry));
+        _mutationCoordinator = mutationCoordinator ?? new HostResourceMutationCoordinator();
     }
 
     public AgentRuntime Create(
@@ -44,6 +52,8 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
         ArgumentNullException.ThrowIfNull(contextManager);
         ArgumentNullException.ThrowIfNull(telemetry);
 
+        // Validate the host hook factory before allocating a transport or provider resources.
+        var hooks = _hooksFactory(telemetry) ?? throw new InvalidOperationException("Runtime hook factory returned null.");
         var registry = NormalRuntimeToolRegistry.Create(tools);
         var domainVerifiers = new List<IAgentRuntimeDomainVerifier>
         {
@@ -51,8 +61,12 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             new PythonRuntimeDomainVerifier(tools.Workspace, tools.StateRoot),
             new StructuredOfficeRuntimeDomainVerifier()
         };
+        tools.RuntimeExtensions?.Populate(registry);
         if (tools.ProductionSession is { } session)
+        {
             registry = session.Configure(tools, registry, domainVerifiers);
+            hooks = session.WithLiveSourceGuard(hooks);
+        }
         var transport = _transportFactory.Create(profile, apiKey, telemetry);
         var verifier = new AgentRuntimeDomainVerifierRouter(domainVerifiers);
 
@@ -60,10 +74,14 @@ public sealed class AgentRuntimeFactory : IAgentRuntimeFactory
             transport,
             contextManager,
             registry,
+            scheduler: new ToolExecutionScheduler(_mutationCoordinator),
             verifier: verifier,
             permissionPolicy: tools.ProductionSession ?? (IAgentRuntimePermissionPolicy)new ScopedAgentRuntimePermissionPolicy(
                 _ => !tools.ReadOnly),
             evidenceProjector: new AgentRuntimeEvidenceProjector(
-                new ArtifactStore(tools.StateRoot)));
+                new ArtifactStore(tools.StateRoot)),
+            hooks: hooks,
+            compactionCoordinator: new RuntimeCompactionCoordinator(tools.StateRoot, contextManager))
+        { WorkCompactionOptions = WorkCompactionOptions, WorkSummarizer = WorkSummarizer };
     }
 }

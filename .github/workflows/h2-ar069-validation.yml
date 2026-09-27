@@ -1,0 +1,43 @@
+name: AR-069 critical repair integration gate
+run-name: AR-069 four-defect integration gate (${{ github.sha }})
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths:
+      - experiments/H2AgentLab/**
+      - experiments/H2AgentLab.OfficeHost/**
+      - src/H2Notes.Avalonia/**
+      - src/H2Notes.Core/**
+      - tests/H2Notes.Tests/**
+      - tools/agent-reliability/test_ar065_wire_control.py
+      - tools/agent-reliability/validate_ar069.ps1
+      - .github/workflows/h2-ar069-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar069-validation
+  cancel-in-progress: false
+jobs:
+  integration:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate all four critical repair paths on one exact SHA
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar069.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR069-Critical-Integration-Evidence
+          path: artifacts/ar069/
+          if-no-files-found: error
+          retention-days: 14

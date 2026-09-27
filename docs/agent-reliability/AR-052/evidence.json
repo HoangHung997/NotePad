@@ -1,0 +1,76 @@
+{
+  "task": "AR-052",
+  "source_sha": "a2263e47a804d2f9f386296b1330b8a1c4231e2b",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "NOT_REQUIRED",
+    "E4": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER",
+    "old_provider_continuation_reused": false,
+    "auto_provider_fallback": false,
+    "mutation_replay_claim": false,
+    "fresh_turn_required": true,
+    "fresh_permission_for_mutation": true
+  },
+  "protocol_matrix": [
+    "Ollama",
+    "OpenAiChat",
+    "OpenAiResponses"
+  ],
+  "tests": {
+    "focused": "8/8",
+    "retained": {
+      "AR-041": "6/6",
+      "AR-042": "6/6",
+      "AR-051": "37/37",
+      "AR-031": "39/39",
+      "AR-050": "50/50"
+    },
+    "full_h2": "1331/1331",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "19/19 SUCCESS"
+  },
+  "runs": {
+    "ar052": {
+      "run_id": 36237795203,
+      "job_id": 108392677499,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36237795173,
+      "job_id": 108392643192,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10905007711,
+      "bytes": 429854,
+      "sha256": "88e026887d8dbb030a34ab3c1bdfd47300f2128e52cd865bff248e42bb6cab66",
+      "expires_at_utc": "2026-10-10T11:20:23Z",
+      "zip_entries": 647,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10905665137,
+      "bytes": 110421122,
+      "sha256": "513e11d60c1f3ce9528aed532255e67a00e6754cc4bd9861c957ee15f597e112",
+      "expires_at_utc": "2026-12-25T11:06:29Z",
+      "zip_entries": 482,
+      "zip_integrity": "PASS",
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
+    }
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "real_provider_e4_certified": false
+  }
+}

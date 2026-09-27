@@ -260,6 +260,17 @@ public static class MbMinimumBootableAgentAcceptanceTests
             throw new InvalidOperationException(
                 "AgentRuntime did not recover from the tool error through deferred discovery and a corrected tool call.");
         }
+        // Preserve the old fully invented-name case as a negative. An unrelated successful
+        // read cannot clear an unknown operation that has no host-selected recovery candidate.
+        var deniedRegistry = new ToolRegistry();
+        deniedRegistry.Register(ReadTool());
+        var deniedTransport = new ToolErrorRecoveryTransport("invented.tool", expectCandidate: false);
+        await using var deniedRuntime = new AgentRuntime(deniedTransport, new AgentContextManager(), deniedRegistry);
+        var blocked = false;
+        try { await deniedRuntime.RunAsync(Request("Do not clear an unrelated unknown operation."), CancellationToken.None); }
+        catch (AgentVerificationRequiredException ex) { blocked = ex.Message.Contains("invented.tool", StringComparison.Ordinal); }
+        if (!blocked || !deniedTransport.SawUnknownToolError || !deniedTransport.SawReadResult)
+            throw new InvalidOperationException("Unrelated success cleared the original unknown operation, or the negative did not execute.");
     }
 
     private static AgentRuntimeRequest Request(string userInput)
@@ -379,7 +390,7 @@ public static class MbMinimumBootableAgentAcceptanceTests
             => ValueTask.CompletedTask;
     }
 
-    private sealed class ToolErrorRecoveryTransport : IAgentTransport
+    private sealed class ToolErrorRecoveryTransport(string invalidName = "fixture.read_missing", bool expectCandidate = true) : IAgentTransport
     {
         private int _continuations;
 
@@ -396,7 +407,7 @@ public static class MbMinimumBootableAgentAcceptanceTests
             cancellationToken.ThrowIfCancellationRequested();
             yield return AgentTransportEvent.Tool(new(
                 "bad-1",
-                "invented.tool",
+                invalidName,
                 "{}"));
             await Task.Yield();
             yield return AgentTransportEvent.Complete(
@@ -419,6 +430,11 @@ public static class MbMinimumBootableAgentAcceptanceTests
                     && error.Content.Contains(
                         "unknown_tool",
                         StringComparison.Ordinal);
+                using var errorJson = JsonDocument.Parse(error.Content);
+                var candidate = errorJson.RootElement.GetProperty("recoveryTools").EnumerateArray()
+                    .Any(item => item.GetString() == "fixture.read");
+                if (candidate != expectCandidate)
+                    throw new InvalidOperationException("Recovery candidate does not match the tested host policy.");
                 if (!SawUnknownToolError)
                     throw new InvalidOperationException(
                         "Unknown tool failure was not returned as a typed tool error.");
@@ -440,9 +456,12 @@ public static class MbMinimumBootableAgentAcceptanceTests
 
             if (_continuations == 2)
             {
-                if (request.NewlyLoadedTools?.Single().Name != "fixture.read")
-                    throw new InvalidOperationException(
-                        "Recovery tool_search did not load fixture.read.");
+                // Unknown-tool recovery may already load the exact candidate. Explicit
+                // discovery must select it without resending a duplicate schema.
+                if (!request.ToolResults.Single().Content.Contains("fixture.read", StringComparison.Ordinal)
+                    || expectCandidate && (request.NewlyLoadedTools?.Count ?? 0) != 0
+                    || !expectCandidate && request.NewlyLoadedTools?.Single().Name != "fixture.read")
+                    throw new InvalidOperationException("Recovery discovery did not preserve selected/cached schema identity.");
 
                 yield return AgentTransportEvent.Tool(new(
                     "read-1",

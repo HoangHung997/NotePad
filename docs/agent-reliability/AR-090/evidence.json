@@ -1,0 +1,80 @@
+{
+  "task": "AR-090",
+  "source_sha": "90a13ee1ea142ff3100e0c765df4c7009825fb70",
+  "status": {
+    "audit": "PASS",
+    "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
+    "project_complete_claim": false,
+    "E5": "DEFERRED_BY_USER",
+    "ar071_selected": true,
+    "ar071_e3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "ar072_selected": true,
+    "ar072_decision": "KEEP_CURRENT",
+    "external_engine_status": "NotTested",
+    "native_e4_pass_claim": false,
+    "multi_pc_claim": false
+  },
+  "tests": {
+    "focused": "7/7",
+    "retained": {
+      "AR-072": "6/6",
+      "AR-071": "6/6",
+      "AR-082": "5/5",
+      "AR-081": "6/6",
+      "AR-080": "4/4",
+      "AR-042": "6/6",
+      "AR-041": "6/6",
+      "AR-062": "6/6",
+      "AR-060": "6/6"
+    },
+    "full_h2": "1382/1382",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "28/28 SUCCESS"
+  },
+  "runs": {
+    "ar090": {
+      "run_id": 36301088132,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36301088148,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "final_audit": {
+      "id": 10925996800,
+      "bytes": 432503,
+      "sha256": "745f79d377dd26b5c2f9b5b64797e2db9fde6017b86f23a9e702e9bf524a0907",
+      "expires_at_utc": "2026-10-27T06:58:24Z",
+      "zip_entries": 653,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10925339147,
+      "bytes": 175503499,
+      "sha256": "16b13791bfba254fee26581a0a0d37d77a30bbc53f44060d9518083c638dc5d7",
+      "expires_at_utc": "2026-12-26T06:46:31Z",
+      "zip_entries": 2970,
+      "zip_integrity": "PASS",
+      "manifest_files": 2969,
+      "manifest_total_bytes": 415263768,
+      "manifest_content_sha256": "fad4e9c50f440f27ab5721268fa3c1273979851fdaab405adf1f0406497e5a86",
+      "manifest_all_file_hashes_verified": true,
+      "manifest_no_missing_or_extra_files": true,
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ],
+      "bundled_python": true
+    }
+  },
+  "safety": {
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none",
+    "project_complete_claim": false,
+    "physical_two_pc_nas_certified": false
+  }
+}

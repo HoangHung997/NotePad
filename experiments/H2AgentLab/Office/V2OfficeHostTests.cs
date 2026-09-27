@@ -120,6 +120,69 @@ public static class V2OfficeHostTests
             Check(snapshot.StateToken.Length == 64, "Excel state token is not a SHA-256 identity.");
         });
 
+        await Test("0804B AR-021 bounded Excel range page crosses OfficeHost IPC and invalidates stale continuation", async () =>
+        {
+            using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);
+            var session = (await client.DiscoverExcelAsync()).ActiveSessionId!;
+            var fields = new[] { ExcelRangeReadFields.Value, ExcelRangeReadFields.Formula };
+            var first = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B2",
+                fields,
+                2));
+
+            Check(first.PageRange == "A1:B1"
+                && first.Cells.Count == 2
+                && first.Metrics.CellsRead == 2
+                && !first.Complete
+                && first.NextCursor is not null,
+                "Bounded range page did not cross the named-pipe protocol correctly.");
+            Check(first.Cells.Single(x => x.Address == "B1").Formula == "=A1",
+                "Range page lost formula evidence.");
+
+            var second = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B2",
+                fields,
+                2,
+                first.NextCursor,
+                first.ContentVersion));
+            Check(second.PageRange == "A2:B2" && second.Complete && second.NextCursor is null,
+                "Range continuation skipped, duplicated or failed to terminate.");
+
+            var structural = await client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                session,
+                "Data",
+                "A1:B1",
+                [ExcelRangeReadFields.Format, ExcelRangeReadFields.Merge, ExcelRangeReadFields.Hidden],
+                2));
+            Check(structural.Complete
+                && structural.NextCursor is null
+                && structural.Cells.Single(x => x.Address == "B1").Italic == true
+                && structural.MergedRanges.Contains("A1:B1", StringComparer.Ordinal),
+                "Single-page structural range evidence did not cross OfficeHost IPC.");
+
+            var snapshot = await client.SnapshotExcelAsync(session);
+            _ = await client.PatchExcelAsync(new ExcelPatchRequest(
+                session,
+                snapshot.StateToken,
+                true,
+                "Data",
+                [new ExcelCellPatch("A2", Value: "CHANGED-AFTER-PAGE")]));
+            await ExpectCode(
+                "stale_content",
+                () => client.ReadExcelRangeAsync(new ExcelReadRangeRequest(
+                    session,
+                    "Data",
+                    "A1:B2",
+                    fields,
+                    2,
+                    first.NextCursor,
+                    first.ContentVersion)));
+        });
+
         await Test("0805 Excel structured patch returns before/after and rejects stale or denied mutation", async () =>
         {
             using var client = new OfficeHostClient(hostExecutable, fixtureMode: true);
@@ -157,6 +220,26 @@ public static class V2OfficeHostTests
                     false,
                     "Data",
                     [new ExcelCellPatch("A1", Value: "DENIED")])));
+        });
+
+        await Test("0805B AR-022 Excel batch preflight prevents late invalid writes and returns operation evidence", async () =>
+        {
+            using var client=new OfficeHostClient(hostExecutable,fixtureMode:true);
+            var session=(await client.DiscoverExcelAsync()).ActiveSessionId!;var before=await client.SnapshotExcelAsync(session);
+            OfficeHostClientException? rejected=null;
+            try{_=await client.PatchExcelAsync(new ExcelPatchRequest(session,before.StateToken,true,"Data",
+                [new("A1",Value:"MUST-NOT-WRITE"),new("C99",Value:"INVALID-LATE")]){ContentToken=ExcelPatchMutationRules.ContentToken(before)});}
+            catch(OfficeHostClientException ex){rejected=ex;}
+            var unchanged=await client.SnapshotExcelAsync(session);
+            Check(rejected?.Code=="cell_not_found"&&rejected.NoEffect,"Late invalid cell was not whole-batch no-effect preflight.");
+            Check(unchanged.Sheets.Single().Cells.Single(x=>x.Address=="A1").Value==before.Sheets.Single().Cells.Single(x=>x.Address=="A1").Value,
+                "Prefix cell was written before preflight completed.");
+            var applied=await client.PatchExcelAsync(new ExcelPatchRequest(session,unchanged.StateToken,true,"Data",
+                [new("A1",Value:"BATCH-A"),new("A2",Value:"BATCH-B")]){ContentToken=ExcelPatchMutationRules.ContentToken(unchanged),
+                LogicalOperationId="ar022-op",BatchId="ar022-batch",ChunkId="ar022-chunk"});
+            Check(applied.MutationStatus==ExcelPatchMutationStatus.Applied&&applied.MutationEffect==ExcelPatchMutationEffect.Applied
+                &&applied.ReadbackComplete&&applied.AppliedCells.SequenceEqual(["A1","A2"])&&applied.UnknownCells.Count==0
+                &&applied.LogicalOperationId=="ar022-op"&&applied.BatchId=="ar022-batch","Applied batch evidence is incomplete.");
         });
 
         await Test("0806 Excel recalc and save-copy preserve original identity and never overwrite", async () =>
@@ -275,6 +358,24 @@ public static class V2OfficeHostTests
                 && snapshot.Headers.Single().Paragraphs.Single().Text == "Fixture Header"
                 && snapshot.Footers.Single().Paragraphs.Single().Text == "Fixture Footer",
                 "Word structured snapshot is incomplete.");
+        });
+
+        await Test("0810B AR-023 bounded Word paragraph pages cross OfficeHost IPC and reject stale continuation", async () =>
+        {
+            using var client=new OfficeHostClient(hostExecutable,fixtureMode:true);
+            var session=(await client.DiscoverWordAsync()).ActiveSessionId!;
+            var first=await client.ReadWordParagraphsAsync(new(session,0,2));
+            Check(first.Paragraphs.Count==2&&!first.Complete&&first.NextCursor is not null
+                &&first.Paragraphs.All(p=>p.Runs.Count==0),"Word paragraph page did not stay bounded/lazy across IPC.");
+            var second=await client.ReadWordParagraphsAsync(new(session,0,2,false,null,false,first.NextCursor,first.ContentVersion));
+            Check(second.Complete&&second.ContentVersion==first.ContentVersion,"Word continuation did not complete on one revision.");
+            var snapshot=await client.SnapshotWordAsync(session);
+            _=await client.PatchWordAsync(new WordPatchRequest(session,snapshot.StateToken,true,[new(0,Text:"CHANGED-AFTER-PAGE")])
+                {ContentVersion=snapshot.ContentVersion});
+            await ExpectCode("stale_content",()=>client.ReadWordParagraphsAsync(
+                new(session,0,2,false,null,false,first.NextCursor,first.ContentVersion)));
+            var formatted=await client.ReadWordParagraphsAsync(new(session,0,2,true));
+            Check(formatted.Paragraphs.All(p=>p.Runs.Count>0),"Word formatting was not available on demand.");
         });
 
         await Test("0811 Word structured text/format patch returns before/after and stale-state protection", async () =>

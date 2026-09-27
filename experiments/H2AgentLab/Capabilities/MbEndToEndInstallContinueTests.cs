@@ -125,7 +125,7 @@ public static class MbEndToEndInstallContinueTests
                 var transport =
                     new EndToEndTransport();
                 var verifier =
-                    new FixtureStateVerifier(state);
+                    new FixtureStateVerifier(state, pluginManager, registry, package.Path);
 
                 await using var runtime = new AgentRuntime(
                     transport,
@@ -169,11 +169,12 @@ public static class MbEndToEndInstallContinueTests
                         && state.Version == 1,
                     "Newly installed tool was not executed exactly once against host state.");
                 Check(verifier.VerificationCount == 1
-                        && result.VerificationHistory.Count == 1
-                        && result.VerificationHistory[0].Passed
-                        && result.VerificationHistory[0].VerifierId
+                        && verifier.InstallVerifications == 1
+                        && result.VerificationHistory.Count == 2
+                        && result.VerificationHistory.All(r => r.Passed)
+                        && result.VerificationHistory[1].VerifierId
                             == FixtureStateVerifier.VerifierId
-                        && result.VerificationHistory[0].Covers(
+                        && result.VerificationHistory[1].Covers(
                             [FixtureStateVerifier.CriterionId]),
                     "Host verifier did not PASS the installed tool mutation.");
                 Check(result.LoadedToolSchemas.Contains(
@@ -213,7 +214,8 @@ public static class MbEndToEndInstallContinueTests
             [
                 new AgentAcceptanceCriterion(
                     FixtureStateVerifier.CriterionId,
-                    "Fixture state equals verified-value after the installed tool is used.")
+                    "Fixture state equals verified-value after the installed tool is used."),
+                new AgentAcceptanceCriterion("mb82.install-readback", "Selected installed package hashes and registry match.")
             ],
             AgentTaskRiskClass.Medium,
             new AgentVerificationPolicy(
@@ -618,10 +620,19 @@ public static class MbEndToEndInstallContinueTests
 
         private readonly FixtureState _state;
 
-        public FixtureStateVerifier(
-            FixtureState state)
+        private readonly PluginManager _plugins;
+        private readonly ToolRegistry _registry;
+        private readonly Dictionary<string, string> _hashes = new(StringComparer.Ordinal);
+        public int InstallVerifications { get; private set; }
+        public FixtureStateVerifier(FixtureState state, PluginManager plugins, ToolRegistry registry, string package)
         {
-            _state = state;
+            _state = state; _plugins = plugins; _registry = registry;
+            using var zip = ZipFile.OpenRead(package);
+            foreach (var entry in zip.Entries.Where(e => !e.FullName.EndsWith('/')))
+            {
+                using var stream = entry.Open();
+                _hashes.Add(entry.FullName, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)));
+            }
         }
 
         public int VerificationCount
@@ -636,6 +647,26 @@ public static class MbEndToEndInstallContinueTests
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
+
+            var install = context.Calls.SingleOrDefault(x => x.Name == CatalogRuntimeToolExecutor.InstallToolName);
+            if (install is not null)
+            {
+                InstallVerifications++;
+                var active = _plugins.GetActive(PluginId);
+                var ok = active is not null && active.Value.Manifest.Version == PluginVersion
+                    && _registry.TryGet(ToolName, out _)
+                    && _hashes.All(h => {
+                        var path = Path.Combine(active.Value.VersionRoot, h.Key.Replace('/', Path.DirectorySeparatorChar));
+                        return File.Exists(path) && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))) == h.Value;
+                    });
+                const string criterionId = "mb82.install-readback";
+                var status = ok ? VerificationCriterionStatus.Passed : VerificationCriterionStatus.Failed;
+                string[] refs = ["fixture:mb82:activated-package-hashes"];
+                return Task.FromResult<VerificationReport?>(new VerificationReport(VerifierId,
+                    [new(criterionId, status, refs, ok ? null : new(criterionId, "Installed package or registry differs."))])
+                { CallCoverage = [new(install.Invocation!.InvocationId, criterionId, "plugin:" + PluginId,
+                    "version:" + PluginVersion, status, refs)] });
+            }
 
             var call = context.Calls.SingleOrDefault(
                 x => x.Name == ToolName);

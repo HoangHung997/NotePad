@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -24,13 +25,20 @@ public sealed class AgentTurnView : StackPanel
     private readonly SortedDictionary<long, H2AgentProgress> _events = [];
     private H2AgentTaskSummary? _last;
     private IH2AgentAdapter? _adapter;
+    private AgentUiProjection? _projection;
     private int _visibleEvents = 40;
     public long LastSequence => _events.Count == 0 ? -1 : _events.Keys.Last();
     public int EventCount => _events.Count;
+    public AgentUiState ProjectedState => _projection?.State ?? AgentUiState.Running;
 
     public AgentTurnView(bool includeUser = false)
     {
         Name = "AgentTurn"; Spacing = 12; HorizontalAlignment = HorizontalAlignment.Stretch;
+        AutomationProperties.SetName(this, "Lượt Agent");
+        AutomationProperties.SetName(_cancelQueued, "Hủy lượt Agent đang xếp hàng");
+        AutomationProperties.SetName(_copyAnswer, "Sao chép câu trả lời Agent");
+        AutomationProperties.SetName(_answer, "Câu trả lời Agent");
+        AutomationProperties.SetName(_error, "Lỗi hoặc blocker của Agent");
         _cancelQueued.Click += (_, _) => { if (_last is { } task) _adapter?.CancelTask(task.TaskId); };
         _copyAnswer.Click += async (_, _) => { if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(_last?.FinalText ?? ""); };
         _answer.OpenResource = target =>
@@ -72,14 +80,15 @@ public sealed class AgentTurnView : StackPanel
         _error.Text = task.Error; _error.IsVisible = !string.IsNullOrWhiteSpace(task.Error);
         if (adapter is not null) _approval.Present(adapter, task.TaskId, task.PendingApproval);
         else _approval.IsVisible = false;
-        var stopping = !terminal && _events.Values.LastOrDefault()?.Code == "cancel-requested";
+        _projection = AgentUiProjector.Project(task, _events.Values);
         var duration = (terminal ? task.UpdatedUtc : DateTime.UtcNow) - task.CreatedUtc;
         var elapsed = duration.TotalMinutes >= 1 ? $"{(int)duration.TotalMinutes} phút {duration.Seconds} giây" : $"{Math.Max(0, (int)duration.TotalSeconds)} giây";
         var count = _events.Values.Count(e => e.Code is "tool-ok" or "tool-error");
-        _activityTitle.Text = task.PendingApproval is not null ? "Cần bạn xác nhận · " + elapsed
-            : stopping ? "Đang dừng…" : task.Status == H2AgentTaskStatus.Queued ? "Đã xếp lượt tiếp theo"
-            : terminal ? $"Đã xử lý trong {elapsed} · {count} thao tác"
-            : "Đang làm việc · " + elapsed + (_events.Count == 0 ? "" : " · " + H2AgentActivity.Label(_events.Values.Last()));
+        _activityTitle.Text = terminal
+            ? $"{_projection.Label} · {elapsed} · {count} thao tác"
+            : _projection.Label + " · " + elapsed;
+        ToolTip.SetTip(_activity, _projection.Detail);
+        AutomationProperties.SetName(_activity, _projection.Label + ". " + _projection.Detail);
         if (terminal && !wasTerminal) _activity.IsExpanded = false;
         if (newEvents) RenderEvents();
         if (changed) RenderArtifacts(adapter, task);
@@ -89,22 +98,49 @@ public sealed class AgentTurnView : StackPanel
     private void RenderEvents()
     {
         _activityRows.Children.Clear();
-        if (_events.Count > _visibleEvents)
+        var collapsed = AgentUiProjector.CollapseForDisplay(_events.Values, int.MaxValue);
+        if (collapsed.Count > _visibleEvents)
         {
-            var older = new Button { Content = $"Xem hoạt động trước · {_events.Count} mục", FontSize = 11 };
+            var older = new Button { Content = $"Xem hoạt động trước · {_events.Count} sự kiện / {collapsed.Count} nhóm", FontSize = 11 };
+            AutomationProperties.SetName(older, "Xem thêm hoạt động Agent trước đó");
             older.Click += (_, _) => { _visibleEvents += 40; RenderEvents(); };
             _activityRows.Children.Add(older);
         }
-        foreach (var item in _events.Values.TakeLast(_visibleEvents))
+        foreach (var group in collapsed.TakeLast(_visibleEvents))
         {
-            var row = new SelectableTextBlock { Name = "AgentActivityRow", Text = H2AgentActivity.Label(item), FontSize = 12,
+            var item = group.Event;
+            if (item.TargetBinding is { } target)
+            {
+                _activityRows.Children.Add(CreateTargetChip(target));
+                continue;
+            }
+            var label = H2AgentActivity.Label(item) + (group.Count > 1 ? $" · ×{group.Count}" : "");
+            var row = new SelectableTextBlock { Name = "AgentActivityRow", Text = label, FontSize = 12,
                 TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse(item.Code == "tool-error" ? "#9C422B" : "#796C62") };
+            AutomationProperties.SetName(row, label);
             ToolTip.SetTip(row, item.AtUtc.ToLocalTime().ToString("HH:mm:ss") + " · " + item.Kind + "/" + item.Code);
             if (item.Code is "tool-result" or "script" or "plan")
-                _activityRows.Children.Add(new Expander { Header = row, FontSize = 11,
-                    Content = new SelectableTextBlock { Text = item.Message, TextWrapping = TextWrapping.Wrap, FontSize = 11 } });
+            {
+                var details = new SelectableTextBlock { Text = item.Message, TextWrapping = TextWrapping.Wrap, FontSize = 11 };
+                AutomationProperties.SetName(details, "Chi tiết hoạt động Agent");
+                _activityRows.Children.Add(new Expander { Header = row, FontSize = 11, Content = details });
+            }
             else _activityRows.Children.Add(row);
         }
+    }
+
+    // Used by the existing Global and Project turn renderer, not a separate chat surface.
+    public static Border CreateTargetChip(H2AgentTargetResolution target)
+    {
+        var chip = new Border { Name = "AgentTargetChip", CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 3), HorizontalAlignment = HorizontalAlignment.Left,
+            Background = Brush.Parse(target.IsExternal ? "#FFF1D6" : "#EAF1ED"),
+            Child = new SelectableTextBlock { Text = target.ScopeLabel, TextWrapping = TextWrapping.Wrap, FontSize = 12,
+                Foreground = Brush.Parse(target.IsExternal ? "#7F4800" : "#315442") } };
+        ToolTip.SetTip(chip, "Host-bound target · " + target.Source + " · " + target.Binding?.Provenance
+            + " · identity only; content verification is separate.");
+        AutomationProperties.SetName(chip, "Đích Agent: " + target.ScopeLabel);
+        return chip;
     }
 
     private void RenderArtifacts(IH2AgentAdapter? adapter, H2AgentTaskSummary task)
@@ -120,6 +156,7 @@ public sealed class AgentTurnView : StackPanel
             var button = new Button { Name = "AgentArtifact", Content = caption, HorizontalAlignment = HorizontalAlignment.Left,
                 MaxWidth = 540, FontSize = 12 };
             ToolTip.SetTip(button, evidence.Summary);
+            AutomationProperties.SetName(button, caption + (string.IsNullOrWhiteSpace(evidence.Summary) ? "" : ". " + evidence.Summary));
             button.Click += (_, _) => OpenArtifact(adapter?.GetEvidence(evidence.EvidenceId) ?? evidence);
             if (evidence.Kind == "artifact") _artifacts.Children.Add(button);
             else evidenceRows.Children.Add(button);

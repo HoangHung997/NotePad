@@ -26,6 +26,7 @@
     </Content>
     <None Update="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <None Update="PORTABLE-README.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="VERIFY-PORTABLE.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/convert.py" Link="tools/ocr/convert.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/got_attention.py" Link="tools/ocr/got_attention.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tools/ocr/layout.py" Link="tools/ocr/layout.py" CopyToOutputDirectory="PreserveNewest" />

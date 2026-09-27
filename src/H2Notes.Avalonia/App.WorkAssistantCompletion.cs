@@ -138,9 +138,11 @@ public partial class App
                     ? "Tác vụ đã hoàn thành."
                     : summary.FinalText!,
             H2AgentTaskStatus.Blocked or H2AgentTaskStatus.Failed =>
-                string.IsNullOrWhiteSpace(summary.Error)
-                    ? "Agent chưa thể hoàn thành tác vụ."
-                    : summary.Error!,
+                !string.IsNullOrWhiteSpace(summary.FinalText)
+                    ? summary.FinalText!
+                    : string.IsNullOrWhiteSpace(summary.Error)
+                        ? "Agent chưa thể hoàn thành tác vụ."
+                        : summary.Error!,
             H2AgentTaskStatus.Cancelled => "Tác vụ đã được hủy.",
             H2AgentTaskStatus.Queued => "Agent đang chuẩn bị tác vụ.",
             _ => "Agent đang xử lý: " + summary.Goal

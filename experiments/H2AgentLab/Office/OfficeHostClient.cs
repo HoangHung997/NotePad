@@ -8,15 +8,16 @@ namespace H2AgentLab.Office;
 
 public sealed class OfficeHostClientException : IOException
 {
-    public OfficeHostClientException(string code, string message) : base(message)
+    public OfficeHostClientException(string code, string message, bool noEffect = false) : base(message)
     {
-        Code = code;
+        Code = code; NoEffect = noEffect;
     }
 
     public string Code { get; }
+    public bool NoEffect { get; }
 }
 
-public sealed class OfficeHostClient : IDisposable
+public sealed class OfficeHostClient : IOfficeSessionClient, IOfficeCaptureClient, IExcelRangeReadClient, IWordPagedReadClient
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -30,6 +31,8 @@ public sealed class OfficeHostClient : IDisposable
     private string? _pipeName;
     private bool _disposed;
     private int _starts;
+    private readonly Guid _connectionIdentity = Guid.NewGuid();
+    public string InstanceIdentity => "office-connection:" + _connectionIdentity.ToString("N") + ":" + _starts;
 
     public OfficeHostClient(
         string hostExecutable,
@@ -49,11 +52,15 @@ public sealed class OfficeHostClient : IDisposable
     public int StartCount => _starts;
     public int? ProcessId => _process is { HasExited: false } ? _process.Id : null;
 
+    public Task<OfficeCaptureResult> CaptureAsync(OfficeCaptureRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<OfficeCaptureResult>("office.capture", request,
+            TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.CaptureDeadlineMilliseconds), cancellationToken);
+
     public Task<OfficePingResult> PingAsync(CancellationToken cancellationToken = default)
         => CallAsync<OfficePingResult>("ping", new { }, null, cancellationToken);
 
     public Task<ExcelDiscovery> DiscoverExcelAsync(CancellationToken cancellationToken = default)
-        => CallAsync<ExcelDiscovery>("excel.discover", new { }, null, cancellationToken);
+        => CallAsync<ExcelDiscovery>("excel.discover", new { }, TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.DiscoveryDeadlineMilliseconds), cancellationToken);
 
     public Task<ExcelLiveSnapshot> SnapshotExcelAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<ExcelLiveSnapshot>(
@@ -62,8 +69,23 @@ public sealed class OfficeHostClient : IDisposable
             null,
             cancellationToken);
 
+    public Task<ExcelRangeReadPage> ReadExcelRangeAsync(
+        ExcelReadRangeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return CallAsync<ExcelRangeReadPage>("excel.readRange", request, null, cancellationToken);
+    }
+
     public Task<ExcelPatchResult> PatchExcelAsync(ExcelPatchRequest request, CancellationToken cancellationToken = default)
-        => CallAsync<ExcelPatchResult>("excel.patch", request, null, cancellationToken);
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ExcelPatchLimits.ValidationError(request.Cells?.Count ?? -1) is { } problem)
+            return Task.FromException<ExcelPatchResult>(new OfficeHostClientException(ExcelPatchLimits.ErrorCode, problem));
+        return CallAsync<ExcelPatchResult>("excel.patch", request, null, cancellationToken);
+    }
 
     public Task<ExcelLiveSnapshot> RecalculateExcelAsync(ExcelRecalculateRequest request, CancellationToken cancellationToken = default)
         => CallAsync<ExcelLiveSnapshot>("excel.recalculate", request, null, cancellationToken);
@@ -72,7 +94,7 @@ public sealed class OfficeHostClient : IDisposable
         => CallAsync<OfficeSaveCopyResult>("excel.saveCopy", request, null, cancellationToken);
 
     public Task<WordDiscovery> DiscoverWordAsync(CancellationToken cancellationToken = default)
-        => CallAsync<WordDiscovery>("word.discover", new { }, null, cancellationToken);
+        => CallAsync<WordDiscovery>("word.discover", new { }, TimeSpan.FromMilliseconds(OfficeDiscoveryLimits.DiscoveryDeadlineMilliseconds), cancellationToken);
 
     public Task<WordLiveSnapshot> SnapshotWordAsync(string sessionId, CancellationToken cancellationToken = default)
         => CallAsync<WordLiveSnapshot>(
@@ -80,6 +102,15 @@ public sealed class OfficeHostClient : IDisposable
             new WordSnapshotRequest(sessionId),
             null,
             cancellationToken);
+
+    public Task<WordParagraphReadPage> ReadWordParagraphsAsync(WordParagraphReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordParagraphReadPage>("word.readParagraphs", request, null, cancellationToken);
+
+    public Task<WordRangeReadPage> ReadWordRangeAsync(WordRangeReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordRangeReadPage>("word.readRange", request, null, cancellationToken);
+
+    public Task<WordTableReadPage> ReadWordTablesAsync(WordTableReadRequest request, CancellationToken cancellationToken = default)
+        => CallAsync<WordTableReadPage>("word.readTables", request, null, cancellationToken);
 
     public Task<WordPatchResult> PatchWordAsync(WordPatchRequest request, CancellationToken cancellationToken = default)
         => CallAsync<WordPatchResult>("word.patch", request, null, cancellationToken);
@@ -112,6 +143,7 @@ public sealed class OfficeHostClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         ArgumentNullException.ThrowIfNull(parameters);
 
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureStarted();
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -160,10 +192,11 @@ public sealed class OfficeHostClient : IDisposable
 
             var response = JsonSerializer.Deserialize<OfficeRpcResponse>(responseJson, Json)
                 ?? throw new IOException("OfficeHost returned invalid response JSON.");
+            if (response.Id != request.Id) throw new IOException("OfficeHost response belongs to another invocation.");
             if (!response.Ok)
                 throw new OfficeHostClientException(
                     response.Error?.Code ?? "host_error",
-                    response.Error?.Message ?? "OfficeHost request failed.");
+                    response.Error?.Message ?? "OfficeHost request failed.", response.Error?.NoEffect == true);
             if (response.Result is not JsonElement result)
                 throw new IOException("OfficeHost response is missing result.");
             return result.Deserialize<T>(Json)
@@ -173,6 +206,11 @@ public sealed class OfficeHostClient : IDisposable
         {
             StopHost();
             throw new TimeoutException($"OfficeHost call '{method}' timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            StopHost();
+            throw;
         }
         catch (OfficeHostClientException)
         {

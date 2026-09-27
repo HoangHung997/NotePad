@@ -5,6 +5,7 @@ using H2AgentLab.Prompting;
 using H2AgentLab.Tasking;
 using H2AgentLab.Tools;
 using H2AgentLab.Transport;
+using H2AgentLab.Verification;
 
 namespace H2AgentLab.Runtime;
 
@@ -83,6 +84,9 @@ public static class MbSchedulerRuntimeTests
             var active = 0;
             var maxActive = 0;
             var executions = 0;
+            var stateFile = Path.Combine(root, "shared-mutation.txt");
+            var verifier = new SharedWriteReadbackVerifier(stateFile);
+            Check(!verifier.Observe().Passed, "Absent side effects were reported verified.");
 
             async ValueTask<string> Write(global::H2AgentLab.ToolCall call, CancellationToken ct)
             {
@@ -92,6 +96,7 @@ public static class MbSchedulerRuntimeTests
                 try
                 {
                     await Task.Delay(100, ct);
+                    await File.AppendAllTextAsync(stateFile, call.Id + "\n", ct);
                     return JsonSerializer.Serialize(new { ok = true, id = call.Id });
                 }
                 finally
@@ -110,10 +115,11 @@ public static class MbSchedulerRuntimeTests
             await using var runtime = new AgentRuntime(
                 new SameResourceMutationTransport(),
                 new AgentContextManager(),
-                registry);
+                registry,
+                verifier: verifier);
 
             var result = await runtime.RunAsync(
-                Request("Write shared fixture twice.", "fixture:shared"),
+                Request("Write shared fixture twice.", "fixture:shared", requireReadback: true),
                 CancellationToken.None);
 
             Check(result.FinalText == "serialized-write-ok",
@@ -122,6 +128,12 @@ public static class MbSchedulerRuntimeTests
                 "Expected two same-resource mutations.");
             Check(maxActive == 1,
                 $"Same-resource mutations overlapped; max concurrency was {maxActive}.");
+            Check(verifier.Observations == 1 && result.VerificationHistory.Single().Passed,
+                "Serialized writes did not receive an independent readback report.");
+            Check(File.ReadAllLines(stateFile).SequenceEqual(new[] { "write-1", "write-2" }),
+                "Serialized side effects were missing, duplicated or reordered.");
+            await File.WriteAllTextAsync(stateFile, "write-1\n");
+            Check(!verifier.Observe().Passed, "Missing second write was falsely verified.");
         });
 
         await Test("MB-33 mutating tool without resource identity fails closed before executor", async () =>
@@ -219,7 +231,7 @@ public static class MbSchedulerRuntimeTests
         return failed == 0 ? 0 : 1;
     }
 
-    private static AgentRuntimeRequest Request(string userInput, string scope)
+    private static AgentRuntimeRequest Request(string userInput, string scope, bool requireReadback = false)
     {
         var contract = new AgentTaskContract(
             Guid.NewGuid(),
@@ -229,9 +241,10 @@ public static class MbSchedulerRuntimeTests
             null,
             ["preserve unrelated state"],
             ["finish fixture"],
-            [],
+            requireReadback ? [new AgentAcceptanceCriterion("mb33.shared-readback", "Both ordered fixture writes are present.")] : [],
             AgentTaskRiskClass.Medium,
-            new AgentVerificationPolicy(requireVerification: false));
+            new AgentVerificationPolicy(requireVerification: requireReadback,
+                requiredVerifierIds: requireReadback ? ["mb33-shared-readback"] : null));
 
         return new AgentRuntimeRequest(
             contract,
@@ -324,6 +337,33 @@ public static class MbSchedulerRuntimeTests
             if (value <= current) return;
             if (Interlocked.CompareExchange(ref target, value, current) == current)
                 return;
+        }
+    }
+
+    private sealed class SharedWriteReadbackVerifier(string path) : IAgentRuntimeVerifier
+    {
+        public int Observations { get; private set; }
+        public VerificationReport Observe()
+        {
+            var matches = File.Exists(path)
+                && File.ReadAllLines(path).SequenceEqual(new[] { "write-1", "write-2" });
+            const string criterion = "mb33.shared-readback";
+            return new("mb33-shared-readback", [new VerificationCriterionResult(criterion,
+                matches ? VerificationCriterionStatus.Passed : VerificationCriterionStatus.Failed,
+                ["fixture:shared-mutation.txt"], matches ? null : new VerificationFailure(criterion,
+                    "Readback does not contain exactly both ordered writes.", ["fixture:shared-mutation.txt"]))]);
+        }
+        public Task<VerificationReport?> VerifyAsync(AgentRuntimeVerificationContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!context.Calls.Any(call => call.Name == "fixture.write_shared"))
+                return Task.FromResult<VerificationReport?>(null);
+            Observations++;
+            var report = Observe();
+            return Task.FromResult<VerificationReport?>(report with
+            { CallCoverage = context.Calls.Where(c => c.Name == "fixture.write_shared").SelectMany(call =>
+                report.Criteria.Select(c => new VerificationCallCoverage(call.Invocation!.InvocationId, c.CriterionId,
+                    path, "ordered-two-writes", c.Status, c.EvidenceIds))).ToArray() });
         }
     }
 

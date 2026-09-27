@@ -1,0 +1,45 @@
+name: AR-070 provider-neutral recovery policy validation
+run-name: AR-070 recovery policy validation (${{ github.sha }})
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/h2-agent-reliability-ar-000]
+    paths:
+      - experiments/H2AgentLab/Runtime/**
+      - experiments/H2AgentLab/Tools/**
+      - experiments/H2AgentLab/Program.cs
+      - src/H2Notes.Avalonia/**
+      - src/H2Notes.Core/**
+      - tests/H2Notes.Tests/**
+      - tools/agent-reliability/validate_ar070.ps1
+      - tools/agent-reliability/run_agent_suites.ps1
+      - .github/workflows/avalonia-ci.yml
+      - .github/workflows/h2-ar070-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: h2-ar070-validation
+  cancel-in-progress: false
+jobs:
+  validation:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate provider-neutral recovery policy
+        shell: pwsh
+        run: tools/agent-reliability/validate_ar070.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AR070-Recovery-Policy-Evidence
+          path: artifacts/ar070/
+          if-no-files-found: error
+          retention-days: 14

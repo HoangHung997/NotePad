@@ -19,7 +19,8 @@ public enum AgentTraceKind
     VerifierFinish,
     Final,
     Error,
-    Cancel
+    Cancel,
+    RuntimeHook
 }
 
 public sealed record AgentTraceEvent

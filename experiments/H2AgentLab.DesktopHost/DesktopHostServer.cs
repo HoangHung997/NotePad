@@ -135,6 +135,12 @@ public sealed class DesktopHostServer
                 Thread.CurrentThread.GetApartmentState() == ApartmentState.STA),
 
             "desktop.list" => _backend.ListWindows(),
+            "desktop.launch_app" => _backend.LaunchApplication(
+                Parameters<DesktopApplicationLaunchRequest>(request)),
+            "desktop.wait_app" => _backend.WaitForApplicationWindow(
+                Parameters<DesktopApplicationWaitRequest>(request)),
+            "desktop.activate_window" => _backend.ActivateWindow(
+                Parameters<DesktopApplicationActivateRequest>(request)),
             "desktop.observe" => _backend.Observe(
                 Parameters<DesktopObserveRequest>(request).SessionId),
             "desktop.act" => _backend.Act(

@@ -55,11 +55,15 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
         ArgumentNullException.ThrowIfNull(context);
 
         var outcomes = new List<AgentRuntimeDomainVerification>();
+        var coverage = new List<VerificationCallCoverage>();
         foreach (var call in context.Calls)
         {
             if (!context.RawToolOutputs.TryGetValue(call.Id, out var raw))
                 continue;
 
+            // A running job is an observation, not a failed verifier and not terminal proof.
+            if (context.Results.Any(r => r.ToolCallId == call.Id && r.Outcome?.Status == Tools.ToolOutcomeStatus.Running))
+                continue;
             if (context.Results.Any(r => r.ToolCallId == call.Id && r.IsError))
             {
                 if (context.MutationCallIds.Contains(call.Id))
@@ -67,6 +71,7 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
                 continue;
             }
 
+            var beforeCount = outcomes.Count;
             var selected = _verifiers
                 .Where(x => x.CanVerify(call, raw))
                 .ToArray();
@@ -81,6 +86,23 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
                     call,
                     raw,
                     cancellationToken).ConfigureAwait(false));
+            }
+            if (outcomes.Count > beforeCount && call.Invocation is not null)
+            {
+                var observed = context.Results.Single(r => r.ToolCallId == call.Id).Outcome;
+                // Exact target and requested postcondition. Freshness tokens are not desired
+                // output; other arguments stay part of the proof identity.
+                var postcondition = JsonSerializer.Serialize(call.Arguments.EnumerateObject()
+                    .Where(p => p.Name is not ("state_token" or "expectedHash" or "expected_hash"))
+                    .OrderBy(p => p.Name, StringComparer.Ordinal).ToDictionary(p => p.Name, p => p.Value));
+                var postId = "post-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(call.Name + "\n" + postcondition))).ToLowerInvariant();
+                var evidenceIds = observed?.EvidenceRefs.Count > 0 ? observed.EvidenceRefs
+                    : context.Evidence.Select(e => e.ReferenceId).ToArray();
+                coverage.Add(new(call.Invocation.InvocationId, MutationCriterionId,
+                    AgentCompletionAssessment.Target(call, observed?.Resource?.Id), postId,
+                    outcomes.Skip(beforeCount).All(o => o.Passed) ? VerificationCriterionStatus.Passed : VerificationCriterionStatus.Failed,
+                    evidenceIds));
             }
         }
 
@@ -117,7 +139,7 @@ public sealed class AgentRuntimeDomainVerifierRouter : IAgentRuntimeVerifier
         return new VerificationReport(
             VerifierId,
             [result],
-            evidence);
+            evidence) { CallCoverage = coverage.ToArray() };
     }
 }
 
@@ -178,7 +200,36 @@ public sealed class FileRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
                 },
                 allowedOutputPaths: [path]));
 
-        return Task.FromResult(ToOutcome(report));
+        var baseOutcome = ToOutcome(report);
+        if (call.Name != "publish_artifact" || !baseOutcome.Passed)
+            return Task.FromResult(baseOutcome);
+
+        if (!resultJson.RootElement.TryGetProperty("artifactVerification", out var receipt)
+            || receipt.ValueKind != JsonValueKind.Object)
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, baseOutcome.EvidenceIds,
+                "Published artifact has no host verification receipt."));
+
+        var receiptSha = RequiredString(receipt, "Sha256").ToLowerInvariant();
+        var evidenceId = RequiredString(receipt, "EvidenceId");
+        var signatureVerified = RequiredBoolean(receipt, "SignatureVerified");
+        var contentVerified = RequiredBoolean(receipt, "ContentVerified");
+        var structureVerified = RequiredBoolean(receipt, "StructureVerified");
+        var format = RequiredString(receipt, "Format");
+        var further = resultJson.RootElement.TryGetProperty("requiresFurtherVerification", out var requires)
+            && requires.ValueKind == JsonValueKind.True;
+
+        var evidence = baseOutcome.EvidenceIds.Append(evidenceId).Distinct(StringComparer.Ordinal).ToArray();
+        if (receiptSha != reportedAfter || !signatureVerified)
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, evidence,
+                "Artifact verification receipt does not match the published bytes."));
+        if (further || !contentVerified || (format is "docx" or "xlsx" && !structureVerified))
+            return Task.FromResult(new AgentRuntimeDomainVerification(
+                DomainId, false, evidence,
+                "Artifact bytes were published but content/layout remains independently unverified. Do not claim completion."));
+
+        return Task.FromResult(baseOutcome with { EvidenceIds = evidence });
     }
 
     private AgentRuntimeDomainVerification ToOutcome(VerificationReport report)
@@ -208,6 +259,15 @@ public sealed class FileRuntimeDomainVerifier : IAgentRuntimeDomainVerifier
             && value.ValueKind == JsonValueKind.String
                 ? value.GetString()?.Trim() ?? ""
                 : "";
+
+    private static bool RequiredBoolean(JsonElement node, string name)
+    {
+        if (!node.TryGetProperty(name, out var value)
+            || value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidOperationException(
+                $"Runtime file verifier requires boolean '{name}'.");
+        return value.GetBoolean();
+    }
 }
 
 public sealed class PythonRuntimeDomainVerifier : IAgentRuntimeDomainVerifier

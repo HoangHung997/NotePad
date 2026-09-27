@@ -113,6 +113,10 @@ internal static class H2CommandCenterUiTests
                 var section = window.FindControl<Border>("CommandCenterAttentionSection")!;
                 var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
                 Check(section.IsVisible, "Needs-attention section is hidden despite a waiting approval.");
+                window.FindControl<Button>("CommandCenterAttentionToggle")!
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(list.IsVisible, "Needs-attention section did not expand for deep-link selection.");
                 var item = list.ItemsSource!.Cast<object>().Single();
 
                 Check((Guid?)Value(item, "ProjectId") == project.Id, "Attention item lost ProjectId source.");
@@ -139,6 +143,193 @@ internal static class H2CommandCenterUiTests
                     "Resolved source left a stale attention row.");
                 Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("0 cần xem", StringComparison.Ordinal),
                     "Global attention summary did not rebuild after resolution.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        test("AR-068 attention defaults collapsed, bounds preview, and remembers machine-local collapse preference", () =>
+        {
+            var now = DateTime.UtcNow;
+            var project = Project("Attention flood", now, 0, 1);
+            var board = new NoteRecord { Title = "Attention board", NoteKind = "project-hub", Projects = [project] };
+            var agent = new CommandCenterAttentionAgentFake(project.Id, now.AddMinutes(5), 21);
+            var app = new App { AgentAdapter = agent };
+            app.LocalSettings.DeviceId = "ar068-test-device";
+            app.State.Notes.Add(board);
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                var section = window.FindControl<Border>("CommandCenterAttentionSection")!;
+                var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
+                var toggle = window.FindControl<Button>("CommandCenterAttentionToggle")!;
+                var showAll = window.FindControl<Button>("CommandCenterAttentionShowAllButton")!;
+
+                Check(section.IsVisible, "Attention section should remain visible while collapsed.");
+                Check(app.LocalSettings.CommandCenter.AttentionCollapsed, "Attention did not default collapsed.");
+                Check(!list.IsVisible && list.ItemsSource!.Cast<object>().Count() == 0,
+                    "Collapsed attention leaked rows into the dashboard.");
+                Check(window.FindControl<TextBlock>("CommandCenterAttentionHeader")!.Text == "Cần bạn xử lý · 21",
+                    "Collapsed header lost the active attention count.");
+
+                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(!app.LocalSettings.CommandCenter.AttentionCollapsed && list.IsVisible,
+                    "Attention section did not expand.");
+                Check(list.ItemsSource!.Cast<object>().Count() == 5,
+                    "Expanded attention preview was not bounded to five rows.");
+                Check(showAll.IsVisible && showAll.Content?.ToString() == "Xem tất cả · 21",
+                    "Long attention preview did not offer Xem tất cả.");
+
+                showAll.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(list.ItemsSource!.Cast<object>().Count() == 21 && !showAll.IsVisible,
+                    "Xem tất cả did not reveal exactly the active attention rows.");
+
+                var projectItem = window.FindControl<ListBox>("CommandCenterList")!.ItemsSource!.Cast<object>().Single();
+                window.FindControl<ListBox>("CommandCenterList")!.SelectedItem = projectItem;
+                Pump();
+                window.FindControl<Button>("ProjectsNavButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(list.IsVisible && list.ItemsSource!.Cast<object>().Count() == 5 && showAll.IsVisible,
+                    "Returning to Command Center did not restore the bounded attention preview.");
+
+                var reloaded = LocalConfiguration.Read();
+                Check(!reloaded.CommandCenter.AttentionCollapsed,
+                    "Expanded/collapsed preference was not persisted machine-locally.");
+            }
+            finally
+            {
+                window.Close();
+            }
+
+            var reopened = new MainWindow(app, board);
+            reopened.Show();
+            Pump();
+            try
+            {
+                var list = reopened.FindControl<ListBox>("CommandCenterAttentionList")!;
+                Check(list.IsVisible && list.ItemsSource!.Cast<object>().Count() == 5,
+                    "Reopened Command Center did not restore expanded preference with bounded preview.");
+            }
+            finally
+            {
+                reopened.Close();
+            }
+        });
+
+        test("AR-068 selecting one attention acknowledges only that event and a new same-task failure reappears", () =>
+        {
+            var now = DateTime.UtcNow;
+            var project = Project("Acknowledgement project", now, 0, 1);
+            var board = new NoteRecord { Title = "Attention board", NoteKind = "project-hub", Projects = [project] };
+            var agent = new CommandCenterAttentionAgentFake(project.Id, now.AddMinutes(5), 2);
+            var app = new App { AgentAdapter = agent };
+            app.LocalSettings.DeviceId = "ar068-ack-device";
+            app.LocalSettings.CommandCenter.AttentionCollapsed = false;
+            app.State.Notes.Add(board);
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                var list = window.FindControl<ListBox>("CommandCenterAttentionList")!;
+                var items = list.ItemsSource!.Cast<object>().ToArray();
+                Check(items.Length == 2, "Acknowledgement fixture did not expose two independent attention events.");
+                var item = items.Single(value => (Guid?)Value(value, "AgentTaskId") == agent.PrimaryTaskId);
+                var other = items.Single(value => (Guid?)Value(value, "AgentTaskId") != agent.PrimaryTaskId);
+                var attentionId = Text(item, "AttentionId");
+                var otherAttentionId = Text(other, "AttentionId");
+
+                list.SelectedItem = item;
+                Pump();
+
+                Check(agent.GetTaskSummary(agent.PrimaryTaskId).Status == H2AgentTaskStatus.WaitingForApproval,
+                    "Acknowledgement mutated authoritative Agent task status.");
+                Check(app.LocalSettings.CommandCenter.AttentionAcknowledgedUtc.ContainsKey(attentionId),
+                    "Selected attention event was not acknowledged locally.");
+
+                window.FindControl<Button>("ProjectsNavButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump();
+                Check(window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Acknowledging one event incorrectly hid the remaining independent event.");
+                var remaining = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(remaining.Length == 1 && Text(remaining[0], "AttentionId") == otherAttentionId,
+                    "Acknowledgement removed or replaced an unrelated attention event.");
+                Check(window.FindControl<TextBlock>("CommandCenterSummary")!.Text!.Contains("1 cần xem", StringComparison.Ordinal),
+                    "Acknowledged event did not decrement active attention count by exactly one.");
+
+                agent.TouchPrimaryWaiting(now.AddMinutes(10));
+                window.RefreshAfterSave();
+                Pump();
+                remaining = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(remaining.Length == 1 && Text(remaining[0], "AttentionId") == otherAttentionId,
+                    "Same pending approval resurfaced only because task UpdatedUtc changed.");
+
+                agent.FailPrimary(now.AddMinutes(30));
+                window.RefreshAfterSave();
+                Pump();
+
+                var replacementItems = window.FindControl<ListBox>("CommandCenterAttentionList")!.ItemsSource!.Cast<object>().ToArray();
+                Check(replacementItems.Length == 2,
+                    "New same-task failure did not reappear alongside the unrelated event.");
+                var replacement = replacementItems.Single(value => (Guid?)Value(value, "AgentTaskId") == agent.PrimaryTaskId);
+                var replacementId = Text(replacement, "AttentionId");
+                Check(replacementId != attentionId,
+                    "New failure revision reused an acknowledged attention identity.");
+                Check(agent.GetTaskSummary(agent.PrimaryTaskId).Status == H2AgentTaskStatus.Failed,
+                    "New failure was hidden by mutating Agent history.");
+                Check(!app.LocalSettings.CommandCenter.AttentionAcknowledgedUtc.ContainsKey(attentionId),
+                    "Resolved/superseded attention acknowledgement was not pruned.");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        test("AR-068 source resolution disappears without acknowledgement and overlay never enters shared project JSON", () =>
+        {
+            var now = DateTime.UtcNow;
+            var project = Project("Resolved condition", now, 0, 1);
+            var board = new NoteRecord { Title = "Attention board", NoteKind = "project-hub", Projects = [project] };
+            var agent = new CommandCenterAttentionAgentFake(project.Id, now.AddMinutes(5), 1);
+            var app = new App { AgentAdapter = agent };
+            app.LocalSettings.CommandCenter.AttentionCollapsed = false;
+            app.State.Notes.Add(board);
+
+            var window = new MainWindow(app, board);
+            window.Show();
+            Pump();
+            try
+            {
+                Check(window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Fixture did not expose active attention before resolution.");
+                Check(app.LocalSettings.CommandCenter.AttentionAcknowledgedUtc.Count == 0,
+                    "Fixture unexpectedly started acknowledged.");
+
+                agent.ResolvePrimary();
+                window.RefreshAfterSave();
+                Pump();
+
+                Check(!window.FindControl<Border>("CommandCenterAttentionSection")!.IsVisible,
+                    "Resolved source condition remained in active attention without an acknowledgement.");
+                Check(app.LocalSettings.CommandCenter.AttentionAcknowledgedUtc.Count == 0,
+                    "Source resolution created acknowledgement metadata.");
+                var shared = System.Text.Json.JsonSerializer.Serialize(app.State);
+                Check(!shared.Contains("AttentionAcknowledgedUtc", StringComparison.Ordinal)
+                      && !shared.Contains("AttentionCollapsed", StringComparison.Ordinal),
+                    "Machine-local attention overlay leaked into shared project/NAS state.");
+                var localJson = System.Text.Json.JsonSerializer.Serialize(app.LocalSettings);
+                Check(localJson.Contains("AttentionAcknowledgedUtc", StringComparison.Ordinal)
+                      && localJson.Contains("AttentionCollapsed", StringComparison.Ordinal),
+                    "Attention overlay is not owned by LocalConfiguration.");
             }
             finally
             {
@@ -410,6 +601,85 @@ internal static class H2CommandCenterUiTests
             current = current.Parent;
         }
         throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
+
+    private sealed class CommandCenterAttentionAgentFake : IH2AgentAdapter
+    {
+        private readonly List<H2AgentTaskSummary> _tasks;
+
+        public Guid PrimaryTaskId => _tasks[0].TaskId;
+
+        public CommandCenterAttentionAgentFake(Guid projectId, DateTime updated, int count)
+        {
+            if (count < 1) throw new ArgumentOutOfRangeException(nameof(count));
+            _tasks = Enumerable.Range(0, count)
+                .Select(index =>
+                {
+                    var at = updated.AddSeconds(index);
+                    return new H2AgentTaskSummary(
+                        Guid.NewGuid(),
+                        projectId,
+                        "Review attention " + (index + 1),
+                        H2AgentTaskStatus.WaitingForApproval,
+                        new H2AgentApproval(Guid.NewGuid(), "Approve fixture " + (index + 1), "Fixture", at),
+                        [],
+                        null,
+                        null,
+                        at.AddMinutes(-1),
+                        at);
+                })
+                .ToList();
+        }
+
+        public Task<Guid> StartTaskAsync(Guid? projectId, string goal, H2AgentTaskContext? context = null, bool readOnly = true, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public H2AgentTaskObservation ObserveTask(Guid taskId, long afterSequence = -1)
+            => new(GetTaskSummary(taskId), Array.Empty<H2AgentProgress>());
+
+        public void CancelTask(Guid taskId) => throw new NotSupportedException();
+        public bool RespondToApproval(Guid taskId, Guid approvalId, bool approved) => false;
+
+        public H2AgentTaskSummary GetTaskSummary(Guid taskId)
+            => _tasks.Single(task => task.TaskId == taskId);
+
+        public IReadOnlyList<H2AgentTaskSummary> GetRecentTasks(Guid? projectId = null, int limit = 50)
+            => _tasks.Where(task => projectId is null || projectId == task.ProjectId)
+                .OrderByDescending(task => task.UpdatedUtc)
+                .Take(limit)
+                .ToArray();
+
+        public H2AgentEvidence? GetEvidence(string evidenceId) => null;
+        public bool AttachProject(Guid taskId, Guid projectId) => false;
+
+        public void TouchPrimaryWaiting(DateTime updated)
+        {
+            _tasks[0] = _tasks[0] with { UpdatedUtc = updated };
+        }
+
+        public void ResolvePrimary()
+        {
+            _tasks[0] = _tasks[0] with
+            {
+                Status = H2AgentTaskStatus.Completed,
+                PendingApproval = null,
+                Error = null,
+                FinalText = "Resolved",
+                UpdatedUtc = _tasks[0].UpdatedUtc.AddMinutes(1)
+            };
+        }
+
+        public void FailPrimary(DateTime updated)
+        {
+            _tasks[0] = _tasks[0] with
+            {
+                Status = H2AgentTaskStatus.Failed,
+                PendingApproval = null,
+                Error = "New specific failure",
+                FinalText = null,
+                UpdatedUtc = updated
+            };
+        }
     }
 
     private sealed class CommandCenterAgentFake : IH2AgentAdapter

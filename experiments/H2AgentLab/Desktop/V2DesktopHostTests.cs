@@ -47,6 +47,58 @@ public static class V2DesktopHostTests
             Check(ping.FixtureMode, "DesktopHost fixture mode was not reported.");
             Check(ping.ProcessId != Environment.ProcessId, "DesktopHost is not a separate process.");
             Check(ping.ProtocolVersion == DesktopProtocolConstants.Version, "Desktop protocol version mismatch.");
+            Check(client.ProcessId == ping.ProcessId,
+                "DesktopHost ping identity does not match the process started by the client.");
+            DesktopHostClient.ValidatePreflightIdentity(client.ProcessId, ping);
+            DesktopHostClient.ValidateLiveProcessIdentity(ping.ProcessId, client.ProcessId);
+
+            foreach (var actual in new int?[] { null, ping.ProcessId + 1 })
+            {
+                try
+                {
+                    DesktopHostClient.ValidateLiveProcessIdentity(ping.ProcessId, actual);
+                    throw new InvalidOperationException("Changed DesktopHost process identity was accepted after preflight.");
+                }
+                catch (DesktopHostClientException ex) when (ex.Code == "preflight_unavailable")
+                {
+                }
+            }
+
+            try
+            {
+                DesktopHostClient.ValidatePreflightIdentity(
+                    ping.ProcessId + 1,
+                    ping);
+                throw new InvalidOperationException("Mismatched DesktopHost PID was accepted.");
+            }
+            catch (DesktopHostClientException ex) when (ex.Code == "preflight_unavailable")
+            {
+            }
+
+            try
+            {
+                DesktopHostClient.ValidatePreflightIdentity(
+                    ping.ProcessId,
+                    ping with { ProtocolVersion = DesktopProtocolConstants.Version + "-stale" });
+                throw new InvalidOperationException("Mismatched DesktopHost protocol was accepted.");
+            }
+            catch (DesktopHostClientException ex) when (ex.Code == "protocol_mismatch")
+            {
+            }
+
+            foreach (Exception preflight in new Exception[]
+            {
+                new IOException("fixture"),
+                new TimeoutException("fixture"),
+                new InvalidOperationException("fixture"),
+                new UnauthorizedAccessException("fixture"),
+                new System.ComponentModel.Win32Exception(5),
+                new System.Security.SecurityException("fixture")
+            })
+                Check(DesktopHostClient.IsPreflightFailure(preflight),
+                    "Known helper-start preflight failure was not classified no-effect: " + preflight.GetType().Name);
+            Check(!DesktopHostClient.IsPreflightFailure(new ArgumentException("fixture")),
+                "Ordinary tool argument failure was incorrectly classified as helper-start preflight.");
 
             var repo = FindRepoRoot();
             var project = File.ReadAllText(
@@ -57,6 +109,12 @@ public static class V2DesktopHostTests
                 && !project.Contains("../H2AgentLab/H2AgentLab.csproj", StringComparison.Ordinal)
                 && !project.Contains("H2AgentLab.OfficeHost", StringComparison.Ordinal),
                 "DesktopHost helper gained UI/model/Python/OfficeHost project coupling.");
+
+            var clientSource = File.ReadAllText(
+                Path.Combine(repo, "experiments", "H2AgentLab", "Desktop", "DesktopHostClient.cs"));
+            Check(clientSource.Contains("Kill(entireProcessTree: false)", StringComparison.Ordinal)
+                && !clientSource.Contains("Kill(entireProcessTree: true)", StringComparison.Ordinal),
+                "DesktopHost client may kill applications launched by the helper when stopping the helper process.");
         });
 
         await Test("0902 window enumeration exposes only policy-allowed fixture window", async () =>

@@ -50,7 +50,10 @@ public sealed record AgentToolResult(
     string ToolCallId,
     string ToolName,
     string Content,
-    bool IsError = false);
+    bool IsError = false)
+{
+    public H2AgentLab.Tools.ToolOutcome? Outcome { get; init; }
+}
 
 public sealed record AgentTransportContinuationRequest(
     Guid TaskId,

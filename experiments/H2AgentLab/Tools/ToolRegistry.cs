@@ -154,7 +154,14 @@ public sealed record ToolDescriptor
         ToolResourceScope? resourceScope = null,
         string? serializationKey = null,
         bool canProvideVerificationEvidence = false,
-        ToolPreferenceMetadata? preference = null)
+        ToolPreferenceMetadata? preference = null,
+        ToolReadiness? readiness = null,
+        ToolContractLimits? limits = null,
+        IReadOnlyList<string>? dependencies = null,
+        IReadOnlyList<string>? supportedOperations = null,
+        ToolResultFormat resultFormat = ToolResultFormat.Auto,
+        Func<global::H2AgentLab.ToolCall, ToolExecutionOutput?>? preflight = null,
+        Func<ToolReadiness>? readinessSnapshot = null)
     {
         Name = ToolNamespace.NormalizeId(name, nameof(name));
         Namespace = toolNamespace ?? throw new ArgumentNullException(nameof(toolNamespace));
@@ -176,6 +183,17 @@ public sealed record ToolDescriptor
             : ToolNamespace.NormalizeId(serializationKey, nameof(serializationKey));
         CanProvideVerificationEvidence = canProvideVerificationEvidence;
         Preference = preference;
+        Readiness = readiness ?? new(ToolReadinessState.Ready);
+        Limits = limits ?? new();
+        if (!Enum.IsDefined(Readiness.State) || !Enum.IsDefined(resultFormat)
+            || Limits.MaxOutputCharacters is < 1_024 or > ToolOutcomeBridge.MaxModelOutputCharacters
+            || Limits.MaxBatchItems is < 1)
+            throw new ArgumentException("Invalid tool readiness or limits.");
+        Dependencies = Array.AsReadOnly((dependencies ?? []).Select(d => ToolNamespace.NormalizeId(d, nameof(dependencies))).Distinct().ToArray());
+        SupportedOperations = Array.AsReadOnly((supportedOperations ?? [Name]).Select(o => ToolNamespace.NormalizeId(o, nameof(supportedOperations))).Distinct().ToArray());
+        ResultFormat = resultFormat;
+        Preflight = preflight;
+        ReadinessSnapshot = readinessSnapshot;
     }
 
     public string Name { get; }
@@ -192,80 +210,163 @@ public sealed record ToolDescriptor
     public string? SerializationKey { get; }
     public bool CanProvideVerificationEvidence { get; }
     public ToolPreferenceMetadata? Preference { get; }
+    public ToolReadiness Readiness { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<global::H2AgentLab.ToolCall, ToolExecutionOutput?>? Preflight { get; }
+    // Host-owned, cheap cached/in-memory readiness only. Never connect or launch apps here.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<ToolReadiness>? ReadinessSnapshot { get; }
+    public ToolReadiness CurrentReadiness
+    {
+        get
+        {
+            if (ReadinessSnapshot is null) return Readiness;
+            try
+            {
+                var snapshot = ReadinessSnapshot();
+                return snapshot is not null && Enum.IsDefined(snapshot.State) ? snapshot : new(ToolReadinessState.Unavailable);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            { return new(ToolReadinessState.Unavailable); }
+        }
+    }
+    public string EffectClass => IsMutating ? "may_change_resource" : "observational";
+    public ToolContractLimits Limits { get; }
+    public IReadOnlyList<string> Dependencies { get; }
+    public IReadOnlyList<string> SupportedOperations { get; }
+    public ToolResultFormat ResultFormat { get; }
+    public string OutputSchemaVersion => "h2-outcome-v1";
     public bool IsMutating => Access == AgentToolAccess.Mutating;
 }
 
 public sealed class ToolRegistry
 {
-    private readonly Dictionary<string, ToolNamespace> _namespaces = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ToolDescriptor> _tools = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+    private Dictionary<string, ToolNamespace> _namespaces = new(StringComparer.Ordinal);
+    private Dictionary<string, ToolDescriptor> _tools = new(StringComparer.Ordinal);
     private long _version;
+    // Non-callable notices share the registry but never acquire an executor.
+    private readonly Dictionary<string, ToolCapabilityNotice> _notices = new(StringComparer.Ordinal);
+    public IReadOnlyList<ToolCapabilityNotice> CapabilityNotices
+    { get { lock (_gate) return _notices.Values.OrderBy(n => n.Name, StringComparer.Ordinal).ToArray(); } }
 
-    public long Version => _version;
-    public IReadOnlyList<ToolNamespace> Namespaces => _namespaces.Values.OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();
-    public IReadOnlyList<ToolDescriptor> Tools => _tools.Values.OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();
+    public void RegisterCapabilityNotice(ToolCapabilityNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        var name = ToolNamespace.NormalizeId(notice.Name, nameof(notice));
+        if (notice.Readiness is null || !Enum.IsDefined(notice.Readiness.State) || notice.Readiness.CanExecute)
+            throw new ArgumentException("A capability notice cannot advertise an executable tool.");
+        var validated = notice with { Name = name,
+            Description = ToolNamespace.NormalizeText(notice.Description, nameof(notice), 512) };
+        lock (_gate) { _notices[name] = validated; _version++; }
+    }
+
+    public void SetReadiness(string name, ToolReadiness readiness)
+    {
+        ArgumentNullException.ThrowIfNull(readiness);
+        if (!Enum.IsDefined(readiness.State)) throw new ArgumentException("Invalid readiness.");
+        lock (_gate)
+        {
+            if (!TryGet(name, out var descriptor)) throw new KeyNotFoundException("Tool is not registered.");
+            _tools[descriptor.Name] = descriptor with { Readiness = readiness };
+            _version++;
+        }
+    }
+
+    public long Version { get { lock (_gate) return _version; } }
+    public IReadOnlyList<ToolNamespace> Namespaces
+    { get { lock (_gate) return _namespaces.Values.OrderBy(x => x.Name, StringComparer.Ordinal).ToArray(); } }
+    public IReadOnlyList<ToolDescriptor> Tools
+    { get { lock (_gate) return _tools.Values.OrderBy(x => x.Name, StringComparer.Ordinal).ToArray(); } }
 
     public void RegisterNamespace(ToolNamespace toolNamespace)
     {
         ArgumentNullException.ThrowIfNull(toolNamespace);
-        if (_namespaces.TryGetValue(toolNamespace.Name, out var existing))
+        lock (_gate)
         {
-            if (existing != toolNamespace)
-                throw new InvalidOperationException($"Tool namespace '{toolNamespace.Name}' is already registered with different metadata.");
-            return;
+            ValidateNamespace(_namespaces, toolNamespace);
+            if (_namespaces.TryAdd(toolNamespace.Name, toolNamespace)) _version++;
         }
-        _namespaces.Add(toolNamespace.Name, toolNamespace);
-        _version++;
     }
 
     public void Register(ToolDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        RegisterNamespace(descriptor.Namespace);
-        if (_tools.ContainsKey(descriptor.Name))
-            throw new InvalidOperationException($"Tool '{descriptor.Name}' is already registered.");
-        _tools.Add(descriptor.Name, descriptor);
-        _version++;
+        lock (_gate)
+        {
+            // Validate both indexes before changing either of them.
+            if (_tools.ContainsKey(descriptor.Name))
+                throw new InvalidOperationException($"Tool '{descriptor.Name}' is already registered.");
+            ValidateNamespace(_namespaces, descriptor.Namespace);
+            if (_namespaces.TryAdd(descriptor.Namespace.Name, descriptor.Namespace)) _version++;
+            _tools.Add(descriptor.Name, descriptor);
+            _version++;
+        }
+    }
+
+    /// <summary>Validate the complete replacement before publishing either registry index.
+    /// The optional host commit runs only after validation; failure leaves the old registry intact.
+    /// Existing descriptor objects remain immutable. This does not itself revoke captured executors.</summary>
+    public void ReplaceWhere(Func<ToolDescriptor, bool> predicate,
+        IReadOnlyList<ToolDescriptor> replacements, Action? commit = null)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(replacements);
+        var incoming = replacements.ToArray();
+        if (incoming.Any(x => x is null)) throw new ArgumentException("Replacement contains null.");
+        lock (_gate)
+        {
+            var removed = _tools.Values.Where(predicate).ToArray();
+            var next = new Dictionary<string, ToolDescriptor>(_tools, StringComparer.Ordinal);
+            foreach (var old in removed) next.Remove(old.Name);
+            var namespaces = new Dictionary<string, ToolNamespace>(_namespaces, StringComparer.Ordinal);
+            foreach (var name in removed.Select(x => x.Namespace.Name).Distinct(StringComparer.Ordinal))
+                if (!next.Values.Any(x => x.Namespace.Name == name)) namespaces.Remove(name);
+            foreach (var descriptor in incoming)
+            {
+                if (!next.TryAdd(descriptor.Name, descriptor))
+                    throw new InvalidOperationException($"Tool '{descriptor.Name}' is already registered.");
+                ValidateNamespace(namespaces, descriptor.Namespace);
+                namespaces.TryAdd(descriptor.Namespace.Name, descriptor.Namespace);
+            }
+            commit?.Invoke();
+            _tools = next;
+            _namespaces = namespaces;
+            if (removed.Length > 0 || incoming.Length > 0) _version++;
+        }
+    }
+
+    private static void ValidateNamespace(Dictionary<string, ToolNamespace> namespaces, ToolNamespace value)
+    {
+        if (namespaces.TryGetValue(value.Name, out var existing) && existing != value)
+            throw new InvalidOperationException($"Tool namespace '{value.Name}' is already registered with different metadata.");
     }
 
     public bool TryGet(string name, out ToolDescriptor descriptor)
     {
-        // Model-supplied lookup names are untrusted; malformed names are a miss, not a crash.
         descriptor = null!;
         if (string.IsNullOrWhiteSpace(name)) return false;
         var normalized = name.Trim().ToLowerInvariant();
         if (normalized.Length > 64 || normalized.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.'))) return false;
-        return _tools.TryGetValue(normalized, out descriptor!);
+        lock (_gate) return _tools.TryGetValue(normalized, out descriptor!);
     }
 
     public IReadOnlyList<ToolDescriptor> GetNamespace(string name)
     {
         var normalized = ToolNamespace.NormalizeId(name, nameof(name));
-        return _tools.Values
-            .Where(x => x.Namespace.Name == normalized)
-            .OrderBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
+        lock (_gate) return _tools.Values.Where(x => x.Namespace.Name == normalized)
+            .OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();
     }
 
     public int UnregisterWhere(Func<ToolDescriptor, bool> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        var names = _tools.Values
-            .Where(predicate)
-            .Select(x => x.Name)
-            .ToArray();
-        foreach (var name in names)
-            _tools.Remove(name);
-
-        if (names.Length > 0)
+        lock (_gate)
         {
-            var usedNamespaces = _tools.Values
-                .Select(x => x.Namespace.Name)
-                .ToHashSet(StringComparer.Ordinal);
-            foreach (var key in _namespaces.Keys.Where(x => !usedNamespaces.Contains(x)).ToArray())
-                _namespaces.Remove(key);
-            _version++;
+            var names = _tools.Values.Where(predicate).Select(x => x.Name).ToHashSet(StringComparer.Ordinal);
+            ReplaceWhere(x => names.Contains(x.Name), Array.Empty<ToolDescriptor>());
+            return names.Count;
         }
-        return names.Length;
     }
 }

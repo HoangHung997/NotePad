@@ -3,7 +3,10 @@ using System.Text.Json;
 namespace H2AgentLab.OfficeProtocol;
 
 public sealed record OfficeRpcRequest(string Id, string Method, JsonElement Parameters);
-public sealed record OfficeRpcError(string Code, string Message);
+public sealed record OfficeRpcError(string Code, string Message)
+{
+    public bool NoEffect { get; init; }
+}
 public sealed record OfficeRpcResponse(string Id, bool Ok, JsonElement? Result, OfficeRpcError? Error);
 
 public sealed record OfficePermission(bool Granted);
@@ -15,11 +18,18 @@ public sealed record ExcelWorkbookInfo(
     bool Saved,
     string ActiveSheet,
     string SelectionAddress,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record ExcelDiscovery(
     IReadOnlyList<ExcelWorkbookInfo> Workbooks,
-    string? ActiveSessionId);
+    string? ActiveSessionId)
+{
+    public OfficeDiscoveryReport? Report { get; init; }
+}
 
 public sealed record ExcelCellState(
     string Address,
@@ -48,7 +58,12 @@ public sealed record ExcelLiveSnapshot(
     string ActiveSheet,
     string SelectionAddress,
     IReadOnlyList<ExcelSheetState> Sheets,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+    public string? ContentToken { get; init; }
+}
+
 
 public sealed record ExcelSnapshotRequest(string SessionId);
 
@@ -62,22 +77,23 @@ public sealed record ExcelCellPatch(
     long? FillColor = null,
     string? NumberFormat = null);
 
-public sealed record ExcelPatchRequest(
-    string SessionId,
-    string StateToken,
-    bool PermissionGranted,
-    string SheetName,
-    IReadOnlyList<ExcelCellPatch> Cells);
-
-public sealed record ExcelPatchResult(
-    ExcelLiveSnapshot Before,
-    ExcelLiveSnapshot After,
-    IReadOnlyList<string> ChangedCells);
-
-public sealed record ExcelRecalculateRequest(
-    string SessionId,
-    string StateToken,
-    bool PermissionGranted);
+public sealed record ExcelPatchRequest(string SessionId,string StateToken,bool PermissionGranted,string SheetName,IReadOnlyList<ExcelCellPatch> Cells)
+{
+    public string? ContentToken { get; init; } public string? LogicalOperationId { get; init; } public string? BatchId { get; init; }
+    public string? ChunkId { get; init; } public int ChunkIndex { get; init; } public int ChunkCount { get; init; }=1;
+}
+public sealed record ExcelPatchResult(ExcelLiveSnapshot Before,ExcelLiveSnapshot After,IReadOnlyList<string> ChangedCells)
+{
+    public string LogicalOperationId { get; init; }=""; public string BatchId { get; init; }=""; public string ChunkId { get; init; }="";
+    public int ChunkIndex { get; init; } public int ChunkCount { get; init; }=1;
+    public ExcelPatchMutationStatus MutationStatus { get; init; }=ExcelPatchMutationStatus.Applied;
+    public ExcelPatchMutationEffect MutationEffect { get; init; }=ExcelPatchMutationEffect.Applied;
+    public bool ReadbackComplete { get; init; }=true; public string? ErrorCode { get; init; } public string? ErrorMessage { get; init; }
+    public IReadOnlyList<string> AppliedCells { get; init; }=[]; public IReadOnlyList<string> UnappliedCells { get; init; }=[];
+    public IReadOnlyList<string> UnknownCells { get; init; }=[]; public string? ContentTokenBefore { get; init; } public string? ContentTokenAfter { get; init; }
+}
+public sealed record ExcelRecalculateRequest(string SessionId,string StateToken,bool PermissionGranted)
+{ public string? ContentToken { get; init; } public string? SheetName { get; init; } public string? Range { get; init; } }
 
 public sealed record OfficeSaveCopyRequest(
     string SessionId,
@@ -99,11 +115,18 @@ public sealed record WordDocumentInfo(
     int SelectionStart,
     int SelectionEnd,
     string SelectionText,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+}
+
 
 public sealed record WordDiscovery(
     IReadOnlyList<WordDocumentInfo> Documents,
-    string? ActiveSessionId);
+    string? ActiveSessionId)
+{
+    public OfficeDiscoveryReport? Report { get; init; }
+}
 
 public sealed record WordRunState(
     int Index,
@@ -149,7 +172,12 @@ public sealed record WordLiveSnapshot(
     IReadOnlyList<WordSectionState> Sections,
     IReadOnlyList<WordPartState> Headers,
     IReadOnlyList<WordPartState> Footers,
-    string StateToken);
+    string StateToken)
+{
+    public OfficeNativeIdentity? NativeIdentity { get; init; }
+    public string? ContentVersion { get; init; }
+}
+
 
 public sealed record WordSnapshotRequest(string SessionId);
 
@@ -164,7 +192,10 @@ public sealed record WordPatchRequest(
     string SessionId,
     string StateToken,
     bool PermissionGranted,
-    IReadOnlyList<WordParagraphPatch> Paragraphs);
+    IReadOnlyList<WordParagraphPatch> Paragraphs)
+{
+    public string? ContentVersion { get; init; }
+}
 
 public sealed record WordPatchResult(
     WordLiveSnapshot Before,
@@ -212,6 +243,6 @@ public sealed record OfficePingResult(
 
 public static class OfficeProtocolConstants
 {
-    public const string Version = "1.0";
+    public const string Version = "1.3";
     public const int MaxMessageBytes = 4 * 1024 * 1024;
 }

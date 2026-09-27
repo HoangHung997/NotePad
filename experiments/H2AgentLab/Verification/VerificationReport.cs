@@ -110,6 +110,11 @@ public sealed record VerificationReport
     public IReadOnlyList<VerificationCriterionResult> Criteria { get; }
     public IReadOnlyList<string> ReportEvidenceIds { get; }
 
+    // Host-only metadata. Runtime never parses these claims from model/tool JSON.
+    public IReadOnlyList<global::H2AgentLab.Runtime.VerificationCallCoverage> CallCoverage { get; init; } = [];
+    public IReadOnlyList<global::H2AgentLab.Runtime.VerificationAlternateResolution> AlternateResolutions { get; init; } = [];
+    public IReadOnlyList<string> ContributingVerifierIds { get; init; } = [];
+
     public bool Passed => Criteria.Count > 0
         && Criteria.All(x => x.Status == VerificationCriterionStatus.Passed);
 

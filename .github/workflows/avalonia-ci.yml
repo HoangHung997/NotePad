@@ -14,18 +14,34 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: avalonia-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Setup Python 3.12 for Agent portable runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+          cache: 'pip'
+          cache-dependency-path: 'experiments/H2AgentLab/agent-python-requirements.txt'
 
       - name: Restore Avalonia solution
         run: dotnet restore .\H2Notes.Avalonia.slnx
@@ -267,6 +283,13 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'h2-agent-mb-repair-runtime'
           dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --mb-repair-runtime-test $out
           Get-Content -LiteralPath (Join-Path $out 'mb-repair-runtime-tests.txt')
+
+      - name: Run H2 Agent AR-070 typed recovery policy tests
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'h2-agent-ar070-recovery-policy'
+          dotnet run --project .\experiments\H2AgentLab\H2AgentLab.csproj -c Release --no-build -- --ar070-recovery-policy-test $out
+          Get-Content -LiteralPath (Join-Path $out 'ar070-recovery-policy-tests.txt')
 
       - name: Run H2 Agent MB-44 host completion gate tests
         shell: pwsh
@@ -602,6 +625,30 @@ jobs:
       - name: Publish self-contained Windows x64
         run: dotnet publish .\src\H2Notes.Avalonia\H2Notes.Avalonia.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-Avalonia-Portable
 
+      - name: Prepare bundled Agent Python runtime
+        shell: pwsh
+        run: |
+          tools/agent-reliability/prepare_agent_python.ps1 -Destination .\artifacts\H2Notes-Avalonia-Portable\python
+
+      - name: Build exact portable manifest
+        shell: pwsh
+        run: |
+          tools/agent-reliability/build_portable_manifest.ps1 -Root .\artifacts\H2Notes-Avalonia-Portable -SourceSha "${{ github.event.pull_request.head.sha || github.sha }}" -SourceBranch "${{ github.head_ref || github.ref_name }}" -RuntimeIdentifier win-x64
+          Get-Content -LiteralPath .\artifacts\H2Notes-Avalonia-Portable\portable-manifest.json | Select-Object -First 40
+
+      - name: Verify packaged portable from clean local profile
+        shell: pwsh
+        run: |
+          $settings = Join-Path $env:RUNNER_TEMP 'h2-portable-ci-clean-settings'
+          $report = Join-Path $env:RUNNER_TEMP 'h2-portable-ci-check'
+          Remove-Item -LiteralPath $settings,$report -Recurse -Force -ErrorAction SilentlyContinue
+          $env:H2_NOTES_SETTINGS_DIRECTORY = $settings
+          $env:H2_BRAVE_SEARCH_API_KEY = $null
+          $env:H2_BROWSER_CDP_ENDPOINT = $null
+          & .\artifacts\H2Notes-Avalonia-Portable\VERIFY-PORTABLE.ps1 -OutputDirectory $report
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged portable preflight failed.' }
+          Get-Content -LiteralPath (Join-Path $report 'portable-check.json')
+
       - name: Verify packaged Agent helpers start and answer IPC
         shell: pwsh
         run: |
@@ -617,7 +664,7 @@ jobs:
           dotnet publish .\tools\H2Notes.NasAcceptance\H2Notes.NasAcceptance.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\H2Notes-NasAcceptance
           @"
           Source branch: ${{ github.ref_name }}
-          Source commit: ${{ github.sha }}
+          Source commit: ${{ github.event.pull_request.head.sha || github.sha }}
           Actions run: ${{ github.run_id }}
           Built UTC: $([DateTime]::UtcNow.ToString('O'))
           "@ | Set-Content -LiteralPath .\artifacts\H2Notes-NasAcceptance\SOURCE.txt -Encoding UTF8
@@ -636,4 +683,5 @@ jobs:
         with:
           name: H2Notes-Avalonia-Portable-win-x64
           path: artifacts/H2Notes-Avalonia-Portable/
+          include-hidden-files: true
           if-no-files-found: warn

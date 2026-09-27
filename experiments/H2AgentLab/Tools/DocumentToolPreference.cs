@@ -54,6 +54,16 @@ public static class DocumentToolPreference
         }
 
         return filtered
+            .Select((result, index) => new
+            {
+                Result = result,
+                Index = index,
+                DeclaredRequestMatch =
+                    result.Descriptor.Preference?.MatchesExplicitRequest(query) == true
+            })
+            .OrderByDescending(x => x.DeclaredRequestMatch)
+            .ThenBy(x => x.Index)
+            .Select(x => x.Result)
             .Take(maxResults)
             .ToArray();
     }

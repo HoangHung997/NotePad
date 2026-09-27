@@ -1,0 +1,1132 @@
+{
+  "task": "AR-000",
+  "captured_at_utc": "2026-09-22T05:10:21.907322+00:00",
+  "code_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+  "checked_head": "0ed36c1b56ffeeb78cfe1447db2eacee545a4294",
+  "branch": "feature/h2-agent-reliability-ar-000",
+  "pr": 3,
+  "capture_run": "https://github.com/HoangHung997/NotePad/actions/runs/35689629807",
+  "runtime_diff": "EMPTY_VERIFIED",
+  "initial_repo_inventory": {
+    "branches": [
+      "main"
+    ],
+    "open_prs": 0,
+    "checked_again_before_branch_creation": true,
+    "local_checkout": "NONE_IN_ASSISTANT_CONTAINER",
+    "user_working_tree": "NOT_ACCESSIBLE"
+  },
+  "documents_read": [
+    {
+      "path": "README.md",
+      "blob_sha": "6b67193c241c4bb28eebeb5c5f435dc7fcefc7e7"
+    },
+    {
+      "path": "docs/H2_AGENT_MASTER_SPEC.md",
+      "blob_sha": "30beffb29cafdc1a53bcc2c61b201f5dd78a2449"
+    },
+    {
+      "path": "docs/H2_AGENT_MASTER_TASKS.md",
+      "blob_sha": "f83cd1ef8e2c79a0e9277a4ff3afa473d8ac68cc"
+    },
+    {
+      "path": "docs/H2_PRODUCT_MASTER_SPEC.md",
+      "blob_sha": "2efbbd8f7acf501eb4a063ee707b0bb413717716"
+    },
+    {
+      "path": "docs/H2_PRODUCT_MASTER_TASKS.md",
+      "blob_sha": "b67e8edfe57a5a780e1dbe5e96a1b18f7a7918c2"
+    },
+    {
+      "path": "docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md",
+      "blob_sha": "4d1fb421b09e36047c48ae282b82ad53590ada1c"
+    },
+    {
+      "path": "docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md",
+      "blob_sha": "0652c5f0d468aad007a7ef8dfc06d5c89687afaa"
+    },
+    {
+      "path": "docs/H2_AGENT_CONSOLIDATED_REVIEW_AND_SOLUTION_2026-09-22.md",
+      "blob_sha": "638098e64e2bc8f71ddb6e260e5395f1d958c14a"
+    },
+    {
+      "path": "docs/H2_AGENT_CHAT_SURFACE_SPEC.md",
+      "blob_sha": "48ea24c644e0004b91113a032db4bb7f6b7c6192"
+    },
+    {
+      "path": "docs/H2_NOTES_NON_AI_BUG_LEDGER.md",
+      "blob_sha": "4e200b70b15bfa7a7b9a83b3a3ba9471ab257750"
+    },
+    {
+      "path": "docs/H2_SYNC_COORDINATOR_EVENT_ARCHITECTURE.md",
+      "blob_sha": "99b573df50e6ccda58a09d5732d389a1dc54c386"
+    }
+  ],
+  "source_owners": {
+    "App.axaml.cs": [
+      {
+        "path": "src/H2Notes.Avalonia/App.axaml.cs",
+        "blob_sha": "ccd1c2cc8504ed0afe4c8628ea7c332ebc849aef"
+      }
+    ],
+    "AiChatPanel.Agent.cs": [
+      {
+        "path": "src/H2Notes.Avalonia/Controls/AiChatPanel.Agent.cs",
+        "blob_sha": "27cde50f4f6ab6a88452c4a605ded45ea234b01d"
+      }
+    ],
+    "WorkAssistantCompactWindow.Conversation.cs": [
+      {
+        "path": "src/H2Notes.Avalonia/WorkAssistantCompactWindow.Conversation.cs",
+        "blob_sha": "7ba5b03ba14a607728c3ca3a7bd3897288f26e11"
+      }
+    ],
+    "LabWindow.cs": [
+      {
+        "path": "experiments/H2AgentLab/LabWindow.cs",
+        "blob_sha": "879d445fe3f9dcced22fbd6d4a1e830c77a9186b"
+      }
+    ],
+    "AgentRuntimeFactory.cs": [
+      {
+        "path": "experiments/H2AgentLab/Runtime/AgentRuntimeFactory.cs",
+        "blob_sha": "153b9dd4984427dce8e17f06fbc90e8a496dec7a"
+      }
+    ],
+    "AgentRuntime.cs": [
+      {
+        "path": "experiments/H2AgentLab/Runtime/AgentRuntime.cs",
+        "blob_sha": "28f356386f406776928bed397250cd2094a94a9f"
+      }
+    ],
+    "AgentOrchestrator.cs": [
+      {
+        "path": "experiments/H2AgentLab/Tasking/AgentOrchestrator.cs",
+        "blob_sha": "f712776d5d2abd32da4f49c3c62948458da0ed1c"
+      }
+    ],
+    "AgentTransportFactory.cs": [
+      {
+        "path": "experiments/H2AgentLab/Transport/AgentTransportFactory.cs",
+        "blob_sha": "eb77607ad9df3602587b9738d07611c38e85b6ef"
+      }
+    ],
+    "H2ProductionToolSession.cs": [
+      {
+        "path": "experiments/H2AgentLab/Integration/H2ProductionToolSession.cs",
+        "blob_sha": "fa573fc18e415f1cc6499533d22b54912bf9f2ce"
+      }
+    ],
+    "H2ProductionToolSession.Desktop.cs": [
+      {
+        "path": "experiments/H2AgentLab/Integration/H2ProductionToolSession.Desktop.cs",
+        "blob_sha": "4209cc4eab02b41e2a98d6dd7e69e1bc4c3e4495"
+      }
+    ],
+    "AgentRuntimeDomainVerification.cs": [
+      {
+        "path": "experiments/H2AgentLab/Runtime/AgentRuntimeDomainVerification.cs",
+        "blob_sha": "e32274fbf917de6699fe54b88dfe99cfed784e8c"
+      }
+    ],
+    "ArtifactStore.cs": [
+      {
+        "path": "experiments/H2AgentLab/Session/ArtifactStore.cs",
+        "blob_sha": "f196227d871d57a42fcbf84b7f45d625fc7febad"
+      }
+    ],
+    "RuntimeCompactionCoordinator.cs": [
+      {
+        "path": "experiments/H2AgentLab/Session/RuntimeCompactionCoordinator.cs",
+        "blob_sha": "5d65388ef3b05ffa54e3dd627dcef26480ee1626"
+      }
+    ],
+    "H2ProductionAgentBridgeTests.cs": [
+      {
+        "path": "tests/H2Notes.Tests/H2ProductionAgentBridgeTests.cs",
+        "blob_sha": "acc7ce6c72e2c1b82e83c773b563f3aed07b4245"
+      }
+    ],
+    "H2SyncCoordinatorContracts.cs": [
+      {
+        "path": "src/H2Notes.Core/H2SyncCoordinatorContracts.cs",
+        "blob_sha": "4088887810b7793c5205a8fe84863996071d3b9c"
+      }
+    ],
+    "H2CoordinatorSqliteStore.cs": [
+      {
+        "path": "src/H2Notes.Coordinator/H2CoordinatorSqliteStore.cs",
+        "blob_sha": "f43370d3e9a78380def9c9e09d9e574bf2f52c7f"
+      }
+    ]
+  },
+  "source_files": {
+    "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs": {
+      "blob_sha": "4a2ec7757f9542137ed6ceb74c5426675ca7ada7",
+      "content_sha256": "6e05f2339afc50d66ececdc4f5a3362631ecfcfcec14d9e84b1facb728e32017"
+    },
+    "experiments/H2AgentLab/Tools/SkillRuntimeTools.cs": {
+      "blob_sha": "e578005f85a3edf1cfa204e29b0f5d0e7d81874a",
+      "content_sha256": "011010bd840618713c64ba3b3bc5befd55a48cdae46bbb173ba4c7c6b0e84dbb"
+    },
+    "experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs": {
+      "blob_sha": "9edb631268cedff9b682abe1cfee78f0d95a94b0",
+      "content_sha256": "becba25f14978832d1813a2a035d1372579590001606e7eec5243e8e587c4871"
+    },
+    "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs": {
+      "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1",
+      "content_sha256": "2f285da14aef0eb75a857e007791477f6c7ed8313296f0d43ad22e3a2e00119a"
+    },
+    "experiments/H2AgentLab/Tools/NormalRuntimeToolRegistry.cs": {
+      "blob_sha": "ae9a74e00cc0f477c41dee8d059bf1380f36c098",
+      "content_sha256": "c1563df99adbf23f9e81642b895b34c10cdd765f6c30b4a2d933755ca1131641"
+    },
+    "experiments/H2AgentLab/V2ArchitectureTests.cs": {
+      "blob_sha": "de0aa8315dc9ce5d1def32295257c227be3d4c6d",
+      "content_sha256": "52f673badbdb3ff062902dbe8a687072a3ba2425bf00118c892872f87206a620"
+    },
+    "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Context.cs": {
+      "blob_sha": "c29a8c15ddd73cb6c974c3e8973e28464b17be13",
+      "content_sha256": "412868500f6ee630353eae396d28ff5b1e1134043a8492d0ae0507b9a487657c"
+    },
+    "experiments/H2AgentLab/Tasking/AgentOrchestratedRun.cs": {
+      "blob_sha": "64a1d467f1608ad9f036dcdab9ddd4477163a17c",
+      "content_sha256": "a9d8de8616de153e9e9f3ffe200bf77f466da73171fa529554dbd35b9169e1e8"
+    },
+    "experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs": {
+      "blob_sha": "1a73d2b6bd33ef11934633790157ec36022ef058",
+      "content_sha256": "8138f5567b11a23d4119eb2841d1e7211129cb3d68883730039afb46c02c49c1"
+    }
+  },
+  "findings": [
+    {
+      "id": "B01",
+      "classification": "CURRENT_CONTRACT_DRIFT",
+      "owners": [
+        "AR-001"
+      ],
+      "observation": "Production StablePrefix requests search_skills; the canonical callable is list_skills.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs",
+          "line": 548,
+          "needle": "discover skills with search_skills",
+          "blob_sha": "4a2ec7757f9542137ed6ceb74c5426675ca7ada7"
+        },
+        {
+          "path": "experiments/H2AgentLab/Tools/SkillRuntimeTools.cs",
+          "line": 13,
+          "needle": "SearchToolName = \"list_skills\"",
+          "blob_sha": "e578005f85a3edf1cfa204e29b0f5d0e7d81874a"
+        }
+      ]
+    },
+    {
+      "id": "B02",
+      "classification": "CURRENT_CONTRACT_DRIFT",
+      "owners": [
+        "AR-001"
+      ],
+      "observation": "Excel schema and adapter permit 200 patches; COM backend rejects above 128. No boundary fix is included here.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs",
+          "line": 39,
+          "needle": "maxItems = 200",
+          "blob_sha": "9edb631268cedff9b682abe1cfee78f0d95a94b0"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs",
+          "line": 138,
+          "needle": "cells.Length is < 1 or > 200",
+          "blob_sha": "9edb631268cedff9b682abe1cfee78f0d95a94b0"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 68,
+          "needle": "request.Cells.Count is < 1 or > 128",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        }
+      ]
+    },
+    {
+      "id": "B03",
+      "classification": "CURRENT_CI_FAILURE",
+      "owners": [
+        "AR-001"
+      ],
+      "observation": "Registry exposes read_tool_output but the exact-name architecture guard omits it; existing CI fails at this guard.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Tools/NormalRuntimeToolRegistry.cs",
+          "line": 32,
+          "needle": "new(\"read_tool_output\"",
+          "blob_sha": "ae9a74e00cc0f477c41dee8d059bf1380f36c098"
+        },
+        {
+          "path": "experiments/H2AgentLab/V2ArchitectureTests.cs",
+          "line": 748,
+          "needle": "Canonical normal runtime registry preserves callable metadata",
+          "blob_sha": "de0aa8315dc9ce5d1def32295257c227be3d4c6d"
+        }
+      ]
+    },
+    {
+      "id": "B04",
+      "classification": "CURRENT_CAPABILITY_LIMITATION",
+      "owners": [
+        "AR-021"
+      ],
+      "observation": "Excel read operations fall back to a whole-session snapshot, not explicit range paging; cumulative UsedRange exceeds a 5000-cell bound.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs",
+          "line": 163,
+          "needle": "else result = await Client.SnapshotExcelAsync",
+          "blob_sha": "9edb631268cedff9b682abe1cfee78f0d95a94b0"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 10,
+          "needle": "MaxExcelCells = 5_000",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 369,
+          "needle": "rowCount * colCount + totalCells > MaxExcelCells",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        }
+      ]
+    },
+    {
+      "id": "B05",
+      "classification": "CURRENT_STATE_TOKEN_RISK",
+      "owners": [
+        "AR-020",
+        "AR-021"
+      ],
+      "observation": "Excel token basis includes active sheet and selection; Word token basis includes selection. UI movement and content revision are not separated.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 456,
+          "needle": "activeSheetName,\n            selectionAddress,\n            sheets",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 509,
+          "needle": "selectionStart,\n            selectionEnd,\n            selectionText,\n            paragraphs",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        }
+      ]
+    },
+    {
+      "id": "B06",
+      "classification": "CURRENT_PARTIAL_MUTATION_RISK",
+      "owners": [
+        "AR-022",
+        "AR-041"
+      ],
+      "observation": "Excel validates each cell address inside the mutating loop. A later invalid cell can follow an earlier applied write; no destructive live reproduction was performed.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 84,
+          "needle": "foreach (var patch in request.Cells)",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 86,
+          "needle": "ValidateSingleCellAddress(patch.Address)",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        },
+        {
+          "path": "experiments/H2AgentLab.OfficeHost/ComOfficeBackend.cs",
+          "line": 96,
+          "needle": "cell.Value2 = patch.Value",
+          "blob_sha": "67a027b4cccfd8d74a9b0fca83c1d11483fc99a1"
+        }
+      ]
+    },
+    {
+      "id": "B07",
+      "classification": "CURRENT_DIAGNOSTIC_LIMITATION",
+      "owners": [
+        "AR-011",
+        "AR-020"
+      ],
+      "observation": "Foreground Office enrichment has a three-second timeout and returns null on selected failures; execution OfficeHost timeout is sixty seconds.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Context.cs",
+          "line": 40,
+          "needle": "defaultTimeout: TimeSpan.FromSeconds(3)",
+          "blob_sha": "c29a8c15ddd73cb6c974c3e8973e28464b17be13"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Context.cs",
+          "line": 61,
+          "needle": "{ return null; }",
+          "blob_sha": "c29a8c15ddd73cb6c974c3e8973e28464b17be13"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2OfficeRuntimeTools.cs",
+          "line": 22,
+          "needle": "defaultTimeout: TimeSpan.FromSeconds(60)",
+          "blob_sha": "9edb631268cedff9b682abe1cfee78f0d95a94b0"
+        }
+      ]
+    },
+    {
+      "id": "B08",
+      "classification": "CURRENT_PRODUCTION_CONTEXT_GAP",
+      "owners": [
+        "AR-010",
+        "AR-050",
+        "AR-051",
+        "AR-052"
+      ],
+      "observation": "Lab uses LabSessionContextAdapter and RuntimeCompactionCoordinator; H2 builds a separate AgentContextInput and snapshots the last 32 turns. Shared primitives do not prove equal production compaction/full-wire budgeting.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Tasking/AgentOrchestratedRun.cs",
+          "line": 143,
+          "needle": "new LabSessionContextAdapter",
+          "blob_sha": "64a1d467f1608ad9f036dcdab9ddd4477163a17c"
+        },
+        {
+          "path": "experiments/H2AgentLab/Tasking/AgentOrchestratedRun.cs",
+          "line": 152,
+          "needle": "new RuntimeCompactionCoordinator",
+          "blob_sha": "64a1d467f1608ad9f036dcdab9ddd4477163a17c"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs",
+          "line": 344,
+          "needle": "new AgentContextInput",
+          "blob_sha": "4a2ec7757f9542137ed6ceb74c5426675ca7ada7"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.Context.cs",
+          "line": 25,
+          "needle": "TakeLast(32)",
+          "blob_sha": "c29a8c15ddd73cb6c974c3e8973e28464b17be13"
+        }
+      ]
+    },
+    {
+      "id": "B09",
+      "classification": "CURRENT_RECOVERY_LIMITATION",
+      "owners": [
+        "AR-031",
+        "AR-040",
+        "AR-041",
+        "AR-052"
+      ],
+      "observation": "Recent-task archive Load converts interrupted nonterminal records to Failed. Durable summaries/replay are not proof of resumable in-flight work or uncertain-write reconciliation.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs",
+          "line": 890,
+          "needle": "Agent task was interrupted when the previous H2 process ended.",
+          "blob_sha": "4a2ec7757f9542137ed6ceb74c5426675ca7ada7"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionAgentAdapter.cs",
+          "line": 888,
+          "needle": "Status = H2AgentTaskStatus.Failed",
+          "blob_sha": "4a2ec7757f9542137ed6ceb74c5426675ca7ada7"
+        }
+      ]
+    },
+    {
+      "id": "B10",
+      "classification": "CURRENT_CAPABILITY_LIMITATION",
+      "owners": [
+        "AR-060"
+      ],
+      "observation": "Production registers HTTP fetch/download/extract/metadata/feed only. Search and a real browser backend are deliberately not advertised without configuration.",
+      "evidence_level": "E0",
+      "live_reproduction": "NOT_RUN",
+      "anchors": [
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs",
+          "line": 27,
+          "needle": "new HttpWebResearchBackend(http)",
+          "blob_sha": "1a73d2b6bd33ef11934633790157ec36022ef058"
+        },
+        {
+          "path": "experiments/H2AgentLab/Integration/H2ProductionToolSession.Domains.cs",
+          "line": 32,
+          "needle": "[\"web.fetch\", \"web.download\", \"web.extract\", \"web.get_metadata\", \"web.read_feed\"]",
+          "blob_sha": "1a73d2b6bd33ef11934633790157ec36022ef058"
+        }
+      ]
+    }
+  ],
+  "baseline_ci": {
+    "id": 35687637186,
+    "head_sha": "1283bc13e07c3cd47d04886166de3dfc595422c0",
+    "url": "https://github.com/HoangHung997/NotePad/actions/runs/35687637186",
+    "conclusion": "failure",
+    "created_at": "2026-09-22T04:38:22Z",
+    "artifact_count": 0,
+    "steps": [
+      {
+        "job_id": 106617792240,
+        "number": 1,
+        "name": "Set up job",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 2,
+        "name": "Checkout",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 3,
+        "name": "Setup .NET 10",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 4,
+        "name": "Restore Avalonia solution",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 5,
+        "name": "Build Avalonia solution",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 6,
+        "name": "Run H2 Notes tests",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 7,
+        "name": "Run H2 NAS acceptance harness self-test",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 8,
+        "name": "Restore H2 Agent Lab DesktopHost",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 9,
+        "name": "Build H2 Agent Lab DesktopHost",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 10,
+        "name": "Run H2 Agent Lab DesktopHost safety self-tests",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 11,
+        "name": "Restore H2 Agent Lab OfficeHost",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 12,
+        "name": "Build H2 Agent Lab OfficeHost",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 13,
+        "name": "Restore H2 Agent Lab",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 14,
+        "name": "Build H2 Agent Lab",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 15,
+        "name": "Run H2 Agent Lab v1 self-test",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 16,
+        "name": "Run H2 Agent Lab v2 architecture guard",
+        "conclusion": "failure"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 17,
+        "name": "Run H2 Agent Lab v2 metrics tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 18,
+        "name": "Run H2 Agent Lab initial A B baseline",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 19,
+        "name": "Run H2 Agent Lab v2 session context tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 20,
+        "name": "Run H2 Agent Lab v2 artifact store tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 21,
+        "name": "Run H2 Agent Lab v2 compaction tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 22,
+        "name": "Run H2 Agent Lab v2 context cache acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 23,
+        "name": "Run H2 Agent Lab v2 orchestrator tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 24,
+        "name": "Run H2 Agent Lab v2 tool registry tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 25,
+        "name": "Run H2 Agent Lab v2 verification gate tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 26,
+        "name": "Run H2 Agent Lab v2 closed file acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 27,
+        "name": "Run H2 Agent Lab v2 Phase 10 acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 28,
+        "name": "Run H2 Agent Lab v2 Phase 11 acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 29,
+        "name": "Run H2 Agent Lab v2 extensibility refinement tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 30,
+        "name": "Run H2 Agent MB-10 runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 31,
+        "name": "Run H2 Agent MB-11 orchestrator runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 32,
+        "name": "Run H2 Agent MB-12 provider runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 33,
+        "name": "Run H2 Agent MB-20 bounded context tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 34,
+        "name": "Run H2 Agent MB-21 runtime compaction tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 35,
+        "name": "Run H2 Agent MB-22 prompt cache runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 36,
+        "name": "Run H2 Agent MB-30 initial tool exposure tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 37,
+        "name": "Run H2 Agent MB-31 ToolRegistry execution tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 38,
+        "name": "Run H2 Agent MB-32 deferred tool loading tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 39,
+        "name": "Run H2 Agent MB-33 scheduler runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 40,
+        "name": "Run H2 Agent MB-40 permission runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 41,
+        "name": "Run H2 Agent MB-41 evidence runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 42,
+        "name": "Run H2 Agent MB-42 verification runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 43,
+        "name": "Run H2 Agent MB-43 bounded repair runtime tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 44,
+        "name": "Run H2 Agent MB-44 host completion gate tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 45,
+        "name": "Run H2 Agent MB-50 canonical SkillCatalog tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 46,
+        "name": "Run H2 Agent MB-51 Codex-style skill discovery tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 47,
+        "name": "Run H2 Agent MB-52 progressive skill loading tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 48,
+        "name": "Run H2 Agent MB-60 extension registration tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 49,
+        "name": "Run H2 Agent MB-61 generic tool preference tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 50,
+        "name": "Run H2 Agent MB-62 computer provider registration tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 51,
+        "name": "Run H2 Agent MB-63 first-party extension card tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 52,
+        "name": "Run H2 Agent MB-70 domain-neutral capability search tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 53,
+        "name": "Run H2 Agent MB-71 installed capability projection tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 54,
+        "name": "Run H2 Agent MB-72 available capability search tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 55,
+        "name": "Run H2 Agent MB-73 thin CapabilityResolver tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 56,
+        "name": "Run H2 Agent MB-74 runtime capability install tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 57,
+        "name": "Run H2 Agent MB-75 task capability pinning tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 58,
+        "name": "Run H2 Agent MB-80 minimal catalog source tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 59,
+        "name": "Run H2 Agent MB-81 package retriever boundary tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 60,
+        "name": "Run H2 Agent MB-82 end-to-end install-and-continue test",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 61,
+        "name": "Run H2 Agent MB-90 retire AgentRunner tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 62,
+        "name": "Run H2 Agent MB-91 retire AgentTools giant switch tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 63,
+        "name": "Run H2 Agent MB-92 retire V1 ToolRegistry adapter tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 64,
+        "name": "Run H2 Agent MB-93 retire duplicate SkillCatalog tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 65,
+        "name": "Run H2 Agent MB-94 retire ComputerTools tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 66,
+        "name": "Run H2 Agent MB-95 trace journal boundary tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 67,
+        "name": "Run H2 Agent MB-100 Minimum Bootable Agent acceptance corpus",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 68,
+        "name": "Run H2 Agent MB-101 fully V2 normal UI path acceptance",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 69,
+        "name": "Run H2 Agent MB-102 context boundedness gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 70,
+        "name": "Run H2 Agent MB-103 extension bus gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 71,
+        "name": "Run H2 Agent MB-104 permission and scope gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 72,
+        "name": "Run H2 Agent MB-105 core correctness gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 73,
+        "name": "Run H2 Agent MB-110 Office acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 74,
+        "name": "Run H2 Agent MB-111 Web freshness legal acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 75,
+        "name": "Run H2 Agent MB-112 Desktop computer-use acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 76,
+        "name": "Run H2 Agent MB-113 AutoCAD extension acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 77,
+        "name": "Run H2 Agent MB-114 MCP acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 78,
+        "name": "Run H2 Agent MB-115 plugin package lifecycle acceptance gate",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 79,
+        "name": "Run H2 Agent MB-120 final architecture report acceptance",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 80,
+        "name": "Run H2 Agent MB-121 public integration boundary acceptance",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 81,
+        "name": "Run H2 Agent Lab v2 DesktopHost acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 82,
+        "name": "Run H2 Agent Lab v2 OfficeHost acceptance tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 83,
+        "name": "Run H2 Agent Lab v2 transport contract tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 84,
+        "name": "Run H2 Agent Lab v2 Ollama transport tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 85,
+        "name": "Run H2 Agent Lab v2 Chat Completions transport tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 86,
+        "name": "Run H2 Agent Lab v2 OpenAI Responses HTTP transport tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 87,
+        "name": "Run H2 Agent Lab v2 OpenAI Responses WebSocket tests",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 88,
+        "name": "Run H2 Agent Lab v2 provider transport resilience matrix",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 89,
+        "name": "Publish self-contained Windows x64",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 90,
+        "name": "Verify packaged Agent helpers start and answer IPC",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 91,
+        "name": "Publish H2 NAS acceptance probe Windows x64",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 92,
+        "name": "Upload H2 NAS acceptance probe",
+        "conclusion": "failure"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 93,
+        "name": "Upload Avalonia portable build",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 185,
+        "name": "Post Setup .NET 10",
+        "conclusion": "skipped"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 186,
+        "name": "Post Checkout",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 106617792240,
+        "number": 187,
+        "name": "Complete job",
+        "conclusion": "success"
+      }
+    ],
+    "log_inspection": {
+      "job_id": 106617792240,
+      "source": "GitHub connector decoded job log inspected in this AR-000 session",
+      "h2_tests": {
+        "passed": 590,
+        "failed": 0
+      },
+      "solution_build": {
+        "warnings": 31,
+        "errors": 0
+      },
+      "desktop_safety": {
+        "passed": 4,
+        "failed": 0
+      },
+      "agent_v1": {
+        "passed": 18,
+        "failed": 0
+      },
+      "architecture_guard": {
+        "passed": 34,
+        "failed": 1
+      },
+      "failure": "Canonical normal runtime registry deleted or invented callable tools.",
+      "downstream_suites": "SKIPPED_AFTER_GUARD",
+      "publish": "NOT_RUN_NO_ARTIFACT",
+      "nas_self_test": "LOCAL_PROTOCOL_ONLY_NOT_E5"
+    }
+  },
+  "environment": {
+    "E0": "SOURCE_AND_CI_INVENTORY_CAPTURED",
+    "E1": "EXISTING_CI_PARTIAL_PASS_FULL_GUARD_FAIL",
+    "E2": "EXISTING_CONCRETE_BRIDGE_WITH_SCRIPTED_TRANSPORT_FIXTURES_NOT_NATIVE_ACCEPTANCE",
+    "E3": "NOT_RUN_AWAITING_ENVIRONMENT",
+    "E4": "NOT_RUN_AWAITING_ENVIRONMENT",
+    "E5": "DEFERRED_BY_USER_AR-083",
+    "configured_user_model": "NOT_INSPECTED_NOT_CHANGED",
+    "native_office_cad": "NOT_ACCESSIBLE_NOT_LAUNCHED",
+    "new_endpoints_credentials_external_messages": "NONE",
+    "model_budget_used": 0
+  },
+  "commands_for_AR001": [
+    "dotnet restore H2Notes.Avalonia.slnx",
+    "dotnet build H2Notes.Avalonia.slnx -c Release --no-restore",
+    "dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build",
+    "dotnet run --project experiments/H2AgentLab/H2AgentLab.csproj -c Release --no-build -- --v2-guard-test .artifacts/agent-reliability/AR-001/guard"
+  ],
+  "next_exact_action": "On existing branch feature/h2-agent-reliability-ar-000, first inspect git status --short --branch and fetch origin without reset; reconcile newer main/checkpoint/PR work, then run the v2 guard command recorded in this manifest to reproduce B03. Execute AR-001 only: canonical skill name, read_tool_output exact-set guard, shared Excel 128/129/200 verdict, RC-02 and full CI/publish smoke. Do not start paging/memory or create a duplicate branch.",
+  "previous_handoff_archived_not_active": "schema_version: 1\nspec_version: H2-AR-SPEC-1.0\nrepository: HoangHung997/NotePad\ncanonical_branch: main\nresearch_baseline_sha: ad8c1082e722546a997b4e78b687980d4766622f\nphase: NOT_STARTED\nactive_task: AR-000\nimplementation_status: NOT_STARTED\nacceptance_status: NOT_RUN\nimplementation_branch: NOT_ASSIGNED\nactive_pr: null\nowner_session: NOT_ASSIGNED\nlast_code_commit: null\nlast_validated_code_commit: null\nworking_tree: NOT_INSPECTED\nuncommitted_files: []\ncheckpoint_saved_at_utc: null\ncompleted_this_session: []\nremaining_in_active_task:\n  - Read current repository, spec, tracker and source report\n  - Resolve branch/HEAD/worker ownership and current CI\n  - Record actual baseline and next command without changing runtime\nlast_test_commands: []\nci_runs: []\nevidence_locations: []\nknown_failures: []\nexternal_blockers: []\ndeferred_acceptance:\n  - id: AR-083\n    status: DEFERRED_BY_USER\n    scope: Physical two-PC/NAS acceptance\n    blocks_independent_implementation: false\n    blocks_claim_of_certified_multi_pc: true\npending_user_decisions: []\nnext_exact_action: Read README and git status/branches, then reconcile AR-000 baseline\nnext_task_if_active_done: AR-001",
+  "historical_gates_unchanged": [
+    "MB-124",
+    "MB-125",
+    "MB-126",
+    "MB-127",
+    "H2M-133F",
+    "H2M-133G..K",
+    "H2-NONAI-001/004/006",
+    "AR-083"
+  ]
+}

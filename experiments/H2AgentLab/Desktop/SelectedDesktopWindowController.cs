@@ -62,8 +62,36 @@ public static class DesktopHostLocator
     public static DesktopHostClient CreateClient()
         => new(ResolveExecutable());
 
+    public static DesktopHostClient CreateClientForApplicationLifecycle()
+    {
+        try
+        {
+            return CreateClient();
+        }
+        catch (global::H2AgentLab.AgentFaultException ex) when (ex.Code == "unavailable")
+        {
+            throw AppPreflightUnavailable();
+        }
+        catch (Exception ex) when (
+            ex is FileNotFoundException
+                or ArgumentException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+        {
+            throw AppPreflightUnavailable();
+        }
+
+        static global::H2AgentLab.AgentFaultException AppPreflightUnavailable()
+            => new(
+                "app_preflight_unavailable",
+                "DesktopHost packaged helper is incomplete or unavailable before application launch.",
+                false);
+    }
+
     private static bool CompleteHelper(string path)
-        => File.Exists(path) && File.Exists(Path.ChangeExtension(path, ".dll"))
+        => File.Exists(path)
+            && File.Exists(Path.ChangeExtension(path, ".dll"))
+            && File.Exists(Path.ChangeExtension(path, ".deps.json"))
             && File.Exists(Path.ChangeExtension(path, ".runtimeconfig.json"));
 }
 
@@ -77,6 +105,7 @@ public sealed class SelectedDesktopWindowController : IDisposable
     private readonly DesktopHostClient _client;
     private readonly bool _ownsClient;
     private DesktopWindowInfo _target;
+    private readonly DesktopWindowInfo _boundTarget;
     private DesktopObservation? _observation;
     private DateTime _observedUtc;
     private bool _disposed;
@@ -94,6 +123,7 @@ public sealed class SelectedDesktopWindowController : IDisposable
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _target = target ?? throw new ArgumentNullException(nameof(target));
+        _boundTarget = target;
         _ownsClient = ownsClient;
     }
 
@@ -130,9 +160,11 @@ public sealed class SelectedDesktopWindowController : IDisposable
 
         try
         {
+            await ValidateDispatchTargetAsync(cancellationToken).ConfigureAwait(false);
             var observation = await _client.ObserveAsync(
                 _target.SessionId,
                 cancellationToken).ConfigureAwait(false);
+            EnsureBoundTarget(observation.Window);
             _target = observation.Window;
             _observation = observation;
             _observedUtc = DateTime.UtcNow;
@@ -232,6 +264,7 @@ public sealed class SelectedDesktopWindowController : IDisposable
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await ValidateDispatchTargetAsync(cancellationToken).ConfigureAwait(false);
             var result = await _client.ActAsync(
                 new DesktopActionRequest(
                     _target.SessionId,
@@ -245,6 +278,7 @@ public sealed class SelectedDesktopWindowController : IDisposable
             var after = await _client.ObserveAsync(
                 _target.SessionId,
                 cancellationToken).ConfigureAwait(false);
+            EnsureBoundTarget(after.Window);
             DesktopEvidenceGate.EnsureMutationEvidence(result, after);
             _target = after.Window;
             _observation = null;
@@ -271,6 +305,27 @@ public sealed class SelectedDesktopWindowController : IDisposable
             _observation = null;
             throw Map(ex);
         }
+    }
+
+    public static bool SameTarget(DesktopWindowInfo bound, DesktopWindowInfo observed)
+        => bound.SessionId == observed.SessionId && bound.Handle == observed.Handle
+            && bound.ProcessId == observed.ProcessId && bound.ProcessStartedUtcTicks > 0
+            && bound.ProcessStartedUtcTicks == observed.ProcessStartedUtcTicks
+            && string.Equals(bound.ProcessName, observed.ProcessName, StringComparison.OrdinalIgnoreCase);
+
+    private async Task ValidateDispatchTargetAsync(CancellationToken ct)
+    {
+        var observed = await _client.ListWindowsAsync(ct).ConfigureAwait(false);
+        if (observed.Count(w => SameTarget(_boundTarget, w)) != 1)
+            throw new Tools.ToolPreflightException("stale_resource");
+    }
+
+    private void EnsureBoundTarget(DesktopWindowInfo current)
+    {
+        if (SameTarget(_boundTarget, current)) return;
+        _observation = null;
+        // Could be after a click/type; do not label this as no effect or permit automatic retry.
+        throw new IOException("Desktop response changed the bound window/session. Reconcile before another action.");
     }
 
     private string TargetLabel()

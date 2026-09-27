@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -19,6 +20,9 @@ public sealed class AgentApprovalPanel : Border
     public AgentApprovalPanel()
     {
         Name = "AgentApprovalPanel"; IsVisible = false;
+        AutomationProperties.SetName(this, "Yêu cầu xác nhận của Agent");
+        AutomationProperties.SetName(_approve, "Cho phép thay đổi này một lần");
+        AutomationProperties.SetName(_deny, "Từ chối thay đổi này");
         Background = Brush.Parse("#FFF4E8"); BorderBrush = Brush.Parse("#DEC3AA");
         BorderThickness = new Thickness(1); CornerRadius = new CornerRadius(6); Padding = new Thickness(10);
         Child = new StackPanel { Spacing = 6, Children = { _title,
@@ -34,6 +38,12 @@ public sealed class AgentApprovalPanel : Border
         IsVisible = approval is not null;
         _title.Text = approval?.Title ?? ""; _details.Text = approval?.Details ?? "";
         _approve.IsEnabled = _deny.IsEnabled = approval is not null;
+        if (approval is not null)
+        {
+            var label = "Cần xác nhận: " + approval.Title;
+            AutomationProperties.SetName(this, label);
+            ToolTip.SetTip(this, label + " · tạo lúc " + approval.CreatedUtc.ToLocalTime().ToString("HH:mm:ss"));
+        }
     }
 
     private void Respond(bool approved)
@@ -43,9 +53,9 @@ public sealed class AgentApprovalPanel : Border
         try
         {
             if (_adapter.RespondToApproval(_taskId, id, approved)) IsVisible = false;
-            else { _title.Text = "Yêu cầu xác nhận này không còn hiệu lực."; _approvalId = null; }
+            else { _title.Text = "Yêu cầu xác nhận này không còn hiệu lực."; AutomationProperties.SetName(this, _title.Text); _approvalId = null; }
         }
         catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException)
-        { _title.Text = ex.Message; _approvalId = null; }
+        { _title.Text = ex.Message; AutomationProperties.SetName(this, _title.Text); _approvalId = null; }
     }
 }
