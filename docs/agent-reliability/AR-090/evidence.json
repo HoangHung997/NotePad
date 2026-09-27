@@ -1,18 +1,21 @@
 {
   "task": "AR-090",
-  "source_sha": "9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b",
+  "source_sha": "dfa8c497dc65457ec13e906d2723637af21ee790",
   "status": {
     "audit": "PASS",
     "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
-    "mandatory_implementation_sequence": "COMPLETE",
     "project_complete_claim": false,
-    "multi_pc_claim": false,
     "E5": "DEFERRED_BY_USER",
-    "native_e4_pass_claim": false
+    "ar071_selected": true,
+    "ar071_e3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "ar072_selected": false,
+    "native_e4_pass_claim": false,
+    "multi_pc_claim": false
   },
   "tests": {
     "focused": "7/7",
     "retained": {
+      "AR-071": "6/6",
       "AR-082": "5/5",
       "AR-081": "6/6",
       "AR-080": "4/4",
@@ -21,55 +24,55 @@
       "AR-062": "6/6",
       "AR-060": "6/6"
     },
-    "full_h2": "1370/1370",
+    "full_h2": "1376/1376",
     "required_agent_suites": "75/75",
-    "exact_sha_workflows": "26/26 SUCCESS"
+    "exact_sha_workflows": "27/27 SUCCESS"
   },
   "runs": {
     "ar090": {
-      "run_id": 36275926048,
-      "job_id": 108498548362,
-      "result": "SUCCESS"
+      "run_id": 36291545249,
+      "authoritative_job_id": 108545502738,
+      "result": "SUCCESS",
+      "note": "First attempt job 108542472849 had one H2M-111 timeout. The same SHA passed H2M-111 in AR-052, AR-061 and AR-041; same-SHA AR-090 rerun passed without runtime/test changes."
     },
     "avalonia_ci": {
-      "run_id": 36275926014,
-      "job_id": 108498733688,
+      "run_id": 36291545016,
+      "job_id": 108542491027,
       "result": "SUCCESS"
     }
   },
   "artifacts": {
-    "evidence": {
-      "id": 10917498062,
-      "bytes": 431017,
-      "sha256": "7f90679135bbd140ec25ce08fda75195b6822061990770130e492e7192bfff55",
-      "expires_at_utc": "2026-10-26T22:36:44Z",
-      "zip_entries": 651,
+    "final_audit": {
+      "id": 10922791996,
+      "bytes": 431753,
+      "sha256": "97213a577206c9cc9ce7a878aa5c6b3f87d463800c57ac619e63814f472ce60f",
+      "expires_at_utc": "2026-10-27T04:00:55Z",
+      "zip_entries": 652,
       "zip_integrity": "PASS"
     },
     "portable": {
-      "id": 10917512842,
-      "bytes": 175483034,
-      "sha256": "7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c",
-      "expires_at_utc": "2026-12-25T22:20:02Z",
+      "id": 10922488662,
+      "bytes": 175504090,
+      "sha256": "c68722b4244077b3feb2d7ba45046fffaf8e392ea7a50f44e6694e1200dacf32",
+      "expires_at_utc": "2026-12-26T03:29:20Z",
       "zip_entries": 2970,
       "zip_integrity": "PASS",
       "manifest_files": 2969,
-      "manifest_total_bytes": 415193548,
-      "manifest_content_sha256": "acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348",
-      "manifest_file_hashes_verified": true
+      "manifest_total_bytes": 415263768,
+      "manifest_content_sha256": "ed5946840372fba3c8c4d8b0dab4299f940b18d3b25a1b71cb9cb074dc0e6541",
+      "manifest_all_file_hashes_verified": true,
+      "required_executables": [
+        "H2Notes.Avalonia.exe",
+        "H2AgentLab.DesktopHost.exe",
+        "H2AgentLab.OfficeHost.exe"
+      ]
     }
-  },
-  "remaining_acceptance": {
-    "AR083": "DEFERRED_BY_USER / E5 NOT PASSED",
-    "optional": [
-      "AR-071 NOT_SELECTED",
-      "AR-072 NOT_SELECTED"
-    ],
-    "native_live": "Remain deferred/awaiting environment per owning AR"
   },
   "safety": {
     "personal_documents_accessed": false,
     "credentials_accessed": false,
-    "external_side_effects": "none"
+    "external_side_effects": "none",
+    "project_complete_claim": false,
+    "physical_two_pc_nas_certified": false
   }
 }

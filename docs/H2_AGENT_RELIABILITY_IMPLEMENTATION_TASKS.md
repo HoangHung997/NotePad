@@ -680,71 +680,78 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-090_FINAL_HANDOFF_REVALIDATION_ACTIVE",
-  "active_task": "AR-090",
+  "phase": "AR-090_FINAL_HANDOFF_REVALIDATED",
+  "active_task": null,
   "parked_task": "AR-083",
-  "implementation_status": "AR-090_REVALIDATION_ACTIVE",
-  "acceptance_status": "AR-090_REVALIDATION_IN_PROGRESS__AR071_E3_DEFERRED__AR083_E5_DEFERRED",
-  "completed_evidence_level": "E2",
-  "required_evidence_level": "AR-090 final handoff must be revalidated after selected AR-071; AR-071 real third-party app/version E3 remains deferred; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
+  "implementation_status": "AR-090_FINAL_AUDIT_COMPLETE",
+  "acceptance_status": "IMPLEMENTATION_READY_FOR_USER_TEST__AR071_E3_DEFERRED__AR083_E5_DEFERRED",
+  "completed_evidence_level": "E2 plus clean-runner portable E3 where AR-082 explicitly claims it; no promotion of deferred native/live acceptance",
+  "required_evidence_level": "AR-071 real third-party app/version E3 remains deferred; native/live provider E3/E4 debts remain as tracked; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "d414490715b5c88bc8e67dcfdc072672c1a474e0",
+  "validated_code_sha": "dfa8c497dc65457ec13e906d2723637af21ee790",
   "implementation_commits": [
-    "83363410e5d8a3d000a3e72f3046cbfaa5aa2508 feat(AR-071): add task-local adapter trial environment",
-    "d414490715b5c88bc8e67dcfdc072672c1a474e0 test(AR-071): validate AR-070 through Agent suite"
+    "dfa8c497dc65457ec13e906d2723637af21ee790 fix(AR-090): audit completed optional AR-071"
   ],
-  "last_validation_result": "AR071 6/6; retained AR064 77/77, AR082 5/5, AR042 6/6, AR041 6/6; full H2 1376/1376; 75/75 required Agent suites PASS. Dedicated AR071 run 36287350092 SUCCESS; Avalonia CI 36287350090 SUCCESS; all 27/27 exact-SHA workflows SUCCESS. Same-SHA AR090 audit run 36287350013 SUCCESS, but final report remains stale until next turn by one-task rule.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at d4144907; AR071 validation artifact reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-27T02:21:07Z",
-  "handoff_label": "AR-090_REVALIDATION_ACTIVE__NO_PROJECT_COMPLETE_CLAIM",
+  "last_validation_result": "AR090 focused 7/7; retained AR071 6/6, AR082 5/5, AR081 6/6, AR080 4/4, AR042 6/6, AR041 6/6, AR062 6/6, AR060 6/6; full H2 1376/1376; 75/75 required Agent suites PASS. Same-SHA AR090 rerun run 36291545249 job 108545502738 SUCCESS after first-attempt one-off H2M-111 timeout. Avalonia CI 36291545016 job 108542491027 SUCCESS with clean-profile portable verification, helper IPC and artifact upload. All 27/27 workflow identities on exact code SHA SUCCESS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at dfa8c497; final AR090 evidence reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-27T04:00:55Z",
+  "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
   "project_complete_claim": false,
-  "user_decision": "Standing instruction authorized required decisions to proceed, so optional AR-071 was selected. User requires complete portable before personal testing. AR-071 real external/native E3 remains DEFERRED_BY_USER; AR-072 remains NOT_SELECTED; AR-083 E5 remains DEFERRED_BY_USER.",
+  "user_decision": "Standing instruction permits required implementation decisions, but user requires complete portable before personal testing. Optional AR-071 was selected/implemented earlier; AR-071 native E3 remains DEFERRED_BY_USER. AR-072 remains NOT_SELECTED. AR-083 E5 remains explicitly DEFERRED_BY_USER.",
   "completed_this_session": [
-    "Reconciled repository truth and continued the actual active AR-071 rather than stale AR-042 context.",
-    "Validated task-local PluginManager staging with no automatic/global promotion and no second plugin catalog.",
-    "Validated SafeWorkspace input copy, hash-only diff/readback, package hash/self-test failure, scope escape rejection, execution rollback and stable-version preservation.",
-    "Validated capability probe on every run and cache reuse only under exact archive/host/dependency/fingerprint identity; app-version change invalidates reuse.",
-    "Validated exact code SHA d4144907 with focused 6/6, full H2 1376/1376, 75/75 Agent suites and 27/27 workflows SUCCESS.",
-    "Downloaded and independently verified AR071 evidence ZIP, AR090 rerun evidence ZIP and final full-CI portable/manifest."
+    "Reconciled repository truth and continued actual active AR-090 instead of stale AR-042 context.",
+    "Diagnosed first AR-090 attempt failure as one H2M-111 timeout; same exact SHA passed H2M-111 in AR-052, AR-061 and AR-041 full-H2 runs.",
+    "Reran AR-090 on the same SHA without runtime changes; rerun passed focused audit, retained gates, full H2 1376/1376 and 75/75 Agent suites.",
+    "Confirmed all 27/27 pull-request workflow identities on exact code SHA completed SUCCESS.",
+    "Downloaded final full-CI portable artifact and independently verified ZIP CRC, required executables, exact source SHA and every manifest file size/SHA256.",
+    "Recomputed portable manifest canonical contentSha256 and matched the embedded manifest."
   ],
-  "remaining_in_active_task": [
-    "Native E3: trial an authorized adapter against a real third-party application/version using disposable/copied resources only.",
-    "Confirm host/version/API and dependency pins, capability probe, cache invalidation, scope containment and independent readback on the real environment.",
-    "Do not modify installed executable/service or auto-promote the trial. Promotion would require a separate explicit decision and regression gate."
+  "remaining_acceptance_debt": [
+    "AR-071 real third-party application/version E3 remains DEFERRED_BY_USER / AWAITING_ENVIRONMENT.",
+    "Native Office/CAD/desktop/model/search/browser and long-duration live E3/E4 cases remain deferred where their tracker rows say so.",
+    "AR-083 physical two-PC/NAS acceptance remains DEFERRED_BY_USER; E5 is not passed.",
+    "AR-072 remains NOT_SELECTED and is not silently started."
   ],
   "evidence_locations": [
-    "docs/agent-reliability/AR-071/implementation.md",
-    "docs/agent-reliability/AR-071/evidence.json",
-    "docs/agent-reliability/AR-071/native-acceptance.md",
-    "GitHub artifact 10921670809 AR071-E1-E2-Evidence",
-    "GitHub artifact 10921366935 H2Notes-Avalonia-Portable-win-x64",
-    "GitHub artifact 10921111894 AR090-Final-Handoff-Evidence same-SHA rerun"
+    "docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md",
+    "docs/agent-reliability/AR-090/evidence.json",
+    "GitHub artifact 10922791996 AR090-Final-Handoff-Evidence",
+    "GitHub artifact 10922488662 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10921366935,
-    "bytes": 175503382,
-    "sha256": "c229823a34a7af2e57a8ce8759c5748da0ae3a3937ee06cd64608f7ab723149b",
-    "expires_at_utc": "2026-12-26T02:02:47Z",
-    "source_sha": "d414490715b5c88bc8e67dcfdc072672c1a474e0",
+    "artifact_id": 10922488662,
+    "bytes": 175504090,
+    "sha256": "c68722b4244077b3feb2d7ba45046fffaf8e392ea7a50f44e6694e1200dacf32",
+    "expires_at_utc": "2026-12-26T03:29:20Z",
+    "source_sha": "dfa8c497dc65457ec13e906d2723637af21ee790",
     "zip_entries": 2970,
     "manifest_files": 2969,
     "manifest_total_bytes": 415263768,
-    "manifest_content_sha256": "41c02f0cd3a41e5f27fe7cf176afbb90ed0484fdd79efd2834012cbc73a9365e",
-    "local_verification": "Downloaded through GitHub connector; ZIP CRC test PASS; three required EXEs present; embedded manifest source SHA exact; all 2969 manifest file sizes/SHA256 verified with zero mismatches."
+    "manifest_content_sha256": "ed5946840372fba3c8c4d8b0dab4299f940b18d3b25a1b71cb9cb074dc0e6541",
+    "local_verification": "Downloaded through GitHub connector; ZIP CRC PASS; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present; embedded source SHA exact; 2969/2969 manifest file sizes and SHA256 matched; canonical manifest contentSha256 recomputed and matched."
+  },
+  "final_audit_evidence": {
+    "artifact_id": 10922791996,
+    "bytes": 431753,
+    "sha256": "97213a577206c9cc9ce7a878aa5c6b3f87d463800c57ac619e63814f472ce60f",
+    "expires_at_utc": "2026-10-27T04:00:55Z",
+    "zip_entries": 652,
+    "zip_integrity": "PASS",
+    "audit": "PASS",
+    "clean_end": true
   },
   "safety_claims": {
-    "auto_promotion": false,
-    "second_catalog": false,
-    "installed_executable_modified": false,
-    "external_service_modified": false,
+    "project_complete_claim": false,
+    "multi_pc_claim": false,
+    "native_e4_pass_claim": false,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Complete exactly AR-090 final handoff revalidation: include selected AR-071 in retained audit, resolve any same-SHA CI anomaly, verify current portable, then reissue final report. Do not start AR-072 or AR-083.",
-  "next_task_if_active_done": "AR-090 only in the next turn. AR-072 remains NOT_SELECTED; AR-083 remains DEFERRED_BY_USER."
+  "next_exact_action": "User may test the final AR-090 portable on the intended Windows machine. If a regression appears, reopen the owning AR task before new scope. Do not start AR-072 or AR-083 unless the user explicitly selects/starts them.",
+  "next_task_if_active_done": "No additional selected implementation task. AR-072 remains NOT_SELECTED; AR-083 remains DEFERRED_BY_USER."
 }
 ```
 

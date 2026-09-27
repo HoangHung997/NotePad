@@ -1,24 +1,28 @@
 # H2 Agent Reliability — Final Handoff
 
-Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 revalidation after selected AR-071.
+Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 post-AR-071 revalidation complete.
 
-> The user explicitly selected optional AR-071 after the AR-090 audit. This report remains exact provenance for the validated AR-090 SHA below, but it is no longer the current code handoff. Re-run AR-090 after AR-071 before issuing a new final handoff.
+This is the current implementation handoff for the validated code SHA below. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
 
-This report carries **IMPLEMENTATION_READY_FOR_USER_TEST** only after the post-AR-071 AR-090 gate succeeds. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
-
-- AR-090 validated code SHA: `PENDING_THIS_GATE`
-- AR-090 final portable artifact: `PENDING_THIS_GATE`
-- Final portable SHA256: `PENDING_THIS_GATE`
-- Final portable ZIP entries: `PENDING_THIS_GATE`
-- Final manifest inventory: `PENDING_THIS_GATE`
-- Final manifest content SHA256: `PENDING_THIS_GATE`
+- AR-090 validated code SHA: `dfa8c497dc65457ec13e906d2723637af21ee790`
+- AR-090 final audit run/job: `36291545249 / 108545502738` — **SUCCESS**
+- AR-090 final evidence artifact: `10922791996`
+- AR-090 final evidence SHA256: `97213a577206c9cc9ce7a878aa5c6b3f87d463800c57ac619e63814f472ce60f`
+- Full Avalonia CI run/job: `36291545016 / 108542491027` — **SUCCESS**
+- AR-090 final portable artifact: `10922488662`
+- Final portable SHA256: `c68722b4244077b3feb2d7ba45046fffaf8e392ea7a50f44e6694e1200dacf32`
+- Final portable ZIP entries: `2970`
+- Final manifest inventory: `2969 files / 415263768 bytes`
+- Final manifest content SHA256: `ed5946840372fba3c8c4d8b0dab4299f940b18d3b25a1b71cb9cb074dc0e6541`
 - Pre-AR-090 validated code SHA: `2f3a0c995307ee4615ceb647ff66322a795fc90f`
 - Pre-AR-090 full-CI portable artifact: `10917395115`
 - Pre-AR-090 portable SHA256: `7cdbbaf684f49aeb57288cfe75e1553f3795eadf5cd07c7047cace7e246521b6`
 
+The first AR-090 attempt on the same code SHA had one H2M-111 timeout. That same H2M-111 case passed on the exact SHA in AR-052, AR-061 and AR-041 full-H2 runs. AR-090 was rerun without a runtime/test change and passed; the final rerun is authoritative.
+
 ## 1. Handoff state
 
-**Implementation state:** all mandatory implementation tasks through AR-082 have an implementation/evidence checkpoint. AR-090 is the final audit/handoff gate.
+**Implementation state:** all mandatory implementation tasks through AR-082 have an implementation/evidence checkpoint, optional selected AR-071 is implemented at E2, and the post-AR-071 AR-090 final audit is green.
 
 **Acceptance state:** not all native/live acceptance is complete. AR-083 physical two-PC/NAS is **DEFERRED_BY_USER** and **E5 NOT PASSED**. Native Office/CAD/desktop/model/search/browser and long-duration interactive E4/E3 cases remain deferred/awaiting environment where their tracker rows say so.
 
@@ -40,7 +44,7 @@ The canonical per-task wording remains the table in `docs/H2_AGENT_RELIABILITY_I
 | AR-080/081 | Implemented | Native/live-model/accessibility E4 debt remains |
 | AR-082 | Implemented | E3 PASS only for clean GitHub-hosted Windows runner profile; physical/native E4 deferred |
 | AR-083 | Harness/work can wait | **DEFERRED_BY_USER; E5 NOT PASSED** |
-| AR-090 | Audit/handoff gate PASS | **IMPLEMENTATION_READY_FOR_USER_TEST**; deferred acceptance below remains open |
+| AR-090 | Final audit/handoff revalidated | **IMPLEMENTATION_READY_FOR_USER_TEST**; deferred acceptance below remains open |
 
 ## 3. Capability matrix
 
@@ -59,6 +63,7 @@ The canonical per-task wording remains the table in `docs/H2_AGENT_RELIABILITY_I
 | Artifact generation/publish | DOCX/XLSX/PDF closed-path E1/E2 green | PDF content/layout and native recalculation/rendering not universally certified |
 | AutoCAD closed/live bridge | E1/E2 green | Real installed AutoCAD selection/undo/session E3/E4 deferred |
 | Plugin/provider lifecycle | E2 green | Trusted external/native provider E3 deferred |
+| Adapter trial environment | AR-071 E1/E2 green, task-local staging, no auto-promotion | Real third-party app/version E3 deferred |
 | OpenAI/Luna tool-call path | E2 wire/runtime green | Real credentialed E4 deferred |
 | UI reliability/performance | E1/E2 green | Native DPI/IME/screen-reader E4 deferred |
 | Portable package/preflight | E3 clean Windows runner profile | Physical clean machine/native providers not certified |
@@ -106,9 +111,10 @@ The 2026-09-19 `H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` is a historical MB-120 ba
 - AR-020/021/022/023/024: real/native Office environment acceptance remains deferred/awaiting environment as tracked.
 - AR-033/041/042: native completion/restart/concurrency scenarios remain deferred where labelled.
 - AR-051/052/060/061/062/063/064/065/066/067/068/069/070/080/081: live model/provider/native app E3/E4 combinations remain deferred where labelled.
+- AR-071: selected and implemented at E2; real external/native E3 remains **DEFERRED_BY_USER / AWAITING_ENVIRONMENT**.
+- AR-072 remains **NOT_SELECTED**.
 - AR-082 proves a fresh GitHub-hosted Windows runner profile only, not a separately supplied physical clean PC.
 - AR-083 physical two-PC/NAS acceptance remains **DEFERRED_BY_USER**.
-- AR-071 was selected and implemented at E2; its real external/native E3 remains deferred. AR-072 remains **NOT_SELECTED**.
 - There is no claim of universal model quality, OCR accuracy, pixel-perfect Word/PDF layout, generic COM/GUI exactly-once execution, distributed resource locking, or all third-party provider compatibility.
 
 ## 7. Reproduce the current source gate
@@ -124,24 +130,33 @@ dotnet run --project .\tests\H2Notes.Tests\H2Notes.Tests.csproj -c Release --no-
 .\tools\agent-reliability\validate_ar090.ps1
 ```
 
-Final AR-090 dedicated validation and full Avalonia CI succeeded on the same code SHA. The exact final artifact/digest/manifest values above are now authoritative for this handoff.
+Final AR-090 same-SHA rerun:
+- focused audit **7/7**;
+- retained AR-071 **6/6**, AR-082 **5/5**, AR-081 **6/6**, AR-080 **4/4**, AR-042 **6/6**, AR-041 **6/6**, AR-062 **6/6**, AR-060 **6/6**;
+- full H2 **1376/1376**;
+- required Agent suites **75/75**;
+- all **27/27** workflow identities on exact code SHA SUCCESS;
+- full Avalonia CI/publish/clean-profile verification/helper IPC SUCCESS.
 
 ## 8. Evidence retention
 
 - Canonical tracker/handoff: `docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_TASKS.md`
 - Canonical AR spec: `docs/H2_AGENT_RELIABILITY_IMPLEMENTATION_SPEC.md`
+- Current final handoff: `docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md`
+- Machine-readable final evidence: `docs/agent-reliability/AR-090/evidence.json`
 - Per-task evidence: `docs/agent-reliability/AR-*/`
-- Current final audit evidence: `docs/agent-reliability/AR-090/`
 - Historical MB architecture report remains retained, explicitly labelled historical.
-- GitHub Actions artifacts are time-limited; final handoff records artifact IDs, sizes, digests, source SHA and expiry.
+- Final audit artifact: `10922791996`, SHA256 `97213a577206c9cc9ce7a878aa5c6b3f87d463800c57ac619e63814f472ce60f`.
+- Final portable artifact: `10922488662`, SHA256 `c68722b4244077b3feb2d7ba45046fffaf8e392ea7a50f44e6694e1200dacf32`.
+- GitHub Actions artifacts are time-limited; IDs/digests/source SHA/expiry are recorded in tracker/evidence.
 
 ## 9. Handoff result
 
-AR-090 validation is green. The permitted handoff label is:
+AR-090 post-AR-071 validation is green. The permitted handoff label is:
 
 > **IMPLEMENTATION_READY_FOR_USER_TEST**
 
-It means the mandatory implementation sequence is built, regression-gated and packaged for the user’s deferred real-environment testing.
+It means the selected/mandatory implementation sequence is built, regression-gated and packaged for the user’s deferred real-environment testing.
 
 It does **not** mean:
 - PROJECT_COMPLETE,
@@ -156,4 +171,5 @@ It does **not** mean:
 2. Any observed regression reopens the owning AR task before new scope is added.
 3. Native/model/provider acceptance may be executed when the user is ready.
 4. AR-083 two-PC/NAS remains deferred until the user explicitly starts it.
-5. AR-071 is already selected/implemented at E2 with native E3 deferred. AR-072 remains unselected unless explicitly requested.
+5. AR-071 is selected/implemented at E2 with native E3 deferred.
+6. AR-072 remains unselected unless explicitly requested.
