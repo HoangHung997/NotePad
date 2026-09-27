@@ -106,7 +106,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER — final full-build real-environment test; NO_E4_PASS_CLAIM |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | USER_SELECTED / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no auto-promotion / no second catalog |
-| AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | USER_SELECTED / ACTIVE — deterministic H2 AgentRuntime vs frozen AgentRunner baseline; external engine NotTested; no production switch |
+| AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | USER_SELECTED / IMPLEMENTED / E1-E2_PASS / KEEP_CURRENT — frozen AgentRunner misses 7 mandatory mappings; external engine NotTested; no production switch |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final portable ready; no physical-clean-machine/native-provider/E4 claim |
@@ -550,7 +550,7 @@ The existing AR-090 audit workflow also reran on this exact code SHA and **SUCCE
 
 **Acceptance boundary / user decision:** real E3 with a real third-party application/version and an authorized compatibility adapter package is **DEFERRED_BY_USER / AWAITING_ENVIRONMENT** until final-build testing. E2 does not certify arbitrary external adapters or promotion safety in every native environment. Promotion, if ever desired, requires a separate explicit decision plus regression evidence. AR-072 remains NOT_SELECTED; AR-083 remains DEFERRED_BY_USER.
 
-### [ ] AR-072 — Thử backend/engine thay thế [CÓ ĐIỀU KIỆN]
+### [~] AR-072 — Thử backend/engine thay thế [CÓ ĐIỀU KIỆN]
 
 **AR-072 activation — 2026-09-27:** selected by the user's standing instruction that decisions required to continue may be treated as approved. Measurable question: whether an alternate engine can replace current H2 AgentRuntime while preserving mandatory TaskId/TurnId/GoalRevision/Job/Approval/Event/restart semantics. This turn uses frozen same-repository `AgentRunner` only as an E2 compatibility baseline; no external package/endpoint is installed or contacted. The prior AR-090 final handoff becomes provenance/stale until AR-072 is validated and AR-090 is reissued. AR-083 remains DEFERRED_BY_USER.
 
@@ -559,6 +559,16 @@ The existing AR-090 audit workflow also reran on this exact code SHA and **SUCCE
 **Làm:** so cùng dataset/task/permission bằng backend hiện tại và ứng viên; record adapter cost, dependencies/license, p50/p95/latency/error/completion; không claim nhãn “fork Codex” bằng chất lượng. Engine substitution phải giữ mapping task/revision/jobs/approvals/events.
 
 **Acceptance:** báo cáo đề nghị giữ/thay/thử tiếp có evidence; không auto-switch production, không hai engine cùng điều khiển task. Nếu không được giao thì giữ NOT_SELECTED_BY_USER và không block mục tiêu chính.
+
+**AR-072 implementation checkpoint — 2026-09-27 (UTC+7):** exact validated code SHA `5582e376c43ce7b4329ecf0e87a2261d0fb948c6`. The selected optional comparison uses one deterministic **read-only, no-external-side-effect** corpus to compare the current `H2ProductionAgentAdapter -> AgentRuntime` path against the frozen same-repository `AgentRunner` baseline. No external engine package, endpoint, credential or license was implicitly installed/contacted; the external candidate is explicitly `NotTested / NotEvaluated`.
+
+Both engines completed **20/20** benchmark iterations with zero corpus errors. Measured in-process control-plane latency was current H2 AgentRuntime p50 **190.230 ms**, p95 **207.617 ms**; frozen AgentRunner p50 **1.566 ms**, p95 **2.690 ms**. These timings do **not** measure model quality, network latency, native app reliability or external-engine quality. Replacement is rejected despite the candidate's lower control-plane latency because it misses **7/7 mandatory mappings** required by H2: TaskId, TurnId, GoalRevision, Jobs, Approvals, typed sequenced Events, and RestartResume. Adapter cost is therefore **High** and the evidence recommendation is **KEEP_CURRENT**.
+
+Dedicated AR-072 run `36296856593` / job `108557354501` **SUCCESS**: focused AR-072 **6/6**, retained AR-071 **6/6**, AR-090 **7/7**, AR-082 **5/5**, AR-080 **4/4**, AR-042 **6/6**, AR-041 **6/6**, full H2 **1382/1382**, and all **75** required Agent suites PASS. Evidence artifact `10924761397`, 433,293 bytes, SHA256 `e6f6262f6c6b3d8f92d9f834201ab4733bc7b645a70f165013195bf3da191d9c`, was independently downloaded; ZIP integrity passed across **651** entries and `validation.json` reports E1=PASS, E2=PASS, E3/E4=NOT_RUN, E5=DEFERRED_BY_USER, clean_end=true, production_switch=false, concurrent_planner_control=false and external_engine_claim=false.
+
+Full Avalonia CI `36296856547` / job `108557192819` **SUCCESS**, including full H2/Agent/MB/Office/Desktop/Web/CAD/MCP/plugin/transport gates, self-contained Windows x64 publish and packaged helper IPC. All **28/28** exact-SHA workflow identities completed SUCCESS, 0 failed. Final portable artifact `10924502338` is 175,503,614 bytes, SHA256 `8aa2475e5ee85b859857d446471fed1df11d64efeab4ef93d2adcb206c75a091`; ZIP integrity passed across **2970** entries, all three main EXEs are present, and independent manifest verification matched **2969/2969** file sizes/SHA256, total bytes **415,263,768**, source SHA exact, and canonical manifest content SHA256 `d707beb4963eb58581d717d4e018cda667c1b708220db520c4003d4e1a4b4eb6`.
+
+**Decision:** keep the current H2 AgentRuntime. Do not switch production and do not run two planners on the same task. A real external-engine trial remains **NotTested** until the user explicitly supplies/authorizes a candidate package/version/endpoint and its license/dependencies can be reviewed. The prior AR-090 final handoff remains intentionally stale; reissuing AR-090 is the **next task/turn**, not part of this AR-072 turn. AR-083 physical two-PC/NAS remains DEFERRED_BY_USER.
 
 ### [~] AR-080 — Corpus công việc dài, nhớ và restart qua production
 
@@ -682,78 +692,117 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-072_ALTERNATIVE_ENGINE_COMPARISON_ACTIVE",
-  "active_task": "AR-072",
-  "parked_task": "AR-090",
-  "implementation_status": "AR-072_ACTIVE",
-  "acceptance_status": "AR-072_NOT_RUN__AR083_E5_DEFERRED",
-  "completed_evidence_level": "E2 plus clean-runner portable E3 where AR-082 explicitly claims it; no promotion of deferred native/live acceptance",
-  "required_evidence_level": "AR-071 real third-party app/version E3 remains deferred; native/live provider E3/E4 debts remain as tracked; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
+  "phase": "AR-072_IMPLEMENTED_E1_E2_PASS_FINAL_BUILD_READY",
+  "active_task": null,
+  "parked_task": "AR-072",
+  "implementation_status": "IMPLEMENTED_SEQUENCE_COMPLETE",
+  "acceptance_status": "E1_E2_PASS__KEEP_CURRENT__EXTERNAL_ENGINE_NOT_TESTED",
+  "completed_evidence_level": "E2 deterministic same-corpus current-engine vs frozen-baseline comparison; no external-engine claim",
+  "required_evidence_level": "Next turn must reissue AR-090 final handoff against the AR-072-completed head. Native/live provider E3/E4 debts remain as tracked; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER.",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
-  "validated_code_sha": "dfa8c497dc65457ec13e906d2723637af21ee790",
+  "validated_code_sha": "5582e376c43ce7b4329ecf0e87a2261d0fb948c6",
   "implementation_commits": [
-    "dfa8c497dc65457ec13e906d2723637af21ee790 fix(AR-090): audit completed optional AR-071"
+    "c6ebdbd0a6773bdec828aa18f24c41036e403f5f test(AR-072): compare alternative engine compatibility",
+    "2056e4d808262f74538f73d8ccf2111f42913ad7 fix(AR-072): correct benchmark markdown literal",
+    "5582e376c43ce7b4329ecf0e87a2261d0fb948c6 docs(AR-072): mark prior final handoff stale"
   ],
-  "last_validation_result": "AR090 focused 7/7; retained AR071 6/6, AR082 5/5, AR081 6/6, AR080 4/4, AR042 6/6, AR041 6/6, AR062 6/6, AR060 6/6; full H2 1376/1376; 75/75 required Agent suites PASS. Same-SHA AR090 rerun run 36291545249 job 108545502738 SUCCESS after first-attempt one-off H2M-111 timeout. Avalonia CI 36291545016 job 108542491027 SUCCESS with clean-profile portable verification, helper IPC and artifact upload. All 27/27 workflow identities on exact code SHA SUCCESS.",
-  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at dfa8c497; final AR090 evidence reports clean_end=true. No reset/force-push/main merge.",
-  "checkpoint_evidence_at_utc": "2026-09-27T04:00:55Z",
-  "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
+  "last_validation_result": "AR072 6/6; benchmark 20/20 current and 20/20 frozen candidate with zero errors; candidate misses 7/7 mandatory mappings, adapter cost High, recommendation KEEP_CURRENT, external candidate NotTested. Retained AR071 6/6, AR090 7/7, AR082 5/5, AR080 4/4, AR042 6/6, AR041 6/6; full H2 1382/1382; 75/75 required Agent suites PASS. Dedicated run 36296856593 SUCCESS; Avalonia CI 36296856547 SUCCESS; all 28/28 exact-SHA workflow identities SUCCESS.",
+  "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 5582e376; AR072 validation artifact reports clean_end=true. No reset/force-push/main merge.",
+  "checkpoint_evidence_at_utc": "2026-09-27T05:37:11Z",
+  "handoff_label": "AR072_IMPLEMENTED_KEEP_CURRENT",
   "project_complete_claim": false,
-  "user_decision": "Standing instruction permits required implementation decisions, but user requires complete portable before personal testing. Optional AR-071 was selected/implemented earlier; AR-071 native E3 remains DEFERRED_BY_USER. AR-072 remains NOT_SELECTED. AR-083 E5 remains explicitly DEFERRED_BY_USER.",
+  "user_decision": "Standing instruction allowed selecting optional AR-072 so work could continue. User requires a complete portable before personal testing. External alternative engine remains NotTested because no explicit candidate package/version/endpoint was supplied. AR-083 remains DEFERRED_BY_USER.",
   "completed_this_session": [
-    "Reconciled repository truth and continued actual active AR-090 instead of stale AR-042 context.",
-    "Diagnosed first AR-090 attempt failure as one H2M-111 timeout; same exact SHA passed H2M-111 in AR-052, AR-061 and AR-041 full-H2 runs.",
-    "Reran AR-090 on the same SHA without runtime changes; rerun passed focused audit, retained gates, full H2 1376/1376 and 75/75 Agent suites.",
-    "Confirmed all 27/27 pull-request workflow identities on exact code SHA completed SUCCESS.",
-    "Downloaded final full-CI portable artifact and independently verified ZIP CRC, required executables, exact source SHA and every manifest file size/SHA256.",
-    "Recomputed portable manifest canonical contentSha256 and matched the embedded manifest."
+    "Reconciled GitHub truth and did not redo already-completed AR-042.",
+    "Compared the actual H2 production adapter/AgentRuntime path with the frozen same-repository AgentRunner baseline on the same deterministic read-only corpus.",
+    "Recorded p50/p95, errors/completions, dependencies/license scope, mandatory mapping parity and adapter-cost class.",
+    "Confirmed both baselines complete 20/20 direct-response iterations with zero errors, but AgentRunner misses all seven mandatory H2 task/revision/job/approval/event/restart mappings.",
+    "Confirmed production composition remains H2ProductionAgentAdapter and no production switch or concurrent planner control was requested.",
+    "Left any real external engine explicitly NotTested rather than installing/contacting an unapproved package/endpoint.",
+    "Validated exact SHA with focused/retained/full H2/Agent suites and 28/28 workflows SUCCESS.",
+    "Downloaded and independently verified AR072 evidence plus full portable ZIP, including all 2969 manifest file hashes and canonical manifest content hash."
   ],
   "remaining_acceptance_debt": [
+    "A real third-party alternative engine/package/version remains NotTested until explicitly authorized and its dependency/license/runtime mapping can be evaluated.",
     "AR-071 real third-party application/version E3 remains DEFERRED_BY_USER / AWAITING_ENVIRONMENT.",
     "Native Office/CAD/desktop/model/search/browser and long-duration live E3/E4 cases remain deferred where their tracker rows say so.",
     "AR-083 physical two-PC/NAS acceptance remains DEFERRED_BY_USER; E5 is not passed.",
-    "AR-072 remains NOT_SELECTED and is not silently started."
+    "AR-090 final handoff is intentionally stale after optional AR-072 activation and must be reissued in the next turn."
   ],
+  "ar072_comparison": {
+    "corpus_id": "ar072-direct-readonly-v1",
+    "iterations_per_engine": 20,
+    "permission": "read-only / no external side effects",
+    "current_engine": "H2 AgentRuntime / production adapter",
+    "current_p50_ms": 190.23,
+    "current_p95_ms": 207.617,
+    "current_completions": "20/20",
+    "current_errors": 0,
+    "candidate": "Frozen AgentRunner",
+    "candidate_p50_ms": 1.566,
+    "candidate_p95_ms": 2.69,
+    "candidate_completions": "20/20",
+    "candidate_errors": 0,
+    "candidate_missing_mandatory_mappings": 7,
+    "candidate_adapter_cost": "High",
+    "mandatory_mappings": [
+      "TaskId",
+      "TurnId",
+      "GoalRevision",
+      "Jobs",
+      "Approvals",
+      "Events",
+      "RestartResume"
+    ],
+    "external_candidate_status": "NotTested",
+    "recommendation": "KEEP_CURRENT",
+    "production_switch": false,
+    "concurrent_planner_control": false,
+    "model_quality_claim": false
+  },
   "evidence_locations": [
-    "docs/agent-reliability/AR-090/FINAL_HANDOFF_REPORT.md",
-    "docs/agent-reliability/AR-090/evidence.json",
-    "GitHub artifact 10922791996 AR090-Final-Handoff-Evidence",
-    "GitHub artifact 10922488662 H2Notes-Avalonia-Portable-win-x64"
+    "docs/agent-reliability/AR-072/implementation.md",
+    "docs/agent-reliability/AR-072/evidence.json",
+    "docs/agent-reliability/AR-072/comparison.md",
+    "GitHub artifact 10924761397 AR072-E1-E2-Comparison-Evidence",
+    "GitHub artifact 10924502338 H2Notes-Avalonia-Portable-win-x64"
   ],
   "downloadable_build": {
-    "artifact_id": 10922488662,
-    "bytes": 175504090,
-    "sha256": "c68722b4244077b3feb2d7ba45046fffaf8e392ea7a50f44e6694e1200dacf32",
-    "expires_at_utc": "2026-12-26T03:29:20Z",
-    "source_sha": "dfa8c497dc65457ec13e906d2723637af21ee790",
+    "artifact_id": 10924502338,
+    "bytes": 175503614,
+    "sha256": "8aa2475e5ee85b859857d446471fed1df11d64efeab4ef93d2adcb206c75a091",
+    "expires_at_utc": "2026-12-26T05:19:12Z",
+    "source_sha": "5582e376c43ce7b4329ecf0e87a2261d0fb948c6",
     "zip_entries": 2970,
     "manifest_files": 2969,
     "manifest_total_bytes": 415263768,
-    "manifest_content_sha256": "ed5946840372fba3c8c4d8b0dab4299f940b18d3b25a1b71cb9cb074dc0e6541",
+    "manifest_content_sha256": "d707beb4963eb58581d717d4e018cda667c1b708220db520c4003d4e1a4b4eb6",
     "local_verification": "Downloaded through GitHub connector; ZIP CRC PASS; H2Notes.Avalonia.exe, H2AgentLab.DesktopHost.exe and H2AgentLab.OfficeHost.exe present; embedded source SHA exact; 2969/2969 manifest file sizes and SHA256 matched; canonical manifest contentSha256 recomputed and matched."
   },
-  "final_audit_evidence": {
-    "artifact_id": 10922791996,
-    "bytes": 431753,
-    "sha256": "97213a577206c9cc9ce7a878aa5c6b3f87d463800c57ac619e63814f472ce60f",
-    "expires_at_utc": "2026-10-27T04:00:55Z",
-    "zip_entries": 652,
+  "comparison_evidence": {
+    "artifact_id": 10924761397,
+    "bytes": 433293,
+    "sha256": "e6f6262f6c6b3d8f92d9f834201ab4733bc7b645a70f165013195bf3da191d9c",
+    "expires_at_utc": "2026-10-11T05:35:56Z",
+    "zip_entries": 651,
     "zip_integrity": "PASS",
-    "audit": "PASS",
     "clean_end": true
   },
   "safety_claims": {
     "project_complete_claim": false,
+    "production_switch": false,
+    "concurrent_planner_control": false,
+    "external_engine_claim": false,
+    "model_quality_claim": false,
     "multi_pc_claim": false,
-    "native_e4_pass_claim": false,
     "personal_documents_accessed": false,
     "credentials_accessed": false,
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Complete exactly AR-072 deterministic same-corpus comparison, validate focused/retained/full CI and produce evidence/portable. Do not start AR-083.",
-  "next_task_if_active_done": "Reissue AR-090 final handoff in the next turn after AR-072 is complete. AR-083 remains DEFERRED_BY_USER."
+  "next_exact_action": "Next implementation turn: reissue AR-090 final handoff/audit against the AR-072-completed head and produce the resulting final portable/evidence. Do not start AR-083.",
+  "next_task_if_active_done": "AR-090 reissue is next. AR-083 remains DEFERRED_BY_USER."
 }
 ```
 
