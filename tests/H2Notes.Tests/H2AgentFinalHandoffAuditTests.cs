@@ -9,6 +9,8 @@ internal static class H2AgentFinalHandoffAuditTests
         var report=File.ReadAllText(Path.Combine(repo,"docs","agent-reliability","AR-090","FINAL_HANDOFF_REPORT.md"));
         var readme=File.ReadAllText(Path.Combine(repo,"README.md"));
         var historical=File.ReadAllText(Path.Combine(repo,"docs","H2_AGENT_FINAL_ARCHITECTURE_REPORT.md"));
+        var activeMatch=Regex.Match(tracker,"\\\"active_task\\\"\\s*:\\s*\\\"(?<id>AR-\\d{3})\\\"");
+        var activeTask=activeMatch.Success?activeMatch.Groups["id"].Value:null;
 
         test("AR-090 audit has no mandatory NOT_STARTED task before final handoff",()=>{
             var rows=tracker.Split('\n').Select(x=>x.Trim()).Where(x=>Regex.IsMatch(x,@"^\| AR-\d{3} \|")).ToArray();
@@ -17,7 +19,15 @@ internal static class H2AgentFinalHandoffAuditTests
             {
                 var cells=row.Split('|').Select(x=>x.Trim()).Where(x=>x.Length>0).ToArray();
                 var id=cells[0];var status=cells[^1];
-                if(id is "AR-071" or "AR-072"){Check(status.Contains("NOT_SELECTED",StringComparison.Ordinal),id+" optional status changed.");continue;}
+                if(id is "AR-071" or "AR-072")
+                {
+                    if(id==activeTask)
+                        Check(status.Contains("ACTIVE",StringComparison.Ordinal)||status.Contains("IMPLEMENTED",StringComparison.Ordinal),
+                            id+" is selected but tracker status is not active/implemented.");
+                    else
+                        Check(status.Contains("NOT_SELECTED",StringComparison.Ordinal),id+" optional status changed without selection.");
+                    continue;
+                }
                 if(id=="AR-083"){Check(status.Contains("DEFERRED_BY_USER",StringComparison.Ordinal),"AR-083 lost deferred status.");continue;}
                 if(id=="AR-090"){Check(status.Contains("ACTIVE",StringComparison.Ordinal)||status.Contains("IMPLEMENTED",StringComparison.Ordinal),"AR-090 is neither active nor implemented.");continue;}
                 Check(!status.Contains("NOT_STARTED",StringComparison.Ordinal),id+" is still mandatory NOT_STARTED.");
@@ -25,6 +35,10 @@ internal static class H2AgentFinalHandoffAuditTests
         });
 
         test("AR-090 handoff makes deferred acceptance impossible to mistake for project completion",()=>{
+            if(activeTask is "AR-071" or "AR-072")
+                Check(report.Contains("STALE_AFTER_OPTIONAL_TASK_ACTIVATION",StringComparison.Ordinal)
+                    && report.Contains(activeTask,StringComparison.Ordinal),
+                    "Prior final handoff was not marked stale after optional task activation.");
             foreach(var required in new[]{"IMPLEMENTATION_READY_FOR_USER_TEST","AR-083","DEFERRED_BY_USER","E5 NOT PASSED",
                 "not “project complete”","native Office","live AutoCAD","NOT_SELECTED"})
                 Check(report.Contains(required,StringComparison.OrdinalIgnoreCase),"Final handoff missing limitation/status: "+required);

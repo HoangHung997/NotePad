@@ -723,6 +723,7 @@ H2AgentRequestBudgetTests.Run(Test);
 H2AgentWorkCompactionTests.Run(Test);
 H2AgentLongWorkProductionCorpusTests.Run(Test);
 H2AgentPluginLifecycleTests.Run(Test);
+H2AdapterTrialTests.Run(Test);
 H2ProductAcceptanceScenarioTests.Run(Test);
 H2AutoCadLiveBridgeTests.Run(Test);
 H2LegacyCleanupTests.Run(Test);

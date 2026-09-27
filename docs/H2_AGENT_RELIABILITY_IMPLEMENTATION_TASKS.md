@@ -105,7 +105,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-068 | Command Center attention collapse + acknowledgement | 032/033 | E2/E4 UI | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E2_PASS / E4_DEFERRED_BY_USER — test on final full build; no E4 PASS claim |
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER — final full-build real-environment test; NO_E4_PASS_CLAIM |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
-| AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | NOT_SELECTED |
+| AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | USER_SELECTED / ACTIVE — task-local PluginManager staging + environment probe/cache/readback; no auto-promotion |
 | AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
@@ -526,7 +526,7 @@ Full Avalonia CI `36254640513` / job `108438987210` **SUCCESS**, including full 
 
 **AR-070 implementation checkpoint — 2026-09-24:** core recovery policy implemented on exact source `566f634318192cf52699951ab4f55edd53a0d488`. Dedicated run `35957798526` / job `107500242184` SUCCESS: focused recovery-policy **5/5**, retained AR-020 **36/36**, AR-033 **42/42**, AR-066 **134/134**, AR-067 **3/3**, full H2 **1270/1270**, Agent **75/75**. Evidence artifact `10791402941`, SHA256 `1e6ba76db8fcbd2ad5b0e1856d0820495635f18fdf3f098820cdf0e1ff92a626`, independently downloaded/hashed/inspected: `failed=[]`, `clean_end=true`, E3/E4 both `DEFERRED_BY_USER`, no E3/E4 PASS claim. All ten pull_request workflows on the same source are SUCCESS; Avalonia CI `35957801240` / job `107499719591` includes full H2, the required AR-070 suite, Windows x64 publish and packaged-helper IPC. Portable artifact `10791113510` SHA256 `98f7f901adbf9f4697e89cb2d89ba43168a23790fbcf5676e4d1a32a55a84c25`; NAS probe `10790909138` SHA256 `0df8cb203eb7e5d4b2df31c0f5853056b84f7ac1020fb5f9d58e12094e6ca790`. The implementation blocks blind same-input transient retry without changed evidence, preserves same live/source identity, exposes bounded provider health/reobserve/backoff/alternate-backend choices, allows corrected arguments and fresh-state recovery, and leaves unknown/partial effects in reconcile-only handling. **AR-041/060/061 remain separate unfinished dependencies; real search/desktop/provider/model E3/E4 is deferred to final full-build testing and is not claimed passed.**
 
-### [ ] AR-071 — Adapter thử theo environment [CÓ ĐIỀU KIỆN]
+### [~] AR-071 — Adapter thử theo environment [CÓ ĐIỀU KIỆN]
 
 **Kích hoạt:** người dùng duyệt hoặc một gap compatibility đã chứng minh yêu cầu adapter thử; ghi lý do trong tracker. Không phải blocker mặc định cho release cơ bản.
 
@@ -535,6 +535,8 @@ Full Avalonia CI `36254640513` / job `108438987210` **SUCCESS**, including full 
 **Test:** script cố đọc ngoài scope, package hash đổi, adapter cũ sau version app đổi, fail self-test, rollback. Không sửa executable đã cài/service bên ngoài.
 
 **Acceptance:** thích ứng không làm hỏng bản ổn định; reuse cache cần capability probe; chưa có nhu cầu giữ NOT_SELECTED_BY_USER, không xây hệ plugin catalog thứ hai.
+
+**AR-071 activation — 2026-09-27:** selected by the user through the standing instruction that required decisions may be treated as approved so work can continue. The prior AR-090 final handoff is now provenance-only/stale until AR-071 is validated and AR-090 is rerun. AR-072 remains NOT_SELECTED and AR-083 remains DEFERRED_BY_USER.
 
 ### [ ] AR-072 — Thử backend/engine thay thế [CÓ ĐIỀU KIỆN]
 
@@ -666,11 +668,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-090_FINAL_AUDIT_PASS__IMPLEMENTATION_READY_FOR_USER_TEST",
-  "active_task": null,
+  "phase": "AR-071_ADAPTER_TRIAL_ACTIVE__PRIOR_AR090_STALE",
+  "active_task": "AR-071",
   "parked_task": "AR-083",
-  "implementation_status": "MANDATORY_IMPLEMENTATION_SEQUENCE_COMPLETE",
-  "acceptance_status": "USER_TEST_AND_DEFERRED_NATIVE_E4_E5_REMAIN",
+  "implementation_status": "AR-071_OPTIONAL_IMPLEMENTATION_ACTIVE",
+  "acceptance_status": "AR-071_NOT_RUN__PRIOR_AR090_STALE",
   "completed_evidence_level": "Final audit PASS; E3 clean Windows runner profile only where AR-082 states it",
   "required_evidence_level": "Deferred native/live provider acceptance remains per owning AR; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
@@ -679,7 +681,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_validation_result": "AR090 7/7; retained AR082 5/5, AR081 6/6, AR080 4/4, AR042 6/6, AR041 6/6, AR062 6/6, AR060 6/6; full H2 1370/1370; 75/75 Agent suites PASS. AR090 run 36275926048 SUCCESS; Avalonia CI 36275926014 SUCCESS; all 26/26 exact-SHA workflows SUCCESS.",
   "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at 9ce4fd88; AR090 validation reports clean_end=true. No reset/force-push/main merge.",
   "checkpoint_evidence_at_utc": "2026-09-26T22:36:45Z",
-  "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
+  "handoff_label": "AR-071_ACTIVE__PRIOR_AR090_STALE",
   "project_complete_claim": false,
   "multi_pc_claim": false,
   "user_decision": "User requires complete portable before personal testing. AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER; deferred native/live E3/E4 acceptance remains open per owning task.",
@@ -707,7 +709,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "Any observed regression reopens the owning AR task before adding new scope.",
     "Native/model/provider acceptance remains deferred where the tracker says so.",
     "AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER until explicitly started.",
-    "Optional AR-071/072 remain NOT_SELECTED."
+    "AR-071 is now selected/active; AR-072 remains NOT_SELECTED."
   ],
   "safety_claims": {
     "physical_clean_machine_claim": false,
@@ -720,8 +722,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "User testing is the next normal action. If a regression appears, reopen the owning AR. AR-083 remains deferred until the user explicitly starts two-PC/NAS acceptance; optional AR-071/072 remain unselected.",
-  "next_task_if_active_done": "No mandatory implementation task remains implied by AR-090. Do not start AR-083 or optional AR-071/072 without explicit user direction."
+  "next_exact_action": "Complete exactly AR-071: task-local adapter trial staging/probe/cache/readback, run dedicated/full CI, publish portable and evidence. Do not start AR-072 or AR-083.",
+  "next_task_if_active_done": "After AR-071 is complete, rerun AR-090 in a later turn before issuing a new final handoff. AR-072 remains unselected; AR-083 remains deferred."
 }
 ```
 

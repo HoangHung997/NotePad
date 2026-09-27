@@ -1,8 +1,10 @@
 # H2 Agent Reliability — Final Handoff
 
-Status: **IMPLEMENTATION_READY_FOR_USER_TEST**
+Status: **STALE_AFTER_OPTIONAL_TASK_ACTIVATION** — AR-071 is active.
 
-This is the current reliability handoff. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
+> The user explicitly selected optional AR-071 after the AR-090 audit. This report remains exact provenance for the validated AR-090 SHA below, but it is no longer the current code handoff. Re-run AR-090 after AR-071 before issuing a new final handoff.
+
+At its validated SHA this report carried **IMPLEMENTATION_READY_FOR_USER_TEST**. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
 
 - AR-090 validated code SHA: `9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b`
 - AR-090 final portable artifact: `10917512842`
@@ -33,7 +35,8 @@ The canonical per-task wording remains the table in `docs/H2_AGENT_RELIABILITY_I
 | AR-033/041/042 | Implemented | Native/restart/concurrency E3 debt remains as labelled |
 | AR-051/052 | Implemented | Real-model/provider E4 debt remains |
 | AR-060–070 | Implemented/core/integration gates complete | Live provider/native E3/E4 debt remains |
-| AR-071/072 | Optional; NOT_SELECTED | Not part of required handoff |
+| AR-071 | Optional; selected after this audit and now ACTIVE | Re-run final audit after AR-071 |
+| AR-072 | Optional; NOT_SELECTED | Not part of current scope |
 | AR-080/081 | Implemented | Native/live-model/accessibility E4 debt remains |
 | AR-082 | Implemented | E3 PASS only for clean GitHub-hosted Windows runner profile; physical/native E4 deferred |
 | AR-083 | Harness/work can wait | **DEFERRED_BY_USER; E5 NOT PASSED** |
