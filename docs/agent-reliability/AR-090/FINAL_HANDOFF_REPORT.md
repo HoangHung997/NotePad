@@ -1,17 +1,17 @@
 # H2 Agent Reliability — Final Handoff
 
-Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 post-AR-072 reissue is the current final audit task.
+Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 post-AR-072 reissue is complete.
 
 This handoff does not replace the AR specification/tracker. It does **not** mean “project complete”, E5 passed, or that deferred native/model/provider acceptance has passed.
 
-- AR-090 validated code SHA: `PENDING_THIS_GATE`
-- AR-090 final audit run/job: `PENDING_THIS_GATE`
-- AR-090 final evidence artifact: `PENDING_THIS_GATE`
-- AR-090 final portable artifact: `PENDING_THIS_GATE`
-- AR-090 final portable SHA256: `PENDING_THIS_GATE`
-- AR-090 final portable ZIP entries: `PENDING_THIS_GATE`
-- Final manifest inventory: `PENDING_THIS_GATE`
-- Final manifest content SHA256: `PENDING_THIS_GATE`
+- AR-090 validated code SHA: `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`
+- AR-090 final audit run/job: `36298779132` / `108562434592`
+- AR-090 final evidence artifact: `10924793729` · SHA256 `91396518fd0845c1c2dabb24ce6011eb005bc4ca0844935ae4c37d50f7c56eff`
+- AR-090 final portable artifact: `10924104516`
+- AR-090 final portable SHA256: `957b25f9c700b3b8bc2efec22036058f8e50525ff176b9f22b951f11aa0c2086`
+- AR-090 final portable ZIP entries: `2,970`
+- Final manifest inventory: `2,969 files / 415,263,768 bytes`
+- Final manifest content SHA256: `cf63cb2e4f7f9be4ec625119b03627e4cb3070e7b03a4391d4d9f494d64ceef8`
 - Post-AR-072 validated code SHA: `5582e376c43ce7b4329ecf0e87a2261d0fb948c6`
 - Post-AR-072 portable artifact: `10924502338`
 - Post-AR-072 portable SHA256: `8aa2475e5ee85b859857d446471fed1df11d64efeab4ef93d2adcb206c75a091`
@@ -42,7 +42,7 @@ This report says **IMPLEMENTATION_READY_FOR_USER_TEST**, not “project complete
 | AR-080/081 | Implemented | Native/live-model/accessibility E4 debt remains |
 | AR-082 | Implemented | E3 PASS for clean GitHub-hosted Windows runner profile only; physical/native E4 deferred |
 | AR-083 | Deferred | **DEFERRED_BY_USER; E5 NOT PASSED** |
-| AR-090 | Final audit reissue active | Handoff label remains **IMPLEMENTATION_READY_FOR_USER_TEST** |
+| AR-090 | Final audit reissue complete | **IMPLEMENTATION_READY_FOR_USER_TEST**; not PROJECT_COMPLETE/E5 |
 
 ## 3. Capability matrix
 
@@ -96,7 +96,7 @@ No secret, API key, personal document, project workspace, Agent journal/task rec
 Current production composition remains:
 `H2 Notes UI -> H2ProductionAgentAdapter -> AgentRuntime -> ToolRegistry/provider adapters -> evidence/completion`.
 
-AR-072 did not change the engine. Frozen `AgentRunner.cs` remains a comparison/baseline harness only and misses seven mandatory H2 mappings. No parity-safe runtime deletion was identified that would preserve every active compatibility/evidence surface.
+AR-072 did not change the engine. Frozen `AgentRunner.cs` remains a comparison/baseline harness only and misses seven mandatory H2 mappings. Decision: **KEEP_CURRENT**. A real external alternative engine remains **NotTested**. No parity-safe runtime deletion was identified that would preserve every active compatibility/evidence surface.
 
 The historical MB-120 baseline remains retained and explicitly separated from current reliability status.
 
@@ -133,7 +133,7 @@ This reissue must retain AR-072, AR-071, AR-082, AR-081, AR-080, AR-042, AR-041,
 - Per-task evidence: `docs/agent-reliability/AR-*/`
 - Historical MB architecture report remains retained and labelled historical.
 - AR-072 evidence artifact: `10924761397`; portable: `10924502338`; validated source: `5582e376c43ce7b4329ecf0e87a2261d0fb948c6`.
-- GitHub Actions artifacts are time-limited; final AR-090 IDs/digests will replace the PENDING fields after this gate.
+- Final post-AR-072 AR-090 evidence: artifact `10924793729`; portable: artifact `10924104516`; source `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`.
 
 ## 9. Handoff result
 
