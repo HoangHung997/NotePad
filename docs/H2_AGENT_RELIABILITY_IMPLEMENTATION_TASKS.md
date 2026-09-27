@@ -106,7 +106,7 @@ AR-000 thêm liên kết từ Master tới hai file AR sau khi đọc bản mớ
 | AR-069 | Critical production integration acceptance | 065/066/067/068 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_INTEGRATION_GATE / E2_INTEGRATION_PASS / E4_DEFERRED_BY_USER — final full-build real-environment test; NO_E4_PASS_CLAIM |
 | AR-070 | Recovery policy xuyên provider | 041/060/061 | E3/E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED_CORE / E2_PASS / E3-E4_DEFERRED_BY_USER — AR-041/060/061 dependency debt retained; no E3/E4 PASS claim |
 | AR-071 | Vùng thử adapter tương thích | 070/064 | E3; optional | USER_SELECTED / IMPLEMENTED / E1-E2_PASS / E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no auto-promotion / no second catalog |
-| AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | NOT_SELECTED |
+| AR-072 | So sánh backend/engine thay thế | 012/064/080 subset | optional | USER_SELECTED / ACTIVE — deterministic H2 AgentRuntime vs frozen AgentRunner baseline; external engine NotTested; no production switch |
 | AR-080 | Corpus dài/recall/restart production | 024/033/042/052/070 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native/live-model/long-hours PASS claim |
 | AR-081 | UI đúng trạng thái, hiệu năng, truy cập | 080 | E4 | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final full build ready; no native DPI/IME/screen-reader E4 PASS claim |
 | AR-082 | Portable/preflight trên môi trường sạch | 081 | E3/E4 clean profile/machine | USER_ACCEPTED_SEQUENCE / IMPLEMENTED / E1-E2_PASS / E3_PASS_CLEAN_WINDOWS_RUNNER_PROFILE_ONLY / E4_DEFERRED_BY_USER_AWAITING_ENVIRONMENT — final portable ready; no physical-clean-machine/native-provider/E4 claim |
@@ -552,6 +552,8 @@ The existing AR-090 audit workflow also reran on this exact code SHA and **SUCCE
 
 ### [ ] AR-072 — Thử backend/engine thay thế [CÓ ĐIỀU KIỆN]
 
+**AR-072 activation — 2026-09-27:** selected by the user's standing instruction that decisions required to continue may be treated as approved. Measurable question: whether an alternate engine can replace current H2 AgentRuntime while preserving mandatory TaskId/TurnId/GoalRevision/Job/Approval/Event/restart semantics. This turn uses frozen same-repository `AgentRunner` only as an E2 compatibility baseline; no external package/endpoint is installed or contacted. The prior AR-090 final handoff becomes provenance/stale until AR-072 is validated and AR-090 is reissued. AR-083 remains DEFERRED_BY_USER.
+
 **Kích hoạt:** có câu hỏi đo được, ví dụ cải thiện window discovery; không cần đợi toàn bộ AR-080 nếu đã có corpus nhỏ liên quan.
 
 **Làm:** so cùng dataset/task/permission bằng backend hiện tại và ứng viên; record adapter cost, dependencies/license, p50/p95/latency/error/completion; không claim nhãn “fork Codex” bằng chất lượng. Engine substitution phải giữ mapping task/revision/jobs/approvals/events.
@@ -680,11 +682,11 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-090_FINAL_HANDOFF_REVALIDATED",
-  "active_task": null,
-  "parked_task": "AR-083",
-  "implementation_status": "AR-090_FINAL_AUDIT_COMPLETE",
-  "acceptance_status": "IMPLEMENTATION_READY_FOR_USER_TEST__AR071_E3_DEFERRED__AR083_E5_DEFERRED",
+  "phase": "AR-072_ALTERNATIVE_ENGINE_COMPARISON_ACTIVE",
+  "active_task": "AR-072",
+  "parked_task": "AR-090",
+  "implementation_status": "AR-072_ACTIVE",
+  "acceptance_status": "AR-072_NOT_RUN__AR083_E5_DEFERRED",
   "completed_evidence_level": "E2 plus clean-runner portable E3 where AR-082 explicitly claims it; no promotion of deferred native/live acceptance",
   "required_evidence_level": "AR-071 real third-party app/version E3 remains deferred; native/live provider E3/E4 debts remain as tracked; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
@@ -750,8 +752,8 @@ Do not claim these defects were already covered by historical Office/transport/U
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "User may test the final AR-090 portable on the intended Windows machine. If a regression appears, reopen the owning AR task before new scope. Do not start AR-072 or AR-083 unless the user explicitly selects/starts them.",
-  "next_task_if_active_done": "No additional selected implementation task. AR-072 remains NOT_SELECTED; AR-083 remains DEFERRED_BY_USER."
+  "next_exact_action": "Complete exactly AR-072 deterministic same-corpus comparison, validate focused/retained/full CI and produce evidence/portable. Do not start AR-083.",
+  "next_task_if_active_done": "Reissue AR-090 final handoff in the next turn after AR-072 is complete. AR-083 remains DEFERRED_BY_USER."
 }
 ```
 

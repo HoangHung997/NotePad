@@ -17,6 +17,8 @@ using H2Notes.Avalonia.Controls;
 using H2Notes.Core;
 using NeraSpreadSheet.Scrolling;
 
+if (args.Length == 3 && args[0] == "--ar072-benchmark" && int.TryParse(args[2], out var ar072Iterations))
+    return H2AlternativeEngineComparisonTests.Benchmark(args[1], ar072Iterations);
 if (args.Length == 4 && args[0] == "--ar040-job-probe")
     return H2AgentLongJobTests.Probe(args[1], args[2], args[3]);
 if (args.Length == 4 && args[0] == "--ar040-process-probe")
@@ -711,6 +713,7 @@ H2AgentArchiveJournalTests.Run(Test);
 H2AgentRestartReconcileTests.Run(Test);
 H2AgentResumeRebaseTests.Run(Test);
 H2AgentSteeringConcurrencyTests.Run(Test);
+H2AlternativeEngineComparisonTests.Run(Test);
 H2WebBackendTests.Run(Test);
 H2ArtifactPublicationTests.Run(Test);
 H2AgentHistoryRetrievalTests.Run(Test);
