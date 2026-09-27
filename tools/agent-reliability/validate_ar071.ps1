@@ -26,7 +26,9 @@ if(!$fv){
 }
 
 $failed=@();$retained=@()
-foreach($case in @('AR-064','AR-070','AR-082','AR-042','AR-041')){
+# AR-070 is an independent Agent suite (--ar070-recovery-policy-test), not an H2Notes.Tests name filter.
+# It is validated by run_agent_suites.ps1 below.
+foreach($case in @('AR-064','AR-082','AR-042','AR-041')){
  dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $case 2>&1|Tee-Object "artifacts/ar071/$case.log"
  $x=$LASTEXITCODE;$t=Get-Content "artifacts/ar071/$case.log" -Raw;$m=[regex]::Matches($t,'RESULT: (\d+) passed, (\d+) failed');$p=[regex]::Matches($t,'(?m)^PASS ').Count
  $v=$x -eq 0 -and $m.Count -eq 1 -and $m[0].Groups[2].Value -eq '0' -and [int]$m[0].Groups[1].Value -eq $p -and $p -gt 0
@@ -42,7 +44,7 @@ $ax=$LASTEXITCODE;if($ax){$failed+='AGENT-SUITES'}
 
 @{
  task='AR-071';code_sha=$sha;focused_result=($fm.Value -join ';');focused_pass_lines=$fp
- retained=$retained;full_result=($m.Value -join ';');full_pass_lines=$p;agent_suites_exit=$ax
+ retained=$retained;full_result=($m.Value -join ';');full_pass_lines=$p;agent_suites_exit=$ax;ar070_via_required_agent_suites=($ax -eq 0)
  E1='PASS';E2=if($full -and $ax -eq 0 -and $failed.Count -eq 0){'PASS'}else{'FAIL'}
  E3='DEFERRED_BY_USER_AWAITING_ENVIRONMENT';E4='NOT_RUN';E5='DEFERRED_BY_USER'
  auto_promotion=$false;second_catalog=$false;clean_end=(!(git status --porcelain))
