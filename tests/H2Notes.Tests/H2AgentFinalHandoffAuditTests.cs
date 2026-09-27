@@ -26,12 +26,19 @@ internal static class H2AgentFinalHandoffAuditTests
                     var notSelected = status.Contains("NOT_SELECTED",StringComparison.Ordinal);
                     Check(selected || notSelected,id+" optional status is neither selected/implemented nor NOT_SELECTED.");
                     if(id==activeTask) Check(selected,id+" is active but tracker status is not selected/implemented.");
-                    if(id=="AR-071" && selected && activeTask!="AR-071")
+                    if(selected && activeTask!=id)
                     {
-                        Check(report.Contains("AR-071",StringComparison.Ordinal)
-                            && report.Contains("IMPLEMENTED",StringComparison.OrdinalIgnoreCase)
-                            && !report.Contains("AR-071/072 remain **NOT_SELECTED**",StringComparison.OrdinalIgnoreCase),
-                            "Completed selected AR-071 is not reflected in the final handoff.");
+                        Check(report.Contains(id,StringComparison.Ordinal)
+                            && report.Contains("IMPLEMENTED",StringComparison.OrdinalIgnoreCase),
+                            "Completed selected "+id+" is not reflected in the final handoff.");
+                        if(id=="AR-072")
+                        {
+                            Check(report.Contains("KEEP_CURRENT",StringComparison.Ordinal)
+                                && report.Contains("NotTested",StringComparison.OrdinalIgnoreCase)
+                                && report.Contains("5582e376c43ce7b4329ecf0e87a2261d0fb948c6",StringComparison.Ordinal)
+                                && report.Contains("10924502338",StringComparison.Ordinal),
+                                "Completed AR-072 decision/evidence is missing from the final handoff.");
+                        }
                     }
                     continue;
                 }
@@ -50,7 +57,7 @@ internal static class H2AgentFinalHandoffAuditTests
                 Check(!report.Contains("STALE_AFTER_OPTIONAL_TASK_ACTIVATION",StringComparison.Ordinal),
                     "Final handoff is still marked stale after the optional task finished and AR-090 resumed.");
             foreach(var required in new[]{"IMPLEMENTATION_READY_FOR_USER_TEST","AR-083","DEFERRED_BY_USER","E5 NOT PASSED",
-                "not “project complete”","native Office","live AutoCAD","NOT_SELECTED"})
+                "not “project complete”","native Office","live AutoCAD","KEEP_CURRENT","NotTested"})
                 Check(report.Contains(required,StringComparison.OrdinalIgnoreCase),"Final handoff missing limitation/status: "+required);
             foreach(var forbidden in new[]{"PROJECT_COMPLETE","E5 PASS","AR-083 PASS"})
                 Check(!Regex.IsMatch(report,@"(?im)^\s*(?:status:\s*)?\*{0,2}"+Regex.Escape(forbidden)+@"\*{0,2}\s*$"),
@@ -101,6 +108,9 @@ internal static class H2AgentFinalHandoffAuditTests
             Check(report.Contains("10917395115",StringComparison.Ordinal)
                 && report.Contains("2f3a0c995307ee4615ceb647ff66322a795fc90f",StringComparison.Ordinal),
                 "Pre-AR090 portable lineage is missing.");
+            Check(report.Contains("10924502338",StringComparison.Ordinal)
+                && report.Contains("5582e376c43ce7b4329ecf0e87a2261d0fb948c6",StringComparison.Ordinal),
+                "Post-AR072 portable lineage is missing.");
         });
     }
 
