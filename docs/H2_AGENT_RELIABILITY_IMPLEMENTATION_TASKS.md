@@ -680,13 +680,13 @@ Do not claim these defects were already covered by historical Office/transport/U
   "schema_version": 1,
   "spec_version": "H2-AR-SPEC-1.0",
   "repository": "HoangHung997/NotePad",
-  "phase": "AR-071_IMPLEMENTED_E1_E2_PASS_E3_DEFERRED__AR090_REVALIDATION_NEXT",
-  "active_task": "AR-071",
+  "phase": "AR-090_FINAL_HANDOFF_REVALIDATION_ACTIVE",
+  "active_task": "AR-090",
   "parked_task": "AR-083",
-  "implementation_status": "AR-071_IMPLEMENTED_SEQUENCE_COMPLETE",
-  "acceptance_status": "E3_DEFERRED_BY_USER_AWAITING_ENVIRONMENT__AR090_REPORT_STILL_STALE_BY_ONE_TASK_RULE",
+  "implementation_status": "AR-090_REVALIDATION_ACTIVE",
+  "acceptance_status": "AR-090_REVALIDATION_IN_PROGRESS__AR071_E3_DEFERRED__AR083_E5_DEFERRED",
   "completed_evidence_level": "E2",
-  "required_evidence_level": "AR-071 real third-party app/version E3 deferred; AR-090 final handoff must be reissued next turn; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
+  "required_evidence_level": "AR-090 final handoff must be revalidated after selected AR-071; AR-071 real third-party app/version E3 remains deferred; AR-083 physical two-PC/NAS E5 remains DEFERRED_BY_USER",
   "implementation_branch": "feature/h2-agent-reliability-ar-000",
   "active_pr": 3,
   "validated_code_sha": "d414490715b5c88bc8e67dcfdc072672c1a474e0",
@@ -697,7 +697,7 @@ Do not claim these defects were already covered by historical Office/transport/U
   "last_validation_result": "AR071 6/6; retained AR064 77/77, AR082 5/5, AR042 6/6, AR041 6/6; full H2 1376/1376; 75/75 required Agent suites PASS. Dedicated AR071 run 36287350092 SUCCESS; Avalonia CI 36287350090 SUCCESS; all 27/27 exact-SHA workflows SUCCESS. Same-SHA AR090 audit run 36287350013 SUCCESS, but final report remains stale until next turn by one-task rule.",
   "working_tree": "User-PC working tree NOT_ACCESSIBLE. GitHub validation used isolated clean checkout at d4144907; AR071 validation artifact reports clean_end=true. No reset/force-push/main merge.",
   "checkpoint_evidence_at_utc": "2026-09-27T02:21:07Z",
-  "handoff_label": "AR-071_IMPLEMENTED_E2_GREEN__AR090_FINAL_REPORT_STALE_UNTIL_NEXT_TURN",
+  "handoff_label": "AR-090_REVALIDATION_ACTIVE__NO_PROJECT_COMPLETE_CLAIM",
   "project_complete_claim": false,
   "user_decision": "Standing instruction authorized required decisions to proceed, so optional AR-071 was selected. User requires complete portable before personal testing. AR-071 real external/native E3 remains DEFERRED_BY_USER; AR-072 remains NOT_SELECTED; AR-083 E5 remains DEFERRED_BY_USER.",
   "completed_this_session": [
@@ -743,7 +743,7 @@ Do not claim these defects were already covered by historical Office/transport/U
     "external_side_effects": "none"
   },
   "pending_user_decisions": [],
-  "next_exact_action": "Next turn execute exactly AR-090 final handoff revalidation/update against the completed AR-071 checkpoint and current portable. Do not start AR-072 or AR-083 in this AR-071 turn.",
+  "next_exact_action": "Complete exactly AR-090 final handoff revalidation: include selected AR-071 in retained audit, resolve any same-SHA CI anomaly, verify current portable, then reissue final report. Do not start AR-072 or AR-083.",
   "next_task_if_active_done": "AR-090 only in the next turn. AR-072 remains NOT_SELECTED; AR-083 remains DEFERRED_BY_USER."
 }
 ```

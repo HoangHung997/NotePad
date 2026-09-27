@@ -28,7 +28,7 @@ $mb=$LASTEXITCODE
 if($mb){throw 'Historical MB-120 compatibility report guard failed'}
 
 $failed=@();$retained=@()
-foreach($case in @('AR-082','AR-081','AR-080','AR-042','AR-041','AR-062','AR-060')){
+foreach($case in @('AR-071','AR-082','AR-081','AR-080','AR-042','AR-041','AR-062','AR-060')){
  dotnet run --project tests/H2Notes.Tests/H2Notes.Tests.csproj -c Release --no-build -- --filter $case 2>&1|Tee-Object "artifacts/ar090/$case.log"
  $x=$LASTEXITCODE;$t=Get-Content "artifacts/ar090/$case.log" -Raw;$m=[regex]::Matches($t,'RESULT: (\d+) passed, (\d+) failed');$p=[regex]::Matches($t,'(?m)^PASS ').Count
  $v=$x -eq 0 -and $m.Count -eq 1 -and $m[0].Groups[2].Value -eq '0' -and [int]$m[0].Groups[1].Value -eq $p -and $p -gt 0
@@ -48,7 +48,7 @@ $ax=$LASTEXITCODE;if($ax){$failed+='AGENT-SUITES'}
  agent_suites_exit=$ax;audit=if($focused -and $mb -eq 0 -and $full -and $ax -eq 0 -and $failed.Count -eq 0){'PASS'}else{'FAIL'}
  handoff_label='IMPLEMENTATION_READY_FOR_USER_TEST'
  E5='DEFERRED_BY_USER';project_complete_claim=$false;multi_pc_claim=$false
- native_e4_pass_claim=$false;optional_ar071_ar072_selected=$false
+ native_e4_pass_claim=$false;ar071_selected=$true;ar071_e3='DEFERRED_BY_USER_AWAITING_ENVIRONMENT';ar072_selected=$false
  clean_end=(!(git status --porcelain));external_side_effects='none';personal_documents='not accessed';credentials='not accessed'
 }|ConvertTo-Json -Depth 10|Set-Content artifacts/ar090/validation.json
 
