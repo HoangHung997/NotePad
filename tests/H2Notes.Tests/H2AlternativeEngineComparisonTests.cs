@@ -247,7 +247,7 @@ internal static class H2AlternativeEngineComparisonTests
         var sb=new StringBuilder();
         sb.AppendLine("# AR-072 deterministic alternative-engine comparison");
         sb.AppendLine();
-        sb.AppendLine($"Corpus: \`{r.CorpusId}\` · iterations/engine: **{r.Iterations}** · permission: **{r.Permission}**.");
+        sb.AppendLine($"Corpus: `{r.CorpusId}` · iterations/engine: **{r.Iterations}** · permission: **{r.Permission}**.");
         sb.AppendLine();
         sb.AppendLine("> "+r.MeasurementScope);
         sb.AppendLine();
