@@ -1,0 +1,82 @@
+{
+  "task": "AR-071",
+  "source_sha": "d414490715b5c88bc8e67dcfdc072672c1a474e0",
+  "status": {
+    "implementation": "IMPLEMENTED",
+    "E1": "PASS",
+    "E2": "PASS",
+    "E3": "DEFERRED_BY_USER_AWAITING_ENVIRONMENT",
+    "E4": "NOT_REQUIRED",
+    "E5": "DEFERRED_BY_USER",
+    "auto_promotion": false,
+    "second_catalog": false
+  },
+  "tests": {
+    "focused": "6/6",
+    "retained": {
+      "AR-064": "77/77",
+      "AR-082": "5/5",
+      "AR-042": "6/6",
+      "AR-041": "6/6"
+    },
+    "ar070_via_required_agent_suites": true,
+    "full_h2": "1376/1376",
+    "required_agent_suites": "75/75",
+    "exact_sha_workflows": "27/27 SUCCESS"
+  },
+  "runs": {
+    "ar071": {
+      "run_id": 36287350092,
+      "job_id": 108530505517,
+      "result": "SUCCESS"
+    },
+    "avalonia_ci": {
+      "run_id": 36287350090,
+      "job_id": 108530568063,
+      "result": "SUCCESS"
+    },
+    "ar090_same_sha_audit": {
+      "run_id": 36287350013,
+      "job_id": 108530505587,
+      "result": "SUCCESS"
+    }
+  },
+  "artifacts": {
+    "evidence": {
+      "id": 10921670809,
+      "bytes": 430337,
+      "sha256": "30bcb3c5ad7dd5d6aa86bada4d28d5fbbf019376947724401df9da19222e50fd",
+      "expires_at_utc": "2026-10-11T02:13:40Z",
+      "zip_entries": 646,
+      "zip_integrity": "PASS"
+    },
+    "portable": {
+      "id": 10921366935,
+      "bytes": 175503382,
+      "sha256": "c229823a34a7af2e57a8ce8759c5748da0ae3a3937ee06cd64608f7ab723149b",
+      "expires_at_utc": "2026-12-26T02:02:47Z",
+      "zip_entries": 2970,
+      "zip_integrity": "PASS",
+      "manifest_files": 2969,
+      "manifest_total_bytes": 415263768,
+      "manifest_content_sha256": "41c02f0cd3a41e5f27fe7cf176afbb90ed0484fdd79efd2834012cbc73a9365e",
+      "manifest_file_hashes_verified": true
+    },
+    "ar090_rerun_evidence": {
+      "id": 10921111894,
+      "bytes": 431289,
+      "sha256": "7fc85c897e6514037126c58f5d3779ba027b01d51f4745af1a0b5e11f55a1a91",
+      "zip_entries": 651,
+      "zip_integrity": "PASS"
+    }
+  },
+  "safety": {
+    "installed_executable_modified": false,
+    "external_service_modified": false,
+    "auto_promotion": false,
+    "second_catalog": false,
+    "personal_documents_accessed": false,
+    "credentials_accessed": false,
+    "external_side_effects": "none"
+  }
+}
