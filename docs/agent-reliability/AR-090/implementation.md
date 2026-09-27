@@ -1,6 +1,6 @@
 # AR-090 — Final reliability audit and handoff (post-AR-072 reissue)
 
-Validated code: `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`.
+Validated code: `90a13ee1ea142ff3100e0c765df4c7009825fb70`.
 
 AR-090 is a parity/audit/handoff task. It does not replace the AR specification, add a new runtime, convert deferred native/live acceptance into PASS, or start AR-083.
 
@@ -27,21 +27,21 @@ AR-083 remains **DEFERRED_BY_USER / E5 NOT PASSED**. Per-task native/live accept
 
 ## Final package
 
-Artifact: `10924104516`.
+Artifact: `10925339147`.
 
-- bytes: 175,504,139
-- SHA256: `957b25f9c700b3b8bc2efec22036058f8e50525ff176b9f22b951f11aa0c2086`
+- bytes: 175,503,499
+- SHA256: `16b13791bfba254fee26581a0a0d37d77a30bbc53f44060d9518083c638dc5d7`
 - ZIP entries: 2,970
-- manifest source SHA: `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`
+- manifest source SHA: `90a13ee1ea142ff3100e0c765df4c7009825fb70`
 - manifest files: 2,969
 - manifest total bytes: 415,263,768
-- manifest content digest: `cf63cb2e4f7f9be4ec625119b03627e4cb3070e7b03a4391d4d9f494d64ceef8`
+- manifest content digest: `fad4e9c50f440f27ab5721268fa3c1273979851fdaab405adf1f0406497e5a86`
 - every manifest file size/SHA256 independently checked: PASS
 - no listed manifest file missing or extra: PASS
 - H2Notes/DesktopHost/OfficeHost executables present: PASS
 - bundled Python runtime present: PASS
 
-Evidence artifact: `10924793729`, 432,426 bytes, SHA256 `91396518fd0845c1c2dabb24ce6011eb005bc4ca0844935ae4c37d50f7c56eff`, ZIP integrity PASS with 653 entries.
+Evidence artifact: `10925996800`, 432,503 bytes, SHA256 `745f79d377dd26b5c2f9b5b64797e2db9fde6017b86f23a9e702e9bf524a0907`, ZIP integrity PASS with 653 entries.
 
 ## Handoff boundary
 

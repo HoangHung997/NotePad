@@ -1,6 +1,6 @@
 {
   "task": "AR-090",
-  "source_sha": "ed9096e92898ddc29b50aaf7ce2f50b96586ff35",
+  "source_sha": "90a13ee1ea142ff3100e0c765df4c7009825fb70",
   "status": {
     "audit": "PASS",
     "handoff_label": "IMPLEMENTATION_READY_FOR_USER_TEST",
@@ -33,35 +33,33 @@
   },
   "runs": {
     "ar090": {
-      "run_id": 36298779132,
-      "job_id": 108562434592,
+      "run_id": 36301088132,
       "result": "SUCCESS"
     },
     "avalonia_ci": {
-      "run_id": 36298779111,
-      "job_id": 108562483261,
+      "run_id": 36301088148,
       "result": "SUCCESS"
     }
   },
   "artifacts": {
     "final_audit": {
-      "id": 10924793729,
-      "bytes": 432426,
-      "sha256": "91396518fd0845c1c2dabb24ce6011eb005bc4ca0844935ae4c37d50f7c56eff",
-      "expires_at_utc": "2026-10-27T06:08:56Z",
+      "id": 10925996800,
+      "bytes": 432503,
+      "sha256": "745f79d377dd26b5c2f9b5b64797e2db9fde6017b86f23a9e702e9bf524a0907",
+      "expires_at_utc": "2026-10-27T06:58:24Z",
       "zip_entries": 653,
       "zip_integrity": "PASS"
     },
     "portable": {
-      "id": 10924104516,
-      "bytes": 175504139,
-      "sha256": "957b25f9c700b3b8bc2efec22036058f8e50525ff176b9f22b951f11aa0c2086",
-      "expires_at_utc": "2026-12-26T05:59:38Z",
+      "id": 10925339147,
+      "bytes": 175503499,
+      "sha256": "16b13791bfba254fee26581a0a0d37d77a30bbc53f44060d9518083c638dc5d7",
+      "expires_at_utc": "2026-12-26T06:46:31Z",
       "zip_entries": 2970,
       "zip_integrity": "PASS",
       "manifest_files": 2969,
       "manifest_total_bytes": 415263768,
-      "manifest_content_sha256": "cf63cb2e4f7f9be4ec625119b03627e4cb3070e7b03a4391d4d9f494d64ceef8",
+      "manifest_content_sha256": "fad4e9c50f440f27ab5721268fa3c1273979851fdaab405adf1f0406497e5a86",
       "manifest_all_file_hashes_verified": true,
       "manifest_no_missing_or_extra_files": true,
       "required_executables": [

@@ -4,14 +4,14 @@ Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 post-AR-072 reissue is
 
 This handoff does not replace the AR specification/tracker. It does **not** mean “project complete”, E5 passed, or that deferred native/model/provider acceptance has passed.
 
-- AR-090 validated code SHA: `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`
-- AR-090 final audit run/job: `36298779132` / `108562434592`
-- AR-090 final evidence artifact: `10924793729` · SHA256 `91396518fd0845c1c2dabb24ce6011eb005bc4ca0844935ae4c37d50f7c56eff`
-- AR-090 final portable artifact: `10924104516`
-- AR-090 final portable SHA256: `957b25f9c700b3b8bc2efec22036058f8e50525ff176b9f22b951f11aa0c2086`
+- AR-090 validated code SHA: `90a13ee1ea142ff3100e0c765df4c7009825fb70`
+- AR-090 final audit run: `36301088132`
+- AR-090 final evidence artifact: `10925996800` · SHA256 `745f79d377dd26b5c2f9b5b64797e2db9fde6017b86f23a9e702e9bf524a0907`
+- AR-090 final portable artifact: `10925339147`
+- AR-090 final portable SHA256: `16b13791bfba254fee26581a0a0d37d77a30bbc53f44060d9518083c638dc5d7`
 - AR-090 final portable ZIP entries: `2,970`
 - Final manifest inventory: `2,969 files / 415,263,768 bytes`
-- Final manifest content SHA256: `cf63cb2e4f7f9be4ec625119b03627e4cb3070e7b03a4391d4d9f494d64ceef8`
+- Final manifest content SHA256: `fad4e9c50f440f27ab5721268fa3c1273979851fdaab405adf1f0406497e5a86`
 - Post-AR-072 validated code SHA: `5582e376c43ce7b4329ecf0e87a2261d0fb948c6`
 - Post-AR-072 portable artifact: `10924502338`
 - Post-AR-072 portable SHA256: `8aa2475e5ee85b859857d446471fed1df11d64efeab4ef93d2adcb206c75a091`
@@ -133,7 +133,7 @@ This reissue must retain AR-072, AR-071, AR-082, AR-081, AR-080, AR-042, AR-041,
 - Per-task evidence: `docs/agent-reliability/AR-*/`
 - Historical MB architecture report remains retained and labelled historical.
 - AR-072 evidence artifact: `10924761397`; portable: `10924502338`; validated source: `5582e376c43ce7b4329ecf0e87a2261d0fb948c6`.
-- Final post-AR-072 AR-090 evidence: artifact `10924793729`; portable: artifact `10924104516`; source `ed9096e92898ddc29b50aaf7ce2f50b96586ff35`.
+- Final post-AR-072 AR-090 evidence: artifact `10925996800`; portable: artifact `10925339147`; source `90a13ee1ea142ff3100e0c765df4c7009825fb70`.
 
 ## 9. Handoff result
 
