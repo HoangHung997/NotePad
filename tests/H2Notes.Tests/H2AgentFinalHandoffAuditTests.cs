@@ -21,11 +21,18 @@ internal static class H2AgentFinalHandoffAuditTests
                 var id=cells[0];var status=cells[^1];
                 if(id is "AR-071" or "AR-072")
                 {
-                    if(id==activeTask)
-                        Check(status.Contains("ACTIVE",StringComparison.Ordinal)||status.Contains("IMPLEMENTED",StringComparison.Ordinal),
-                            id+" is selected but tracker status is not active/implemented.");
-                    else
-                        Check(status.Contains("NOT_SELECTED",StringComparison.Ordinal),id+" optional status changed without selection.");
+                    var selected = status.Contains("ACTIVE",StringComparison.Ordinal)
+                        || status.Contains("IMPLEMENTED",StringComparison.Ordinal);
+                    var notSelected = status.Contains("NOT_SELECTED",StringComparison.Ordinal);
+                    Check(selected || notSelected,id+" optional status is neither selected/implemented nor NOT_SELECTED.");
+                    if(id==activeTask) Check(selected,id+" is active but tracker status is not selected/implemented.");
+                    if(id=="AR-071" && selected && activeTask!="AR-071")
+                    {
+                        Check(report.Contains("AR-071",StringComparison.Ordinal)
+                            && report.Contains("IMPLEMENTED",StringComparison.OrdinalIgnoreCase)
+                            && !report.Contains("AR-071/072 remain **NOT_SELECTED**",StringComparison.OrdinalIgnoreCase),
+                            "Completed selected AR-071 is not reflected in the final handoff.");
+                    }
                     continue;
                 }
                 if(id=="AR-083"){Check(status.Contains("DEFERRED_BY_USER",StringComparison.Ordinal),"AR-083 lost deferred status.");continue;}
@@ -39,6 +46,9 @@ internal static class H2AgentFinalHandoffAuditTests
                 Check(report.Contains("STALE_AFTER_OPTIONAL_TASK_ACTIVATION",StringComparison.Ordinal)
                     && report.Contains(activeTask,StringComparison.Ordinal),
                     "Prior final handoff was not marked stale after optional task activation.");
+            else
+                Check(!report.Contains("STALE_AFTER_OPTIONAL_TASK_ACTIVATION",StringComparison.Ordinal),
+                    "Final handoff is still marked stale after the optional task finished and AR-090 resumed.");
             foreach(var required in new[]{"IMPLEMENTATION_READY_FOR_USER_TEST","AR-083","DEFERRED_BY_USER","E5 NOT PASSED",
                 "not “project complete”","native Office","live AutoCAD","NOT_SELECTED"})
                 Check(report.Contains(required,StringComparison.OrdinalIgnoreCase),"Final handoff missing limitation/status: "+required);

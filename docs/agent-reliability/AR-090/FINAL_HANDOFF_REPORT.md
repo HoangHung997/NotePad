@@ -1,17 +1,17 @@
 # H2 Agent Reliability — Final Handoff
 
-Status: **STALE_AFTER_OPTIONAL_TASK_ACTIVATION** — AR-071 is active.
+Status: **IMPLEMENTATION_READY_FOR_USER_TEST** — AR-090 revalidation after selected AR-071.
 
 > The user explicitly selected optional AR-071 after the AR-090 audit. This report remains exact provenance for the validated AR-090 SHA below, but it is no longer the current code handoff. Re-run AR-090 after AR-071 before issuing a new final handoff.
 
-At its validated SHA this report carried **IMPLEMENTATION_READY_FOR_USER_TEST**. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
+This report carries **IMPLEMENTATION_READY_FOR_USER_TEST** only after the post-AR-071 AR-090 gate succeeds. It does not replace the AR specification/tracker and it does not claim that deferred native/model/two-PC acceptance has passed.
 
-- AR-090 validated code SHA: `9ce4fd8834ca0790bb95c091bf9f4f2019c7cf8b`
-- AR-090 final portable artifact: `10917512842`
-- Final portable SHA256: `7e0cd414d7d94aae6743344c21a31b702e3bf5efb8883deab36921c49754d00c`
-- Final portable ZIP entries: `2970`
-- Final manifest inventory: `2969 files / 415193548 bytes`
-- Final manifest content SHA256: `acadbc434f7c168c409db976a4ca3a1fc9c207d586c852b3a368156eec5d6348`
+- AR-090 validated code SHA: `PENDING_THIS_GATE`
+- AR-090 final portable artifact: `PENDING_THIS_GATE`
+- Final portable SHA256: `PENDING_THIS_GATE`
+- Final portable ZIP entries: `PENDING_THIS_GATE`
+- Final manifest inventory: `PENDING_THIS_GATE`
+- Final manifest content SHA256: `PENDING_THIS_GATE`
 - Pre-AR-090 validated code SHA: `2f3a0c995307ee4615ceb647ff66322a795fc90f`
 - Pre-AR-090 full-CI portable artifact: `10917395115`
 - Pre-AR-090 portable SHA256: `7cdbbaf684f49aeb57288cfe75e1553f3795eadf5cd07c7047cace7e246521b6`
@@ -35,7 +35,7 @@ The canonical per-task wording remains the table in `docs/H2_AGENT_RELIABILITY_I
 | AR-033/041/042 | Implemented | Native/restart/concurrency E3 debt remains as labelled |
 | AR-051/052 | Implemented | Real-model/provider E4 debt remains |
 | AR-060–070 | Implemented/core/integration gates complete | Live provider/native E3/E4 debt remains |
-| AR-071 | Optional; selected after this audit and now ACTIVE | Re-run final audit after AR-071 |
+| AR-071 | Optional; selected and IMPLEMENTED / E2 PASS | Real third-party application/version E3 remains DEFERRED_BY_USER / AWAITING_ENVIRONMENT |
 | AR-072 | Optional; NOT_SELECTED | Not part of current scope |
 | AR-080/081 | Implemented | Native/live-model/accessibility E4 debt remains |
 | AR-082 | Implemented | E3 PASS only for clean GitHub-hosted Windows runner profile; physical/native E4 deferred |
@@ -108,7 +108,7 @@ The 2026-09-19 `H2_AGENT_FINAL_ARCHITECTURE_REPORT.md` is a historical MB-120 ba
 - AR-051/052/060/061/062/063/064/065/066/067/068/069/070/080/081: live model/provider/native app E3/E4 combinations remain deferred where labelled.
 - AR-082 proves a fresh GitHub-hosted Windows runner profile only, not a separately supplied physical clean PC.
 - AR-083 physical two-PC/NAS acceptance remains **DEFERRED_BY_USER**.
-- Optional AR-071/072 remain **NOT_SELECTED**.
+- AR-071 was selected and implemented at E2; its real external/native E3 remains deferred. AR-072 remains **NOT_SELECTED**.
 - There is no claim of universal model quality, OCR accuracy, pixel-perfect Word/PDF layout, generic COM/GUI exactly-once execution, distributed resource locking, or all third-party provider compatibility.
 
 ## 7. Reproduce the current source gate
@@ -156,4 +156,4 @@ It does **not** mean:
 2. Any observed regression reopens the owning AR task before new scope is added.
 3. Native/model/provider acceptance may be executed when the user is ready.
 4. AR-083 two-PC/NAS remains deferred until the user explicitly starts it.
-5. Optional AR-071/072 remain unselected unless explicitly requested.
+5. AR-071 is already selected/implemented at E2 with native E3 deferred. AR-072 remains unselected unless explicitly requested.
